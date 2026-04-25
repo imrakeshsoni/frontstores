@@ -30,9 +30,13 @@ const SHOP_TYPES = [
 ];
 
 const STATES = [
-  'Andhra Pradesh','Assam','Bihar','Delhi','Goa','Gujarat','Haryana',
-  'Karnataka','Kerala','Madhya Pradesh','Maharashtra','Odisha',
-  'Punjab','Rajasthan','Tamil Nadu','Telangana','Uttar Pradesh','West Bengal',
+  'Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh',
+  'Goa','Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka',
+  'Kerala','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram',
+  'Nagaland','Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana',
+  'Tripura','Uttar Pradesh','Uttarakhand','West Bengal',
+  'Andaman and Nicobar Islands','Chandigarh','Delhi',
+  'Jammu and Kashmir','Ladakh','Lakshadweep','Puducherry',
 ];
 
 export function RegisterPage() {
@@ -62,7 +66,7 @@ export function RegisterPage() {
           <div>
             <span className="chip">Launch your store in minutes</span>
             <h1 className="mt-6 max-w-xl text-balance">
-              A storefront operating system designed with product-page polish.
+              A frontstore operating system designed with product-page polish.
             </h1>
             <p className="mt-5 max-w-lg text-base leading-7 text-slate-600">
               Set up your brand, onboard your team, and move from paperwork to a modern retail

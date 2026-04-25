@@ -13,6 +13,7 @@ COPY tsconfig.base.json ./
 COPY libs/common/ ./libs/common/
 RUN npm run build --workspace=libs/common
 COPY apps/tenant-service/ ./apps/tenant-service/
+COPY tools/seeds/ ./tools/seeds/
 RUN npm run build --workspace=apps/tenant-service
 
 FROM node:20-alpine AS runner
@@ -22,5 +23,6 @@ COPY --from=builder /app/apps/tenant-service/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/libs/common ./libs/common
 COPY --from=builder /app/apps/tenant-service/package.json .
+COPY --from=builder /app/tools/seeds ./tools/seeds
 EXPOSE 3002
 CMD ["node", "dist/main"]

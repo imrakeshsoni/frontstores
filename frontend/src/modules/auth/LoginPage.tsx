@@ -138,7 +138,7 @@ export function LoginPage() {
                 <Store className="h-6 w-6" />
               </div>
               <p className="section-label">Sign In</p>
-              <h2 className="mt-3 text-3xl">Welcome back to your storefront.</h2>
+              <h2 className="mt-3 text-3xl">Welcome back to your frontstore.</h2>
               <p className="mt-3 text-sm leading-6 text-slate-500">
                 Sign in to manage products, inventory, orders, and reports from one clean,
                 focused workspace.
