@@ -473,7 +473,8 @@ export function CustomersPage() {
 
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-          <div className="card-strong w-full max-w-2xl rounded-[2rem] p-6">
+          <div className="card-strong flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-[2rem]">
+          <div className="flex-1 overflow-y-auto p-6">
             <div className="mb-6 flex items-center justify-between">
               <div>
                 <p className="section-label">Customers</p>
@@ -574,30 +575,51 @@ export function CustomersPage() {
               </div>
 
               {predefinedProducts.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {predefinedProducts.map((p: any) => (
-                    <span
-                      key={p.id}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700"
-                    >
-                      {p.name}
-                      {p.supplier_name && (
-                        <span className="text-blue-400">· {p.supplier_name}</span>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setPredefinedProducts((prev) => prev.filter((x: any) => x.id !== p.id))}
-                        className="ml-0.5 rounded-full hover:text-blue-900"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
+                <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50">
+                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Product</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">SKU</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Unit</th>
+                        <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">MRP</th>
+                        <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">GST%</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Supplier</th>
+                        <th className="px-3 py-2" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {predefinedProducts.map((p: any) => (
+                        <tr key={p.id} className="hover:bg-slate-50">
+                          <td className="px-3 py-2.5 font-medium text-slate-900">{p.name}</td>
+                          <td className="px-3 py-2.5 text-slate-500">{p.sku || '—'}</td>
+                          <td className="px-3 py-2.5 text-slate-500">{p.unit || '—'}</td>
+                          <td className="px-3 py-2.5 text-right text-slate-700">
+                            {p.mrp ? `₹${Number(p.mrp).toFixed(2)}` : '—'}
+                          </td>
+                          <td className="px-3 py-2.5 text-right text-slate-500">
+                            {(p.gstRate ?? p.gst_rate) ? `${p.gstRate ?? p.gst_rate}%` : '—'}
+                          </td>
+                          <td className="px-3 py-2.5 text-slate-500">{p.supplierName ?? p.supplier_name ?? '—'}</td>
+                          <td className="px-3 py-2.5 text-right">
+                            <button
+                              type="button"
+                              onClick={() => setPredefinedProducts((prev) => prev.filter((x: any) => x.id !== p.id))}
+                              className="rounded-full p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-500"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
+          </div>
 
-            <div className="mt-6 flex justify-end gap-3">
+            <div className="border-t border-slate-200/70 px-6 py-4 flex justify-end gap-3">
               <button className="btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
               <button className="btn-primary" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
                 {saveMutation.isPending ? 'Saving…' : editing ? 'Update Customer' : 'Create Customer'}
