@@ -29,7 +29,7 @@ export class CreateProductDto {
   hsnCode?: string;
 
   @IsOptional()
-  @IsIn(['kg', 'gram', 'litre', 'ml', 'piece', 'strip', 'box', 'pack', 'dozen', 'unit'])
+  @IsIn(['kg', 'gram', 'litre', 'ml', 'piece', 'strip', 'box', 'pack', 'dozen', 'unit', 'bottle', 'tablet', 'capsule', 'sachet', 'vial', 'tube', 'jar'])
   unit?: string;
 
   @IsOptional()
@@ -95,4 +95,8 @@ export class ProductQueryDto {
   @IsOptional()
   @Transform(({ value }) => value !== 'false')
   isActive?: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  customerId?: string;
 }

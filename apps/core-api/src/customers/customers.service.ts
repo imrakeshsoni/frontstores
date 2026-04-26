@@ -182,6 +182,59 @@ export class CustomersService {
     };
   }
 
+  async getPredefinedProducts(tenantId: string, customerId: string): Promise<any[]> {
+    const customer = await this.repo.findOne({ where: { id: customerId, tenantId } });
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    return this.dataSource.query(
+      `SELECT
+         p.id,
+         p.name,
+         p.sku,
+         p.unit,
+         p.mrp,
+         p.selling_price,
+         p.gst_rate,
+         COALESCE(s.name, NULL) AS supplier_name
+       FROM customer_products cp
+       JOIN products p ON p.id = cp.product_id AND p.tenant_id = cp.tenant_id
+       LEFT JOIN LATERAL (
+         SELECT s2.name
+         FROM purchase_order_items poi
+         JOIN purchase_orders po ON po.id = poi.purchase_order_id AND po.tenant_id = poi.tenant_id
+         JOIN suppliers s2 ON s2.id = po.supplier_id AND s2.tenant_id = poi.tenant_id
+         WHERE poi.tenant_id = cp.tenant_id AND poi.product_id = p.id
+         ORDER BY po.created_at DESC
+         LIMIT 1
+       ) s ON true
+       WHERE cp.tenant_id = $1 AND cp.customer_id = $2
+       ORDER BY p.name`,
+      [tenantId, customerId],
+    );
+  }
+
+  async setPredefinedProducts(tenantId: string, customerId: string, productIds: string[]): Promise<void> {
+    const customer = await this.repo.findOne({ where: { id: customerId, tenantId } });
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    await this.dataSource.transaction(async (manager) => {
+      await manager.query(
+        `DELETE FROM customer_products WHERE tenant_id = $1 AND customer_id = $2`,
+        [tenantId, customerId],
+      );
+
+      if (productIds.length > 0) {
+        const values = productIds
+          .map((_, i) => `($1, $2, $${i + 3})`)
+          .join(', ');
+        await manager.query(
+          `INSERT INTO customer_products (tenant_id, customer_id, product_id) VALUES ${values} ON CONFLICT DO NOTHING`,
+          [tenantId, customerId, ...productIds],
+        );
+      }
+    });
+  }
+
   async sendCreditReminder(
     tenantId: string,
     id: string,

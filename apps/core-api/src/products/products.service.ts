@@ -63,23 +63,27 @@ export class ProductsService {
       );
     }
     if (query.lowStock) {
-      // Join inventory to filter low-stock items
       qb.innerJoin(
         'inventory',
         'inv',
         'inv.product_id = p.id AND inv.quantity <= inv.reorder_level AND inv.reorder_level > 0',
       );
     }
+    if (query.customerId) {
+      qb.innerJoin(
+        'customer_products',
+        'cp',
+        'cp.product_id = p.id AND cp.tenant_id = p.tenant_id AND cp.customer_id = :customerId',
+        { customerId: query.customerId },
+      );
+    }
 
     qb.orderBy('p.name', 'ASC').skip(skip).take(take);
 
     const [data, total] = await qb.getManyAndCount();
-    return paginatedResponse(
-      await this.attachInventoryContext(tenantId, shopId, data),
-      total,
-      page,
-      perPage,
-    );
+    const withInventory = await this.attachInventoryContext(tenantId, shopId, data);
+    const withSupplier = await this.attachSupplierContext(tenantId, withInventory);
+    return paginatedResponse(withSupplier, total, page, perPage);
   }
 
   async findOne(tenantId: string, id: string): Promise<Product> {
@@ -130,6 +134,29 @@ export class ProductsService {
   private async invalidateCache(tenantId: string): Promise<void> {
     // Pattern delete — clear all product cache keys for this tenant
     await this.cache.del(`products:${tenantId}`);
+  }
+
+  private async attachSupplierContext(
+    tenantId: string,
+    products: Array<Product & Record<string, unknown>>,
+  ): Promise<Array<Product & Record<string, unknown>>> {
+    if (products.length === 0) return products;
+
+    const rows = await this.dataSource.query(
+      `SELECT DISTINCT ON (poi.product_id)
+         poi.product_id,
+         s.name AS supplier_name
+       FROM purchase_order_items poi
+       JOIN purchase_orders po ON po.id = poi.purchase_order_id AND po.tenant_id = poi.tenant_id
+       JOIN suppliers s ON s.id = po.supplier_id AND s.tenant_id = poi.tenant_id
+       WHERE poi.tenant_id = $1
+         AND poi.product_id = ANY($2)
+       ORDER BY poi.product_id, po.created_at DESC`,
+      [tenantId, products.map((p) => p.id)],
+    );
+
+    const supplierByProductId = new Map(rows.map((r: any) => [r.product_id, r.supplier_name]));
+    return products.map((p) => ({ ...p, supplierName: supplierByProductId.get(p.id) ?? null }));
   }
 
   private async attachInventoryContext(

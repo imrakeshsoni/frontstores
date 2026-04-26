@@ -88,6 +88,26 @@ export class CustomersController {
     );
   }
 
+  @Get(':id/predefined-products')
+  @RequirePermission('customers', 'read')
+  async getPredefinedProducts(
+    @CurrentTenant() tenant: TenantContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return successResponse(await this.customersService.getPredefinedProducts(tenant.tenantId, id));
+  }
+
+  @Put(':id/predefined-products')
+  @RequirePermission('customers', 'write')
+  async setPredefinedProducts(
+    @CurrentTenant() tenant: TenantContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { productIds: string[] },
+  ) {
+    await this.customersService.setPredefinedProducts(tenant.tenantId, id, body.productIds ?? []);
+    return successResponse({ updated: true });
+  }
+
   @Put(':id')
   @RequirePermission('customers', 'write')
   async update(

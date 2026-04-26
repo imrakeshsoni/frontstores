@@ -26,10 +26,22 @@ type InvoiceSnapshot = {
     expiry?: string;
     quantityLabel: string;
     amount: number;
+    gstRate: number;
+    discountAmount: number;
   }>;
   subtotal: number;
   gstAmount: number;
+  totalDiscount: number;
   total: number;
+  // template fields captured at order-time so print/share don't depend on live query state
+  dlNumbers: string;
+  storeName: string;
+  storeAddress: string;
+  headerLeft: string;
+  headerRight: string;
+  whatsappNumber: string;
+  footerNote: string;
+  signatureLabel: string;
 };
 
 type CartPanelStore = {
@@ -72,6 +84,7 @@ export function POSPage() {
   const [invoiceSnapshot, setInvoiceSnapshot] = useState<InvoiceSnapshot | null>(null);
   const [isSendingInvoiceWhatsapp, setIsSendingInvoiceWhatsapp] = useState(false);
   const [heldCarts, setHeldCarts] = useState<HeldCart[]>(() => readHeldCarts());
+  const [predefinedCustomerId, setPredefinedCustomerId] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const invoiceSheetRef = useRef<HTMLDivElement>(null);
 
@@ -91,6 +104,7 @@ export function POSPage() {
   });
 
   const invoiceTemplate = settingsContext?.shop?.settings?.invoiceTemplate ?? {};
+  const shopAddress = settingsContext?.shop?.address ?? {};
 
   const { data: popularProducts, isFetching: isFetchingPopular } = useQuery({
     queryKey: ['pos-top-products', shopId],
@@ -102,11 +116,12 @@ export function POSPage() {
   });
 
   const { data: searchResults, isFetching } = useQuery({
-    queryKey: ['product-search', trimmedSearch],
-    queryFn: () =>
-      apiClient
-        .get(`/api/core/products?search=${encodeURIComponent(trimmedSearch)}&perPage=50`)
-        .then((r) => r.data.data),
+    queryKey: ['product-search', trimmedSearch, predefinedCustomerId],
+    queryFn: () => {
+      const params = new URLSearchParams({ search: trimmedSearch, perPage: '50' });
+      if (predefinedCustomerId) params.set('customerId', predefinedCustomerId);
+      return apiClient.get(`/api/core/products?${params}`).then((r) => r.data.data);
+    },
     enabled: trimmedSearch.length > 0,
   });
 
@@ -132,7 +147,7 @@ export function POSPage() {
 
       return response.data.data;
     },
-    onSuccess: (customer) => {
+    onSuccess: async (customer) => {
       if (!customer) {
         return;
       }
@@ -140,6 +155,14 @@ export function POSPage() {
       cart.setCustomer(customer.id, customer.name ?? customer.phone ?? 'Customer', customer.phone ?? null);
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       toast.success(`Attached ${customer.name ?? customer.phone}`);
+
+      try {
+        const res = await apiClient.get(`/api/core/customers/${customer.id}/predefined-products`);
+        const products: any[] = res.data.data ?? [];
+        setPredefinedCustomerId(products.length > 0 ? customer.id : null);
+      } catch {
+        setPredefinedCustomerId(null);
+      }
     },
     onError: (err: any) => {
       toast.error(err.response?.data?.message ?? 'Unable to attach customer');
@@ -187,6 +210,7 @@ export function POSPage() {
     persistHeldCarts(nextHeldCarts);
     cart.clearCart();
     setCustomerPhone('');
+    setPredefinedCustomerId(null);
     toast.success('Cart held successfully');
   };
 
@@ -253,13 +277,41 @@ export function POSPage() {
     const batchNo = selectedBatch?.batchNo ?? selectedBatch?.batch_no;
     const manufactureDate = selectedBatch?.manufactureDate ?? selectedBatch?.manufacture_date;
     const expiryDate = selectedBatch?.expiry ?? selectedBatch?.expiryDate ?? selectedBatch?.expiry_date;
+    const batchAvailableQuantity = Number(selectedBatch?.quantity ?? 0) || undefined;
+    const unitPrice = isMedicalStore
+      ? Number(product.mrp ?? product.sellingPrice ?? product.selling_price ?? 0)
+      : Number(product.sellingPrice ?? product.selling_price ?? product.mrp ?? 0);
+    const currentItem = cart.items.find(
+      (item) =>
+        item.productId === resolvedProductId &&
+        (item.batchNo ?? 'no-batch') === (batchNo ?? 'no-batch') &&
+        (item.expiryDate ?? 'no-exp') === (expiryDate ?? 'no-exp'),
+    );
+
+    const availableQuantity = Number(product.availableQuantity ?? product.available_quantity ?? 0) || undefined;
+    const targetItemToCheck = currentItem ?? {
+      quantity: 0,
+      looseQty: 0,
+      totalUnits: Number(product.attributes?.totalUnits ?? 0) || undefined,
+      availableQuantity,
+      batchAvailableQuantity,
+    };
+
+    if (!canApplyCartQuantityChange(targetItemToCheck, {
+      nextQuantity: (currentItem?.quantity ?? 0) + 1,
+      nextLooseQty: currentItem?.looseQty ?? 0,
+    })) {
+      toast.error('Not enough stock available');
+      return;
+    }
+
     cart.addItem({
       itemKey: [resolvedProductId, batchNo ?? 'no-batch', expiryDate ?? 'no-exp'].join(':'),
       productId: resolvedProductId,
       name: product.name ?? product.product_name,
       sku: product.sku,
       unit: product.unit ?? 'pc',
-      unitPrice: Number(product.sellingPrice ?? product.selling_price ?? product.mrp ?? 0),
+      unitPrice,
       looseUnitPrice: Number(product.attributes?.looseSellingPrice ?? 0) || undefined,
       gstRate: Number(product.gstRate ?? product.gst_rate ?? 0),
       discount: 0,
@@ -267,11 +319,13 @@ export function POSPage() {
       manufactureDate,
       expiryDate,
       availableBatches: getSortedBatches(product),
+      availableQuantity: Number(product.availableQuantity ?? product.available_quantity ?? 0) || undefined,
+      batchAvailableQuantity,
       totalUnits: Number(product.attributes?.totalUnits ?? 0) || undefined,
     });
     setSearch('');
     searchRef.current?.focus();
-  }, [cart]);
+  }, [cart, isMedicalStore]);
 
   const placeMutation = useMutation({
     mutationFn: async (paymentRef?: string) => {
@@ -330,7 +384,10 @@ export function POSPage() {
           item.unitPrice * item.quantity +
           (item.isLoose ? (item.looseUnitPrice ?? 0) * (item.looseQty ?? 0) : 0) -
           item.discount,
+        gstRate: item.gstRate ?? 0,
+        discountAmount: item.discount ?? 0,
       }));
+      const totalDiscount = cart.items.reduce((sum, item) => sum + (item.discount ?? 0), 0);
 
       setInvoiceSnapshot({
         billNumber: res.data.data.billNumber,
@@ -344,7 +401,16 @@ export function POSPage() {
         items: snapshotItems,
         subtotal: cart.subtotal(),
         gstAmount: cart.taxAmount(),
+        totalDiscount,
         total: cart.total(),
+        dlNumbers: invoiceTemplate.dlNumbers ?? '',
+        storeName: invoiceTemplate.storeDisplayName || activeShop?.name || '',
+        storeAddress: invoiceTemplate.addressLine || [shopAddress.line1, shopAddress.city].filter(Boolean).join(', ') || '',
+        headerLeft: invoiceTemplate.headerLeft || 'Chemist & Druggist',
+        headerRight: invoiceTemplate.headerRight || 'Cash/Credit Memo',
+        whatsappNumber: invoiceTemplate.whatsappNumber ?? '',
+        footerNote: invoiceTemplate.footerNote || 'Thanks for your purchase',
+        signatureLabel: invoiceTemplate.signatureLabel || 'Authorised Signature',
       });
       cart.clearCart();
       setCustomerPhone('');
@@ -352,6 +418,7 @@ export function POSPage() {
       setLoyaltyPointsRedeemed('0');
       setPatientName('');
       setDoctorName('');
+      setPredefinedCustomerId(null);
       setShowPayment(false);
       invalidateSalesData();
       queryClient.invalidateQueries({ queryKey: ['customers'] });
@@ -449,6 +516,149 @@ export function POSPage() {
     }
   };
 
+  const handlePrintInvoiceA5 = () => {
+    if (!invoiceSnapshot) return;
+
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    if (!printWindow) {
+      toast.error('Unable to open print window');
+      return;
+    }
+
+    const storeName = invoiceSnapshot.storeName || 'Medical Store';
+    const address = invoiceSnapshot.storeAddress || '';
+    const headerLeft = invoiceSnapshot.headerLeft;
+    const dlNumbers = invoiceSnapshot.dlNumbers;
+    const headerRight = invoiceSnapshot.headerRight;
+    const whatsapp = invoiceSnapshot.whatsappNumber;
+    const footerNote = invoiceSnapshot.footerNote;
+    const signatureLabel = invoiceSnapshot.signatureLabel;
+
+    const itemRows = invoiceSnapshot.items.map((item) => {
+      const mfgExp = [
+        item.manufactureDate ? `Mfg: ${item.manufactureDate}` : '',
+        item.expiry ? `Exp: ${item.expiry}` : '',
+      ].filter(Boolean).join(' / ') || '-';
+      return `
+        <tr>
+          <td class="td-name">${item.name}<br><span class="qty-label">${item.quantityLabel}</span></td>
+          <td class="td-center">${item.batchNo || '-'}</td>
+          <td class="td-center">${mfgExp}</td>
+          <td class="td-amount">${item.amount.toFixed(2)}</td>
+        </tr>`;
+    }).join('');
+
+    const dateStr = new Date(invoiceSnapshot.createdAt).toLocaleString('en-IN', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+
+    printWindow.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${invoiceSnapshot.billNumber}</title>
+  <style>
+    @page { size: A5 portrait; margin: 8mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #1e3a8a; background: white; }
+
+    .invoice { border: 2px solid #1e3a8a; width: 100%; }
+
+    /* header strip */
+    .hdr { display: flex; justify-content: space-between; align-items: flex-start;
+           padding: 8px 14px; border-bottom: 2px solid #1e3a8a; font-weight: 600; font-size: 11px; }
+    .hdr-right { text-align: right; }
+    .hdr-phone { font-size: 12px; margin-top: 3px; }
+
+    /* store name banner */
+    .banner { text-align: center; padding: 8px 14px; border-bottom: 2px solid #1e3a8a; }
+    .store-name { font-size: 20px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
+    .store-addr { font-size: 10px; font-weight: 600; margin-top: 2px; }
+
+    /* meta row */
+    .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px;
+            padding: 7px 14px; border-bottom: 2px solid #1e3a8a; font-size: 10px; }
+    .meta span { font-weight: 700; }
+
+    /* items table */
+    table { width: 100%; border-collapse: collapse; font-size: 10px; }
+    th { padding: 6px 8px; border-bottom: 2px solid #1e3a8a; font-weight: 700;
+         text-align: left; background: white; }
+    th.th-amount { text-align: right; }
+    td { padding: 5px 8px; border-bottom: 1px solid #bfdbfe; vertical-align: top; }
+    td.td-center { text-align: center; border-left: 1px solid #bfdbfe; }
+    td.td-amount { text-align: right; font-weight: 700; white-space: nowrap; border-left: 1px solid #bfdbfe; }
+    td.td-name { border-right: none; }
+    .qty-label { color: #3b82f6; font-size: 9px; }
+
+    /* total row */
+    .total-row td { border-top: 2px solid #1e3a8a; border-bottom: none; font-weight: 700; padding: 6px 8px; }
+    .total-label { text-align: right; }
+    .total-value { text-align: right; font-size: 13px; font-weight: 900; white-space: nowrap; }
+
+    /* footer */
+    .footer { display: flex; justify-content: space-between; align-items: flex-end;
+               padding: 10px 14px 8px; }
+    .footer-note { font-size: 10px; font-weight: 600; max-width: 55%; }
+    .sig-block { text-align: right; font-size: 10px; font-weight: 600; min-width: 100px; }
+    .sig-line { border-top: 1px solid #1e3a8a; margin-top: 28px; padding-top: 3px; }
+  </style>
+</head>
+<body>
+<div class="invoice">
+  <div class="hdr">
+    <div>${headerLeft.replace(/\n/g, '<br>')}</div>
+    <div class="hdr-right">
+      <div>${headerRight}</div>
+      ${whatsapp ? `<div class="hdr-phone">${whatsapp}</div>` : ''}
+    </div>
+  </div>
+
+  <div class="banner">
+    <div class="store-name">${storeName}</div>
+    ${address ? `<div class="store-addr">${address}</div>` : ''}
+  </div>
+
+  <div class="meta">
+    <div><span>DL No.</span> ${dlNumbers || '-'}</div>
+    <div><span>Date.</span> ${dateStr}</div>
+    <div><span>Patient.</span> ${invoiceSnapshot.patientName || invoiceSnapshot.customerName || '-'}</div>
+    <div><span>Doctor.</span> ${invoiceSnapshot.doctorName || '-'}</div>
+    <div><span>Bill No.</span> ${invoiceSnapshot.billNumber}</div>
+    <div><span>Payment.</span> ${invoiceSnapshot.paymentMethod === 'credit' ? 'Credit' : invoiceSnapshot.paymentMethod.toUpperCase()}</div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:40%">Drug Name &amp; Qty</th>
+        <th style="width:16%;text-align:center;border-left:1px solid #bfdbfe">Batch No</th>
+        <th style="width:28%;text-align:center;border-left:1px solid #bfdbfe">Mfg / Exp</th>
+        <th class="th-amount" style="width:16%;border-left:1px solid #bfdbfe">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${itemRows}
+      <tr class="total-row">
+        <td colspan="2">${footerNote}</td>
+        <td class="total-label">Total ₹</td>
+        <td class="total-value">${invoiceSnapshot.total.toFixed(2)}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <div class="footer-note">* Goods once sold will not be taken back</div>
+    <div class="sig-block"><div class="sig-line">${signatureLabel}</div></div>
+  </div>
+</div>
+<script>window.onload = () => { window.print(); }<\/script>
+</body>
+</html>`);
+    printWindow.document.close();
+  };
+
   const resultList = showingSearchResults ? (searchResults ?? []) : (popularProducts ?? []);
   const resultHeading = showingSearchResults ? 'Search results' : 'Top selling products';
   const resultSubheading = showingSearchResults
@@ -472,17 +682,30 @@ export function POSPage() {
 
       <div className="grid h-[calc(100vh-15rem)] min-h-[540px] gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         <div className="card flex h-full min-h-0 flex-col gap-4 overflow-hidden p-4 md:p-5">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              ref={searchRef}
-              autoFocus
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={handleSearchKeyDown}
-              placeholder="Search product or scan barcode (press Enter for barcode)"
-              className="input py-3 pl-11 text-base"
-            />
+          <div className="flex flex-col gap-2">
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                ref={searchRef}
+                autoFocus
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Search product or scan barcode (press Enter for barcode)"
+                className="input py-3 pl-11 text-base"
+              />
+            </div>
+            {predefinedCustomerId && (
+              <p className="text-xs text-blue-600">
+                Showing predefined products for this customer only.{' '}
+                <button
+                  className="underline hover:text-blue-800"
+                  onClick={() => setPredefinedCustomerId(null)}
+                >
+                  Show all
+                </button>
+              </p>
+            )}
           </div>
 
           <div className="card-strong flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -539,7 +762,13 @@ export function POSPage() {
                       </div>
                       <div className="text-right">
                         <p className="font-semibold text-blue-700">
-                          {formatCurrency(Number(p.sellingPrice ?? p.selling_price ?? p.mrp ?? 0))}
+                          {formatCurrency(
+                            Number(
+                              isMedicalStore
+                                ? (p.mrp ?? p.sellingPrice ?? p.selling_price ?? 0)
+                                : (p.sellingPrice ?? p.selling_price ?? p.mrp ?? 0),
+                            ),
+                          )}
                         </p>
                         <p className="text-xs text-slate-400">
                           {!showingSearchResults && p.total_revenue
@@ -614,6 +843,7 @@ export function POSPage() {
           attachCustomerIfNeeded={attachCustomerIfNeeded}
           formatCurrency={formatCurrency}
           onCollectPayment={() => setShowPayment(true)}
+          onClearCart={() => { setCustomerPhone(''); setPredefinedCustomerId(null); }}
         />
       </div>
 
@@ -782,7 +1012,6 @@ export function POSPage() {
           <div className="card-strong flex max-h-[calc(100vh-2rem)] w-full max-w-5xl flex-col rounded-[2rem] p-6">
             <div className="flex shrink-0 items-start justify-between gap-4">
               <div>
-                <p className="section-label">Invoice Ready</p>
                 <h2 className="mt-2 text-2xl text-slate-950">{invoiceSnapshot.billNumber}</h2>
                 <p className="mt-2 text-sm text-slate-500">
                   Generated right after {invoiceSnapshot.paymentMethod === 'credit' ? 'credit sale' : 'payment confirmation'}.
@@ -792,6 +1021,9 @@ export function POSPage() {
                 <button className="btn-secondary" onClick={() => void handleDownloadInvoice()}>
                   <Download className="h-4 w-4" />
                   Download
+                </button>
+                <button className="btn-secondary" onClick={handlePrintInvoiceA5}>
+                  Print A5
                 </button>
                 <button className="btn-secondary" onClick={() => void handleSendWhatsApp()} disabled={isSendingInvoiceWhatsapp}>
                   <MessageCircle className="h-4 w-4" />
@@ -807,28 +1039,27 @@ export function POSPage() {
               <div ref={invoiceSheetRef} className="min-w-0 overflow-hidden rounded-[1.75rem] border-2 border-blue-900 bg-white">
                 <div className="flex items-start justify-between gap-6 border-b-2 border-blue-900 px-6 py-4 text-sm font-semibold text-blue-900">
                   <div className="whitespace-pre-line">
-                    {invoiceTemplate.headerLeft || 'Chemist & Druggist'}
-                    {invoiceTemplate.dlNumbers ? `\n${invoiceTemplate.dlNumbers}` : ''}
+                    {invoiceSnapshot.headerLeft}
                   </div>
                   <div className="text-right">
-                    <div>{invoiceTemplate.headerRight || 'Cash/Credit Memo'}</div>
-                    {invoiceTemplate.whatsappNumber && (
-                      <div className="mt-1 text-base">{invoiceTemplate.whatsappNumber}</div>
+                    <div>{invoiceSnapshot.headerRight}</div>
+                    {invoiceSnapshot.whatsappNumber && (
+                      <div className="mt-1 text-base">{invoiceSnapshot.whatsappNumber}</div>
                     )}
                   </div>
                 </div>
 
                 <div className="border-b-2 border-blue-900 px-6 py-4 text-center text-blue-900">
                   <div className="text-[2rem] font-black uppercase tracking-wide">
-                    {invoiceTemplate.storeDisplayName || activeShop?.name || 'Medical Store'}
+                    {invoiceSnapshot.storeName}
                   </div>
                   <div className="mt-1 text-base font-semibold">
-                    {invoiceTemplate.addressLine || activeShop?.name || ''}
+                    {invoiceSnapshot.storeAddress}
                   </div>
                 </div>
 
                 <div className="grid gap-3 border-b-2 border-blue-900 px-6 py-4 text-sm text-blue-900 md:grid-cols-2">
-                  <div><span className="font-bold">No.</span> {invoiceSnapshot.billNumber}</div>
+                  <div><span className="font-bold">DL Number.</span> {invoiceSnapshot.dlNumbers || '-'}</div>
                   <div><span className="font-bold">Date.</span> {new Date(invoiceSnapshot.createdAt).toLocaleString('en-IN')}</div>
                   <div><span className="font-bold">Name of Patient.</span> {invoiceSnapshot.patientName || invoiceSnapshot.customerName || '-'}</div>
                   <div><span className="font-bold">Rx. by Doctor / Other.</span> {invoiceSnapshot.doctorName || '-'}</div>
@@ -841,6 +1072,8 @@ export function POSPage() {
                         <th className="border-r border-blue-900 px-4 py-3 text-left">Name of Drug & Qty.</th>
                         <th className="border-r border-blue-900 px-4 py-3 text-left">Batch No</th>
                         <th className="border-r border-blue-900 px-4 py-3 text-left">Mfg/Exp.</th>
+                        <th className="border-r border-blue-900 px-4 py-3 text-right">GST%</th>
+                        <th className="border-r border-blue-900 px-4 py-3 text-right">Discount</th>
                         <th className="px-4 py-3 text-right">Amount</th>
                       </tr>
                     </thead>
@@ -854,13 +1087,34 @@ export function POSPage() {
                               .filter(Boolean)
                               .join(' · ') || '-'}
                           </td>
+                          <td className="border-r border-blue-200 px-4 py-3 text-right whitespace-nowrap">
+                            {item.gstRate > 0 ? `${item.gstRate}%` : '—'}
+                          </td>
+                          <td className="border-r border-blue-200 px-4 py-3 text-right whitespace-nowrap">
+                            {item.discountAmount > 0 ? `₹${item.discountAmount.toFixed(2)}` : '—'}
+                          </td>
                           <td className="px-4 py-3 text-right font-semibold whitespace-nowrap">{item.amount.toFixed(2)}</td>
                         </tr>
                       ))}
+                      {invoiceSnapshot.totalDiscount > 0 && (
+                        <tr className="border-b border-blue-200">
+                          <td colSpan={4} className="px-4 py-2 text-right text-xs text-blue-600">{invoiceSnapshot.footerNote}</td>
+                          <td className="border-r border-blue-200 px-4 py-2 text-right text-xs font-medium text-blue-700">Total Discount</td>
+                          <td className="px-4 py-2 text-right text-xs font-semibold whitespace-nowrap">₹{invoiceSnapshot.totalDiscount.toFixed(2)}</td>
+                        </tr>
+                      )}
+                      <tr className="border-b border-blue-200">
+                        <td colSpan={4} className={`px-4 py-2 ${invoiceSnapshot.totalDiscount > 0 ? '' : 'font-semibold'}`}>
+                          {invoiceSnapshot.totalDiscount > 0 ? '' : invoiceSnapshot.footerNote}
+                        </td>
+                        <td className="border-r border-blue-200 px-4 py-2 text-right text-xs font-medium text-blue-700">GST</td>
+                        <td className="px-4 py-2 text-right text-xs font-semibold whitespace-nowrap">₹{invoiceSnapshot.gstAmount.toFixed(2)}</td>
+                      </tr>
                       <tr>
-                        <td className="px-4 py-4 font-semibold">{invoiceTemplate.footerNote || 'Thanks'}</td>
-                        <td />
-                        <td className="px-4 py-4 text-right font-bold">Total</td>
+                        <td colSpan={4} className="px-4 py-4 font-semibold">
+                          {invoiceSnapshot.totalDiscount > 0 ? invoiceSnapshot.footerNote : ''}
+                        </td>
+                        <td className="border-r border-blue-900 px-4 py-4 text-right font-bold">Total</td>
                         <td className="px-4 py-4 text-right text-lg font-black whitespace-nowrap">{invoiceSnapshot.total.toFixed(2)}</td>
                       </tr>
                     </tbody>
@@ -870,7 +1124,7 @@ export function POSPage() {
                 <div className="flex justify-end px-6 py-6 text-blue-900">
                   <div className="min-w-40 text-right font-semibold">
                     <div className="text-xs uppercase tracking-[0.2em] text-blue-500">For Store</div>
-                    <div className="mt-10">{invoiceTemplate.signatureLabel || 'Signature'}</div>
+                    <div className="mt-10">{invoiceSnapshot.signatureLabel}</div>
                   </div>
                 </div>
               </div>
@@ -890,6 +1144,7 @@ function CartPanel({
   attachCustomerIfNeeded,
   formatCurrency,
   onCollectPayment,
+  onClearCart,
   titleSuffix,
   footerContent,
 }: {
@@ -900,9 +1155,35 @@ function CartPanel({
   attachCustomerIfNeeded: () => Promise<string | null>;
   formatCurrency: (n: number) => string;
   onCollectPayment?: () => void;
+  onClearCart?: () => void;
   titleSuffix?: string;
   footerContent?: ReactNode;
 }) {
+  const handleQtyChange = (item: CartItem, nextQuantity: number) => {
+    if (!canApplyCartQuantityChange(item, { nextQuantity, nextLooseQty: item.looseQty ?? 0 })) {
+      toast.error('Not enough stock available for this item');
+      return;
+    }
+    cart.updateQty(item.itemKey, nextQuantity);
+  };
+
+  const handleLooseQtyChange = (item: CartItem, nextLooseQty: number) => {
+    if (!canApplyCartQuantityChange(item, { nextQuantity: item.quantity, nextLooseQty })) {
+      toast.error('Not enough stock available for this batch');
+      return;
+    }
+    cart.updateLooseQty(item.itemKey, nextLooseQty);
+  };
+
+  const handleLooseToggle = (item: CartItem, nextEnabled: boolean) => {
+    const targetLooseQty = nextEnabled ? (item.looseQty && item.looseQty > 0 ? item.looseQty : 1) : 0;
+    if (!canApplyCartQuantityChange(item, { nextQuantity: item.quantity, nextLooseQty: targetLooseQty })) {
+      toast.error('Not enough stock available for this batch');
+      return;
+    }
+    cart.toggleLoose(item.itemKey, nextEnabled);
+  };
+
   return (
     <div className="card flex h-full min-h-0 flex-col overflow-hidden">
       <div className="border-b border-slate-200/60 p-4">
@@ -911,7 +1192,10 @@ function CartPanel({
             Cart ({cart.itemCount()}){titleSuffix ? ` · ${titleSuffix}` : ''}
           </h2>
           {cart.items.length > 0 && (
-            <button onClick={cart.clearCart} className="text-sm font-medium text-rose-500 hover:underline">
+            <button
+              onClick={() => { cart.clearCart(); onClearCart?.(); }}
+              className="text-sm font-medium text-rose-500 hover:underline"
+            >
               Clear
             </button>
           )}
@@ -993,14 +1277,14 @@ function CartPanel({
                   <div className="flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1">
                     <span className="text-slate-500">Qty</span>
                     <button
-                      onClick={() => cart.updateQty(item.itemKey, item.quantity - 1)}
+                      onClick={() => handleQtyChange(item, item.quantity - 1)}
                       className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white hover:bg-slate-50"
                     >
                       <Minus className="h-3 w-3" />
                     </button>
                     <span className="w-7 text-center font-semibold text-slate-900">{item.quantity}</span>
                     <button
-                      onClick={() => cart.updateQty(item.itemKey, item.quantity + 1)}
+                      onClick={() => handleQtyChange(item, item.quantity + 1)}
                       className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white hover:bg-slate-50"
                     >
                       <Plus className="h-3 w-3" />
@@ -1012,7 +1296,7 @@ function CartPanel({
                       <span className="text-emerald-700">Loose</span>
                       <button
                         type="button"
-                        onClick={() => cart.toggleLoose(item.itemKey, !item.isLoose)}
+                        onClick={() => handleLooseToggle(item, !item.isLoose)}
                         className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
                           item.isLoose ? 'bg-emerald-500' : 'bg-slate-300'
                         }`}
@@ -1025,14 +1309,14 @@ function CartPanel({
                         />
                       </button>
                       <button
-                        onClick={() => cart.updateLooseQty(item.itemKey, (item.looseQty ?? 0) - 1)}
+                        onClick={() => handleLooseQtyChange(item, (item.looseQty ?? 0) - 1)}
                         className="flex h-6 w-6 items-center justify-center rounded-full border border-emerald-200 bg-white hover:bg-emerald-50"
                       >
                         <Minus className="h-3 w-3" />
                       </button>
                       <span className="w-6 text-center font-semibold text-emerald-900">{item.looseQty ?? 0}</span>
                       <button
-                        onClick={() => cart.updateLooseQty(item.itemKey, (item.looseQty ?? 0) + 1)}
+                        onClick={() => handleLooseQtyChange(item, (item.looseQty ?? 0) + 1)}
                         className="flex h-6 w-6 items-center justify-center rounded-full border border-emerald-200 bg-white hover:bg-emerald-50"
                       >
                         <Plus className="h-3 w-3" />
@@ -1124,6 +1408,30 @@ function getSortedBatches(product: any) {
     const rightDate = right.expiry ? new Date(right.expiry).getTime() : Number.MAX_SAFE_INTEGER;
     return leftDate - rightDate;
   });
+}
+
+function canApplyCartQuantityChange(
+  item: Pick<CartItem, 'quantity' | 'looseQty' | 'totalUnits' | 'availableQuantity' | 'batchAvailableQuantity'> | undefined,
+  next: { nextQuantity: number; nextLooseQty: number },
+) {
+  if (!item) {
+    return true;
+  }
+
+  const availableBaseQuantity = Number(item.batchAvailableQuantity ?? item.availableQuantity ?? 0);
+  if (availableBaseQuantity <= 0) {
+    return next.nextQuantity <= 0 && next.nextLooseQty <= 0;
+  }
+
+  const safeQuantity = Math.max(0, next.nextQuantity);
+  const safeLooseQty = Math.max(0, next.nextLooseQty);
+  const unitsPerPack = Number(item.totalUnits ?? 0);
+
+  if (unitsPerPack > 0) {
+    return safeQuantity + safeLooseQty / unitsPerPack <= availableBaseQuantity;
+  }
+
+  return safeQuantity <= availableBaseQuantity;
 }
 
 function readHeldCarts(): HeldCart[] {

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Banknote, Plus, Search, Trash2, Users } from 'lucide-react';
+import { Banknote, Package, Plus, Search, Trash2, Users, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/app/store/auth.store';
@@ -27,6 +27,11 @@ export function CustomersPage() {
   const [form, setForm] = useState<CustomerForm>(emptyForm);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [reminderNotes, setReminderNotes] = useState('');
+  const [predefinedSearch, setPredefinedSearch] = useState('');
+  const [predefinedProducts, setPredefinedProducts] = useState<any[]>([]);
+  const [showProductDropdown, setShowProductDropdown] = useState(false);
+  const predefinedSearchRef = useRef<HTMLInputElement>(null);
+  const shopId = useAuthStore((s) => s.activeShopId);
 
   const { data, isLoading } = useQuery({
     queryKey: ['customers', search, page],
@@ -42,6 +47,23 @@ export function CustomersPage() {
     enabled: !!selectedCustomer?.id,
   });
 
+  const trimmedPredefinedSearch = predefinedSearch.trim();
+  const { data: productSearchResults, isFetching: isFetchingProducts } = useQuery({
+    queryKey: ['customer-product-search', trimmedPredefinedSearch, shopId],
+    queryFn: () =>
+      apiClient
+        .get(`/api/core/products?search=${encodeURIComponent(trimmedPredefinedSearch)}&perPage=20`)
+        .then((r) => r.data.data),
+    enabled: showForm && trimmedPredefinedSearch.length > 1,
+  });
+
+  const { data: existingPredefined } = useQuery({
+    queryKey: ['customer-predefined', editing?.id],
+    queryFn: () =>
+      apiClient.get(`/api/core/customers/${editing!.id}/predefined-products`).then((r) => r.data.data),
+    enabled: !!editing?.id,
+  });
+
   useEffect(() => {
     if (editing) {
       setForm({
@@ -52,8 +74,17 @@ export function CustomersPage() {
       });
     } else {
       setForm(emptyForm);
+      setPredefinedProducts([]);
     }
+    setPredefinedSearch('');
+    setShowProductDropdown(false);
   }, [editing]);
+
+  useEffect(() => {
+    if (existingPredefined) {
+      setPredefinedProducts(existingPredefined);
+    }
+  }, [existingPredefined]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -66,17 +97,28 @@ export function CustomersPage() {
 
       if (!payload.name) throw new Error('Customer name is required');
 
-      if (editing?.id) {
-        return apiClient.put(`/api/core/customers/${editing.id}`, payload);
+      let customerId = editing?.id;
+      if (customerId) {
+        await apiClient.put(`/api/core/customers/${customerId}`, payload);
+      } else {
+        const res = await apiClient.post('/api/core/customers', payload);
+        customerId = res.data.data?.id;
       }
-      return apiClient.post('/api/core/customers', payload);
+
+      if (customerId) {
+        await apiClient.put(`/api/core/customers/${customerId}/predefined-products`, {
+          productIds: predefinedProducts.map((p: any) => p.id),
+        });
+      }
     },
     onSuccess: () => {
       toast.success(editing ? 'Customer updated' : 'Customer created');
       setShowForm(false);
       setEditing(null);
       setForm(emptyForm);
+      setPredefinedProducts([]);
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['customer-predefined'] });
     },
     onError: (err: any) => {
       toast.error(err.message ?? err.response?.data?.message ?? 'Unable to save customer');
@@ -474,6 +516,85 @@ export function CustomersPage() {
                   placeholder="vip, chronic-care, wholesale"
                 />
               </div>
+            </div>
+
+            <div className="mt-5 border-t border-slate-200/70 pt-5">
+              <label className="mb-1 block text-sm font-medium text-slate-700">Predefined Products</label>
+              <p className="mb-3 text-xs text-slate-400">
+                Products linked to this customer will filter the billing search automatically.
+              </p>
+
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  ref={predefinedSearchRef}
+                  className="input pl-9"
+                  placeholder="Search product by name or SKU…"
+                  value={predefinedSearch}
+                  onChange={(e) => {
+                    setPredefinedSearch(e.target.value);
+                    setShowProductDropdown(true);
+                  }}
+                  onFocus={() => setShowProductDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowProductDropdown(false), 150)}
+                />
+                {showProductDropdown && trimmedPredefinedSearch.length > 1 && (
+                  <div className="absolute z-10 mt-1 w-full rounded-xl border border-slate-200 bg-white shadow-lg">
+                    {isFetchingProducts && (
+                      <div className="px-4 py-3 text-sm text-slate-400">Searching…</div>
+                    )}
+                    {!isFetchingProducts && (!productSearchResults || productSearchResults.length === 0) && (
+                      <div className="px-4 py-3 text-sm text-slate-400">No products found</div>
+                    )}
+                    {(productSearchResults ?? [])
+                      .filter((p: any) => !predefinedProducts.some((sel: any) => sel.id === p.id))
+                      .map((product: any) => (
+                        <button
+                          key={product.id}
+                          type="button"
+                          className="flex w-full items-start gap-3 px-4 py-2.5 text-left hover:bg-slate-50"
+                          onMouseDown={() => {
+                            setPredefinedProducts((prev) => [...prev, product]);
+                            setPredefinedSearch('');
+                            setShowProductDropdown(false);
+                            predefinedSearchRef.current?.focus();
+                          }}
+                        >
+                          <Package className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                          <div>
+                            <p className="text-sm font-medium text-slate-900">{product.name}</p>
+                            <p className="text-xs text-slate-400">
+                              {[product.sku, product.supplierName].filter(Boolean).join(' · ')}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                  </div>
+                )}
+              </div>
+
+              {predefinedProducts.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {predefinedProducts.map((p: any) => (
+                    <span
+                      key={p.id}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700"
+                    >
+                      {p.name}
+                      {p.supplier_name && (
+                        <span className="text-blue-400">· {p.supplier_name}</span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setPredefinedProducts((prev) => prev.filter((x: any) => x.id !== p.id))}
+                        className="ml-0.5 rounded-full hover:text-blue-900"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="mt-6 flex justify-end gap-3">
