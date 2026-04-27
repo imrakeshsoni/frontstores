@@ -5,6 +5,21 @@ import { json, urlencoded } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 
+function isAllowedOrigin(origin?: string) {
+  if (!origin) return true;
+
+  const configuredOrigins = (process.env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  if (configuredOrigins.includes(origin)) return true;
+
+  const allowed =
+    /^https?:\/\/(frontstores\.com|.*\.frontstores\.com|.*\.run\.app|localhost|127\.0\.0\.1|(\[[0-9a-fA-F:]+\]))(:\d+)?$/;
+  return allowed.test(origin);
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const logger = new Logger('CoreAPI');
@@ -14,8 +29,7 @@ async function bootstrap() {
   app.use(urlencoded({ extended: true, limit: '12mb' }));
   app.enableCors({
     origin: (origin, cb) => {
-      const allowed = /^https?:\/\/(.*\.shoposphere\.in|localhost|127\.0\.0\.1|(\[[0-9a-fA-F:]+\]))(:\d+)?$/;
-      if (!origin || allowed.test(origin)) cb(null, true);
+      if (isAllowedOrigin(origin)) cb(null, true);
       else cb(new Error('Not allowed by CORS'));
     },
     credentials: true,

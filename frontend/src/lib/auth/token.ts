@@ -4,6 +4,7 @@ export interface DecodedToken {
   tenantId?: string;
   tenantSlug?: string;
   shopId?: string | null;
+  isPlatformAdmin?: boolean;
   permissions?: Record<string, Record<string, boolean>>;
 }
 

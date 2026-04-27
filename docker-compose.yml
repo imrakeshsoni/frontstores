@@ -53,6 +53,7 @@ services:
       PORT: 3001
       DATABASE_URL: postgresql://shoposphere:shoposphere@postgres:5432/shoposphere
       REDIS_URL: redis://:shoposphere@redis:6379
+      DB_PASSWORD: ""
     ports:
       - '3001:3001'
     depends_on:
@@ -72,6 +73,7 @@ services:
       PORT: 3002
       DATABASE_URL: postgresql://shoposphere:shoposphere@postgres:5432/shoposphere
       REDIS_URL: redis://:shoposphere@redis:6379
+      DB_PASSWORD: ""
     ports:
       - '3002:3002'
     depends_on:
@@ -91,6 +93,7 @@ services:
       PORT: 3003
       DATABASE_URL: postgresql://shoposphere:shoposphere@postgres:5432/shoposphere
       REDIS_URL: redis://:shoposphere@redis:6379
+      DB_PASSWORD: ""
     ports:
       - '3003:3003'
     depends_on:
@@ -110,6 +113,7 @@ services:
       PORT: 3007
       DATABASE_URL: postgresql://shoposphere:shoposphere@postgres:5432/shoposphere
       REDIS_URL: redis://:shoposphere@redis:6379
+      DB_PASSWORD: ""
     ports:
       - '3007:3007'
     depends_on:
@@ -129,6 +133,7 @@ services:
       PORT: 3008
       DATABASE_URL: postgresql://shoposphere:shoposphere@postgres:5432/shoposphere
       REDIS_URL: redis://:shoposphere@redis:6379
+      DB_PASSWORD: ""
     ports:
       - '3008:3008'
     depends_on:
@@ -142,10 +147,13 @@ services:
     container_name: shoposphere_web
     restart: unless-stopped
     environment:
-      VITE_API_URL: http://localhost:3003
-      VITE_AUTH_URL: http://localhost:3001
+      AUTH_SERVICE_URL: http://auth-service:3001
+      TENANT_SERVICE_URL: http://tenant-service:3002
+      CORE_API_URL: http://core-api:3003
+      ORDER_SERVICE_URL: http://order-service:3007
+      REPORT_SERVICE_URL: http://report-service:3008
     ports:
-      - '3000:80'
+      - '3000:8080'
     depends_on:
       - core-api
       - auth-service

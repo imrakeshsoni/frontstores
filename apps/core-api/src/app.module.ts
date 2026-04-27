@@ -1,4 +1,4 @@
-import { Module, MiddlewareConsumer, RequestMethod } from '@nestjs/common';
+import { Module, MiddlewareConsumer, RequestMethod, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
@@ -26,11 +26,18 @@ import { Broadcast } from './broadcasts/broadcast.entity';
 import { BroadcastsController } from './broadcasts/broadcasts.controller';
 import { BroadcastsService } from './broadcasts/broadcasts.service';
 import { WhatsAppService } from './broadcasts/whatsapp.service';
+import { AdminController } from './admin/admin.controller';
+import { AdminService } from './admin/admin.service';
+import { Enquiry } from './enquiries/enquiry.entity';
+import { EnquiriesController } from './enquiries/enquiries.controller';
+import { EnquiriesService } from './enquiries/enquiries.service';
+import { BackupController } from './backup/backup.controller';
+import { BackupService } from './backup/backup.service';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, envFilePath: '../../.env' }),
-    DatabaseModule.forRoot([Product, Inventory, StockMovement, Customer, Category, Supplier, PurchaseOrder, PurchaseOrderItem, CustomFieldDefinition, Broadcast]),
+    DatabaseModule.forRoot([Product, Inventory, StockMovement, Customer, Category, Supplier, PurchaseOrder, PurchaseOrderItem, CustomFieldDefinition, Broadcast, Enquiry]),
     JwtModule.register({ secret: process.env.JWT_SECRET }),
     CacheModule.register({
       isGlobal: true,
@@ -48,14 +55,28 @@ import { WhatsAppService } from './broadcasts/whatsapp.service';
       PurchaseOrderItem,
       CustomFieldDefinition,
       Broadcast,
+      Enquiry,
     ]),
   ],
-  controllers: [ProductsController, InventoryController, CustomersController, SuppliersController, ContextController, BroadcastsController],
-  providers: [ProductsService, InventoryService, CustomersService, SuppliersService, ContextService, BroadcastsService, WhatsAppService, EventBusService],
+  controllers: [ProductsController, InventoryController, CustomersController, SuppliersController, ContextController, BroadcastsController, AdminController, EnquiriesController, BackupController],
+  providers: [ProductsService, InventoryService, CustomersService, SuppliersService, ContextService, BroadcastsService, WhatsAppService, AdminService, EventBusService, EnquiriesService, BackupService],
   exports: [ProductsService, InventoryService, CustomersService, SuppliersService, ContextService, BroadcastsService, WhatsAppService],
 })
 export class AppModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(TenantMiddleware).forRoutes({ path: '*', method: RequestMethod.ALL });
+    consumer
+      .apply(TenantMiddleware)
+      .forRoutes(
+        ProductsController,
+        InventoryController,
+        CustomersController,
+        SuppliersController,
+        ContextController,
+        BroadcastsController,
+        AdminController,
+        BackupController,
+        { path: 'v1/enquiries', method: RequestMethod.GET },
+        { path: 'v1/enquiries/:id', method: RequestMethod.PATCH },
+      );
   }
 }

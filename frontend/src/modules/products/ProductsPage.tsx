@@ -21,6 +21,9 @@ type ProductForm = {
   looseSellingPrice: string;
   lowStockQuantity: string;
   nrx: boolean;
+  locationSection: string;
+  locationRack: string;
+  locationShelf: string;
 };
 
 const emptyForm: ProductForm = {
@@ -36,6 +39,9 @@ const emptyForm: ProductForm = {
   looseSellingPrice: '',
   lowStockQuantity: '',
   nrx: false,
+  locationSection: '',
+  locationRack: '',
+  locationShelf: '',
 };
 
 export function ProductsPage() {
@@ -68,14 +74,17 @@ export function ProductsPage() {
         sku: editing.sku ?? '',
         barcode: editing.barcode ?? '',
         unit: editing.unit ?? 'piece',
-        mrp: editing.mrp ? String(editing.mrp) : '',
-        sellingPrice: editing.sellingPrice ? String(editing.sellingPrice) : '',
+        mrp: editing.mrp ? String(editing.mrp) : editing.sellingPrice ? String(editing.sellingPrice) : '',
+        sellingPrice: editing.sellingPrice ? String(editing.sellingPrice) : editing.mrp ? String(editing.mrp) : '',
         purchasePrice: editing.purchasePrice ? String(editing.purchasePrice) : '',
         gstRate: editing.gstRate ? String(editing.gstRate) : '12',
         totalUnits: editing.attributes?.totalUnits ? String(editing.attributes.totalUnits) : '',
         looseSellingPrice: editing.attributes?.looseSellingPrice ? String(editing.attributes.looseSellingPrice) : '',
         lowStockQuantity: editing.attributes?.lowStockQuantity ? String(editing.attributes.lowStockQuantity) : '',
         nrx: editing.attributes?.nrx === true,
+        locationSection: editing.attributes?.locationSection ?? '',
+        locationRack: editing.attributes?.locationRack ?? '',
+        locationShelf: editing.attributes?.locationShelf ?? '',
       });
     } else {
       setForm(emptyForm);
@@ -87,7 +96,7 @@ export function ProductsPage() {
       return;
     }
 
-    const stripPrice = Number(form.sellingPrice || 0);
+    const stripPrice = Number(form.mrp || 0);
     const totalUnits = Number(form.totalUnits || 0);
 
     if (stripPrice > 0 && totalUnits > 0) {
@@ -96,7 +105,7 @@ export function ProductsPage() {
         looseSellingPrice: (stripPrice / totalUnits).toFixed(2),
       }));
     }
-  }, [form.sellingPrice, form.totalUnits, form.unit, isMedicalStore]);
+  }, [form.mrp, form.totalUnits, form.unit, isMedicalStore]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -106,8 +115,10 @@ export function ProductsPage() {
         sku: isMedicalStore ? undefined : form.sku.trim() || undefined,
         barcode: isMedicalStore ? undefined : form.barcode.trim() || undefined,
         unit: form.unit,
-        mrp: isMedicalStore ? undefined : form.mrp ? Number(form.mrp) : undefined,
-        sellingPrice: form.sellingPrice ? Number(form.sellingPrice) : undefined,
+        mrp: form.mrp ? Number(form.mrp) : undefined,
+        sellingPrice: isMedicalStore
+          ? (form.mrp ? Number(form.mrp) : undefined)
+          : (form.sellingPrice ? Number(form.sellingPrice) : undefined),
         purchasePrice: isMedicalStore ? undefined : form.purchasePrice ? Number(form.purchasePrice) : undefined,
         gstRate: Number(form.gstRate || 0),
         shopId,
@@ -120,6 +131,9 @@ export function ProductsPage() {
             ? { looseSellingPrice: Number(form.looseSellingPrice) }
             : {}),
           ...(isMedicalStore ? { nrx: form.nrx } : {}),
+          ...(form.locationSection ? { locationSection: form.locationSection } : {}),
+          ...(form.locationRack.trim() ? { locationRack: form.locationRack.trim() } : {}),
+          ...(form.locationShelf ? { locationShelf: form.locationShelf } : {}),
         },
       };
 
@@ -142,7 +156,8 @@ export function ProductsPage() {
       queryClient.invalidateQueries({ queryKey: ['pos-top-products'] });
     },
     onError: (err: any) => {
-      toast.error(err.message ?? err.response?.data?.message ?? 'Unable to save product');
+      const msg = err.response?.data?.message;
+      toast.error(Array.isArray(msg) ? msg.join(', ') : (msg ?? err.message ?? 'Unable to save product'));
     },
   });
 
@@ -203,7 +218,7 @@ export function ProductsPage() {
               <th>SKU</th>
               <th>Unit</th>
               <th className="text-right">MRP</th>
-              <th className="text-right">Selling Price</th>
+              {!isMedicalStore && <th className="text-right">Selling Price</th>}
               <th className="text-right">GST</th>
               <th className="text-right">Actions</th>
             </tr>
@@ -212,7 +227,7 @@ export function ProductsPage() {
             {isLoading &&
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i}>
-                  {Array.from({ length: 7 }).map((_, j) => (
+                  {Array.from({ length: isMedicalStore ? 6 : 7 }).map((_, j) => (
                     <td key={j}>
                       <div className="h-4 rounded bg-slate-200 animate-pulse" />
                     </td>
@@ -221,7 +236,7 @@ export function ProductsPage() {
               ))}
             {!isLoading && data?.data?.length === 0 && (
               <tr>
-                <td colSpan={7} className="p-0">
+                <td colSpan={isMedicalStore ? 6 : 7} className="p-0">
                   <EmptyState
                     icon={<Package className="h-8 w-8" />}
                     title="No products yet"
@@ -230,16 +245,26 @@ export function ProductsPage() {
                 </td>
               </tr>
             )}
-            {(data?.data ?? []).map((p: any) => (
+            {(data?.data ?? []).map((p: any) => {
+              const loc = [p.attributes?.locationSection, p.attributes?.locationRack, p.attributes?.locationShelf]
+                .filter(Boolean).join(' · ');
+              return (
               <tr key={p.id}>
-                <td className="font-semibold text-slate-950">{p.name}</td>
+                <td>
+                  <p className="font-semibold text-slate-950">{p.name}</p>
+                  {loc && <p className="mt-0.5 text-xs text-slate-400">{loc}</p>}
+                </td>
                 <td className="text-slate-500">{p.sku ?? '—'}</td>
                 <td className="text-slate-500">{p.unit ?? '—'}</td>
-                <td className="text-right">{formatCurrency(Number(p.mrp ?? 0))}</td>
+                <td className="text-right">{formatCurrency(Number(p.mrp ?? p.sellingPrice ?? 0))}</td>
+                {!isMedicalStore && (
+                  <td className="text-right font-semibold text-blue-700">
+                    {formatCurrency(Number(p.sellingPrice ?? 0))}
+                  </td>
+                )}
                 <td className="text-right font-semibold text-blue-700">
-                  {formatCurrency(Number(p.sellingPrice ?? 0))}
+                  {p.gstRate}%
                 </td>
-                <td className="text-right">{p.gstRate}%</td>
                 <td className="text-right">
                   <div className="flex items-center justify-end gap-2">
                     {can('products', 'write') && (
@@ -264,7 +289,8 @@ export function ProductsPage() {
                   </div>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -342,18 +368,18 @@ export function ProductsPage() {
               {isMedicalStore && (
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">
-                    {form.unit === 'strip' ? 'Strip Selling Price' : 'Selling Price'}
+                    {form.unit === 'strip' ? 'Strip MRP' : 'MRP'}
                   </label>
                   <input
                     className="input"
-                    value={form.sellingPrice}
-                    onChange={(e) => setForm((current) => ({ ...current, sellingPrice: e.target.value }))}
+                    value={form.mrp}
+                    onChange={(e) => setForm((current) => ({ ...current, mrp: e.target.value }))}
                   />
                 </div>
               )}
               {isMedicalStore && form.unit === 'strip' && (
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">Loose Selling Price</label>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">Loose MRP</label>
                   <input
                     className="input"
                     value={form.looseSellingPrice}
@@ -397,6 +423,36 @@ export function ProductsPage() {
                   <input className="input" value={form.purchasePrice} onChange={(e) => setForm((current) => ({ ...current, purchasePrice: e.target.value }))} />
                 </div>
               )}
+
+              <div className="md:col-span-2 border-t border-slate-100 pt-4">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-400">Store Placement</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">Rack</label>
+                    <input
+                      className="input"
+                      value={form.locationSection}
+                      onChange={(e) => setForm((c) => ({ ...c, locationSection: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">Shelf</label>
+                    <input
+                      className="input"
+                      value={form.locationRack}
+                      onChange={(e) => setForm((c) => ({ ...c, locationRack: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">Container</label>
+                    <input
+                      className="input"
+                      value={form.locationShelf}
+                      onChange={(e) => setForm((c) => ({ ...c, locationShelf: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="mt-6 flex items-center justify-between gap-3">

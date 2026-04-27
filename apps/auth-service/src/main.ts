@@ -4,6 +4,21 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 
+function isAllowedOrigin(origin?: string) {
+  if (!origin) return true;
+
+  const configuredOrigins = (process.env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  if (configuredOrigins.includes(origin)) return true;
+
+  const allowed =
+    /^https?:\/\/(frontstores\.com|.*\.frontstores\.com|.*\.run\.app|localhost|127\.0\.0\.1|(\[[0-9a-fA-F:]+\]))(:\d+)?$/;
+  return allowed.test(origin);
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const logger = new Logger('AuthService');
@@ -12,9 +27,7 @@ async function bootstrap() {
 
   app.enableCors({
     origin: (origin, callback) => {
-      // Allow requests from *.shoposphere.in subdomains + common local dev hosts
-      const allowed = /^https?:\/\/(.*\.shoposphere\.in|localhost|127\.0\.0\.1|(\[[0-9a-fA-F:]+\]))(:\d+)?$/;
-      if (!origin || allowed.test(origin)) {
+      if (isAllowedOrigin(origin)) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));

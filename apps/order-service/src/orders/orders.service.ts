@@ -6,7 +6,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, EntityManager } from 'typeorm';
 import { Order, OrderItem, Payment, BillSequence } from './order.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { EventBusService, paginatedResponse, parsePagination } from '@shoposphere/common';
@@ -83,7 +83,7 @@ export class OrdersService {
       const summary = this.calculateSummary(dto);
 
       // 2. Generate bill number atomically
-      const billNumber = await this.nextBillNumber(tenantId, dto.shopId);
+      const billNumber = await this.nextBillNumber(manager, tenantId, dto.shopId);
 
       // 3. Save order
       const order = manager.create(Order, {
@@ -131,9 +131,9 @@ export class OrdersService {
           gstRate,
           gstAmount,
           total: lineTotal,
-          batchNo: item.batchNo,
-          manufactureDate: item.manufactureDate ?? null,
-          expiryDate: item.expiryDate ?? null,
+          batchNo: item.batchNo || undefined,
+          manufactureDate: item.manufactureDate || null,
+          expiryDate: item.expiryDate || null,
         });
       });
       await manager.save(OrderItem, items);
@@ -178,12 +178,12 @@ export class OrdersService {
                AND product_id = $5
                AND batch_no IS NOT DISTINCT FROM $6`,
             [
-              resolvedBatchNo ?? item.batchNo ?? null,
-              resolvedManufactureDate ?? item.manufactureDate ?? null,
-              resolvedExpiryDate ?? item.expiryDate ?? null,
+              resolvedBatchNo || item.batchNo || null,
+              resolvedManufactureDate || item.manufactureDate || null,
+              resolvedExpiryDate || item.expiryDate || null,
               savedOrder.id,
               item.productId,
-              item.batchNo ?? null,
+              item.batchNo || null,
             ],
           );
 
@@ -485,7 +485,7 @@ export class OrdersService {
         throw new BadRequestException('No order items found to return');
       }
 
-      const billNumber = await this.nextBillNumber(tenantId, order.shopId);
+      const billNumber = await this.nextBillNumber(manager, tenantId, order.shopId);
       const returnOrder = await manager.save(
         Order,
         manager.create(Order, {
@@ -667,7 +667,7 @@ export class OrdersService {
         0,
       );
 
-      const billNumber = await this.nextBillNumber(tenantId, order.shopId);
+      const billNumber = await this.nextBillNumber(manager, tenantId, order.shopId);
       const returnOrder = await manager.save(
         Order,
         manager.create(Order, {
@@ -844,28 +844,34 @@ export class OrdersService {
     };
   }
 
-  private async nextBillNumber(tenantId: string, shopId: string): Promise<string> {
-    // Atomic increment via UPDATE...RETURNING — safe under concurrency
-    const result = await this.dataSource.query(
+  private async nextBillNumber(manager: EntityManager, tenantId: string, shopId: string): Promise<string> {
+    // Atomic increment. Resets last_number to 1 when the calendar month changes.
+    const result = await manager.query(
       `UPDATE bill_sequences
-       SET last_number = last_number + 1
+       SET
+         last_number  = CASE WHEN current_period = TO_CHAR(NOW(), 'YYYY-MM') THEN last_number + 1 ELSE 1 END,
+         current_period = TO_CHAR(NOW(), 'YYYY-MM')
        WHERE tenant_id = $1 AND shop_id = $2
-       RETURNING prefix, last_number, EXTRACT(YEAR FROM NOW())::int AS year`,
+       RETURNING prefix, last_number, TO_CHAR(NOW(), 'YYYY') AS yr, TO_CHAR(NOW(), 'MM') AS mo`,
       [tenantId, shopId],
     );
 
-    if (!result[0]?.length) {
-      // First order — insert sequence row
-      await this.dataSource.query(
-        `INSERT INTO bill_sequences (tenant_id, shop_id, prefix, last_number) VALUES ($1, $2, 'ORD', 1)
-         ON CONFLICT DO NOTHING`,
+    const rows: Array<{ prefix: string; last_number: number; yr: string; mo: string }> =
+      Array.isArray(result[0]) ? result[0] : result;
+
+    if (!rows.length) {
+      await manager.query(
+        `INSERT INTO bill_sequences (tenant_id, shop_id, prefix, last_number, current_period)
+         VALUES ($1, $2, 'OD', 1, TO_CHAR(NOW(), 'YYYY-MM'))
+         ON CONFLICT (tenant_id, shop_id) DO NOTHING`,
         [tenantId, shopId],
       );
-      return `ORD-${new Date().getFullYear()}-00001`;
+      const now = new Date();
+      return `OD-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-1`;
     }
 
-    const { prefix, last_number, year } = result[0][0];
-    return `${prefix}-${year}-${String(last_number).padStart(5, '0')}`;
+    const { prefix, last_number, yr, mo } = rows[0];
+    return `${prefix}-${yr}-${mo}-${last_number}`;
   }
 
   private allocateBatchesForSale(

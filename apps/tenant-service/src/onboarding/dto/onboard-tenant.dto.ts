@@ -4,9 +4,8 @@ import {
   IsNotEmpty,
   IsOptional,
   IsIn,
-  Length,
   Matches,
-  IsBoolean,
+  MinLength,
 } from 'class-validator';
 
 export class OnboardTenantDto {
@@ -29,7 +28,7 @@ export class OnboardTenantDto {
   phone: string;
 
   @IsString()
-  @Length(8, 9, { message: 'Password must be 8-9 characters' })
+  @MinLength(8, { message: 'Password must be at least 8 characters' })
   password: string;
 
   @IsOptional()
@@ -51,7 +50,4 @@ export class OnboardTenantDto {
   @IsIn(['starter', 'growth', 'enterprise'])
   plan?: string;
 
-  @IsOptional()
-  @IsBoolean()
-  seedDemoData?: boolean;
 }

@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { Sun, Moon, Download, UploadCloud, ShieldAlert } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
 import { NAV_ITEMS } from '@/components/layout/AppLayout';
 import { PageIntro } from '@/components/ui/PageIntro';
+import { useTheme } from '@/lib/theme/useTheme';
 
 type SettingsForm = {
   tenantName: string;
+  logoDataUrl: string;
   plan: string;
   currency: string;
   timezone: string;
@@ -17,6 +20,7 @@ type SettingsForm = {
   shopType: string;
   phone: string;
   gstNumber: string;
+  addressLine1: string;
   city: string;
   invoiceDlNumbers: string;
   invoiceHeaderLeft: string;
@@ -30,6 +34,7 @@ type SettingsForm = {
 
 const emptyForm: SettingsForm = {
   tenantName: '',
+  logoDataUrl: '',
   plan: 'starter',
   currency: 'INR',
   timezone: 'Asia/Kolkata',
@@ -40,6 +45,7 @@ const emptyForm: SettingsForm = {
   shopType: '',
   phone: '',
   gstNumber: '',
+  addressLine1: '',
   city: '',
   invoiceDlNumbers: '',
   invoiceHeaderLeft: 'Chemist & Druggist',
@@ -54,6 +60,49 @@ const emptyForm: SettingsForm = {
 export function SettingsPage() {
   const [form, setForm] = useState<SettingsForm>(emptyForm);
   const [isEditing, setIsEditing] = useState(false);
+  const { theme, toggleTheme } = useTheme();
+
+  const [isExporting, setIsExporting] = useState(false);
+  const [restoreConfirm, setRestoreConfirm] = useState(false);
+  const restoreInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const res = await apiClient.get('/api/core/backup/export', { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/zip' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `frontstores-backup-${new Date().toISOString().slice(0, 10)}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Backup downloaded successfully');
+    } catch {
+      toast.error('Failed to generate backup');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const restoreMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await apiClient.post('/api/core/backup/restore', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return res.data.data;
+    },
+    onSuccess: (data) => {
+      const total = Object.values(data.restored as Record<string, number>).reduce((a, b) => a + b, 0);
+      toast.success(`Restore complete — ${total} records restored`);
+      setRestoreConfirm(false);
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message ?? 'Restore failed');
+      setRestoreConfirm(false);
+    },
+  });
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['settings-context'],
@@ -80,6 +129,7 @@ export function SettingsPage() {
         shopType: data.shop?.type ?? '',
         phone: data.shop?.phone ?? '',
         gstNumber: data.shop?.gst_number ?? '',
+        addressLine1: data.shop?.address?.line1 ?? '',
         city: data.shop?.address?.city ?? '',
         invoiceDlNumbers: data.shop?.settings?.invoiceTemplate?.dlNumbers ?? '',
         invoiceHeaderLeft:
@@ -95,6 +145,7 @@ export function SettingsPage() {
         invoiceFooterNote: data.shop?.settings?.invoiceTemplate?.footerNote ?? 'Thanks',
         invoiceSignatureLabel:
           data.shop?.settings?.invoiceTemplate?.signatureLabel ?? 'Signature',
+        logoDataUrl: data.shop?.settings?.logoDataUrl ?? '',
       });
       setIsEditing(false);
     }
@@ -126,7 +177,10 @@ export function SettingsPage() {
         shopType: form.shopType.trim(),
         phone: form.phone.trim(),
         gstNumber: form.gstNumber.trim(),
-        address: { city: form.city.trim() },
+        address: {
+          line1: form.addressLine1.trim(),
+          city: form.city.trim(),
+        },
         shopSettings: {
           invoiceTemplate: {
             dlNumbers: form.invoiceDlNumbers.trim(),
@@ -184,87 +238,6 @@ export function SettingsPage() {
             <label className="mb-2 block text-sm font-medium text-slate-700">Timezone</label>
             <input className="input" value={form.timezone} disabled={!isEditing} onChange={(e) => setForm((current) => ({ ...current, timezone: e.target.value }))} />
           </div>
-          <div className="md:col-span-2 rounded-3xl border border-slate-200 bg-slate-50/80 p-5">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold text-slate-900">Menu Locker</p>
-                <p className="mt-1 text-sm text-slate-500">Protect any left-side menu with one shared 4-digit PIN.</p>
-              </div>
-              <button
-                type="button"
-                disabled={!isEditing}
-                onClick={() =>
-                  setForm((current) => ({
-                    ...current,
-                    enableMenuPin: !current.enableMenuPin,
-                  }))
-                }
-                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
-                  form.enableMenuPin ? 'bg-emerald-500' : 'bg-slate-300'
-                }`}
-                aria-pressed={form.enableMenuPin}
-              >
-                <span
-                  className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                    form.enableMenuPin ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
-            </div>
-            {form.enableMenuPin && (
-              <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,220px),1fr]">
-                <div className="max-w-xs">
-                  <label className="mb-2 block text-sm font-medium text-slate-700">4-Digit PIN</label>
-                  <input
-                    className="input"
-                    type="password"
-                    disabled={!isEditing}
-                    inputMode="numeric"
-                    maxLength={4}
-                    value={form.menuPin}
-                    onChange={(e) =>
-                      setForm((current) => ({
-                        ...current,
-                        menuPin: e.target.value.replace(/\D/g, '').slice(0, 4),
-                      }))
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">Select Menus</label>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {NAV_ITEMS.map((item) => {
-                      const isChecked = form.protectedMenus.includes(item.lockKey);
-
-                      return (
-                        <label
-                          key={item.lockKey}
-                          className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3"
-                        >
-                          <span className="text-sm font-medium text-slate-700">{item.label}</span>
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                            disabled={!isEditing}
-                            checked={isChecked}
-                            onChange={() =>
-                              setForm((current) => ({
-                                ...current,
-                                protectedMenus: isChecked
-                                  ? current.protectedMenus.filter((menu) => menu !== item.lockKey)
-                                  : [...current.protectedMenus, item.lockKey],
-                              }))
-                            }
-                          />
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
           <div className="md:col-span-2 mt-4">
             <p className="section-label">Shop</p>
           </div>
@@ -283,6 +256,10 @@ export function SettingsPage() {
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-700">GST Number</label>
             <input className="input" value={form.gstNumber} disabled={!isEditing} onChange={(e) => setForm((current) => ({ ...current, gstNumber: e.target.value }))} />
+          </div>
+          <div className="md:col-span-2">
+            <label className="mb-2 block text-sm font-medium text-slate-700">Address Line 1</label>
+            <input className="input" value={form.addressLine1} disabled={!isEditing} onChange={(e) => setForm((current) => ({ ...current, addressLine1: e.target.value }))} />
           </div>
           <div className="md:col-span-2">
             <label className="mb-2 block text-sm font-medium text-slate-700">City</label>
@@ -331,6 +308,204 @@ export function SettingsPage() {
               </div>
             </div>
           </div>
+
+          {/* ── Backup & Restore ── */}
+          <div className="md:col-span-2 mt-4">
+            <p className="section-label">Backup & Restore</p>
+          </div>
+          <div className="md:col-span-2 rounded-3xl border border-slate-200 bg-slate-50/80 p-5 dark:border-white/10 dark:bg-white/5 space-y-5">
+
+            {/* Export */}
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Download className="h-5 w-5 text-emerald-500 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Export Backup</p>
+                  <p className="mt-0.5 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                    Download all your data — products, orders, customers, inventory and more — as a ZIP file.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleExport}
+                disabled={isExporting}
+                className="shrink-0 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50"
+              >
+                {isExporting ? 'Preparing…' : 'Download ZIP'}
+              </button>
+            </div>
+
+            <div className="border-t border-slate-200 dark:border-white/10" />
+
+            {/* Restore */}
+            <div className="flex items-start gap-3">
+              <UploadCloud className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Restore from Backup</p>
+                <p className="mt-0.5 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                  Upload a previously exported ZIP file. <strong>Only works if your account has no existing records.</strong>
+                </p>
+                <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-start gap-2">
+                  <ShieldAlert className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-800">
+                    Restore will be blocked if any data already exists in this account. This prevents accidental overwrites.
+                  </p>
+                </div>
+                <input
+                  ref={restoreInputRef}
+                  type="file"
+                  accept=".zip"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) setRestoreConfirm(true);
+                  }}
+                />
+                {!restoreConfirm ? (
+                  <button
+                    type="button"
+                    onClick={() => restoreInputRef.current?.click()}
+                    className="mt-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100"
+                  >
+                    Choose Backup ZIP…
+                  </button>
+                ) : (
+                  <div className="mt-3 flex items-center gap-3">
+                    <p className="text-sm font-medium text-slate-700">
+                      {restoreInputRef.current?.files?.[0]?.name} — ready to restore. Confirm?
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const file = restoreInputRef.current?.files?.[0];
+                        if (file) restoreMutation.mutate(file);
+                      }}
+                      disabled={restoreMutation.isPending}
+                      className="rounded-2xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-600 disabled:opacity-50"
+                    >
+                      {restoreMutation.isPending ? 'Restoring…' : 'Yes, Restore'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setRestoreConfirm(false); if (restoreInputRef.current) restoreInputRef.current.value = ''; }}
+                      className="text-sm text-slate-500 hover:text-slate-800"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ── Appearance ── */}
+          <div className="md:col-span-2 mt-4">
+            <p className="section-label">Appearance</p>
+          </div>
+          <div className="md:col-span-2 rounded-3xl border border-slate-200 bg-slate-50/80 p-5 dark:border-white/10 dark:bg-white/5">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                {theme === 'dark' ? <Moon className="h-5 w-5 text-slate-400" /> : <Sun className="h-5 w-5 text-amber-500" />}
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    {theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
+                  </p>
+                  <p className="mt-0.5 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                    Switch between light and dark interface.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+                  theme === 'dark' ? 'bg-emerald-500' : 'bg-slate-300'
+                }`}
+                aria-pressed={theme === 'dark'}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                    theme === 'dark' ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
+          {/* ── Menu Locker ── */}
+          <div className="md:col-span-2 mt-4">
+            <p className="section-label">Security</p>
+          </div>
+          <div className="md:col-span-2 rounded-3xl border border-slate-200 bg-slate-50/80 p-5 dark:border-white/10 dark:bg-white/5">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Menu Locker</p>
+                <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>Protect any left-side menu with one shared 4-digit PIN.</p>
+              </div>
+              <button
+                type="button"
+                disabled={!isEditing}
+                onClick={() => setForm((c) => ({ ...c, enableMenuPin: !c.enableMenuPin }))}
+                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+                  form.enableMenuPin ? 'bg-emerald-500' : 'bg-slate-300'
+                }`}
+                aria-pressed={form.enableMenuPin}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                    form.enableMenuPin ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            {form.enableMenuPin && (
+              <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,220px),1fr]">
+                <div className="max-w-xs">
+                  <label className="mb-2 block text-sm font-medium" style={{ color: 'var(--text-primary)' }}>4-Digit PIN</label>
+                  <input
+                    className="input"
+                    type="password"
+                    disabled={!isEditing}
+                    inputMode="numeric"
+                    maxLength={4}
+                    value={form.menuPin}
+                    onChange={(e) => setForm((c) => ({ ...c, menuPin: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Select Menus</label>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {NAV_ITEMS.map((item) => {
+                      const isChecked = form.protectedMenus.includes(item.lockKey);
+                      return (
+                        <label
+                          key={item.lockKey}
+                          className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 dark:border-white/10 dark:bg-white/5"
+                        >
+                          <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{item.label}</span>
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                            disabled={!isEditing}
+                            checked={isChecked}
+                            onChange={() =>
+                              setForm((c) => ({
+                                ...c,
+                                protectedMenus: isChecked
+                                  ? c.protectedMenus.filter((m) => m !== item.lockKey)
+                                  : [...c.protectedMenus, item.lockKey],
+                              }))
+                            }
+                          />
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="mt-6 flex justify-end gap-3">
@@ -359,6 +534,7 @@ export function SettingsPage() {
                       shopType: data.shop?.type ?? '',
                       phone: data.shop?.phone ?? '',
                       gstNumber: data.shop?.gst_number ?? '',
+                      addressLine1: data.shop?.address?.line1 ?? '',
                       city: data.shop?.address?.city ?? '',
                       invoiceDlNumbers: data.shop?.settings?.invoiceTemplate?.dlNumbers ?? '',
                       invoiceHeaderLeft:
@@ -375,6 +551,7 @@ export function SettingsPage() {
                         data.shop?.settings?.invoiceTemplate?.footerNote ?? 'Thanks',
                       invoiceSignatureLabel:
                         data.shop?.settings?.invoiceTemplate?.signatureLabel ?? 'Signature',
+                      logoDataUrl: data.shop?.settings?.logoDataUrl ?? '',
                     });
                   }
                   setIsEditing(false);

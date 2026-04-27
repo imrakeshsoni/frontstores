@@ -59,6 +59,7 @@ export class AuthService {
         name: user.name,
         email: user.email,
         tenantId: user.tenantId,
+        isPlatformAdmin: user.isPlatformAdmin,
       },
     };
   }
@@ -101,12 +102,12 @@ export class AuthService {
     const jwtPayload = {
       sub: user.id,
       email: user.email,
-      tenantId: user.tenantId,
+      tenantId: user.tenantId ?? user.tenant_id,
       tenantSlug: tenant.slug,
-      shopId: user.shopId,
-      profileId: user.profileId,
-      roleId: user.roleId,
-      isPlatformAdmin: user.isPlatformAdmin,
+      shopId: user.shopId ?? user.shop_id,
+      profileId: user.profileId ?? user.profile_id,
+      roleId: user.roleId ?? user.role_id,
+      isPlatformAdmin: user.isPlatformAdmin ?? user.is_platform_admin,
       permissions: userWithPerms.permissions ?? {},
     };
 

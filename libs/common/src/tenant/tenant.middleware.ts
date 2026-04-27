@@ -13,6 +13,7 @@ export interface AuthenticatedRequest extends Request {
     profileId: string;
     roleId: string;
     permissions: Record<string, Record<string, boolean>>;
+    isPlatformAdmin?: boolean;
   };
 }
 

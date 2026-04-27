@@ -1,11 +1,10 @@
 import { Injectable, ConflictException, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
-import { readFileSync } from 'fs';
-import { join } from 'path';
 import { generateSlug } from '@shoposphere/common';
 import { EventBusService } from '@shoposphere/common';
 import { OnboardTenantDto } from './dto/onboard-tenant.dto';
+import { SignupEmailService } from './signup-email.service';
 
 const SYSTEM_PROFILES = {
   owner: {
@@ -70,10 +69,6 @@ const SYSTEM_PROFILES = {
   },
 };
 
-const LARGE_DEMO_SEED_SQL_PATH = join(
-  __dirname,
-  '../../../../tools/seeds/medplus-large-demo.sql',
-);
 
 @Injectable()
 export class OnboardingService {
@@ -82,6 +77,7 @@ export class OnboardingService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly eventBus: EventBusService,
+    private readonly signupEmailService: SignupEmailService,
   ) {}
 
   async onboard(dto: OnboardTenantDto) {
@@ -177,14 +173,9 @@ export class OnboardingService {
       // 6. Seed bill number sequence
       await manager.query(
         `INSERT INTO bill_sequences (tenant_id, shop_id, prefix, last_number)
-         VALUES ($1, $2, 'ORD', 0)`,
+         VALUES ($1, $2, 'OD', 0)`,
         [tenant.id, shop.id],
       );
-
-      if (dto.seedDemoData ?? true) {
-        await manager.query(this.buildLargeDemoSeedSql(tenant.id, tenant.slug, dto.email));
-        this.logger.log(`Large demo data seeded for tenant: ${tenant.slug}`);
-      }
 
       this.logger.log(`Tenant onboarded: ${tenant.slug} (id: ${tenant.id})`);
 
@@ -197,13 +188,29 @@ export class OnboardingService {
         ownerName: dto.ownerName,
       });
 
-      return {
+      const result = {
         tenantId: tenant.id,
         slug: tenant.slug,
         shopId: shop.id,
-        loginUrl: `https://${tenant.slug}.shoposphere.in`,
+        loginUrl: `https://frontstores.com/login?slug=${tenant.slug}`,
         userId: user.id,
       };
+
+      try {
+        await this.signupEmailService.sendLoginDetails({
+          ownerEmail: dto.email,
+          ownerName: dto.ownerName,
+          shopName: dto.shopName,
+          tenantSlug: tenant.slug,
+          password: dto.password,
+        });
+      } catch (error: any) {
+        this.logger.warn(
+          `Login details email skipped for ${tenant.slug}: ${error?.message ?? 'unknown error'}`,
+        );
+      }
+
+      return result;
     });
   }
 
@@ -223,20 +230,4 @@ export class OnboardingService {
     }
   }
 
-  private buildLargeDemoSeedSql(tenantId: string, tenantSlug: string, adminEmail: string): string {
-    const sql = readFileSync(LARGE_DEMO_SEED_SQL_PATH, 'utf8');
-
-    return [
-      `SELECT set_config('app.current_tenant_id', '${this.escapeSqlLiteral(tenantId)}', false);`,
-      sql
-      .replace(/^BEGIN;\s*/m, '')
-      .replace(/\s*COMMIT;\s*$/m, '')
-      .replace("'admin@medplus.com'", `'${this.escapeSqlLiteral(adminEmail)}'`)
-      .replace("'medplus'", `'${this.escapeSqlLiteral(tenantSlug)}'`),
-    ].join('\n');
-  }
-
-  private escapeSqlLiteral(value: string): string {
-    return value.replace(/'/g, "''");
-  }
 }

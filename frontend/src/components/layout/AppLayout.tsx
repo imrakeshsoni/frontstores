@@ -13,6 +13,7 @@ import {
   Settings,
   LogOut,
   Store,
+  Shield,
 } from 'lucide-react';
 import { useAuthStore } from '@/app/store/auth.store';
 import { apiClient } from '@/lib/api/client';
@@ -57,6 +58,10 @@ export function AppLayout() {
     navigate('/login');
   };
 
+  const navItems = user?.isPlatformAdmin
+    ? [...NAV_ITEMS, { to: '/admin', lockKey: 'admin', icon: Shield, label: 'Admin' }]
+    : NAV_ITEMS;
+
   return (
     <div className="flex min-h-screen" style={{ backgroundColor: 'var(--bg)' }}>
       {/* Sidebar */}
@@ -81,7 +86,7 @@ export function AppLayout() {
           </div>
           <div>
             <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
-              ShopOS
+              {activeShop?.name || 'ShopOS'}
             </p>
             <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
               {getShopTypeLabel(activeShop?.type)}
@@ -91,7 +96,7 @@ export function AppLayout() {
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
-          {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
+          {navItems.map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
               to={to}
@@ -152,7 +157,7 @@ export function AppLayout() {
             >
               <Store className="h-4 w-4 text-white" />
             </div>
-            <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>ShopOS</span>
+            <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{activeShop?.name || 'ShopOS'}</span>
           </div>
           <span className="chip text-xs">{user?.email}</span>
         </header>
@@ -167,7 +172,7 @@ export function AppLayout() {
             borderBottom: '1px solid var(--surface-border)',
           }}
         >
-          {NAV_ITEMS.map(({ to, label }) => (
+          {navItems.map(({ to, label }) => (
             <NavLink
               key={to}
               to={to}

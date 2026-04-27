@@ -21,6 +21,8 @@ export interface CartItem {
     quantity: number;
     purchasePrice?: number;
   }>;
+  availableQuantity?: number;
+  batchAvailableQuantity?: number;
   totalUnits?: number;
   looseUnitPrice?: number;
   isLoose?: boolean;

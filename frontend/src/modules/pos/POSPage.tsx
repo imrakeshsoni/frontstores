@@ -25,6 +25,8 @@ type InvoiceSnapshot = {
     manufactureDate?: string;
     expiry?: string;
     quantityLabel: string;
+    quantity: number;
+    unitPrice: number;
     amount: number;
     gstRate: number;
     discountAmount: number;
@@ -48,6 +50,7 @@ type CartPanelStore = {
   items: CartItem[];
   customerId: string | null;
   customerName: string | null;
+  customerPhone: string | null;
   clearCart: () => void;
   removeItem: (itemKey: string) => void;
   toggleLoose: (itemKey: string, enabled: boolean) => void;
@@ -76,8 +79,8 @@ export function POSPage() {
   const [search, setSearch] = useState('');
   const [showPayment, setShowPayment] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
-  const [customerPhone, setCustomerPhone] = useState('');
-  const [creditCustomerSearch, setCreditCustomerSearch] = useState('');
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [loyaltyPointsRedeemed, setLoyaltyPointsRedeemed] = useState('0');
   const [patientName, setPatientName] = useState('');
   const [doctorName, setDoctorName] = useState('');
@@ -133,57 +136,33 @@ export function POSPage() {
     enabled: trimmedSearch.length > 0,
   });
 
-  const { data: creditCustomerResults, isFetching: isFetchingCreditCustomers } = useQuery({
-    queryKey: ['credit-customer-search', creditCustomerSearch],
+  const trimmedCustomerSearch = customerSearch.trim();
+  const { data: customerSearchResults = [], isFetching: isFetchingCustomers } = useQuery({
+    queryKey: ['pos-customer-search', trimmedCustomerSearch],
     queryFn: () =>
       apiClient
-        .get(`/api/core/customers?search=${encodeURIComponent(creditCustomerSearch)}&perPage=10`)
+        .get(`/api/core/customers?search=${encodeURIComponent(trimmedCustomerSearch)}&perPage=8`)
         .then((r) => r.data.data),
-    enabled: showPayment && isMedicalStore && creditCustomerSearch.trim().length > 0,
-  });
-
-  const customerMutation = useMutation({
-    mutationFn: async () => {
-      const phone = customerPhone.trim();
-      if (!phone) {
-        return null;
-      }
-
-      const response = await apiClient.post('/api/core/customers/upsert-by-phone', {
-        phone,
-      });
-
-      return response.data.data;
-    },
-    onSuccess: async (customer) => {
-      if (!customer) {
-        return;
-      }
-
-      cart.setCustomer(customer.id, customer.name ?? customer.phone ?? 'Customer', customer.phone ?? null);
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
-      toast.success(`Attached ${customer.name ?? customer.phone}`);
-
-      try {
-        const res = await apiClient.get(`/api/core/customers/${customer.id}/predefined-products`);
-        const products: any[] = res.data.data ?? [];
-        setPredefinedCustomerId(products.length > 0 ? customer.id : null);
-      } catch {
-        setPredefinedCustomerId(null);
-      }
-    },
-    onError: (err: any) => {
-      toast.error(err.response?.data?.message ?? 'Unable to attach customer');
-    },
+    enabled: trimmedCustomerSearch.length > 1,
   });
 
   const attachCustomerIfNeeded = async () => {
-    if (cart.customerId || !customerPhone.trim()) {
-      return cart.customerId ?? null;
-    }
+    return cart.customerId ?? null;
+  };
 
-    const customer = await customerMutation.mutateAsync();
-    return customer?.id ?? null;
+  const handleCustomerSelect = async (customer: any) => {
+    cart.setCustomer(customer.id, customer.name ?? customer.phone ?? 'Customer', customer.phone ?? null);
+    setCustomerSearch('');
+    setShowCustomerDropdown(false);
+    toast.success(`Attached ${customer.name ?? customer.phone}`);
+
+    try {
+      const res = await apiClient.get(`/api/core/customers/${customer.id}/predefined-products`);
+      const products: any[] = res.data.data ?? [];
+      setPredefinedCustomerId(products.length > 0 ? customer.id : null);
+    } catch {
+      setPredefinedCustomerId(null);
+    }
   };
 
   const invalidateSalesData = () => {
@@ -217,7 +196,7 @@ export function POSPage() {
     setHeldCarts(nextHeldCarts);
     persistHeldCarts(nextHeldCarts);
     cart.clearCart();
-    setCustomerPhone('');
+    setCustomerSearch('');
     setPredefinedCustomerId(null);
     toast.success('Cart held successfully');
   };
@@ -246,7 +225,6 @@ export function POSPage() {
     if (heldCart.customerId && heldCart.customerName) {
       cart.setCustomer(heldCart.customerId, heldCart.customerName, heldCart.customerPhone ?? null);
     }
-    setCustomerPhone(heldCart.customerPhone ?? '');
 
     const nextHeldCarts = heldCarts.filter((entry) => entry.id !== heldCartId);
     setHeldCarts(nextHeldCarts);
@@ -270,13 +248,6 @@ export function POSPage() {
       } catch {
         toast.error('Product not found');
       }
-    }
-  };
-
-  const handleCustomerKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      await attachCustomerIfNeeded();
     }
   };
 
@@ -388,6 +359,8 @@ export function POSPage() {
         quantityLabel: item.isLoose && (item.looseQty ?? 0) > 0
           ? `${item.quantity} ${item.unit} + ${item.looseQty} loose`
           : `${item.quantity} ${item.unit}`,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
         amount:
           item.unitPrice * item.quantity +
           (item.isLoose ? (item.looseUnitPrice ?? 0) * (item.looseQty ?? 0) : 0) -
@@ -405,7 +378,7 @@ export function POSPage() {
         patientName,
         doctorName,
         customerName: cart.customerName ?? '',
-        customerPhone: cart.customerPhone ?? customerPhone ?? '',
+        customerPhone: cart.customerPhone ?? '',
         items: snapshotItems,
         subtotal: cart.subtotal(),
         gstAmount: cart.taxAmount(),
@@ -421,8 +394,7 @@ export function POSPage() {
         signatureLabel: invoiceTemplate.signatureLabel || 'Authorised Signature',
       });
       cart.clearCart();
-      setCustomerPhone('');
-      setCreditCustomerSearch('');
+      setCustomerSearch('');
       setLoyaltyPointsRedeemed('0');
       setPatientName('');
       setDoctorName('');
@@ -841,13 +813,17 @@ export function POSPage() {
 
         <CartPanel
           cart={cart}
-          customerPhone={customerPhone}
-          setCustomerPhone={setCustomerPhone}
-          handleCustomerKeyDown={handleCustomerKeyDown}
-          attachCustomerIfNeeded={attachCustomerIfNeeded}
+          customerSearch={customerSearch}
+          setCustomerSearch={setCustomerSearch}
+          showCustomerDropdown={showCustomerDropdown}
+          setShowCustomerDropdown={setShowCustomerDropdown}
+          customerSearchResults={customerSearchResults}
+          isFetchingCustomers={isFetchingCustomers}
+          onCustomerSelect={handleCustomerSelect}
+          onClearCustomer={() => { setCustomerSearch(''); setPredefinedCustomerId(null); }}
           formatCurrency={formatCurrency}
           onCollectPayment={() => setShowPayment(true)}
-          onClearCart={() => { setCustomerPhone(''); setPredefinedCustomerId(null); }}
+          onClearCart={() => { setCustomerSearch(''); setPredefinedCustomerId(null); }}
         />
       </div>
 
@@ -856,10 +832,14 @@ export function POSPage() {
           <div className="mx-auto grid h-full max-w-7xl gap-4 lg:grid-cols-[1.4fr_0.6fr]">
             <CartPanel
               cart={cart}
-              customerPhone={customerPhone}
-              setCustomerPhone={setCustomerPhone}
-              handleCustomerKeyDown={handleCustomerKeyDown}
-              attachCustomerIfNeeded={attachCustomerIfNeeded}
+              customerSearch={customerSearch}
+              setCustomerSearch={setCustomerSearch}
+              showCustomerDropdown={showCustomerDropdown}
+              setShowCustomerDropdown={setShowCustomerDropdown}
+              customerSearchResults={customerSearchResults}
+              isFetchingCustomers={isFetchingCustomers}
+              onCustomerSelect={handleCustomerSelect}
+              onClearCustomer={() => { setCustomerSearch(''); setPredefinedCustomerId(null); }}
               formatCurrency={formatCurrency}
               titleSuffix="Checkout"
               footerContent={
@@ -902,78 +882,40 @@ export function POSPage() {
             </div>
 
             {isMedicalStore && (
-              <div className="mb-6 space-y-3">
-                <div className="grid gap-3">
-                  <input
-                    value={patientName}
-                    onChange={(e) => setPatientName(e.target.value)}
-                    placeholder="Patient name"
-                    className="input"
-                  />
-                  <input
-                    value={doctorName}
-                    onChange={(e) => setDoctorName(e.target.value)}
-                    placeholder="Doctor / Other"
-                    className="input"
-                  />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">Customer</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Search and select a customer if you want to tag this order. It becomes required for credit sales.
-                  </p>
-                </div>
+              <div className="mb-6 grid gap-3">
                 <input
-                  value={creditCustomerSearch}
-                  onChange={(e) => setCreditCustomerSearch(e.target.value)}
-                  placeholder="Search customer by name, mobile, or customer ID"
+                  value={patientName}
+                  onChange={(e) => setPatientName(e.target.value)}
+                  placeholder="Patient name"
                   className="input"
                 />
-                {cart.customerName && (
-                  <div className="rounded-2xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                    Selected customer: <span className="font-semibold">{cart.customerName}</span>
-                  </div>
-                )}
-                {cart.customerId && (
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">Redeem Loyalty Points</label>
-                    <input
-                      type="number"
-                      min="0"
-                      className="input"
-                      value={loyaltyPointsRedeemed}
-                      onChange={(e) => setLoyaltyPointsRedeemed(e.target.value)}
-                      placeholder="0"
-                    />
-                    <p className="mt-1 text-xs text-slate-500">10 points redeem as roughly Rs 1 discount.</p>
-                  </div>
-                )}
-                {paymentMethod === 'credit' && !cart.customerId && (
-                  <div className="rounded-2xl bg-amber-50 px-3 py-2 text-sm text-amber-700">
-                    Customer selection is required for credit sales.
-                  </div>
-                )}
-                {isFetchingCreditCustomers && (
-                  <div className="text-sm text-slate-400">Searching customers…</div>
-                )}
-                {(creditCustomerResults ?? []).length > 0 && (
-                  <div className="max-h-52 space-y-2 overflow-y-auto rounded-2xl border border-slate-200 p-2">
-                    {(creditCustomerResults ?? []).map((customer: any) => (
-                      <button
-                        key={customer.id}
-                        type="button"
-                        onClick={() => cart.setCustomer(customer.id, customer.name ?? customer.phone ?? customer.id, customer.phone ?? null)}
-                        className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left hover:bg-slate-50"
-                      >
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900">{customer.name ?? 'Customer'}</p>
-                          <p className="text-xs text-slate-500">{customer.phone ?? customer.id}</p>
-                        </div>
-                        <span className="text-xs text-slate-500">₹{Number(customer.creditBalance ?? 0).toFixed(2)}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
+                <input
+                  value={doctorName}
+                  onChange={(e) => setDoctorName(e.target.value)}
+                  placeholder="Doctor / Other"
+                  className="input"
+                />
+              </div>
+            )}
+
+            {cart.customerId && (
+              <div className="mb-6">
+                <label className="mb-2 block text-sm font-medium text-slate-700">Redeem Loyalty Points</label>
+                <input
+                  type="number"
+                  min="0"
+                  className="input"
+                  value={loyaltyPointsRedeemed}
+                  onChange={(e) => setLoyaltyPointsRedeemed(e.target.value)}
+                  placeholder="0"
+                />
+                <p className="mt-1 text-xs text-slate-500">10 points redeem as roughly Rs 1 discount.</p>
+              </div>
+            )}
+
+            {paymentMethod === 'credit' && !cart.customerId && (
+              <div className="mb-4 rounded-2xl bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                Attach a customer in the cart before selling on credit.
               </div>
             )}
 
@@ -995,11 +937,11 @@ export function POSPage() {
 
               <button
                 onClick={() => placeMutation.mutate(undefined)}
-                disabled={placeMutation.isPending || customerMutation.isPending}
+                disabled={placeMutation.isPending}
                 className="btn-primary w-full py-3 text-base"
               >
                 <CheckCircle className="h-5 w-5" />
-                {placeMutation.isPending || customerMutation.isPending
+                {placeMutation.isPending
                   ? 'Processing…'
                   : paymentMethod === 'credit'
                     ? 'Sell On Credit'
@@ -1027,7 +969,7 @@ export function POSPage() {
                   Download
                 </button>
                 <button className="btn-secondary" onClick={handlePrintInvoiceA5}>
-                  Print A5
+                  Print
                 </button>
                 <button className="btn-secondary" onClick={() => void handleSendWhatsApp()} disabled={isSendingInvoiceWhatsapp}>
                   <MessageCircle className="h-4 w-4" />
@@ -1078,10 +1020,12 @@ export function POSPage() {
                   <table className="w-full min-w-[720px] border-collapse text-sm text-blue-900">
                     <thead className="sticky top-0 bg-white">
                       <tr className="border-b-2 border-blue-900">
-                        <th className="border-r border-blue-900 px-4 py-3 text-left">Name of Drug & Qty.</th>
+                        <th className="border-r border-blue-900 px-4 py-3 text-left">Name of Drug</th>
                         <th className="border-r border-blue-900 px-4 py-3 text-left">Batch No</th>
                         <th className="border-r border-blue-900 px-4 py-3 text-left">Expiry Date</th>
+                        <th className="border-r border-blue-900 px-4 py-3 text-center">Qty</th>
                         <th className="border-r border-blue-900 px-4 py-3 text-right">GST%</th>
+                        <th className="border-r border-blue-900 px-4 py-3 text-right">GST Amt</th>
                         <th className="border-r border-blue-900 px-4 py-3 text-right">Discount</th>
                         <th className="px-4 py-3 text-right">Amount</th>
                       </tr>
@@ -1089,13 +1033,24 @@ export function POSPage() {
                     <tbody>
                       {invoiceSnapshot.items.map((item, index) => (
                         <tr key={`${item.name}-${index}`} className="border-b border-blue-200 align-top">
-                          <td className="border-r border-blue-200 px-4 py-3 break-words">{item.name} ({item.quantityLabel})</td>
+                          <td className="border-r border-blue-200 px-4 py-3 break-words">{item.name}</td>
                           <td className="border-r border-blue-200 px-4 py-3 break-words">{item.batchNo || '-'}</td>
                           <td className="border-r border-blue-200 px-4 py-3 break-words">
                             {item.expiry || '-'}
                           </td>
+                          <td className="border-r border-blue-200 px-4 py-3 text-center whitespace-nowrap">
+                            {item.quantityLabel}
+                          </td>
                           <td className="border-r border-blue-200 px-4 py-3 text-right whitespace-nowrap">
                             {item.gstRate > 0 ? `${item.gstRate}%` : '—'}
+                          </td>
+                          <td className="border-r border-blue-200 px-4 py-3 text-right whitespace-nowrap">
+                            {item.gstRate > 0 ? (
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-xs text-blue-500">₹{(item.unitPrice * item.gstRate / (100 + item.gstRate)).toFixed(2)}/unit</span>
+                                <span className="font-medium">₹{(item.amount * item.gstRate / (100 + item.gstRate)).toFixed(2)}</span>
+                              </div>
+                            ) : '—'}
                           </td>
                           <td className="border-r border-blue-200 px-4 py-3 text-right whitespace-nowrap">
                             {item.discountAmount > 0 ? `₹${item.discountAmount.toFixed(2)}` : '—'}
@@ -1105,20 +1060,20 @@ export function POSPage() {
                       ))}
                       {invoiceSnapshot.totalDiscount > 0 && (
                         <tr className="border-b border-blue-200">
-                          <td colSpan={4} className="px-4 py-2 text-right text-xs text-blue-600">{invoiceSnapshot.footerNote}</td>
+                          <td colSpan={6} className="px-4 py-2 text-right text-xs text-blue-600">{invoiceSnapshot.footerNote}</td>
                           <td className="border-r border-blue-200 px-4 py-2 text-right text-xs font-medium text-blue-700">Total Discount</td>
                           <td className="px-4 py-2 text-right text-xs font-semibold whitespace-nowrap">₹{invoiceSnapshot.totalDiscount.toFixed(2)}</td>
                         </tr>
                       )}
                       <tr className="border-b border-blue-200">
-                        <td colSpan={4} className={`px-4 py-2 ${invoiceSnapshot.totalDiscount > 0 ? '' : 'font-semibold'}`}>
+                        <td colSpan={6} className={`px-4 py-2 ${invoiceSnapshot.totalDiscount > 0 ? '' : 'font-semibold'}`}>
                           {invoiceSnapshot.totalDiscount > 0 ? '' : invoiceSnapshot.footerNote}
                         </td>
                         <td className="border-r border-blue-200 px-4 py-2 text-right text-xs font-medium text-blue-700">GST</td>
                         <td className="px-4 py-2 text-right text-xs font-semibold whitespace-nowrap">₹{invoiceSnapshot.gstAmount.toFixed(2)}</td>
                       </tr>
                       <tr>
-                        <td colSpan={4} className="px-4 py-4 font-semibold">
+                        <td colSpan={6} className="px-4 py-4 font-semibold">
                           {invoiceSnapshot.totalDiscount > 0 ? invoiceSnapshot.footerNote : ''}
                         </td>
                         <td className="border-r border-blue-900 px-4 py-4 text-right font-bold">Total</td>
@@ -1145,10 +1100,14 @@ export function POSPage() {
 
 function CartPanel({
   cart,
-  customerPhone,
-  setCustomerPhone,
-  handleCustomerKeyDown,
-  attachCustomerIfNeeded,
+  customerSearch,
+  setCustomerSearch,
+  showCustomerDropdown,
+  setShowCustomerDropdown,
+  customerSearchResults,
+  isFetchingCustomers,
+  onCustomerSelect,
+  onClearCustomer,
   formatCurrency,
   onCollectPayment,
   onClearCart,
@@ -1156,10 +1115,14 @@ function CartPanel({
   footerContent,
 }: {
   cart: CartPanelStore;
-  customerPhone: string;
-  setCustomerPhone: (value: string) => void;
-  handleCustomerKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => Promise<void>;
-  attachCustomerIfNeeded: () => Promise<string | null>;
+  customerSearch: string;
+  setCustomerSearch: (value: string) => void;
+  showCustomerDropdown: boolean;
+  setShowCustomerDropdown: (v: boolean) => void;
+  customerSearchResults: any[];
+  isFetchingCustomers: boolean;
+  onCustomerSelect: (customer: any) => void;
+  onClearCustomer: () => void;
   formatCurrency: (n: number) => string;
   onCollectPayment?: () => void;
   onClearCart?: () => void;
@@ -1212,30 +1175,49 @@ function CartPanel({
           <div className="mt-2 flex items-center gap-2 rounded-xl bg-blue-50 px-3 py-2 text-sm">
             <UserPlus className="h-3.5 w-3.5 text-blue-600" />
             <span className="font-medium text-blue-700">{cart.customerName}</span>
+            {cart.customerPhone && <span className="text-xs text-blue-400">{cart.customerPhone}</span>}
             <button
-              onClick={() => {
-                cart.setCustomer('', '', null);
-                setCustomerPhone('');
-              }}
+              onClick={() => { cart.setCustomer('', '', null); onClearCustomer(); }}
               className="ml-auto"
             >
               <X className="h-3.5 w-3.5 text-blue-400" />
             </button>
           </div>
         ) : (
-          <div className="mt-2 flex gap-2">
+          <div className="relative mt-2">
+            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
             <input
-              value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
-              onKeyDown={(e) => { void handleCustomerKeyDown(e); }}
-              onBlur={() => {
-                if (customerPhone.trim()) {
-                  void attachCustomerIfNeeded();
-                }
-              }}
-              placeholder="Customer mobile (optional)"
-              className="input h-10 py-2 text-sm"
+              value={customerSearch}
+              onChange={(e) => { setCustomerSearch(e.target.value); setShowCustomerDropdown(true); }}
+              onFocus={() => { if (customerSearch.trim().length > 1) setShowCustomerDropdown(true); }}
+              onBlur={() => setTimeout(() => setShowCustomerDropdown(false), 150)}
+              placeholder="Search customer by name or mobile…"
+              className="input h-10 py-2 pl-9 text-sm"
             />
+            {showCustomerDropdown && customerSearch.trim().length > 1 && (
+              <div className="absolute z-20 mt-1 w-full rounded-xl border border-slate-200 bg-white shadow-lg">
+                {isFetchingCustomers && (
+                  <div className="px-4 py-3 text-sm text-slate-400">Searching…</div>
+                )}
+                {!isFetchingCustomers && customerSearchResults.length === 0 && (
+                  <div className="px-4 py-3 text-sm text-slate-400">No customers found</div>
+                )}
+                {customerSearchResults.map((customer: any) => (
+                  <button
+                    key={customer.id}
+                    type="button"
+                    className="flex w-full items-center justify-between px-4 py-2.5 text-left hover:bg-slate-50 first:rounded-t-xl last:rounded-b-xl"
+                    onMouseDown={() => onCustomerSelect(customer)}
+                  >
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{customer.name ?? 'Customer'}</p>
+                      <p className="text-xs text-slate-500">{customer.phone ?? '—'}</p>
+                    </div>
+                    <span className="text-xs text-slate-400">₹{Number(customer.creditBalance ?? 0).toFixed(2)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

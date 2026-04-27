@@ -12,3 +12,4 @@ coverage
 *.tfstate
 *.tfstate.backup
 .terraform.lock.hcl
+.deploy-logs/

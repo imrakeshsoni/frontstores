@@ -17,6 +17,7 @@ export function InventoryPage() {
   const isMedicalStore = isMedicalShopType(activeShopType);
   const queryClient = useQueryClient();
   const labelSheetRef = useRef<HTMLDivElement>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [showAdjust, setShowAdjust] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showAudit, setShowAudit] = useState(false);
@@ -38,6 +39,19 @@ export function InventoryPage() {
     expiryDate: '',
     notes: '',
   });
+  const [productSearchInput, setProductSearchInput] = useState('');
+  const [showProductDropdown, setShowProductDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowProductDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const { data, isLoading } = useQuery({
     queryKey: ['inventory', shopId],
@@ -129,7 +143,31 @@ export function InventoryPage() {
       }),
     [data?.data, isMedicalStore],
   );
+  const filteredInventoryRows = useMemo(() => {
+    if (!searchQuery) return inventoryRows;
+    const lowerQuery = searchQuery.toLowerCase();
+    return inventoryRows.filter(
+      (row: any) =>
+        row.product_name?.toLowerCase().includes(lowerQuery) ||
+        row.sku?.toLowerCase().includes(lowerQuery) ||
+        row.batchNo?.toLowerCase().includes(lowerQuery)
+    );
+  }, [inventoryRows, searchQuery]);
+
   const parsedImportRows = useMemo(() => parseInventoryImport(importText), [importText]);
+  
+  const filteredAdjustProducts = useMemo(() => {
+    if (!products) return [];
+    if (!productSearchInput) return products;
+    const lowerQuery = productSearchInput.toLowerCase();
+    return products.filter(
+      (p: any) =>
+        p.name?.toLowerCase().includes(lowerQuery) ||
+        p.sku?.toLowerCase().includes(lowerQuery) ||
+        p.barcode?.toLowerCase().includes(lowerQuery)
+    );
+  }, [products, productSearchInput]);
+
   const auditRows = useMemo(
     () =>
       inventoryRows.map((row: any) => {
@@ -270,6 +308,15 @@ export function InventoryPage() {
         }
       />
       <div className="card overflow-hidden">
+        <div className="border-b border-slate-200/60 px-5 py-4">
+          <input
+            type="text"
+            className="input max-w-sm"
+            placeholder="Search inventory by product, SKU, or batch..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
         <table className="data-table">
           <thead>
             <tr>
@@ -279,21 +326,22 @@ export function InventoryPage() {
               {isMedicalStore && <th>Batch Details</th>}
               <th className="text-right">Reorder At</th>
               <th>Status</th>
+              {can('inventory', 'adjust') && <th className="text-right">Action</th>}
             </tr>
           </thead>
           <tbody>
-            {!isLoading && inventoryRows.length === 0 && (
+            {!isLoading && filteredInventoryRows.length === 0 && (
               <tr>
-                <td colSpan={isMedicalStore ? 6 : 5} className="p-0">
+                <td colSpan={isMedicalStore ? 7 : 6} className="p-0">
                   <EmptyState
                     icon={<Boxes className="h-8 w-8" />}
-                    title="Inventory will appear here"
-                    description="Once products are stocked, this screen becomes your clean operating view for quantity and reorder thresholds."
+                    title={searchQuery ? "No matching products found" : "Inventory will appear here"}
+                    description={searchQuery ? "Try a different search term." : "Once products are stocked, this screen becomes your clean operating view for quantity and reorder thresholds."}
                   />
                 </td>
               </tr>
             )}
-            {inventoryRows.map((i: any) => {
+            {filteredInventoryRows.map((i: any) => {
               const isLow = i.reorder_level > 0 && Number(i.rowQuantity) <= Number(i.reorder_level);
               return (
                 <tr key={i.id} className={isLow ? '!bg-rose-50/80' : ''}>
@@ -319,6 +367,27 @@ export function InventoryPage() {
                       <span className="badge badge-green">OK</span>
                     )}
                   </td>
+                  {can('inventory', 'adjust') && (
+                    <td className="text-right">
+                      <button
+                        className="btn-secondary whitespace-nowrap"
+                        onClick={() => {
+                          setAdjustment((current) => ({
+                            ...current,
+                            productId: i.product_id,
+                            batchNo: i.batchNo || '',
+                            manufactureDate: i.manufactureDate || '',
+                            expiryDate: i.expiryDate || '',
+                          }));
+                          setProductSearchInput(i.product_name || '');
+                          setShowProductDropdown(false);
+                          setShowAdjust(true);
+                        }}
+                      >
+                        Adjust
+                      </button>
+                    </td>
+                  )}
                 </tr>
               );
             })}
@@ -393,16 +462,43 @@ export function InventoryPage() {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="md:col-span-2">
                 <label className="mb-2 block text-sm font-medium text-slate-700">Product</label>
-                <select
-                  className="input"
-                  value={adjustment.productId}
-                  onChange={(e) => setAdjustment((current) => ({ ...current, productId: e.target.value }))}
-                >
-                  <option value="">Select product</option>
-                  {(products ?? []).map((product: any) => (
-                    <option key={product.id} value={product.id}>{product.name}</option>
-                  ))}
-                </select>
+                <div className="relative" ref={dropdownRef}>
+                  <input
+                    type="text"
+                    className="input w-full"
+                    placeholder="Search product..."
+                    value={productSearchInput}
+                    onChange={(e) => {
+                      setProductSearchInput(e.target.value);
+                      setAdjustment((current) => ({ ...current, productId: '' }));
+                      setShowProductDropdown(true);
+                    }}
+                    onFocus={() => setShowProductDropdown(true)}
+                  />
+                  {showProductDropdown && (
+                    <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                      {filteredAdjustProducts.length === 0 ? (
+                        <div className="px-4 py-2 text-sm text-slate-500">No products found.</div>
+                      ) : (
+                        filteredAdjustProducts.map((p: any) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 focus:bg-slate-50 focus:outline-none"
+                            onClick={() => {
+                              setAdjustment((current) => ({ ...current, productId: p.id }));
+                              setProductSearchInput(p.name);
+                              setShowProductDropdown(false);
+                            }}
+                          >
+                            <div className="font-medium text-slate-900">{p.name}</div>
+                            {p.sku && <div className="text-xs text-slate-500">SKU: {p.sku}</div>}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">Direction</label>
@@ -508,7 +604,7 @@ export function InventoryPage() {
                       <p className="mt-1 text-xs text-slate-500">{importSourceLabel}</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <button className="btn-secondary" type="button" onClick={downloadInventoryTemplate}>
+                      <button className="btn-secondary" type="button" onClick={() => downloadInventoryTemplate(isMedicalStore)}>
                         <Download className="h-4 w-4" />
                         Template
                       </button>
@@ -531,7 +627,11 @@ export function InventoryPage() {
                       setImportText(event.target.value);
                       setImportSourceLabel('Manual paste or typed data');
                     }}
-                    placeholder={`product_name,sku,barcode,unit,mrp,selling_price,purchase_price,gst_rate,low_stock_quantity,total_units,loose_selling_price,nrx,quantity,batch_no,manufacture_date,expiry_date,supplier_name\nParacetamol 650,PCM650,,strip,35,32,24,12,10,15,3,false,20,BATCH-APR-01,2026-01-10,2028-01-09,Sun Pharma`}
+                    placeholder={
+                      isMedicalStore
+                        ? 'product_name,sku,barcode,unit,mrp,purchase_price,gst_rate,low_stock_quantity,total_units,loose_mrp,nrx,quantity,batch_no,manufacture_date,expiry_date,supplier_name\nParacetamol 650,PCM650,,strip,35,24,12,10,15,3,false,20,BATCH-APR-01,2026-01-10,2028-01-09,Sun Pharma'
+                        : 'product_name,sku,barcode,unit,mrp,selling_price,purchase_price,gst_rate,low_stock_quantity,total_units,loose_selling_price,nrx,quantity,batch_no,manufacture_date,expiry_date,supplier_name\nParacetamol 650,PCM650,,strip,35,32,24,12,10,15,3,false,20,BATCH-APR-01,2026-01-10,2028-01-09,Sun Pharma'
+                    }
                   />
                 </div>
               </div>
@@ -551,7 +651,11 @@ export function InventoryPage() {
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
                   <p className="font-semibold text-slate-800">Supported columns</p>
-                  <p className="mt-2">Use headers like `product_name`, `sku`, `barcode`, `unit`, `mrp`, `selling_price`, `purchase_price`, `gst_rate`, `quantity`, `batch_no`, `manufacture_date`, `expiry_date`, `supplier_name`.</p>
+                  <p className="mt-2">
+                    {isMedicalStore
+                      ? 'Use headers like `product_name`, `sku`, `barcode`, `unit`, `mrp`, `purchase_price`, `gst_rate`, `quantity`, `batch_no`, `manufacture_date`, `expiry_date`, `supplier_name`. `loose_mrp` is supported for strip breakup pricing.'
+                      : 'Use headers like `product_name`, `sku`, `barcode`, `unit`, `mrp`, `selling_price`, `purchase_price`, `gst_rate`, `quantity`, `batch_no`, `manufacture_date`, `expiry_date`, `supplier_name`.'}
+                  </p>
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
@@ -959,12 +1063,12 @@ function buildImportRow(headers: string[], values: string[]): { row: InventoryIm
       barcode: emptyToUndefined(get('barcode')),
       unit: emptyToUndefined(get('unit')),
       mrp: parseOptionalNumber(get('mrp')),
-      sellingPrice: parseOptionalNumber(get('selling_price', 'sellingprice', 'sale_price')),
+      sellingPrice: parseOptionalNumber(get('selling_price', 'sellingprice', 'sale_price', 'mrp')),
       purchasePrice: parseOptionalNumber(get('purchase_price', 'purchaseprice', 'buy_price', 'cost_price')),
       gstRate: parseOptionalNumber(get('gst_rate', 'gst')),
       lowStockQuantity: parseOptionalNumber(get('low_stock_quantity', 'low_stock', 'reorder_level')),
       totalUnits: parseOptionalNumber(get('total_units', 'pack_size')),
-      looseSellingPrice: parseOptionalNumber(get('loose_selling_price', 'loose_price')),
+      looseSellingPrice: parseOptionalNumber(get('loose_selling_price', 'loose_price', 'loose_mrp')),
       nrx: parseOptionalBoolean(get('nrx', 'is_nrx', 'prescription_required')),
       quantity,
       batchNo: emptyToUndefined(get('batch_no', 'batch', 'batch_number')),
@@ -1046,12 +1150,18 @@ function escapeCsvValue(value: string) {
   return value;
 }
 
-function downloadInventoryTemplate() {
-  const csv = [
-    'product_name,sku,barcode,unit,mrp,selling_price,purchase_price,gst_rate,low_stock_quantity,total_units,loose_selling_price,nrx,quantity,batch_no,manufacture_date,expiry_date,supplier_name',
-    'Paracetamol 650,PCM650,,strip,35,32,24,12,10,15,3,false,20,BATCH-APR-01,2026-01-10,2028-01-09,Sun Pharma',
-    'Amoxicillin 500,AMX500,,box,120,110,84,12,8,,,true,12,BATCH-APR-02,2026-02-15,2028-02-14,Cipla',
-  ].join('\n');
+function downloadInventoryTemplate(isMedicalStore: boolean) {
+  const csv = isMedicalStore
+    ? [
+        'product_name,sku,barcode,unit,mrp,purchase_price,gst_rate,low_stock_quantity,total_units,loose_mrp,nrx,quantity,batch_no,manufacture_date,expiry_date,supplier_name',
+        'Paracetamol 650,PCM650,,strip,35,24,12,10,15,3,false,20,BATCH-APR-01,2026-01-10,2028-01-09,Sun Pharma',
+        'Amoxicillin 500,AMX500,,box,120,84,12,8,,,true,12,BATCH-APR-02,2026-02-15,2028-02-14,Cipla',
+      ].join('\n')
+    : [
+        'product_name,sku,barcode,unit,mrp,selling_price,purchase_price,gst_rate,low_stock_quantity,total_units,loose_selling_price,nrx,quantity,batch_no,manufacture_date,expiry_date,supplier_name',
+        'Paracetamol 650,PCM650,,strip,35,32,24,12,10,15,3,false,20,BATCH-APR-01,2026-01-10,2028-01-09,Sun Pharma',
+        'Amoxicillin 500,AMX500,,box,120,110,84,12,8,,,true,12,BATCH-APR-02,2026-02-15,2028-02-14,Cipla',
+      ].join('\n');
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);

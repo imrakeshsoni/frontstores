@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { DatabaseModule, EventBusService } from '@shoposphere/common';
 import { OnboardingController } from './onboarding/onboarding.controller';
 import { OnboardingService } from './onboarding/onboarding.service';
+import { SignupEmailService } from './onboarding/signup-email.service';
 import { BillingController } from './subscriptions/billing.controller';
 import { Tenant } from './tenants/tenant.entity';
 import { SubscriptionPlan, TenantSubscription } from './subscriptions/subscription.entity';
@@ -14,7 +15,7 @@ import { SubscriptionPlan, TenantSubscription } from './subscriptions/subscripti
     DatabaseModule.forRoot([Tenant, SubscriptionPlan, TenantSubscription]),
     TypeOrmModule.forFeature([Tenant, SubscriptionPlan, TenantSubscription]),
   ],
-  providers: [OnboardingService, EventBusService],
+  providers: [OnboardingService, SignupEmailService, EventBusService],
   controllers: [OnboardingController, BillingController],
 })
 export class AppModule {}

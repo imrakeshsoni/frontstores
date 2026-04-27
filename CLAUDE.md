@@ -5,6 +5,38 @@ Owner: imrakeshsoni@gmail.com | GitHub: github.com/imrakeshsoni/cloudystores
 
 ---
 
+## ⚠️ Data Safety Policy — Non-Negotiable
+
+**Preserving user data is an absolute requirement. Any change that violates this
+policy must be blocked regardless of urgency.**
+
+| Rule | Detail |
+|------|--------|
+| No data destruction | Migrations must never DROP, TRUNCATE, or DELETE user rows |
+| No auto-seeding | Application code must never insert demo/default data on startup or login |
+| Backup before migrate | Every migration run takes a full DB backup first |
+| Idempotent migrations | Every migration must be safe to re-run (IF NOT EXISTS, ON CONFLICT DO NOTHING, ADD COLUMN IF NOT EXISTS) |
+| Checksum tracking | `_schema_migrations` table records every applied file; already-applied files are skipped |
+| Env isolation | Local, staging, and production use completely separate databases — never share or copy between envs |
+| Audit before run | `migrate-safe.sh` scans every migration for DROP/TRUNCATE/DELETE/destructive ALTER before executing |
+| Destructive ops blocked | Any script containing destructive SQL fails immediately with a clear error |
+
+**How to write a safe migration:**
+```sql
+-- ✅ Good — idempotent, non-destructive
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS notes TEXT;
+CREATE INDEX IF NOT EXISTS idx_orders_tenant ON orders(tenant_id);
+UPDATE bill_sequences SET prefix = 'OD' WHERE prefix = 'ORD';  -- safe, targeted
+
+-- ❌ Blocked — migrate-safe.sh will refuse to run these
+DROP TABLE old_sessions;
+TRUNCATE products;
+DELETE FROM customers;
+ALTER TABLE users DROP COLUMN legacy_field;
+```
+
+---
+
 ## Deploy to Google Cloud (THE ONLY DEPLOY COMMAND YOU NEED)
 
 ```bash
@@ -18,7 +50,8 @@ build → deploy backends → deploy frontend (in correct order).
 **Flags:**
 ```bash
 bash tools/deploy-gcp.sh --no-build   # skip rebuild, just redeploy current images
-bash tools/deploy-gcp.sh --migrate    # also run DB migrations (first-time setup)
+bash tools/deploy-gcp.sh --migrate    # also run DB migrations (backup taken first)
+bash tools/deploy-gcp.sh --dry-run    # print the full plan without executing anything
 ```
 
 **Prerequisites (one-time setup):**
@@ -44,7 +77,7 @@ gcloud config set project cloudystores
 **Live service URLs:**
 | Service          | URL                                                        |
 |------------------|------------------------------------------------------------|
-| **Frontend**     | https://frontend-bu5d62ltja-el.a.run.app                  |
+| **Frontend**     | https://frontstores.com                                    |
 | auth-service     | https://auth-service-bu5d62ltja-el.a.run.app              |
 | tenant-service   | https://tenant-service-bu5d62ltja-el.a.run.app            |
 | core-api         | https://core-api-bu5d62ltja-el.a.run.app                  |
@@ -113,16 +146,70 @@ npm run dev                   # starts all services via Turborepo
 
 ## DB Migrations
 
-Migrations only need to run once (or when a new migration file is added).
-They have already been run for the live database as of 2026-04-25.
+All migrations go through `tools/migrate-safe.sh` which enforces:
+1. Destructive-command audit (blocks DROP, TRUNCATE, DELETE, destructive ALTER)
+2. Full database backup before any migration runs
+3. Checksum-based skip — already-applied files are never re-executed
+4. Applied-file log in `_schema_migrations` table
 
-To run them again (e.g. after adding a new migration file):
+**To add a new migration:**
+1. Create `tools/migrations/008_description.sql` — use `IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS`
+2. Add the filename to the `MIGRATIONS` array in `tools/migrate-safe.sh`
+3. Test locally: `bash tools/migrate-safe.sh --env local`
+4. Deploy with: `bash tools/deploy-gcp.sh --migrate`
+
+---
+
+## ⚠️ Multi-Tenant Isolation Rules — Mandatory for Every New Table
+
+This app serves N independent businesses (medical stores, grocery shops, etc.).
+**Each business must be 100% isolated — they must never see each other's data.**
+This is enforced at two layers: application code (tenant_id in every query) AND
+PostgreSQL Row Level Security (RLS). Both layers must be present.
+
+### Every new table MUST have all four of these — no exceptions:
+
+```sql
+-- 1. tenant_id column
+CREATE TABLE IF NOT EXISTS your_table (
+  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id  UUID NOT NULL REFERENCES tenants(id),   -- ← REQUIRED
+  -- ... your columns ...
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 2. Enable RLS
+ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;
+
+-- 3. Force RLS (blocks the DB owner user from bypassing policies)
+ALTER TABLE your_table FORCE ROW LEVEL SECURITY;
+
+-- 4. Isolation policy
+CREATE POLICY tenant_isolation_your_table ON your_table
+  USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid)
+  WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid);
+
+-- 5. Index (performance)
+CREATE INDEX IF NOT EXISTS idx_your_table_tenant ON your_table(tenant_id);
+```
+
+### What NEVER goes in a migration:
+- `DROP TABLE` / `TRUNCATE` / `DELETE FROM` / `DROP COLUMN` — blocked by migrate-safe.sh
+- Demo data, seed data, default records — accounts must always start empty
+- Tables without `tenant_id` that store per-business data
+
+**To run migrations locally (safe, with backup):**
+```bash
+bash tools/migrate-safe.sh --env local
+```
+
+**To run migrations in production (backup mandatory, auto-taken):**
 ```bash
 bash tools/deploy-gcp.sh --migrate
 ```
 
-To write a new migration: add a file `tools/migrations/005_description.sql`
-and add it to the loop in `tools/deploy-gcp.sh`.
+Migration history is tracked in the `_schema_migrations` table.
+Migrations already applied are silently skipped on every subsequent run.
 
 ---
 

@@ -5,6 +5,10 @@ import { Toaster } from 'sonner';
 import App from './App';
 import './index.css';
 
+// Apply saved theme before first render to avoid flash
+const savedTheme = localStorage.getItem('theme');
+if (savedTheme === 'dark') document.documentElement.classList.add('dark');
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

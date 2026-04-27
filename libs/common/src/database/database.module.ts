@@ -13,7 +13,7 @@ export const createDatabaseConfig = (
 
   // When DB_PASSWORD is injected (e.g. Cloud Run secret), parse URL components
   // manually so we avoid URL-encoding issues and the pg "Invalid URL" empty-host bug.
-  if (injectedPassword !== undefined) {
+  if (injectedPassword) {
     // Extract ?host= param (Cloud SQL Auth Proxy socket path)
     const hostParam = rawUrl.match(/[?&]host=([^&]+)/)?.[1];
     const socketPath = hostParam ? decodeURIComponent(hostParam) : undefined;

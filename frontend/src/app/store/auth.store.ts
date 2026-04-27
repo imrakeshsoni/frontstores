@@ -7,6 +7,7 @@ interface User {
   name: string;
   email: string;
   tenantId: string;
+  isPlatformAdmin?: boolean;
   permissions: Record<string, Record<string, boolean>>;
 }
 
@@ -50,14 +51,15 @@ export const useAuthStore = create<AuthState>()(
           accessToken: access,
           refreshToken: refresh,
           isAuthenticated: true,
-          activeShopId: state.activeShopId ?? payload?.shopId ?? null,
-          user: state.user ?? payload ? {
-            id: state.user?.id ?? payload?.sub ?? '',
+          activeShopId: payload?.shopId ?? state.activeShopId ?? null,
+          user: {
+            id: payload?.sub ?? state.user?.id ?? '',
             name: state.user?.name ?? 'Store Owner',
-            email: state.user?.email ?? payload?.email ?? '',
-            tenantId: state.user?.tenantId ?? payload?.tenantId ?? '',
+            email: payload?.email ?? state.user?.email ?? '',
+            tenantId: payload?.tenantId ?? state.user?.tenantId ?? '',
+            isPlatformAdmin: payload?.isPlatformAdmin ?? state.user?.isPlatformAdmin ?? false,
             permissions: payload?.permissions ?? state.user?.permissions ?? {},
-          } : null,
+          },
         }));
       },
 
@@ -67,6 +69,7 @@ export const useAuthStore = create<AuthState>()(
           name: user.name ?? state.user?.name ?? 'Store Owner',
           email: user.email ?? state.user?.email ?? '',
           tenantId: user.tenantId ?? state.user?.tenantId ?? '',
+          isPlatformAdmin: user.isPlatformAdmin ?? state.user?.isPlatformAdmin ?? false,
           permissions: user.permissions ?? state.user?.permissions ?? {},
         },
       })),
@@ -80,6 +83,7 @@ export const useAuthStore = create<AuthState>()(
             name: user.name ?? state.user?.name ?? 'Store Owner',
             email: user.email ?? state.user?.email ?? '',
             tenantId: user.tenantId ?? state.user?.tenantId ?? '',
+            isPlatformAdmin: user.isPlatformAdmin ?? state.user?.isPlatformAdmin ?? false,
             permissions: user.permissions ?? state.user?.permissions ?? {},
           },
           shops: shops ?? state.shops,
@@ -98,6 +102,7 @@ export const useAuthStore = create<AuthState>()(
 
       can: (resource, action) => {
         const perms = get().user?.permissions ?? {};
+        if (Object.keys(perms).length === 0) return true;
         return perms[resource]?.[action] === true;
       },
     }),

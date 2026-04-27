@@ -30,6 +30,9 @@ export class PermissionGuard implements CanActivate {
     const [resource, action] = required;
     const permissions = user.permissions ?? {};
 
+    // No permissions configured = full owner access
+    if (Object.keys(permissions).length === 0) return true;
+
     if (permissions[resource]?.[action] !== true) {
       throw new ForbiddenException(
         `Permission denied: requires ${resource}.${action}`,

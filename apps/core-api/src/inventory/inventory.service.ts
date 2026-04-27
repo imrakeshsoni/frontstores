@@ -646,7 +646,7 @@ export class InventoryService {
       barcode: barcode || undefined,
       unit: row.unit || 'piece',
       mrp: row.mrp,
-      sellingPrice: row.sellingPrice,
+      sellingPrice: row.sellingPrice ?? row.mrp,
       purchasePrice: row.purchasePrice,
       gstRate: row.gstRate ?? 12,
       attributes: {

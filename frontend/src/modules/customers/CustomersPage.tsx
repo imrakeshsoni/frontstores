@@ -305,166 +305,178 @@ export function CustomersPage() {
 
       {selectedCustomer && customerDetail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-          <div className="card-strong w-full max-w-3xl rounded-[2rem] p-6">
-            <div className="mb-6 flex items-center justify-between">
+          <div className="card-strong flex w-full max-w-6xl flex-col overflow-hidden rounded-[2rem]" style={{ maxHeight: '92vh' }}>
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-200/60 px-6 py-5">
               <div>
                 <p className="section-label">Customer</p>
-                <h2 className="mt-2 text-2xl">{customerDetail.name}</h2>
+                <h2 className="mt-1 text-2xl">{customerDetail.name}</h2>
               </div>
               <button className="btn-secondary" onClick={() => setSelectedCustomer(null)}>Close</button>
             </div>
 
-            <div className="mb-6 grid gap-4 md:grid-cols-3">
-              <div className="card p-4">
-                <p className="text-xs text-slate-500">Phone</p>
-                <p className="mt-1 font-semibold text-slate-900">{customerDetail.phone ?? '—'}</p>
-              </div>
-              <div className="card p-4">
-                <p className="text-xs text-slate-500">Credit Balance</p>
-                <p className="mt-1 font-semibold text-slate-900">₹{Number(customerDetail.creditBalance ?? 0).toFixed(2)}</p>
-              </div>
-              <div className="card p-4">
-                <p className="text-xs text-slate-500">Loyalty Points</p>
-                <p className="mt-1 font-semibold text-slate-900">{customerDetail.loyaltyPoints ?? 0}</p>
-              </div>
-            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
 
-            <div className="mb-6 grid gap-4 md:grid-cols-4">
-              <div className="card p-4">
-                <p className="text-xs text-slate-500">Current</p>
-                <p className="mt-1 font-semibold text-slate-900">₹{Number(customerDetail.aging?.current ?? 0).toFixed(2)}</p>
-              </div>
-              <div className="card p-4">
-                <p className="text-xs text-slate-500">31-60 Days</p>
-                <p className="mt-1 font-semibold text-slate-900">₹{Number(customerDetail.aging?.bucket_31_60 ?? 0).toFixed(2)}</p>
-              </div>
-              <div className="card p-4">
-                <p className="text-xs text-slate-500">61-90 Days</p>
-                <p className="mt-1 font-semibold text-slate-900">₹{Number(customerDetail.aging?.bucket_61_90 ?? 0).toFixed(2)}</p>
-              </div>
-              <div className="card p-4">
-                <p className="text-xs text-slate-500">90+ Days</p>
-                <p className="mt-1 font-semibold text-rose-600">₹{Number(customerDetail.aging?.bucket_90_plus ?? 0).toFixed(2)}</p>
-              </div>
-            </div>
-
-            <div className="card p-4">
-              <div className="flex flex-col gap-3 md:flex-row md:items-end">
-                <div className="flex-1">
-                  <label className="mb-2 block text-sm font-medium text-slate-700">Collect Credit Payment</label>
-                  <input
-                    type="number"
-                    className="input"
-                    value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
-                    placeholder="Amount"
-                  />
-                </div>
-                <button className="btn-secondary" onClick={() => collectMutation.mutate()} disabled={collectMutation.isPending}>
-                  <Banknote className="h-4 w-4" />
-                  {collectMutation.isPending ? 'Collecting…' : 'Collect'}
-                </button>
-              </div>
-            </div>
-
-            <div className="card p-4">
-              <div className="flex flex-col gap-3 md:flex-row md:items-end">
-                <div className="flex-1">
-                  <label className="mb-2 block text-sm font-medium text-slate-700">Reminder Note</label>
-                  <input
-                    className="input"
-                    value={reminderNotes}
-                    onChange={(e) => setReminderNotes(e.target.value)}
-                    placeholder="Called customer / follow-up promised / WhatsApp reminder"
-                  />
-                </div>
-                <button className="btn-secondary" onClick={() => reminderMutation.mutate()} disabled={reminderMutation.isPending}>
-                  {reminderMutation.isPending ? 'Saving…' : 'Log Reminder'}
-                </button>
-              </div>
-            </div>
-
-            <div className="card overflow-hidden">
-              <div className="border-b border-slate-200/60 px-4 py-3">
-                <p className="text-sm font-semibold text-slate-950">Linked Orders</p>
-              </div>
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Bill</th>
-                    <th>Date</th>
-                    <th>Status</th>
-                    <th className="text-right">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(customerDetail.orders ?? []).length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="text-center text-slate-400">No orders linked yet</td>
-                    </tr>
-                  )}
-                  {(customerDetail.orders ?? []).map((order: any) => (
-                    <tr key={order.id}>
-                      <td className="font-semibold text-slate-900">{order.bill_number}</td>
-                      <td>{new Date(order.created_at).toLocaleDateString()}</td>
-                      <td>{order.payment_status}</td>
-                      <td className="text-right">₹{Number(order.total ?? 0).toFixed(2)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="card overflow-hidden">
-              <div className="border-b border-slate-200/60 px-4 py-3">
-                <p className="text-sm font-semibold text-slate-950">Customer Ledger</p>
-              </div>
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Bill</th>
-                    <th>Date</th>
-                    <th>Type</th>
-                    <th>Status</th>
-                    <th className="text-right">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(customerDetail.ledger ?? []).length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="text-center text-slate-400">No ledger entries yet</td>
-                    </tr>
-                  )}
-                  {(customerDetail.ledger ?? []).map((entry: any) => (
-                    <tr key={`${entry.id}-${entry.created_at}`}>
-                      <td className="font-semibold text-slate-900">{entry.bill_number}</td>
-                      <td>{new Date(entry.created_at).toLocaleDateString()}</td>
-                      <td className="capitalize">{entry.entry_type}</td>
-                      <td>{entry.payment_status}</td>
-                      <td className="text-right">₹{Number(entry.total ?? 0).toFixed(2)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="card overflow-hidden">
-              <div className="border-b border-slate-200/60 px-4 py-3">
-                <p className="text-sm font-semibold text-slate-950">Reminder History</p>
-              </div>
-              <div className="divide-y divide-slate-100">
-                {(customerDetail.reminderHistory ?? []).length === 0 && (
-                  <div className="px-4 py-5 text-sm text-slate-400">No reminders logged yet.</div>
-                )}
-                {(customerDetail.reminderHistory ?? []).map((entry: any, index: number) => (
-                  <div key={`${entry.sentAt}-${index}`} className="px-4 py-3 text-sm">
-                    <p className="font-semibold text-slate-900">{entry.channel ?? 'manual'} reminder</p>
-                    <p className="mt-1 text-slate-500">
-                      {new Date(entry.sentAt).toLocaleString()} · Outstanding ₹{Number(entry.outstanding ?? 0).toFixed(2)}
-                    </p>
-                    {entry.notes && <p className="mt-1 text-slate-600">{entry.notes}</p>}
+                {/* Left column: stats + actions */}
+                <div className="flex flex-col gap-4">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="card p-4">
+                      <p className="text-xs text-slate-500">Phone</p>
+                      <p className="mt-1 font-semibold text-slate-900">{customerDetail.phone ?? '—'}</p>
+                    </div>
+                    <div className="card p-4">
+                      <p className="text-xs text-slate-500">Credit Balance</p>
+                      <p className="mt-1 font-semibold text-slate-900">₹{Number(customerDetail.creditBalance ?? 0).toFixed(2)}</p>
+                    </div>
+                    <div className="card p-4">
+                      <p className="text-xs text-slate-500">Loyalty Points</p>
+                      <p className="mt-1 font-semibold text-slate-900">{customerDetail.loyaltyPoints ?? 0}</p>
+                    </div>
                   </div>
-                ))}
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="card p-4">
+                      <p className="text-xs text-slate-500">Current</p>
+                      <p className="mt-1 font-semibold text-slate-900">₹{Number(customerDetail.aging?.current ?? 0).toFixed(2)}</p>
+                    </div>
+                    <div className="card p-4">
+                      <p className="text-xs text-slate-500">31-60 Days</p>
+                      <p className="mt-1 font-semibold text-slate-900">₹{Number(customerDetail.aging?.bucket_31_60 ?? 0).toFixed(2)}</p>
+                    </div>
+                    <div className="card p-4">
+                      <p className="text-xs text-slate-500">61-90 Days</p>
+                      <p className="mt-1 font-semibold text-slate-900">₹{Number(customerDetail.aging?.bucket_61_90 ?? 0).toFixed(2)}</p>
+                    </div>
+                    <div className="card p-4">
+                      <p className="text-xs text-slate-500">90+ Days</p>
+                      <p className="mt-1 font-semibold text-rose-600">₹{Number(customerDetail.aging?.bucket_90_plus ?? 0).toFixed(2)}</p>
+                    </div>
+                  </div>
+
+                  <div className="card p-4">
+                    <label className="mb-2 block text-sm font-medium text-slate-700">Collect Credit Payment</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        className="input flex-1"
+                        value={paymentAmount}
+                        onChange={(e) => setPaymentAmount(e.target.value)}
+                        placeholder="Amount"
+                      />
+                      <button className="btn-secondary shrink-0" onClick={() => collectMutation.mutate()} disabled={collectMutation.isPending}>
+                        <Banknote className="h-4 w-4" />
+                        {collectMutation.isPending ? 'Collecting…' : 'Collect'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="card p-4">
+                    <label className="mb-2 block text-sm font-medium text-slate-700">Reminder Note</label>
+                    <div className="flex gap-2">
+                      <input
+                        className="input flex-1"
+                        value={reminderNotes}
+                        onChange={(e) => setReminderNotes(e.target.value)}
+                        placeholder="Called customer / follow-up promised / WhatsApp reminder"
+                      />
+                      <button className="btn-secondary shrink-0" onClick={() => reminderMutation.mutate()} disabled={reminderMutation.isPending}>
+                        {reminderMutation.isPending ? 'Saving…' : 'Log Reminder'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="card overflow-hidden">
+                    <div className="border-b border-slate-200/60 px-4 py-3">
+                      <p className="text-sm font-semibold text-slate-950">Reminder History</p>
+                    </div>
+                    <div className="max-h-48 divide-y divide-slate-100 overflow-y-auto">
+                      {(customerDetail.reminderHistory ?? []).length === 0 && (
+                        <div className="px-4 py-5 text-sm text-slate-400">No reminders logged yet.</div>
+                      )}
+                      {(customerDetail.reminderHistory ?? []).map((entry: any, index: number) => (
+                        <div key={`${entry.sentAt}-${index}`} className="px-4 py-3 text-sm">
+                          <p className="font-semibold text-slate-900">{entry.channel ?? 'manual'} reminder</p>
+                          <p className="mt-1 text-slate-500">
+                            {new Date(entry.sentAt).toLocaleString()} · Outstanding ₹{Number(entry.outstanding ?? 0).toFixed(2)}
+                          </p>
+                          {entry.notes && <p className="mt-1 text-slate-600">{entry.notes}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right column: orders + ledger */}
+                <div className="flex flex-col gap-4">
+                  <div className="card overflow-hidden">
+                    <div className="border-b border-slate-200/60 px-4 py-3">
+                      <p className="text-sm font-semibold text-slate-950">Linked Orders</p>
+                    </div>
+                    <div className="max-h-72 overflow-y-auto">
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>Bill</th>
+                            <th>Date</th>
+                            <th>Status</th>
+                            <th className="text-right">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(customerDetail.orders ?? []).length === 0 && (
+                            <tr>
+                              <td colSpan={4} className="text-center text-slate-400">No orders linked yet</td>
+                            </tr>
+                          )}
+                          {(customerDetail.orders ?? []).map((order: any) => (
+                            <tr key={order.id}>
+                              <td className="font-semibold text-slate-900">{order.bill_number}</td>
+                              <td>{new Date(order.created_at).toLocaleDateString()}</td>
+                              <td>{order.payment_status}</td>
+                              <td className="text-right">₹{Number(order.total ?? 0).toFixed(2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="card overflow-hidden">
+                    <div className="border-b border-slate-200/60 px-4 py-3">
+                      <p className="text-sm font-semibold text-slate-950">Customer Ledger</p>
+                    </div>
+                    <div className="max-h-72 overflow-y-auto">
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>Bill</th>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                            <th className="text-right">Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(customerDetail.ledger ?? []).length === 0 && (
+                            <tr>
+                              <td colSpan={5} className="text-center text-slate-400">No ledger entries yet</td>
+                            </tr>
+                          )}
+                          {(customerDetail.ledger ?? []).map((entry: any) => (
+                            <tr key={`${entry.id}-${entry.created_at}`}>
+                              <td className="font-semibold text-slate-900">{entry.bill_number}</td>
+                              <td>{new Date(entry.created_at).toLocaleDateString()}</td>
+                              <td className="capitalize">{entry.entry_type}</td>
+                              <td>{entry.payment_status}</td>
+                              <td className="text-right">₹{Number(entry.total ?? 0).toFixed(2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
               </div>
             </div>
           </div>

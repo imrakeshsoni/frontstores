@@ -6,7 +6,6 @@ import { apiClient } from '@/lib/api/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 
 const LoginPage = lazy(() => import('@/modules/auth/LoginPage').then((module) => ({ default: module.LoginPage })));
-const RegisterPage = lazy(() => import('@/modules/auth/RegisterPage').then((module) => ({ default: module.RegisterPage })));
 const Dashboard = lazy(() => import('@/modules/dashboard/Dashboard').then((module) => ({ default: module.Dashboard })));
 const POSPage = lazy(() => import('@/modules/pos/POSPage').then((module) => ({ default: module.POSPage })));
 const ProductsPage = lazy(() => import('@/modules/products/ProductsPage').then((module) => ({ default: module.ProductsPage })));
@@ -16,6 +15,7 @@ const CustomersPage = lazy(() => import('@/modules/customers/CustomersPage').the
 const SuppliersPage = lazy(() => import('@/modules/suppliers/SuppliersPage').then((module) => ({ default: module.SuppliersPage })));
 const ReportsPage = lazy(() => import('@/modules/reports/ReportsPage').then((module) => ({ default: module.ReportsPage })));
 const SettingsPage = lazy(() => import('@/modules/settings/SettingsPage').then((module) => ({ default: module.SettingsPage })));
+const AdminPage = lazy(() => import('@/modules/admin/AdminPage').then((module) => ({ default: module.AdminPage })));
 
 function RouteFallback() {
   return (
@@ -195,7 +195,7 @@ export default function App() {
       <Suspense fallback={<RouteFallback />}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/register" element={<Navigate to="/login" replace />} />
           <Route
             path="/"
             element={
@@ -214,6 +214,7 @@ export default function App() {
             <Route path="suppliers" element={<SuppliersRoute />} />
             <Route path="reports" element={<ReportsRoute />} />
             <Route path="settings" element={<SettingsRoute />} />
+            <Route path="admin" element={<AdminPage />} />
           </Route>
         </Routes>
       </Suspense>
