@@ -189,7 +189,7 @@ export function ReportsPage() {
 
       {tab === 'margin' && (
         <div className="card overflow-hidden">
-          <table className="data-table">
+          <div className="overflow-x-auto"><table className="data-table">
             <thead>
               <tr>
                 <th>Product</th>
@@ -212,7 +212,7 @@ export function ReportsPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </div>
       )}
 
@@ -233,7 +233,7 @@ export function ReportsPage() {
             </div>
           </div>
           <div className="card overflow-hidden">
-            <table className="data-table">
+            <div className="overflow-x-auto"><table className="data-table">
               <thead>
                 <tr>
                   <th>Name</th>
@@ -256,7 +256,7 @@ export function ReportsPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           </div>
         </div>
       )}
@@ -278,7 +278,7 @@ export function ReportsPage() {
             </div>
           </div>
           <div className="card overflow-hidden">
-            <table className="data-table">
+            <div className="overflow-x-auto"><table className="data-table">
               <thead>
                 <tr>
                   <th>Product</th>
@@ -297,7 +297,7 @@ export function ReportsPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           </div>
         </div>
       )}
@@ -320,7 +320,7 @@ export function ReportsPage() {
                   Total Tax Collected: <span className="text-blue-600 font-bold">{fmt(Number(gstData.totalTaxCollected))}</span>
                 </p>
               </div>
-              <table className="data-table">
+              <div className="overflow-x-auto"><table className="data-table">
                 <thead>
                   <tr>
                     <th>GST Rate</th>
@@ -343,7 +343,7 @@ export function ReportsPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             </div>
           )}
         </div>
@@ -373,7 +373,7 @@ export function ReportsPage() {
               </div>
 
               <div className="card overflow-hidden">
-                <table className="data-table">
+                <div className="overflow-x-auto"><table className="data-table">
                   <thead>
                     <tr>
                       <th>Payment Method</th>
@@ -395,7 +395,7 @@ export function ReportsPage() {
                       </tr>
                     )}
                   </tbody>
-                </table>
+                </table></div>
               </div>
             </>
           )}
@@ -404,7 +404,7 @@ export function ReportsPage() {
 
       {tab === 'audit' && (
         <div className="card overflow-hidden">
-          <table className="data-table">
+          <div className="overflow-x-auto"><table className="data-table">
             <thead>
               <tr>
                 <th>Time</th>
@@ -430,14 +430,14 @@ export function ReportsPage() {
                 </tr>
               )}
             </tbody>
-          </table>
+          </table></div>
         </div>
       )}
 
       {/* Stock Valuation tab */}
       {tab === 'valuation' && (
         <div className="card overflow-hidden">
-          <table className="data-table">
+          <div className="overflow-x-auto"><table className="data-table">
             <thead>
               <tr>
                 <th>Product</th>
@@ -460,7 +460,7 @@ export function ReportsPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </div>
       )}
 
@@ -480,7 +480,7 @@ export function ReportsPage() {
           </div>
 
           <div className="card overflow-hidden">
-            <table className="data-table">
+            <div className="overflow-x-auto"><table className="data-table">
               <thead>
                 <tr>
                   <th>Message</th>
@@ -511,7 +511,7 @@ export function ReportsPage() {
                   </tr>
                 )}
               </tbody>
-            </table>
+            </table></div>
           </div>
         </div>
       )}

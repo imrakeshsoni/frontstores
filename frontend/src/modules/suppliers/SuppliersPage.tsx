@@ -294,6 +294,7 @@ export function SuppliersPage() {
       </div>
 
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="data-table">
           <thead>
             <tr>
@@ -351,6 +352,7 @@ export function SuppliersPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       <div className="card overflow-hidden">
@@ -358,6 +360,7 @@ export function SuppliersPage() {
           <h3 className="text-lg font-semibold text-slate-950">Recent Purchases</h3>
           <p className="mt-1 text-sm text-slate-500">Draft purchase orders can be received later when stock actually arrives.</p>
         </div>
+        <div className="overflow-x-auto">
         <table className="data-table">
           <thead>
             <tr>
@@ -391,6 +394,7 @@ export function SuppliersPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {data?.meta && (

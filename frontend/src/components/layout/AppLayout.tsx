@@ -63,7 +63,7 @@ export function AppLayout() {
     : NAV_ITEMS;
 
   return (
-    <div className="flex min-h-screen" style={{ backgroundColor: 'var(--bg)' }}>
+    <div className="flex h-screen overflow-hidden" style={{ backgroundColor: 'var(--bg)' }}>
       {/* Sidebar */}
       <aside
         className="hidden lg:flex w-64 flex-col"
@@ -139,7 +139,7 @@ export function AppLayout() {
       </aside>
 
       {/* Main content */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Mobile top bar */}
         <header
           className="lg:hidden sticky top-0 z-20 flex items-center justify-between px-4 py-3"
@@ -190,7 +190,7 @@ export function AppLayout() {
           ))}
         </div>
 
-        <main className="flex-1 min-w-0">
+        <main className="flex-1 min-w-0 overflow-y-auto">
           <Outlet />
         </main>
       </div>

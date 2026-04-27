@@ -317,6 +317,7 @@ export function InventoryPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
+        <div className="overflow-x-auto">
         <table className="data-table">
           <thead>
             <tr>
@@ -393,6 +394,7 @@ export function InventoryPage() {
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       {isMedicalStore && (
@@ -401,6 +403,7 @@ export function InventoryPage() {
             <h3 className="text-lg font-semibold text-slate-950">Expiry Watch</h3>
             <p className="mt-1 text-sm text-slate-500">Batches expiring in the next 90 days so the store can discount, return, or clear them early.</p>
           </div>
+          <div className="overflow-x-auto">
           <table className="data-table">
             <thead>
               <tr>
@@ -445,6 +448,7 @@ export function InventoryPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

@@ -211,6 +211,7 @@ export function ProductsPage() {
       </div>
 
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="data-table">
           <thead>
             <tr>
@@ -293,6 +294,7 @@ export function ProductsPage() {
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       {data?.meta && (
