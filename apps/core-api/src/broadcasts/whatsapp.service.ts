@@ -1,17 +1,32 @@
 import { Injectable, Logger } from '@nestjs/common';
 
+export interface WhatsAppCredentials {
+  accessToken: string;
+  phoneNumberId: string;
+  apiVersion?: string;
+}
+
 @Injectable()
 export class WhatsAppService {
   private readonly logger = new Logger(WhatsAppService.name);
 
-  async sendTextMessage(to: string, body: string): Promise<{ success: boolean; data?: unknown; error?: string }> {
-    return this.sendMessage(to, {
-      type: 'text',
-      text: {
-        preview_url: false,
-        body,
-      },
-    });
+  resolveCredentials(override?: Partial<WhatsAppCredentials>): WhatsAppCredentials | null {
+    const accessToken = override?.accessToken || process.env.WHATSAPP_ACCESS_TOKEN;
+    const phoneNumberId = override?.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID;
+    if (!accessToken || !phoneNumberId) return null;
+    return {
+      accessToken,
+      phoneNumberId,
+      apiVersion: override?.apiVersion ?? process.env.WHATSAPP_API_VERSION ?? 'v22.0',
+    };
+  }
+
+  async sendTextMessage(
+    to: string,
+    body: string,
+    creds?: Partial<WhatsAppCredentials>,
+  ): Promise<{ success: boolean; data?: unknown; error?: string }> {
+    return this.sendMessage(to, { type: 'text', text: { preview_url: false, body } }, creds);
   }
 
   async sendTemplateMessage(
@@ -19,17 +34,10 @@ export class WhatsAppService {
     templateName: string,
     languageCode: string,
     bodyParameters: string[] = [],
+    creds?: Partial<WhatsAppCredentials>,
   ): Promise<{ success: boolean; data?: unknown; error?: string }> {
     const components = bodyParameters.length > 0
-      ? [
-          {
-            type: 'body',
-            parameters: bodyParameters.map((text) => ({
-              type: 'text',
-              text,
-            })),
-          },
-        ]
+      ? [{ type: 'body', parameters: bodyParameters.map((text) => ({ type: 'text', text })) }]
       : undefined;
 
     return this.sendMessage(to, {
@@ -39,23 +47,18 @@ export class WhatsAppService {
         language: { code: languageCode },
         ...(components ? { components } : {}),
       },
-    });
+    }, creds);
   }
 
   async uploadMedia(
     file: Buffer,
     mimeType: string,
     fileName: string,
+    creds?: Partial<WhatsAppCredentials>,
   ): Promise<{ success: boolean; mediaId?: string; data?: unknown; error?: string }> {
-    const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
-    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-    const apiVersion = process.env.WHATSAPP_API_VERSION ?? 'v22.0';
-
-    if (!accessToken || !phoneNumberId) {
-      return {
-        success: false,
-        error: 'WhatsApp API is not configured. Add WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID.',
-      };
+    const resolved = this.resolveCredentials(creds);
+    if (!resolved) {
+      return { success: false, error: 'WhatsApp API is not configured. Add credentials in Settings → WhatsApp.' };
     }
 
     try {
@@ -64,31 +67,17 @@ export class WhatsAppService {
       formData.append('file', new Blob([file], { type: mimeType }), fileName);
 
       const response = await fetch(
-        `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/media`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: formData,
-        },
+        `https://graph.facebook.com/${resolved.apiVersion}/${resolved.phoneNumberId}/media`,
+        { method: 'POST', headers: { Authorization: `Bearer ${resolved.accessToken}` }, body: formData },
       );
 
       const data = (await response.json()) as { id?: string; error?: { message?: string } };
       if (!response.ok || !data?.id) {
         this.logger.error(`WhatsApp media upload failed: ${JSON.stringify(data)}`);
-        return {
-          success: false,
-          error: data?.error?.message ?? 'WhatsApp media upload failed',
-          data,
-        };
+        return { success: false, error: data?.error?.message ?? 'WhatsApp media upload failed', data };
       }
 
-      return {
-        success: true,
-        mediaId: data.id,
-        data,
-      };
+      return { success: true, mediaId: data.id, data };
     } catch (error: any) {
       this.logger.error(`WhatsApp media upload error: ${error?.message ?? error}`);
       return { success: false, error: error?.message ?? 'WhatsApp media upload failed' };
@@ -99,64 +88,43 @@ export class WhatsAppService {
     to: string,
     mediaId: string,
     caption?: string,
+    creds?: Partial<WhatsAppCredentials>,
   ): Promise<{ success: boolean; data?: unknown; error?: string }> {
     return this.sendMessage(to, {
       type: 'image',
-      image: {
-        id: mediaId,
-        ...(caption ? { caption } : {}),
-      },
-    });
+      image: { id: mediaId, ...(caption ? { caption } : {}) },
+    }, creds);
   }
 
   private async sendMessage(
     to: string,
     payload: Record<string, unknown>,
+    creds?: Partial<WhatsAppCredentials>,
   ): Promise<{ success: boolean; data?: unknown; error?: string }> {
-    const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
-    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-    const apiVersion = process.env.WHATSAPP_API_VERSION ?? 'v22.0';
-
-    if (!accessToken || !phoneNumberId) {
-      return {
-        success: false,
-        error: 'WhatsApp API is not configured. Add WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID.',
-      };
+    const resolved = this.resolveCredentials(creds);
+    if (!resolved) {
+      return { success: false, error: 'WhatsApp API is not configured. Add credentials in Settings → WhatsApp.' };
     }
 
     const normalizedPhone = normalizeWhatsAppPhone(to);
     if (!normalizedPhone) {
-      return {
-        success: false,
-        error: `Invalid phone number: ${to}`,
-      };
+      return { success: false, error: `Invalid phone number: ${to}` };
     }
 
     try {
       const response = await fetch(
-        `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`,
+        `https://graph.facebook.com/${resolved.apiVersion}/${resolved.phoneNumberId}/messages`,
         {
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            messaging_product: 'whatsapp',
-            to: normalizedPhone,
-            ...payload,
-          }),
+          headers: { Authorization: `Bearer ${resolved.accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messaging_product: 'whatsapp', to: normalizedPhone, ...payload }),
         },
       );
 
       const data = (await response.json()) as { error?: { message?: string } };
       if (!response.ok) {
         this.logger.error(`WhatsApp send failed for ${normalizedPhone}: ${JSON.stringify(data)}`);
-        return {
-          success: false,
-          error: data?.error?.message ?? 'WhatsApp send failed',
-          data,
-        };
+        return { success: false, error: data?.error?.message ?? 'WhatsApp send failed', data };
       }
 
       return { success: true, data };

@@ -23,9 +23,9 @@ export class BroadcastsController {
 
   @Post('send-invoice')
   @HttpCode(HttpStatus.OK)
-  async sendInvoice(@Body() dto: SendInvoiceWhatsappDto) {
+  async sendInvoice(@CurrentTenant() tenant: TenantContext, @Body() dto: SendInvoiceWhatsappDto) {
     return successResponse(
-      await this.broadcastsService.sendInvoiceToWhatsApp(dto),
+      await this.broadcastsService.sendInvoiceToWhatsApp(dto, tenant.tenantId, tenant.shopId),
     );
   }
 }

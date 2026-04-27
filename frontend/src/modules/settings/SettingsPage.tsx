@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Sun, Moon, Download, UploadCloud, ShieldAlert } from 'lucide-react';
+import { Sun, Moon, Download, UploadCloud, ShieldAlert, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
 import { NAV_ITEMS } from '@/components/layout/AppLayout';
 import { PageIntro } from '@/components/ui/PageIntro';
@@ -30,6 +30,8 @@ type SettingsForm = {
   invoiceAddressLine: string;
   invoiceFooterNote: string;
   invoiceSignatureLabel: string;
+  waPhoneNumberId: string;
+  waAccessToken: string;
 };
 
 const emptyForm: SettingsForm = {
@@ -55,11 +57,14 @@ const emptyForm: SettingsForm = {
   invoiceAddressLine: '',
   invoiceFooterNote: 'Thanks',
   invoiceSignatureLabel: 'Signature',
+  waPhoneNumberId: '',
+  waAccessToken: '',
 };
 
 export function SettingsPage() {
   const [form, setForm] = useState<SettingsForm>(emptyForm);
   const [isEditing, setIsEditing] = useState(false);
+  const [showToken, setShowToken] = useState(false);
   const { theme, toggleTheme } = useTheme();
 
   const [isExporting, setIsExporting] = useState(false);
@@ -146,6 +151,8 @@ export function SettingsPage() {
         invoiceSignatureLabel:
           data.shop?.settings?.invoiceTemplate?.signatureLabel ?? 'Signature',
         logoDataUrl: data.shop?.settings?.logoDataUrl ?? '',
+        waPhoneNumberId: data.shop?.settings?.whatsapp?.phoneNumberId ?? '',
+        waAccessToken: data.shop?.settings?.whatsapp?.accessToken ?? '',
       });
       setIsEditing(false);
     }
@@ -191,6 +198,10 @@ export function SettingsPage() {
             addressLine: form.invoiceAddressLine.trim(),
             footerNote: form.invoiceFooterNote.trim(),
             signatureLabel: form.invoiceSignatureLabel.trim(),
+          },
+          whatsapp: {
+            phoneNumberId: form.waPhoneNumberId.trim(),
+            accessToken: form.waAccessToken.trim(),
           },
         },
       });
@@ -305,6 +316,63 @@ export function SettingsPage() {
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">Signature Label</label>
                 <input className="input" value={form.invoiceSignatureLabel} disabled={!isEditing} onChange={(e) => setForm((current) => ({ ...current, invoiceSignatureLabel: e.target.value }))} />
+              </div>
+            </div>
+          </div>
+
+          {/* ── WhatsApp Business API ── */}
+          <div className="md:col-span-2 mt-4">
+            <p className="section-label">WhatsApp Business API</p>
+          </div>
+          <div className="md:col-span-2 rounded-3xl border border-slate-200 bg-slate-50/80 p-5 dark:border-white/10 dark:bg-white/5 space-y-5">
+            <div className="flex items-start gap-3">
+              {form.waPhoneNumberId && form.waAccessToken ? (
+                <CheckCircle className="h-5 w-5 text-emerald-500 flex-shrink-0 mt-0.5" />
+              ) : (
+                <AlertCircle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+              )}
+              <div>
+                <p className="text-sm font-semibold text-slate-800 dark:text-white">
+                  {form.waPhoneNumberId && form.waAccessToken ? 'WhatsApp is configured — invoice sending is active' : 'WhatsApp not configured'}
+                </p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Get your credentials from <strong>Meta Business Manager → WhatsApp → API Setup</strong>. Each store uses its own WhatsApp Business number.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Phone Number ID</label>
+                <input
+                  className="input font-mono text-sm"
+                  placeholder="e.g. 123456789012345"
+                  value={form.waPhoneNumberId}
+                  disabled={!isEditing}
+                  onChange={(e) => setForm((f) => ({ ...f, waPhoneNumberId: e.target.value }))}
+                />
+                <p className="mt-1 text-xs text-slate-400">Found in Meta Developer Portal → WhatsApp → API Setup</p>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Access Token</label>
+                <div className="relative">
+                  <input
+                    className="input pr-10 font-mono text-sm"
+                    type={showToken ? 'text' : 'password'}
+                    placeholder="EAAxxxxxxxx..."
+                    value={form.waAccessToken}
+                    disabled={!isEditing}
+                    onChange={(e) => setForm((f) => ({ ...f, waAccessToken: e.target.value }))}
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    onClick={() => setShowToken((v) => !v)}
+                  >
+                    {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                <p className="mt-1 text-xs text-slate-400">Create a permanent token via Business Settings → System Users</p>
               </div>
             </div>
           </div>
@@ -552,6 +620,8 @@ export function SettingsPage() {
                       invoiceSignatureLabel:
                         data.shop?.settings?.invoiceTemplate?.signatureLabel ?? 'Signature',
                       logoDataUrl: data.shop?.settings?.logoDataUrl ?? '',
+                      waPhoneNumberId: data.shop?.settings?.whatsapp?.phoneNumberId ?? '',
+                      waAccessToken: data.shop?.settings?.whatsapp?.accessToken ?? '',
                     });
                   }
                   setIsEditing(false);

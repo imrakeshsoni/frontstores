@@ -1,11 +1,11 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { paginatedResponse, parsePagination } from '@shoposphere/common';
 import { Broadcast } from './broadcast.entity';
 import { BroadcastQueryDto, CreateBroadcastDto, SendInvoiceWhatsappDto } from './dto/broadcast.dto';
 import { Customer } from '../customers/customer.entity';
-import { WhatsAppService } from './whatsapp.service';
+import { WhatsAppService, WhatsAppCredentials } from './whatsapp.service';
 
 @Injectable()
 export class BroadcastsService {
@@ -15,7 +15,21 @@ export class BroadcastsService {
     @InjectRepository(Customer)
     private readonly customersRepo: Repository<Customer>,
     private readonly whatsAppService: WhatsAppService,
+    private readonly dataSource: DataSource,
   ) {}
+
+  private async getShopWhatsAppCredentials(tenantId: string, shopId?: string): Promise<Partial<WhatsAppCredentials>> {
+    if (!shopId) return {};
+    const [shop] = await this.dataSource.query(
+      `SELECT settings FROM shops WHERE tenant_id = $1 AND id = $2 LIMIT 1`,
+      [tenantId, shopId],
+    );
+    const wa = shop?.settings?.whatsapp ?? {};
+    return {
+      accessToken: wa.accessToken || undefined,
+      phoneNumberId: wa.phoneNumberId || undefined,
+    };
+  }
 
   async create(
     tenantId: string,
@@ -119,7 +133,7 @@ export class BroadcastsService {
     return this.repo.save(broadcast);
   }
 
-  async sendInvoiceToWhatsApp(dto: SendInvoiceWhatsappDto) {
+  async sendInvoiceToWhatsApp(dto: SendInvoiceWhatsappDto, tenantId?: string, shopId?: string) {
     const message = dto.message?.trim() ?? '';
     if (!message) {
       throw new BadRequestException('Invoice message is required');
@@ -134,10 +148,18 @@ export class BroadcastsService {
       throw new BadRequestException('Invoice image format is invalid');
     }
 
+    const creds = tenantId ? await this.getShopWhatsAppCredentials(tenantId, shopId) : {};
+
+    const resolved = this.whatsAppService.resolveCredentials(creds);
+    if (!resolved) {
+      throw new BadRequestException('WhatsApp is not configured. Go to Settings → WhatsApp and add your API credentials.');
+    }
+
     const uploadResult = await this.whatsAppService.uploadMedia(
       parsedImage.buffer,
       dto.mimeType?.trim() || parsedImage.mimeType,
       dto.fileName?.trim() || 'invoice.png',
+      creds,
     );
 
     if (!uploadResult.success || !uploadResult.mediaId) {
@@ -148,6 +170,7 @@ export class BroadcastsService {
       dto.phone,
       uploadResult.mediaId,
       message,
+      creds,
     );
 
     if (directSendResult.success) {
@@ -159,8 +182,8 @@ export class BroadcastsService {
       };
     }
 
-    const invoiceTemplateName = process.env.WHATSAPP_INVOICE_TEMPLATE_NAME ?? process.env.WHATSAPP_DEFAULT_TEMPLATE_NAME ?? 'hello_world';
-    const invoiceTemplateLanguage = process.env.WHATSAPP_INVOICE_TEMPLATE_LANGUAGE ?? process.env.WHATSAPP_TEMPLATE_LANGUAGE ?? 'en_US';
+    const invoiceTemplateName = process.env.WHATSAPP_INVOICE_TEMPLATE_NAME ?? 'hello_world';
+    const invoiceTemplateLanguage = process.env.WHATSAPP_INVOICE_TEMPLATE_LANGUAGE ?? 'en_US';
     const invoiceTemplateParams = this.pickTemplateParams(
       process.env.WHATSAPP_INVOICE_TEMPLATE_BODY_PARAM_COUNT,
       message.split('\n').filter(Boolean),
@@ -171,6 +194,7 @@ export class BroadcastsService {
       invoiceTemplateName,
       invoiceTemplateLanguage,
       invoiceTemplateParams,
+      creds,
     );
 
     if (!fallbackResult.success) {
