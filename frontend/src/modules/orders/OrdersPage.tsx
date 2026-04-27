@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { Search, Eye, Ban, RotateCcw } from 'lucide-react';
+import { Search, Eye, Ban, RotateCcw, Printer, MessageCircle } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/app/store/auth.store';
 import { PageIntro } from '@/components/ui/PageIntro';
@@ -170,8 +170,144 @@ export function OrdersPage() {
     },
   });
 
+  const { data: settingsContext } = useQuery({
+    queryKey: ['settings-context-orders'],
+    queryFn: () => apiClient.get('/api/core/context/settings').then((r) => r.data.data),
+    enabled: !!shopId,
+  });
+
+  const invoiceTemplate = settingsContext?.shop?.settings?.invoiceTemplate ?? {};
+  const shopAddress = settingsContext?.shop?.address ?? {};
+  const activeShop = useAuthStore((s) => s.shops.find((shop) => shop.id === s.activeShopId) ?? null);
+
   const formatCurrency = (n: number) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(n);
+
+  const handlePrint = () => {
+    if (!selectedOrder) return;
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    if (!printWindow) { toast.error('Unable to open print window'); return; }
+
+    const storeName = invoiceTemplate.storeDisplayName || activeShop?.name || 'Store';
+    const address = invoiceTemplate.addressLine || [shopAddress.line1, shopAddress.city].filter(Boolean).join(', ') || '';
+    const headerLeft = invoiceTemplate.headerLeft || '';
+    const headerRight = invoiceTemplate.headerRight || 'Cash/Credit Memo';
+    const dlNumbers = invoiceTemplate.dlNumbers || '';
+    const whatsapp = invoiceTemplate.whatsappNumber || '';
+    const footerNote = invoiceTemplate.footerNote || 'Thanks for your purchase';
+    const signatureLabel = invoiceTemplate.signatureLabel || 'Authorised Signature';
+    const paymentMethod = selectedOrder.payments?.[0]?.method ?? 'cash';
+    const customerName = selectedOrder.customer?.name || '';
+    const patientName = selectedOrder.patientName || customerName || '-';
+    const doctorName = selectedOrder.doctorName || '-';
+
+    const dateStr = new Date(selectedOrder.createdAt).toLocaleString('en-IN', {
+      day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
+
+    const itemRows = (selectedOrder.items ?? []).map((item: any) => {
+      const exp = item.expiryDate || '-';
+      return `<tr>
+        <td class="td-name">${item.product?.name ?? 'Product'}<br><span class="qty-label">${item.quantity} units</span></td>
+        <td class="td-center">${item.batchNo || '-'}</td>
+        <td class="td-center">${exp}</td>
+        <td class="td-amount">${Number(item.total).toFixed(2)}</td>
+      </tr>`;
+    }).join('');
+
+    printWindow.document.write(`<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>${selectedOrder.billNumber}</title>
+<style>
+  @page { size: A5 portrait; margin: 8mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 11px; color: #1e3a8a; background: white; }
+  .invoice { border: 2px solid #1e3a8a; width: 100%; }
+  .hdr { display: flex; justify-content: space-between; align-items: flex-start; padding: 8px 14px; border-bottom: 2px solid #1e3a8a; font-weight: 600; font-size: 11px; }
+  .hdr-right { text-align: right; }
+  .hdr-phone { font-size: 12px; margin-top: 3px; }
+  .banner { text-align: center; padding: 8px 14px; border-bottom: 2px solid #1e3a8a; }
+  .store-name { font-size: 20px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
+  .store-addr { font-size: 10px; font-weight: 600; margin-top: 2px; }
+  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; padding: 7px 14px; border-bottom: 2px solid #1e3a8a; font-size: 10px; }
+  .meta span { font-weight: 700; }
+  table { width: 100%; border-collapse: collapse; font-size: 10px; }
+  th { padding: 6px 8px; border-bottom: 2px solid #1e3a8a; font-weight: 700; text-align: left; background: white; }
+  th.th-amount { text-align: right; }
+  td { padding: 5px 8px; border-bottom: 1px solid #bfdbfe; vertical-align: top; }
+  td.td-center { text-align: center; border-left: 1px solid #bfdbfe; }
+  td.td-amount { text-align: right; font-weight: 700; white-space: nowrap; border-left: 1px solid #bfdbfe; }
+  td.td-name { border-right: none; }
+  .qty-label { color: #3b82f6; font-size: 9px; }
+  .total-row td { border-top: 2px solid #1e3a8a; border-bottom: none; font-weight: 700; padding: 6px 8px; }
+  .total-label { text-align: right; }
+  .total-value { text-align: right; font-size: 13px; font-weight: 900; white-space: nowrap; }
+  .footer { display: flex; justify-content: space-between; align-items: flex-end; padding: 10px 14px 8px; }
+  .footer-note { font-size: 10px; font-weight: 600; max-width: 55%; }
+  .sig-block { text-align: right; font-size: 10px; font-weight: 600; min-width: 100px; }
+  .sig-line { border-top: 1px solid #1e3a8a; margin-top: 28px; padding-top: 3px; }
+</style></head>
+<body><div class="invoice">
+  <div class="hdr">
+    <div>${headerLeft.replace(/\n/g, '<br>')}</div>
+    <div class="hdr-right"><div>${headerRight}</div>${whatsapp ? `<div class="hdr-phone">${whatsapp}</div>` : ''}</div>
+  </div>
+  <div class="banner">
+    <div class="store-name">${storeName}</div>
+    ${address ? `<div class="store-addr">${address}</div>` : ''}
+  </div>
+  <div class="meta">
+    <div><span>DL No.</span> ${dlNumbers || '-'}</div>
+    <div><span>Date.</span> ${dateStr}</div>
+    <div><span>Patient.</span> ${patientName}</div>
+    <div><span>Doctor.</span> ${doctorName}</div>
+    <div><span>Bill No.</span> ${selectedOrder.billNumber}</div>
+    <div><span>Payment.</span> ${paymentMethod === 'credit' ? 'Credit' : paymentMethod.toUpperCase()}</div>
+  </div>
+  <table><thead><tr>
+    <th style="width:40%">Drug Name &amp; Qty</th>
+    <th style="width:16%;text-align:center;border-left:1px solid #bfdbfe">Batch No</th>
+    <th style="width:28%;text-align:center;border-left:1px solid #bfdbfe">Expiry</th>
+    <th class="th-amount" style="width:16%;border-left:1px solid #bfdbfe">Amount</th>
+  </tr></thead>
+  <tbody>${itemRows}
+    <tr class="total-row">
+      <td colspan="2">${footerNote}</td>
+      <td class="total-label">Total ₹</td>
+      <td class="total-value">${Number(selectedOrder.total).toFixed(2)}</td>
+    </tr>
+  </tbody></table>
+  <div class="footer">
+    <div class="footer-note">* Goods once sold will not be taken back</div>
+    <div class="sig-block"><div class="sig-line">${signatureLabel}</div></div>
+  </div>
+</div>
+<script>window.onload = () => { window.print(); }<\/script>
+</body></html>`);
+    printWindow.document.close();
+  };
+
+  const handleWhatsApp = () => {
+    if (!selectedOrder) return;
+    const phone = String(selectedOrder.customer?.phone ?? '').replace(/\D/g, '');
+    const storeName = invoiceTemplate.storeDisplayName || activeShop?.name || 'Store';
+    const lines = [
+      `*${storeName}*`,
+      `Bill No: ${selectedOrder.billNumber}`,
+      `Date: ${format(new Date(selectedOrder.createdAt), 'dd MMM yyyy, HH:mm')}`,
+      '',
+      ...(selectedOrder.items ?? []).map((item: any) =>
+        `• ${item.product?.name ?? 'Product'} x${item.quantity} — ₹${Number(item.total).toFixed(2)}`
+      ),
+      '',
+      `*Total: ₹${Number(selectedOrder.total).toFixed(2)}*`,
+      `Payment: ${(selectedOrder.payments?.[0]?.method ?? 'cash').toUpperCase()}`,
+      '',
+      invoiceTemplate.footerNote || 'Thanks for your purchase',
+    ];
+    const text = encodeURIComponent(lines.join('\n'));
+    const url = phone ? `https://wa.me/91${phone}?text=${text}` : `https://wa.me/?text=${text}`;
+    window.open(url, '_blank');
+  };
 
   return (
     <div className="page-shell page-stack">
@@ -343,9 +479,23 @@ export function OrdersPage() {
                   {selectedOrder?.billNumber ?? 'Loading order'}
                 </h2>
               </div>
-              <button className="btn-secondary" onClick={() => setSelectedOrderId(null)}>
-                Close
-              </button>
+              <div className="flex gap-2">
+                {selectedOrder && (
+                  <>
+                    <button className="btn-secondary" onClick={handlePrint}>
+                      <Printer className="h-4 w-4" />
+                      Print
+                    </button>
+                    <button className="btn-secondary" onClick={handleWhatsApp}>
+                      <MessageCircle className="h-4 w-4" />
+                      WhatsApp
+                    </button>
+                  </>
+                )}
+                <button className="btn-secondary" onClick={() => setSelectedOrderId(null)}>
+                  Close
+                </button>
+              </div>
             </div>
 
             {isFetchingOrder && (
