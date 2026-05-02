@@ -1,5 +1,5 @@
 import { Entity, Column, Unique } from 'typeorm';
-import { TenantScopedEntity } from '@shoposphere/common';
+import { TenantScopedEntity } from '@frontstores/common';
 
 @Entity('custom_field_definitions')
 @Unique(['tenantId', 'objectType', 'fieldName'])

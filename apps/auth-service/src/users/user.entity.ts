@@ -1,5 +1,5 @@
 import { Entity, Column, Index, ManyToOne, JoinColumn } from 'typeorm';
-import { TenantScopedEntity } from '@shoposphere/common';
+import { TenantScopedEntity } from '@frontstores/common';
 
 @Entity('users')
 @Index(['tenantId', 'email'], { unique: true })

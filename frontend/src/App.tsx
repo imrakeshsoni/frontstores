@@ -6,6 +6,7 @@ import { apiClient } from '@/lib/api/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 
 const LoginPage = lazy(() => import('@/modules/auth/LoginPage').then((module) => ({ default: module.LoginPage })));
+const DevAutoLogin = lazy(() => import('@/modules/auth/DevAutoLogin').then((module) => ({ default: module.DevAutoLogin })));
 const Dashboard = lazy(() => import('@/modules/dashboard/Dashboard').then((module) => ({ default: module.Dashboard })));
 const POSPage = lazy(() => import('@/modules/pos/POSPage').then((module) => ({ default: module.POSPage })));
 const ProductsPage = lazy(() => import('@/modules/products/ProductsPage').then((module) => ({ default: module.ProductsPage })));
@@ -195,6 +196,7 @@ export default function App() {
       <Suspense fallback={<RouteFallback />}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/dev" element={<DevAutoLogin />} />
           <Route path="/register" element={<Navigate to="/login" replace />} />
           <Route
             path="/"

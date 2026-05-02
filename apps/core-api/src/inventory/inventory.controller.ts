@@ -15,7 +15,7 @@ import {
   TenantContext,
   RequirePermission,
   successResponse,
-} from '@shoposphere/common';
+} from '@frontstores/common';
 
 class AdjustStockDto {
   @IsString()
@@ -27,8 +27,8 @@ class AdjustStockDto {
   @IsNumber()
   quantity: number;
 
-  @IsIn(['sale', 'purchase', 'return', 'adjustment', 'transfer'])
-  type: 'sale' | 'purchase' | 'return' | 'adjustment' | 'transfer';
+  @IsIn(['sale', 'purchase', 'return', 'adjustment', 'transfer', 'write-off'])
+  type: 'sale' | 'purchase' | 'return' | 'adjustment' | 'transfer' | 'write-off';
 
   @IsOptional()
   @IsString()

@@ -86,7 +86,7 @@ export function AppLayout() {
           </div>
           <div>
             <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
-              {activeShop?.name || 'ShopOS'}
+              {activeShop?.name || 'FrontStores'}
             </p>
             <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
               {getShopTypeLabel(activeShop?.type)}
@@ -157,7 +157,7 @@ export function AppLayout() {
             >
               <Store className="h-4 w-4 text-white" />
             </div>
-            <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{activeShop?.name || 'ShopOS'}</span>
+            <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{activeShop?.name || 'FrontStores'}</span>
           </div>
           <span className="chip text-xs">{user?.email}</span>
         </header>

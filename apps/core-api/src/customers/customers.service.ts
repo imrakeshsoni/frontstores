@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Customer } from './customer.entity';
-import { paginatedResponse, parsePagination } from '@shoposphere/common';
+import { paginatedResponse, parsePagination } from '@frontstores/common';
 import { UpdateCustomerDto } from './dto/customer.dto';
 
 export interface CreateCustomerDto {

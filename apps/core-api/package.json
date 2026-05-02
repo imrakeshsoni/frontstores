@@ -1,5 +1,5 @@
 {
-  "name": "@shoposphere/core-api",
+  "name": "@frontstores/core-api",
   "version": "1.0.0",
   "scripts": {
     "build": "nest build",
@@ -16,7 +16,7 @@
     "@nestjs/jwt": "^10.2.0",
     "@nestjs/platform-express": "^10.3.0",
     "@nestjs/typeorm": "^10.0.2",
-    "@shoposphere/common": "^1.0.0",
+    "@frontstores/common": "^1.0.0",
     "@types/adm-zip": "^0.5.8",
     "@types/archiver": "^7.0.0",
     "adm-zip": "^0.5.17",

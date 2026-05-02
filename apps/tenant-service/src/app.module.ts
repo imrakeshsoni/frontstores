@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { DatabaseModule, EventBusService } from '@shoposphere/common';
+import { DatabaseModule, EventBusService } from '@frontstores/common';
 import { OnboardingController } from './onboarding/onboarding.controller';
 import { OnboardingService } from './onboarding/onboarding.service';
 import { SignupEmailService } from './onboarding/signup-email.service';

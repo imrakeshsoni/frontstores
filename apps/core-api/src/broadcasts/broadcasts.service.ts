@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { paginatedResponse, parsePagination } from '@shoposphere/common';
+import { paginatedResponse, parsePagination } from '@frontstores/common';
 import { Broadcast } from './broadcast.entity';
 import { BroadcastQueryDto, CreateBroadcastDto, SendInvoiceWhatsappDto } from './dto/broadcast.dto';
 import { Customer } from '../customers/customer.entity';

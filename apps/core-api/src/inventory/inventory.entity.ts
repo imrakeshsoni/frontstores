@@ -1,5 +1,5 @@
 import { Entity, Column, Index, Unique } from 'typeorm';
-import { TenantScopedEntity } from '@shoposphere/common';
+import { TenantScopedEntity } from '@frontstores/common';
 
 @Entity('inventory')
 @Unique(['tenantId', 'shopId', 'productId'])

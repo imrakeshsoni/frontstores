@@ -8,7 +8,7 @@ import { apiClient } from '@/lib/api/client';
 
 const schema = z.object({
   shopName:  z.string().min(2, 'Shop name required'),
-  shopType:  z.enum(['medical','grocery','retail','restaurant','electronics','clothing','other']),
+  shopType:  z.literal('medical').default('medical'),
   ownerName: z.string().min(2, 'Your name required'),
   email:     z.string().email('Invalid email'),
   phone:     z.string().regex(/^[6-9]\d{9}$/, 'Invalid Indian mobile number'),
@@ -18,16 +18,6 @@ const schema = z.object({
 });
 
 type FormData = z.infer<typeof schema>;
-
-const SHOP_TYPES = [
-  { value: 'medical',     label: 'Medical / Pharmacy' },
-  { value: 'grocery',     label: 'Grocery / Kirana' },
-  { value: 'retail',      label: 'General Retail' },
-  { value: 'restaurant',  label: 'Restaurant / Café' },
-  { value: 'electronics', label: 'Electronics' },
-  { value: 'clothing',    label: 'Clothing / Apparel' },
-  { value: 'other',       label: 'Other' },
-];
 
 const STATES = [
   'Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh',
@@ -77,7 +67,7 @@ export function RegisterPage() {
           <div className="space-y-4">
             {[
               ['14-day trial', 'No card required to explore the full experience.'],
-              ['Guided onboarding', 'Smart defaults for retail, pharmacy, grocery, and more.'],
+              ['Guided onboarding', 'Smart defaults for medical stores and pharmacies.'],
               ['Built for India', 'GST, inventory control, POS, and reporting in one place.'],
             ].map(([title, description]) => (
               <div key={title} className="card flex items-start gap-4 p-5">
@@ -120,15 +110,6 @@ export function RegisterPage() {
                 <label className="mb-2 block text-sm font-medium text-slate-700">Shop Name</label>
                 <input {...register('shopName')} placeholder="Med Plus Pharmacy" className="input" />
                 {errors.shopName && <p className="mt-1 text-xs text-rose-500">{errors.shopName.message}</p>}
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">Shop Type</label>
-                <select {...register('shopType')} className="input">
-                  {SHOP_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
               </div>
 
               <div>

@@ -16,7 +16,7 @@ import {
   RequirePermission,
   TenantContext,
   successResponse,
-} from '@shoposphere/common';
+} from '@frontstores/common';
 import { SuppliersService } from './suppliers.service';
 import { CreatePurchaseOrderDto, CreateSupplierDto, ReceivePurchaseOrderDto, SettleSupplierPaymentDto, SupplierQueryDto, UpdateSupplierDto } from './dto/supplier.dto';
 

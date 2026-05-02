@@ -1,5 +1,5 @@
 import { Entity, Column, Index, ManyToOne, JoinColumn } from 'typeorm';
-import { TenantScopedEntity } from '@shoposphere/common';
+import { TenantScopedEntity } from '@frontstores/common';
 
 @Entity('products')
 @Index(['tenantId', 'sku'], { unique: true, where: 'sku IS NOT NULL' })

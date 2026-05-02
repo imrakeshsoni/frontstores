@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, EntityManager } from 'typeorm';
 import { Inventory, StockMovement } from './inventory.entity';
-import { InsufficientStockException, paginatedResponse, parsePagination } from '@shoposphere/common';
+import { InsufficientStockException, paginatedResponse, parsePagination } from '@frontstores/common';
 import { Product } from '../products/product.entity';
 import { Supplier } from '../suppliers/supplier.entity';
 
@@ -10,7 +10,7 @@ export interface StockAdjustmentDto {
   shopId: string;
   productId: string;
   quantity: number;  // positive=in, negative=out
-  type: 'sale' | 'purchase' | 'return' | 'adjustment' | 'transfer';
+  type: 'sale' | 'purchase' | 'return' | 'adjustment' | 'transfer' | 'write-off';
   referenceId?: string;
   referenceType?: string;
   notes?: string;

@@ -1,5 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query } from '@nestjs/common';
-import { CurrentTenant, RequirePermission, TenantContext, successResponse } from '@shoposphere/common';
+import { CurrentTenant, RequirePermission, TenantContext, successResponse } from '@frontstores/common';
 import { BroadcastsService } from './broadcasts.service';
 import { BroadcastQueryDto, CreateBroadcastDto, SendInvoiceWhatsappDto } from './dto/broadcast.dto';
 

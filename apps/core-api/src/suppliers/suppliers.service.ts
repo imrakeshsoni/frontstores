@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { paginatedResponse, parsePagination } from '@shoposphere/common';
+import { paginatedResponse, parsePagination } from '@frontstores/common';
 import { Inventory } from '../inventory/inventory.entity';
 import { Product } from '../products/product.entity';
 import { PurchaseOrder, PurchaseOrderItem, Supplier } from './supplier.entity';

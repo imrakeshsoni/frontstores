@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { createHmac } from 'crypto';
 import { DataSource } from 'typeorm';
-import { EventBusService } from '@shoposphere/common';
+import { EventBusService } from '@frontstores/common';
 
 @Controller('billing')
 export class BillingController {

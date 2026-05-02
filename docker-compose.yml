@@ -3,7 +3,7 @@ version: '3.9'
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: shoposphere_db
+    container_name: frontstores_db
     restart: unless-stopped
     environment:
       POSTGRES_USER: shoposphere
@@ -22,7 +22,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: shoposphere_redis
+    container_name: frontstores_redis
     restart: unless-stopped
     command: redis-server --appendonly yes --requirepass shoposphere
     ports:
@@ -35,23 +35,14 @@ services:
       timeout: 5s
       retries: 5
 
-  mailhog:
-    image: mailhog/mailhog:latest
-    container_name: shoposphere_mail
-    ports:
-      - '1025:1025'
-      - '8025:8025'
-
   auth-service:
-    build:
-      context: .
-      dockerfile: apps/auth-service/Dockerfile
-    container_name: shoposphere_auth
+    image: shoposphere-auth-service:latest
+    container_name: frontstores_auth
     restart: unless-stopped
     env_file: .env
     environment:
       PORT: 3001
-      DATABASE_URL: postgresql://shoposphere:shoposphere@postgres:5432/shoposphere
+      DATABASE_URL: postgresql://shoposphere:shoposphere@host.docker.internal:5432/shoposphere
       REDIS_URL: redis://:shoposphere@redis:6379
       DB_PASSWORD: ""
     ports:
@@ -63,15 +54,13 @@ services:
         condition: service_healthy
 
   tenant-service:
-    build:
-      context: .
-      dockerfile: apps/tenant-service/Dockerfile
-    container_name: shoposphere_tenant
+    image: shoposphere-tenant-service:latest
+    container_name: frontstores_tenant
     restart: unless-stopped
     env_file: .env
     environment:
       PORT: 3002
-      DATABASE_URL: postgresql://shoposphere:shoposphere@postgres:5432/shoposphere
+      DATABASE_URL: postgresql://shoposphere:shoposphere@host.docker.internal:5432/shoposphere
       REDIS_URL: redis://:shoposphere@redis:6379
       DB_PASSWORD: ""
     ports:
@@ -83,15 +72,13 @@ services:
         condition: service_healthy
 
   core-api:
-    build:
-      context: .
-      dockerfile: apps/core-api/Dockerfile
-    container_name: shoposphere_core
+    image: shoposphere-core-api:latest
+    container_name: frontstores_core
     restart: unless-stopped
     env_file: .env
     environment:
       PORT: 3003
-      DATABASE_URL: postgresql://shoposphere:shoposphere@postgres:5432/shoposphere
+      DATABASE_URL: postgresql://shoposphere:shoposphere@host.docker.internal:5432/shoposphere
       REDIS_URL: redis://:shoposphere@redis:6379
       DB_PASSWORD: ""
     ports:
@@ -103,15 +90,13 @@ services:
         condition: service_healthy
 
   order-service:
-    build:
-      context: .
-      dockerfile: apps/order-service/Dockerfile
-    container_name: shoposphere_orders
+    image: shoposphere-order-service:latest
+    container_name: frontstores_orders
     restart: unless-stopped
     env_file: .env
     environment:
       PORT: 3007
-      DATABASE_URL: postgresql://shoposphere:shoposphere@postgres:5432/shoposphere
+      DATABASE_URL: postgresql://shoposphere:shoposphere@host.docker.internal:5432/shoposphere
       REDIS_URL: redis://:shoposphere@redis:6379
       DB_PASSWORD: ""
     ports:
@@ -123,15 +108,13 @@ services:
         condition: service_healthy
 
   report-service:
-    build:
-      context: .
-      dockerfile: apps/report-service/Dockerfile
-    container_name: shoposphere_reports
+    image: shoposphere-report-service:latest
+    container_name: frontstores_reports
     restart: unless-stopped
     env_file: .env
     environment:
       PORT: 3008
-      DATABASE_URL: postgresql://shoposphere:shoposphere@postgres:5432/shoposphere
+      DATABASE_URL: postgresql://shoposphere:shoposphere@host.docker.internal:5432/shoposphere
       REDIS_URL: redis://:shoposphere@redis:6379
       DB_PASSWORD: ""
     ports:
@@ -141,10 +124,8 @@ services:
         condition: service_healthy
 
   frontend:
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
-    container_name: shoposphere_web
+    image: shoposphere-frontend:latest
+    container_name: frontstores_web
     restart: unless-stopped
     environment:
       AUTH_SERVICE_URL: http://auth-service:3001

@@ -9,7 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, EntityManager } from 'typeorm';
 import { Order, OrderItem, Payment, BillSequence } from './order.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
-import { EventBusService, paginatedResponse, parsePagination } from '@shoposphere/common';
+import { EventBusService, paginatedResponse, parsePagination } from '@frontstores/common';
 
 interface OrderSummary {
   subtotal: number;
@@ -935,5 +935,15 @@ export class OrdersService {
     return Object.fromEntries(
       Object.entries(raw).map(([key, value]) => [key, Number(value ?? 0)]),
     );
+  }
+
+  async deleteOrder(tenantId: string, id: string): Promise<void> {
+    const order = await this.orderRepo.findOne({ where: { id, tenantId } });
+    if (!order) throw new NotFoundException('Order not found');
+
+    await this.dataSource.transaction(async (manager) => {
+      await manager.delete(OrderItem, { orderId: id });
+      await manager.delete(Order, { id, tenantId });
+    });
   }
 }

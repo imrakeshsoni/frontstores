@@ -13,6 +13,7 @@ type SettingsForm = {
   plan: string;
   currency: string;
   timezone: string;
+  enableKeyboardBillingMode: boolean;
   enableMenuPin: boolean;
   menuPin: string;
   protectedMenus: string[];
@@ -40,6 +41,7 @@ const emptyForm: SettingsForm = {
   plan: 'starter',
   currency: 'INR',
   timezone: 'Asia/Kolkata',
+  enableKeyboardBillingMode: false,
   enableMenuPin: false,
   menuPin: '',
   protectedMenus: [],
@@ -113,6 +115,7 @@ export function SettingsPage() {
     queryKey: ['settings-context'],
     queryFn: () => apiClient.get('/api/core/context/settings').then((r) => r.data.data),
   });
+  const isKeyboardBillingTenant = data?.tenant?.slug === 'kuleshwar-medical-store';
 
   useEffect(() => {
     if (data) {
@@ -121,6 +124,7 @@ export function SettingsPage() {
         plan: data.tenant?.plan ?? 'starter',
         currency: data.tenant?.settings?.currency ?? 'INR',
         timezone: data.tenant?.settings?.timezone ?? 'Asia/Kolkata',
+        enableKeyboardBillingMode: data.tenant?.settings?.enableKeyboardBillingMode === true,
         enableMenuPin:
           data.tenant?.settings?.enableMenuPin === true ||
           data.tenant?.settings?.enableDashboardPin === true,
@@ -174,6 +178,7 @@ export function SettingsPage() {
         tenantSettings: {
           currency: form.currency.trim(),
           timezone: form.timezone.trim(),
+          enableKeyboardBillingMode: isKeyboardBillingTenant ? form.enableKeyboardBillingMode : false,
           enableMenuPin: form.enableMenuPin,
           menuPin: form.enableMenuPin ? form.menuPin.trim() : '',
           protectedMenus: form.enableMenuPin ? form.protectedMenus : [],
@@ -249,6 +254,34 @@ export function SettingsPage() {
             <label className="mb-2 block text-sm font-medium text-slate-700">Timezone</label>
             <input className="input" value={form.timezone} disabled={!isEditing} onChange={(e) => setForm((current) => ({ ...current, timezone: e.target.value }))} />
           </div>
+          {isKeyboardBillingTenant && (
+            <div className="md:col-span-2 mt-4 rounded-3xl border border-slate-200 bg-slate-50/80 p-5">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Billing Mode</p>
+                  <p className="mt-1 text-sm text-slate-500">Switch this tenant between normal billing and a keyboard-first billing flow.</p>
+                </div>
+                <button
+                  type="button"
+                  disabled={!isEditing}
+                  onClick={() => setForm((current) => ({ ...current, enableKeyboardBillingMode: !current.enableKeyboardBillingMode }))}
+                  className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+                    form.enableKeyboardBillingMode ? 'bg-emerald-500' : 'bg-slate-300'
+                  }`}
+                  aria-pressed={form.enableKeyboardBillingMode}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                      form.enableKeyboardBillingMode ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+                Current mode: <span className="font-semibold text-slate-900">{form.enableKeyboardBillingMode ? 'Keyboard Only' : 'Normal'}</span>
+              </div>
+            </div>
+          )}
           <div className="md:col-span-2 mt-4">
             <p className="section-label">Shop</p>
           </div>
@@ -589,6 +622,7 @@ export function SettingsPage() {
                       plan: data.tenant?.plan ?? 'starter',
                       currency: data.tenant?.settings?.currency ?? 'INR',
                       timezone: data.tenant?.settings?.timezone ?? 'Asia/Kolkata',
+                      enableKeyboardBillingMode: data.tenant?.settings?.enableKeyboardBillingMode === true,
                       enableMenuPin:
                         data.tenant?.settings?.enableMenuPin === true ||
                         data.tenant?.settings?.enableDashboardPin === true,

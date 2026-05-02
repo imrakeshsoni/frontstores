@@ -4,7 +4,7 @@ import {
   RequirePermission,
   TenantContext,
   successResponse,
-} from '@shoposphere/common';
+} from '@frontstores/common';
 import { IsOptional, IsString } from 'class-validator';
 import { ContextService } from './context.service';
 

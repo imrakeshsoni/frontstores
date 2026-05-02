@@ -16,7 +16,7 @@ import {
   RequirePermission,
   TenantContext,
   successResponse,
-} from '@shoposphere/common';
+} from '@frontstores/common';
 import { CustomersService } from './customers.service';
 import {
   CollectCreditPaymentDto,

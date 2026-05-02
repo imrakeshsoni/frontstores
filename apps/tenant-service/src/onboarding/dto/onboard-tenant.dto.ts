@@ -13,7 +13,7 @@ export class OnboardTenantDto {
   @IsNotEmpty()
   shopName: string;
 
-  @IsIn(['medical', 'grocery', 'retail', 'restaurant', 'electronics', 'clothing', 'other'])
+  @IsIn(['medical'])
   shopType: string;
 
   @IsString()

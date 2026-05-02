@@ -1,15 +1,9 @@
 import { useAuthStore } from '@/app/store/auth.store';
 
-export type ShopType = 'medical' | 'grocery' | 'retail' | 'restaurant' | 'electronics' | 'clothing' | 'other';
+export type ShopType = 'medical';
 
 const SHOP_TYPE_LABELS: Record<ShopType, string> = {
   medical: 'Medical Store',
-  grocery: 'Grocery Store',
-  retail: 'Retail Store',
-  restaurant: 'Restaurant',
-  electronics: 'Electronics Store',
-  clothing: 'Clothing Store',
-  other: 'Store',
 };
 
 export function isMedicalShopType(shopType?: string | null): boolean {

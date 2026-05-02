@@ -1,5 +1,5 @@
 import { Entity, Column, Index } from 'typeorm';
-import { TenantScopedEntity } from '@shoposphere/common';
+import { TenantScopedEntity } from '@frontstores/common';
 
 @Entity('categories')
 export class Category extends TenantScopedEntity {

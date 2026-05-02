@@ -106,6 +106,6 @@ export const useAuthStore = create<AuthState>()(
         return perms[resource]?.[action] === true;
       },
     }),
-    { name: 'shoposphere-auth' },
+    { name: 'frontstores-auth' },
   ),
 );

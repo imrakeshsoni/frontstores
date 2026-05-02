@@ -38,11 +38,11 @@ export class SignupEmailService {
     await transporter.sendMail({
       from,
       to: payload.ownerEmail,
-      subject: `Your ${payload.shopName} ShopOS login details`,
+      subject: `Your ${payload.shopName} FrontStores login details`,
       text: [
         `Hi ${payload.ownerName},`,
         '',
-        `Your ${payload.shopName} ShopOS account is ready.`,
+        `Your ${payload.shopName} FrontStores account is ready.`,
         '',
         `Login URL: ${loginUrl}`,
         `Shop ID: ${payload.tenantSlug}`,
@@ -53,7 +53,7 @@ export class SignupEmailService {
       ].join('\n'),
       html: `
         <p>Hi ${this.escapeHtml(payload.ownerName)},</p>
-        <p>Your <strong>${this.escapeHtml(payload.shopName)}</strong> ShopOS account is ready.</p>
+        <p>Your <strong>${this.escapeHtml(payload.shopName)}</strong> FrontStores account is ready.</p>
         <table style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px">
           <tr><td style="padding:6px 12px 6px 0"><strong>Login URL</strong></td><td><a href="${loginUrl}">${loginUrl}</a></td></tr>
           <tr><td style="padding:6px 12px 6px 0"><strong>Shop ID</strong></td><td>${this.escapeHtml(payload.tenantSlug)}</td></tr>

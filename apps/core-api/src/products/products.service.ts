@@ -10,7 +10,7 @@ import { Inject } from '@nestjs/common';
 import type { Cache } from 'cache-manager';
 import { Product } from './product.entity';
 import { CreateProductDto, UpdateProductDto, ProductQueryDto } from './dto/product.dto';
-import { paginatedResponse, parsePagination, generateSKU, DuplicateResourceException } from '@shoposphere/common';
+import { paginatedResponse, parsePagination, generateSKU, DuplicateResourceException } from '@frontstores/common';
 
 @Injectable()
 export class ProductsService {

@@ -234,6 +234,78 @@ JWT_REFRESH_SECRET            = shoposphere-production-refresh-secret-secure-key
 
 ---
 
+## Dev Tenant Workflow — Mandatory Before Every Task
+
+Before starting ANY feature, fix, or change — always ask these two questions first:
+
+**Q1 — Which app?**
+List the options by number so the user can reply fast:
+```
+1) Medical Store  (active)
+2) Grocery / Kirana  (planned)
+3) General Retail  (planned)
+4) Other
+5) All apps
+```
+
+**Q2 — Which tenant scope?**
+```
+1) All tenants  (feature goes to everyone)
+2) Specific tenant
+```
+If user picks **specific tenant**, fetch and show the live tenant list so they can choose:
+```bash
+export PATH="$PATH:/opt/homebrew/share/google-cloud-sdk/bin"
+echo "SELECT id, name, slug FROM tenants WHERE status='active' ORDER BY created_at DESC;" \
+  | gcloud sql connect shoposphere-sql --user=shoposphere --database=shoposphere --project=cloudystores --quiet 2>&1
+```
+If this fails with a credentials error, tell the user to run `gcloud auth application-default login` first.
+
+**Then act based on the answer:**
+
+| Scope | What to do |
+|-------|-----------|
+| All tenants | Check `.dev-tenants.json` for `dev-all` entry. If present → use it. If missing → `bash tools/dev-tenant.sh --all` (syncs `roshan-medical-store` from production as the base, saves as `dev-all`). Deploy normally to all. |
+| Specific tenant | Check `.dev-tenants.json` for that slug. If present → use existing creds. If missing → `bash tools/dev-tenant.sh --slug <slug>` (syncs that tenant from production to local — no business data). Deploy with that `tenant_id`. |
+
+**What gets synced from production (no business data, ever):**
+- Tenant config and settings
+- Shop config
+- Profiles and permissions
+- Roles and hierarchy
+- Users (passwords replaced with `Local1234!:<email-dots>`)
+- Bill sequences
+
+**What is NEVER synced:** orders, customers, products, inventory, payments.
+
+**The script is idempotent and schema-safe:**
+- First checks `.dev-tenants.json` — if entry exists, exits immediately (no production query)
+- If entry is missing, runs `migrate-safe.sh --env local` first, then syncs from production
+- Re-running is always safe — uses INSERT ... ON CONFLICT / UPDATE internally
+
+**Reading `.dev-tenants.json`:**
+Format: `{ "<slug>": { tenant_id, shop_id, email, password, ... } }`
+Never create a dev tenant manually — always go through `dev-tenant.sh`.
+
+---
+
+## Token Efficiency — Mandatory
+
+Claude Code burns tokens fast. These rules apply on every task, no exceptions:
+
+| Rule | How |
+|------|-----|
+| Grep before reading | Use `grep`/`find` to locate the exact lines needed; never read a whole file to find one symbol |
+| Targeted reads only | Always pass `offset` + `limit` to Read; never read a 300-line file when you need 10 lines |
+| No redundant reads | If a file was already read this session, use that content — don't re-read it |
+| Parallel tool calls | Fire all independent tool calls in one message block, never sequentially when they don't depend on each other |
+| Spawn Explore for broad searches | Use the Explore subagent for any search spanning > 3 queries; don't burn main context |
+| Short responses | One or two sentences per update; no narrating thought process; no trailing summaries |
+| No unnecessary confirmation | Don't ask "should I proceed?" for small, clearly-scoped, reversible edits |
+| Skip scaffolding reads | Don't read `package.json`, `tsconfig.json`, or boilerplate files unless the task directly involves them |
+
+---
+
 ## Common Commands
 
 ```bash

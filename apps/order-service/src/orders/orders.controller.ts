@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Body,
   Param,
   Query,
@@ -18,7 +19,7 @@ import {
   TenantContext,
   RequirePermission,
   successResponse,
-} from '@shoposphere/common';
+} from '@frontstores/common';
 
 class VoidOrderDto {
   @IsString()
@@ -160,5 +161,16 @@ export class OrdersController {
   ) {
     const order = await this.ordersService.convertQuotation(tenant.tenantId, id, tenant.userId, dto);
     return successResponse(order);
+  }
+
+  @Delete(':id')
+  @RequirePermission('orders', 'void')
+  @HttpCode(HttpStatus.OK)
+  async deleteOrder(
+    @CurrentTenant() tenant: TenantContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    await this.ordersService.deleteOrder(tenant.tenantId, id);
+    return successResponse({ message: 'Order deleted' });
   }
 }

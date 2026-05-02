@@ -88,38 +88,28 @@ export const useCartStore = create<CartState>((set, get) => ({
 
   updateQty: (itemKey, quantity) => {
     set((state) => ({
-      items: state.items
-        .map((item) => {
-          if (item.itemKey !== itemKey) return item;
+      items: state.items.map((item) => {
+        if (item.itemKey !== itemKey) return item;
 
-          const nextQuantity = Math.max(0, quantity);
-          const shouldKeep = nextQuantity > 0 || (item.isLoose && (item.looseQty ?? 0) > 0);
-          if (!shouldKeep) return null;
-
-          const updatedItem = { ...item, quantity: nextQuantity };
-          return syncDiscountFromPercent(updatedItem);
-        })
-        .filter(Boolean) as CartItem[],
+        const nextQuantity = Math.max(0, quantity);
+        const updatedItem = { ...item, quantity: nextQuantity };
+        return syncDiscountFromPercent(updatedItem);
+      }),
     }));
   },
 
   updateLooseQty: (itemKey, looseQty) => {
     set((state) => ({
-      items: state.items
-        .map((item) => {
-          if (item.itemKey !== itemKey) return item;
+      items: state.items.map((item) => {
+        if (item.itemKey !== itemKey) return item;
 
-          const nextLooseQty = Math.max(0, looseQty);
-          const shouldKeep = item.quantity > 0 || nextLooseQty > 0;
-          if (!shouldKeep) return null;
-
-          return syncDiscountFromPercent({
-            ...item,
-            isLoose: nextLooseQty > 0,
-            looseQty: nextLooseQty,
-          });
-        })
-        .filter(Boolean) as CartItem[],
+        const nextLooseQty = Math.max(0, looseQty);
+        return syncDiscountFromPercent({
+          ...item,
+          isLoose: nextLooseQty > 0,
+          looseQty: nextLooseQty,
+        });
+      }),
     }));
   },
 
@@ -166,7 +156,7 @@ export const useCartStore = create<CartState>((set, get) => ({
         item.itemKey === itemKey
           ? syncDiscountFromPercent({
               ...item,
-              discountPercent: Math.max(0, Math.min(100, discountPercent)),
+              discountPercent: Math.max(0, Math.min(100, Math.trunc(discountPercent))),
             })
           : item,
       ),

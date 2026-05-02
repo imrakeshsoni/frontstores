@@ -1,7 +1,7 @@
 import { Controller, Post, Body, Get, Param, HttpCode, HttpStatus } from '@nestjs/common';
 import { OnboardingService } from './onboarding.service';
 import { OnboardTenantDto } from './dto/onboard-tenant.dto';
-import { successResponse } from '@shoposphere/common';
+import { successResponse } from '@frontstores/common';
 
 @Controller('onboarding')
 export class OnboardingController {

@@ -1,8 +1,8 @@
 import { Injectable, ConflictException, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
-import { generateSlug } from '@shoposphere/common';
-import { EventBusService } from '@shoposphere/common';
+import { generateSlug } from '@frontstores/common';
+import { EventBusService } from '@frontstores/common';
 import { OnboardTenantDto } from './dto/onboard-tenant.dto';
 import { SignupEmailService } from './signup-email.service';
 

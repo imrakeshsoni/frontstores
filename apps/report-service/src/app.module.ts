@@ -2,7 +2,7 @@ import { Module, MiddlewareConsumer, RequestMethod } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { CacheModule } from '@nestjs/cache-manager';
-import { DatabaseModule, TenantMiddleware } from '@shoposphere/common';
+import { DatabaseModule, TenantMiddleware } from '@frontstores/common';
 import { SalesService } from './sales/sales.service';
 import { SalesController } from './sales/sales.controller';
 

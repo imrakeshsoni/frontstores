@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, ForbiddenException, HttpCode, HttpStatus } from '@nestjs/common';
 import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
-import { CurrentUser, successResponse } from '@shoposphere/common';
+import { CurrentUser, successResponse } from '@frontstores/common';
 import { EnquiriesService } from './enquiries.service';
 
 class CreateEnquiryDto {

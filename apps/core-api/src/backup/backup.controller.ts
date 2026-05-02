@@ -4,7 +4,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
-import { CurrentTenant, TenantContext, successResponse } from '@shoposphere/common';
+import { CurrentTenant, TenantContext, successResponse } from '@frontstores/common';
 import { BackupService } from './backup.service';
 
 @Controller('backup')

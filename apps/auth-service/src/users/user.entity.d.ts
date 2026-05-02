@@ -1,4 +1,4 @@
-import { TenantScopedEntity } from '@shoposphere/common';
+import { TenantScopedEntity } from '@frontstores/common';
 export declare class User extends TenantScopedEntity {
     shopId: string | null;
     cognitoSub: string;

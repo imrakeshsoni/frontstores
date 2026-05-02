@@ -3,7 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { CacheModule } from '@nestjs/cache-manager';
-import { DatabaseModule, TenantMiddleware, EventBusService } from '@shoposphere/common';
+import { DatabaseModule, TenantMiddleware, EventBusService } from '@frontstores/common';
 
 import { Product } from './products/product.entity';
 import { Inventory, StockMovement } from './inventory/inventory.entity';

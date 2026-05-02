@@ -1,7 +1,8 @@
-import { useState, useRef, useCallback, ReactNode } from 'react';
+import { useState, useRef, useCallback, ReactNode, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Search, Trash2, Plus, Minus, IndianRupee, UserPlus, X, CheckCircle, Download, MessageCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '@/lib/api/client';
 import { useCartStore } from '@/app/store/cart.store';
 import type { CartItem } from '@/app/store/cart.store';
@@ -73,23 +74,84 @@ type HeldCart = {
   items: CartItem[];
 };
 
-const HELD_CARTS_STORAGE_KEY = 'shoposphere-held-carts';
+type ProductForm = {
+  name: string;
+  unit: string;
+  dosageForm: string;
+  mlVolume: string;
+  mrp: string;
+  gstRate: string;
+  totalUnits: string;
+  looseSellingPrice: string;
+  lowStockQuantity: string;
+  nrx: boolean;
+  locationSection: string;
+  locationRack: string;
+  locationShelf: string;
+};
+
+type KeyboardZone = 'search' | 'results' | 'cart' | 'cart-action' | 'customer' | 'payment-method' | 'payment-customer' | 'payment-fields' | 'payment-confirm';
+type CartEditField = 'quantity' | 'loose' | 'discount' | 'remove';
+type PaymentFieldFocus = 'patient' | 'doctor' | 'loyalty';
+
+const HELD_CARTS_STORAGE_KEY = 'frontstores-held-carts';
+const ML_VOLUME_OPTIONS = ['30', '60', '80', '100', '120', '150', '180', '200', '220', '250', '300', '350', '400', '450', '500', '550', '600', '650', '900', '1000'];
+const DOSAGE_FORM_OPTIONS = ['Tablet', 'Syrup', 'Powder', 'Drop', 'Injection', 'Opthalmic', 'Ointment', 'Inhalation'];
+const emptyProductForm: ProductForm = {
+  name: '',
+  unit: 'piece',
+  dosageForm: '',
+  mlVolume: '',
+  mrp: '',
+  gstRate: '12',
+  totalUnits: '',
+  looseSellingPrice: '',
+  lowStockQuantity: '',
+  nrx: false,
+  locationSection: '',
+  locationRack: '',
+  locationShelf: '',
+};
 
 export function POSPage() {
   const [search, setSearch] = useState('');
   const [showPayment, setShowPayment] = useState(false);
+  const [showAddProduct, setShowAddProduct] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  const [focusedPaymentMethod, setFocusedPaymentMethod] = useState<PaymentMethod>('cash');
+  const [paymentMethodConfirmed, setPaymentMethodConfirmed] = useState(false);
   const [customerSearch, setCustomerSearch] = useState('');
+  const [creditCustomerSearch, setCreditCustomerSearch] = useState('');
+  const [showCreditCustomerDropdown, setShowCreditCustomerDropdown] = useState(false);
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [loyaltyPointsRedeemed, setLoyaltyPointsRedeemed] = useState('0');
   const [patientName, setPatientName] = useState('');
   const [doctorName, setDoctorName] = useState('');
   const [invoiceSnapshot, setInvoiceSnapshot] = useState<InvoiceSnapshot | null>(null);
+  const [invoiceDateTime, setInvoiceDateTime] = useState('');
   const [isSendingInvoiceWhatsapp, setIsSendingInvoiceWhatsapp] = useState(false);
   const [heldCarts, setHeldCarts] = useState<HeldCart[]>(() => readHeldCarts());
   const [predefinedCustomerId, setPredefinedCustomerId] = useState<string | null>(null);
+  const [productForm, setProductForm] = useState<ProductForm>(emptyProductForm);
+  const [selectedResultIndex, setSelectedResultIndex] = useState(0);
+  const [selectedCartIndex, setSelectedCartIndex] = useState(0);
+  const [keyboardZone, setKeyboardZone] = useState<KeyboardZone>('search');
+  const [batchSelectionActive, setBatchSelectionActive] = useState(false);
+  const [selectedBatchIndex, setSelectedBatchIndex] = useState(0);
+  const [customerResultIndex, setCustomerResultIndex] = useState(0);
+  const [cartEditField, setCartEditField] = useState<CartEditField>('quantity');
+  const [paymentFieldFocus, setPaymentFieldFocus] = useState<PaymentFieldFocus>('patient');
+  const [isCustomerSearchActive, setIsCustomerSearchActive] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const customerSearchRef = useRef<HTMLInputElement>(null);
+  const patientNameRef = useRef<HTMLInputElement>(null);
+  const doctorNameRef = useRef<HTMLInputElement>(null);
+  const loyaltyPointsRef = useRef<HTMLInputElement>(null);
   const invoiceSheetRef = useRef<HTMLDivElement>(null);
+  const activeDiscountInputRef = useRef<HTMLInputElement>(null);
+  const collectPaymentButtonRef = useRef<HTMLButtonElement>(null);
+  const confirmPaymentBtnRef = useRef<HTMLButtonElement>(null);
+  const creditCustomerSearchRef = useRef<HTMLInputElement>(null);
 
   const shopId = useAuthStore((s) => s.activeShopId);
   const activeShopType = useActiveShopType();
@@ -97,6 +159,8 @@ export function POSPage() {
   const queryClient = useQueryClient();
   const cart = useCartStore();
   const activeShop = useAuthStore((s) => s.shops.find((shop) => shop.id === s.activeShopId) ?? null);
+  const can = useAuthStore((s) => s.can);
+  const navigate = useNavigate();
   const trimmedSearch = search.trim();
   const showingSearchResults = trimmedSearch.length > 0;
 
@@ -108,15 +172,12 @@ export function POSPage() {
 
   const invoiceTemplate = settingsContext?.shop?.settings?.invoiceTemplate ?? {};
   const shopAddress = settingsContext?.shop?.address ?? {};
-
-  const { data: popularProducts, isFetching: isFetchingPopular } = useQuery({
-    queryKey: ['pos-top-products', shopId],
-    queryFn: () =>
-      apiClient
-        .get(`/api/reports/reports/sales/top-products?shopId=${shopId}&days=180&limit=50`)
-        .then((r) => r.data.data),
-    enabled: !!shopId && !showingSearchResults && !predefinedCustomerId,
-  });
+  const tenantSlug = settingsContext?.tenant?.slug ?? '';
+  const isLocalMedplusTenant = tenantSlug === 'medplus';
+  const keyboardBillingMode =
+    isMedicalStore || settingsContext?.tenant?.settings?.enableKeyboardBillingMode === true || isLocalMedplusTenant;
+  const canEditInvoiceDateTime = isMedicalStore || tenantSlug === 'roshan-medical-store' || isLocalMedplusTenant;
+  const hasBillableItems = cart.items.some((item) => getCartItemBillableQuantity(item) > 0);
 
   const { data: predefinedDefaultProducts, isFetching: isFetchingPredefined } = useQuery({
     queryKey: ['pos-predefined-products', predefinedCustomerId],
@@ -146,6 +207,16 @@ export function POSPage() {
     enabled: trimmedCustomerSearch.length > 1,
   });
 
+  const trimmedCreditCustomerSearch = creditCustomerSearch.trim();
+  const { data: creditCustomerResults = [] } = useQuery({
+    queryKey: ['pos-credit-customer-search', trimmedCreditCustomerSearch],
+    queryFn: () =>
+      apiClient
+        .get(`/api/core/customers?search=${encodeURIComponent(trimmedCreditCustomerSearch)}&perPage=8`)
+        .then((r) => r.data.data),
+    enabled: trimmedCreditCustomerSearch.length > 1,
+  });
+
   const attachCustomerIfNeeded = async () => {
     return cart.customerId ?? null;
   };
@@ -165,6 +236,11 @@ export function POSPage() {
     }
   };
 
+  const handleOpenAddProduct = () => {
+    setProductForm(emptyProductForm);
+    setShowAddProduct(true);
+  };
+
   const invalidateSalesData = () => {
     queryClient.invalidateQueries({ queryKey: ['today-summary'] });
     queryClient.invalidateQueries({ queryKey: ['sales-summary'] });
@@ -178,7 +254,7 @@ export function POSPage() {
   };
 
   const saveCurrentCartAsHold = () => {
-    if (cart.items.length === 0) {
+    if (!hasBillableItems) {
       toast.error('Add items before holding the cart');
       return;
     }
@@ -240,6 +316,13 @@ export function POSPage() {
 
   const handleSearchKeyDown = async (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && trimmedSearch) {
+      if (showingSearchResults && resultList.length > 0) {
+        e.preventDefault();
+        addSelectedResultToCart();
+        focusSearch();
+        return;
+      }
+
       try {
         const res = await apiClient.get(`/api/core/products/barcode/${encodeURIComponent(trimmedSearch)}`);
         const product = res.data.data;
@@ -250,6 +333,59 @@ export function POSPage() {
       }
     }
   };
+
+  const addFromNextBatchIfAvailable = useCallback((item: CartItem) => {
+    const batches = Array.isArray(item.availableBatches) ? item.availableBatches : [];
+    if (batches.length === 0) {
+      return false;
+    }
+
+    const currentBatchIndex = batches.findIndex(
+      (batch) =>
+        (batch.batchNo ?? 'no-batch') === (item.batchNo ?? 'no-batch') &&
+        (batch.expiry ?? 'no-exp') === (item.expiryDate ?? 'no-exp'),
+    );
+
+    for (const batch of batches.slice(currentBatchIndex >= 0 ? currentBatchIndex + 1 : 0)) {
+      const allocatedQuantity = cart.items
+        .filter(
+          (cartItem) =>
+            cartItem.productId === item.productId &&
+            (cartItem.batchNo ?? 'no-batch') === (batch.batchNo ?? 'no-batch') &&
+            (cartItem.expiryDate ?? 'no-exp') === (batch.expiry ?? 'no-exp'),
+        )
+        .reduce((sum, cartItem) => sum + getCartItemBillableQuantity(cartItem), 0);
+
+      if (allocatedQuantity >= Number(batch.quantity ?? 0)) {
+        continue;
+      }
+
+      cart.addItem({
+        itemKey: [item.productId, batch.batchNo ?? 'no-batch', batch.expiry ?? 'no-exp'].join(':'),
+        productId: item.productId,
+        name: item.name,
+        sku: item.sku,
+        unit: item.unit,
+        unitPrice: item.unitPrice,
+        looseUnitPrice: item.looseUnitPrice,
+        gstRate: item.gstRate,
+        discount: 0,
+        batchNo: batch.batchNo,
+        manufactureDate: batch.manufactureDate,
+        expiryDate: batch.expiry,
+        availableBatches: item.availableBatches,
+        availableQuantity: item.availableQuantity,
+        batchAvailableQuantity: Number(batch.quantity ?? 0) || undefined,
+        totalUnits: item.totalUnits,
+        quantity: 1,
+      });
+
+      toast.message(`Added 1 unit from batch ${batch.batchNo ?? 'next batch'}`);
+      return true;
+    }
+
+    return false;
+  }, [cart]);
 
   const addToCart = useCallback((product: any, selectedBatch?: any) => {
     const resolvedProductId = product.id ?? product.product_id;
@@ -311,7 +447,7 @@ export function POSPage() {
       if (!shopId) {
         throw new Error('Select a shop before billing');
       }
-      if (cart.items.length === 0) {
+      if (!hasBillableItems) {
         throw new Error('Add at least one product to continue');
       }
 
@@ -325,11 +461,13 @@ export function POSPage() {
       return apiClient.post('/api/orders/orders', {
         shopId,
         customerId: finalCustomerId ?? undefined,
-        items: cart.items.map((i) => ({
+        items: cart.items
+          .filter((i) => getCartItemBillableQuantity(i) > 0)
+          .map((i) => ({
           productId: i.productId,
-          quantity: i.quantity + (i.isLoose && i.totalUnits ? (i.looseQty ?? 0) / i.totalUnits : 0),
+          quantity: getCartItemBillableQuantity(i),
           unitPrice: (() => {
-            const combinedQty = i.quantity + (i.isLoose && i.totalUnits ? (i.looseQty ?? 0) / i.totalUnits : 0);
+            const combinedQty = getCartItemBillableQuantity(i);
             if (combinedQty <= 0) return i.unitPrice;
             const combinedSubtotal = i.unitPrice * i.quantity + (i.isLoose ? (i.looseUnitPrice ?? 0) * (i.looseQty ?? 0) : 0);
             return combinedSubtotal / combinedQty;
@@ -399,12 +537,68 @@ export function POSPage() {
       setPatientName('');
       setDoctorName('');
       setPredefinedCustomerId(null);
+      setCreditCustomerSearch('');
+      setShowCreditCustomerDropdown(false);
       setShowPayment(false);
       invalidateSalesData();
       queryClient.invalidateQueries({ queryKey: ['customers'] });
     },
     onError: (err: any) => {
       toast.error(err.response?.data?.message ?? err.message ?? 'Order failed');
+    },
+  });
+
+  const createProductMutation = useMutation({
+    mutationFn: async () => {
+      if (!shopId) throw new Error('Select a shop before creating products');
+
+      const payload = {
+        name: productForm.name.trim(),
+        unit: productForm.unit,
+        mrp: productForm.mrp ? Number(productForm.mrp) : undefined,
+        sellingPrice: productForm.mrp ? Number(productForm.mrp) : undefined,
+        gstRate: Number(productForm.gstRate || 0),
+        shopId,
+        attributes: {
+          ...(productForm.lowStockQuantity ? { lowStockQuantity: Number(productForm.lowStockQuantity) } : {}),
+          ...(productForm.unit === 'strip' && productForm.totalUnits ? { totalUnits: Number(productForm.totalUnits) } : {}),
+          ...(productForm.unit === 'strip' && productForm.looseSellingPrice ? { looseSellingPrice: Number(productForm.looseSellingPrice) } : {}),
+          ...(productForm.unit === 'ml' && productForm.mlVolume ? { mlVolume: Number(productForm.mlVolume) } : {}),
+          ...(productForm.dosageForm ? { dosageForm: productForm.dosageForm } : {}),
+          nrx: productForm.nrx,
+          ...(productForm.locationSection ? { locationSection: productForm.locationSection } : {}),
+          ...(productForm.locationRack.trim() ? { locationRack: productForm.locationRack.trim() } : {}),
+          ...(productForm.locationShelf ? { locationShelf: productForm.locationShelf } : {}),
+        },
+      };
+
+      if (!payload.name) throw new Error('Product name is required');
+
+      return apiClient.post('/api/core/products', payload);
+    },
+    onSuccess: (response) => {
+      const product = response.data?.data;
+      toast.success('Product created. Add opening stock now.');
+      setShowAddProduct(false);
+      setProductForm(emptyProductForm);
+      queryClient.invalidateQueries({ queryKey: ['product-search'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-products'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['pos-top-products'] });
+      navigate('/inventory', {
+        state: {
+          openAdjustStock: true,
+          productId: product?.id ?? '',
+          productName: product?.name ?? '',
+          direction: 'add',
+          type: 'purchase',
+          returnTo: '/pos',
+        },
+      });
+    },
+    onError: (err: any) => {
+      const msg = err.response?.data?.message;
+      toast.error(Array.isArray(msg) ? msg.join(', ') : (msg ?? err.message ?? 'Unable to save product'));
     },
   });
 
@@ -513,22 +707,24 @@ export function POSPage() {
     const whatsapp = invoiceSnapshot.whatsappNumber;
     const footerNote = invoiceSnapshot.footerNote;
     const signatureLabel = invoiceSnapshot.signatureLabel;
+    const invoiceDate = getInvoiceDisplayDate(invoiceSnapshot, invoiceDateTime, canEditInvoiceDateTime);
 
     const itemRows = invoiceSnapshot.items.map((item) => {
-      const mfgExp = [
-        item.manufactureDate ? `Mfg: ${item.manufactureDate}` : '',
-        item.expiry ? `Exp: ${item.expiry}` : '',
-      ].filter(Boolean).join(' / ') || '-';
+      const lineValueAmount = getInvoiceItemValueAmount(item);
+      const lineTotalAmount = getInvoiceItemTotalAmount(item);
       return `
         <tr>
-          <td class="td-name">${item.name}<br><span class="qty-label">${item.quantityLabel}</span></td>
-          <td class="td-center">${item.batchNo || '-'}</td>
-          <td class="td-center">${mfgExp}</td>
-          <td class="td-amount">${item.amount.toFixed(2)}</td>
+          <td class="td-name">${item.name}</td>
+          <td class="td-center">${item.quantityLabel}</td>
+          <td class="td-amount">${item.unitPrice.toFixed(2)}</td>
+          <td class="td-amount">${lineValueAmount.toFixed(2)}</td>
+          <td class="td-center">${item.gstRate > 0 ? `${item.gstRate}%` : '-'}</td>
+          <td class="td-amount">${item.discountAmount > 0 ? item.discountAmount.toFixed(2) : '-'}</td>
+          <td class="td-amount">${lineTotalAmount.toFixed(2)}</td>
         </tr>`;
     }).join('');
 
-    const dateStr = new Date(invoiceSnapshot.createdAt).toLocaleString('en-IN', {
+    const dateStr = invoiceDate.toLocaleString('en-IN', {
       day: '2-digit', month: 'short', year: 'numeric',
       hour: '2-digit', minute: '2-digit',
     });
@@ -612,16 +808,19 @@ export function POSPage() {
   <table>
     <thead>
       <tr>
-        <th style="width:40%">Drug Name &amp; Qty</th>
-        <th style="width:16%;text-align:center;border-left:1px solid #bfdbfe">Batch No</th>
-        <th style="width:28%;text-align:center;border-left:1px solid #bfdbfe">Mfg / Exp</th>
-        <th class="th-amount" style="width:16%;border-left:1px solid #bfdbfe">Amount</th>
+        <th style="width:30%">Product</th>
+        <th style="width:12%;text-align:center;border-left:1px solid #bfdbfe">Qty</th>
+        <th class="th-amount" style="width:12%;border-left:1px solid #bfdbfe">MRP</th>
+        <th class="th-amount" style="width:14%;border-left:1px solid #bfdbfe">Value</th>
+        <th style="width:10%;text-align:center;border-left:1px solid #bfdbfe">GST%</th>
+        <th class="th-amount" style="width:10%;border-left:1px solid #bfdbfe">Discount</th>
+        <th class="th-amount" style="width:12%;border-left:1px solid #bfdbfe">Amount</th>
       </tr>
     </thead>
     <tbody>
       ${itemRows}
       <tr class="total-row">
-        <td colspan="2">${footerNote}</td>
+        <td colspan="5">${footerNote}</td>
         <td class="total-label">Total ₹</td>
         <td class="total-value">${invoiceSnapshot.total.toFixed(2)}</td>
       </tr>
@@ -639,56 +838,885 @@ export function POSPage() {
     printWindow.document.close();
   };
 
-  const defaultList = predefinedCustomerId ? (predefinedDefaultProducts ?? []) : (popularProducts ?? []);
-  const resultList = showingSearchResults ? (searchResults ?? []) : defaultList;
+  const resultList = showingSearchResults ? (searchResults ?? []) : (predefinedCustomerId ? (predefinedDefaultProducts ?? []) : []);
   const resultHeading = showingSearchResults
     ? 'Search results'
     : predefinedCustomerId
       ? 'Predefined products'
-      : 'Top selling products';
+      : '';
   const resultSubheading = showingSearchResults
     ? 'Tap any matching item to add it directly to the bill.'
     : predefinedCustomerId
       ? 'Showing products predefined for this customer.'
-      : 'Your 50 most sold items are ready first, so billing can start immediately.';
-  const resultLoading = showingSearchResults ? isFetching : (predefinedCustomerId ? isFetchingPredefined : isFetchingPopular);
+      : '';
+  const resultLoading = showingSearchResults ? isFetching : (predefinedCustomerId ? isFetchingPredefined : false);
+
+  const clampIndex = (index: number, size: number) => {
+    if (size <= 0) return 0;
+    if (index < 0) return 0;
+    if (index >= size) return size - 1;
+    return index;
+  };
+
+  const focusSearch = () => {
+    requestAnimationFrame(() => searchRef.current?.focus());
+  };
+
+  const moveSelectedResult = (delta: number) => {
+    const newIndex = clampIndex(selectedResultIndex + delta, resultList.length);
+    setSelectedResultIndex(newIndex);
+    const newProduct = resultList[newIndex];
+    const batches = newProduct ? getSortedBatches(newProduct) : [];
+    setBatchSelectionActive(batches.length > 0);
+    setSelectedBatchIndex(0);
+  };
+
+  const moveSelectedCart = (delta: number) => {
+    setSelectedCartIndex((current) => clampIndex(current + delta, cart.items.length));
+  };
+
+  const selectedCartItem = cart.items[selectedCartIndex];
+
+  const focusKeyboardZone = useCallback((zone: KeyboardZone) => {
+    setKeyboardZone(zone);
+    if (zone !== 'results') {
+      setBatchSelectionActive(false);
+      setSelectedBatchIndex(0);
+    }
+    requestAnimationFrame(() => {
+      if (zone === 'search' || zone === 'results') {
+        searchRef.current?.focus();
+        return;
+      }
+      if (zone === 'cart') {
+        (document.activeElement as HTMLElement)?.blur();
+        return;
+      }
+      if (zone === 'cart-action') {
+        collectPaymentButtonRef.current?.focus();
+        return;
+      }
+      if (zone === 'customer') {
+        customerSearchRef.current?.focus();
+        return;
+      }
+      if (zone === 'payment-fields') {
+        if (paymentFieldFocus === 'doctor') {
+          doctorNameRef.current?.focus();
+          return;
+        }
+        if (paymentFieldFocus === 'loyalty') {
+          loyaltyPointsRef.current?.focus();
+          return;
+        }
+        patientNameRef.current?.focus();
+        return;
+      }
+      if (zone === 'payment-customer') {
+        creditCustomerSearchRef.current?.focus();
+        return;
+      }
+      if (zone === 'payment-confirm') {
+        confirmPaymentBtnRef.current?.focus();
+        return;
+      }
+    });
+  }, [paymentFieldFocus]);
+
+  const addSelectedResultToCart = () => {
+    const target = resultList[selectedResultIndex];
+    if (!target) return;
+    const batches = getSortedBatches(target);
+    addToCart(target, batches[selectedBatchIndex] ?? batches[0]);
+    setBatchSelectionActive(false);
+    setSelectedBatchIndex(0);
+  };
+
+  const cyclePaymentMethod = () => {
+    setPaymentMethod((current) => {
+      const methods: PaymentMethod[] = ['cash', 'upi', 'card', 'credit'];
+      const nextIndex = (methods.indexOf(current) + 1) % methods.length;
+      return methods[nextIndex];
+    });
+  };
+
+  const openPaymentKeyboardFlow = useCallback(() => {
+    if (!hasBillableItems) {
+      toast.error('Add items before collecting payment');
+      return;
+    }
+    setShowPayment(true);
+    setKeyboardZone('payment-method');
+  }, [hasBillableItems]);
+
+  const cycleKeyboardZone = useCallback((direction: 1 | -1) => {
+    const billingZones: KeyboardZone[] = ['search', 'results', 'cart', 'customer', 'payment-method'];
+    const paymentZones: KeyboardZone[] = ['payment-method', 'payment-fields', 'payment-confirm'];
+    const zones = showPayment ? paymentZones : billingZones;
+    const currentIndex = zones.indexOf(keyboardZone);
+    const fallbackIndex = currentIndex >= 0 ? currentIndex : 0;
+    const nextIndex = (fallbackIndex + direction + zones.length) % zones.length;
+    const nextZone = zones[nextIndex];
+    if (nextZone === 'payment-method' && !showPayment) {
+      openPaymentKeyboardFlow();
+      return;
+    }
+    focusKeyboardZone(nextZone);
+  }, [focusKeyboardZone, keyboardZone, openPaymentKeyboardFlow, showPayment]);
+
+  const cycleCartEditField = useCallback((direction: 1 | -1) => {
+    const fields: CartEditField[] = ['quantity', 'loose', 'discount', 'remove'];
+    const currentIndex = fields.indexOf(cartEditField);
+    const nextIndex = (currentIndex + direction + fields.length) % fields.length;
+    setCartEditField(fields[nextIndex]);
+  }, [cartEditField]);
+
+  const moveCartEditField = useCallback((direction: 1 | -1) => {
+    if (!selectedCartItem) return;
+
+    const canSellLoose = selectedCartItem.unit === 'strip' && Number(selectedCartItem.totalUnits ?? 0) > 0;
+
+    if (direction === 1) {
+      if (cartEditField === 'quantity') {
+        if (canSellLoose) {
+          if ((selectedCartItem.looseQty ?? 0) <= 0) {
+            if (!canApplyCartQuantityChange(selectedCartItem, {
+              nextQuantity: selectedCartItem.quantity,
+              nextLooseQty: 1,
+            })) {
+              toast.error('Not enough stock available');
+              return;
+            }
+            cart.toggleLoose(selectedCartItem.itemKey, true);
+            cart.updateLooseQty(selectedCartItem.itemKey, 1);
+          }
+          setCartEditField('loose');
+          return;
+        }
+
+        setCartEditField('discount');
+        return;
+      }
+
+      if (cartEditField === 'loose') {
+        setCartEditField('discount');
+      }
+
+      return;
+    }
+
+    if (cartEditField === 'discount') {
+      setCartEditField(canSellLoose ? 'loose' : 'quantity');
+      return;
+    }
+
+    if (cartEditField === 'loose') {
+      setCartEditField('quantity');
+    }
+  }, [cart, cartEditField, selectedCartItem]);
+
+  const adjustSelectedCartItem = useCallback((delta: number) => {
+    if (!selectedCartItem) return;
+
+    if (cartEditField === 'quantity') {
+      const nextQuantity = selectedCartItem.quantity + delta;
+      if (nextQuantity < 0) return;
+      if (
+        delta > 0 &&
+        !canApplyCartQuantityChange(selectedCartItem, {
+          nextQuantity,
+          nextLooseQty: selectedCartItem.looseQty ?? 0,
+        })
+      ) {
+        if (addFromNextBatchIfAvailable(selectedCartItem)) {
+          return;
+        }
+      }
+      if (!canApplyCartQuantityChange(selectedCartItem, {
+        nextQuantity,
+        nextLooseQty: selectedCartItem.looseQty ?? 0,
+      })) {
+        toast.error('Not enough stock available');
+        return;
+      }
+      cart.updateQty(selectedCartItem.itemKey, nextQuantity);
+      return;
+    }
+
+    if (cartEditField === 'loose') {
+      if (!(selectedCartItem.unit === 'strip' && Number(selectedCartItem.totalUnits ?? 0) > 0)) {
+        toast.error('Loose sale is only available for strip products');
+        return;
+      }
+      const nextLooseQty = Math.max(0, (selectedCartItem.looseQty ?? 0) + delta);
+      if (!canApplyCartQuantityChange(selectedCartItem, {
+        nextQuantity: selectedCartItem.quantity,
+        nextLooseQty,
+      })) {
+        toast.error('Not enough stock available');
+        return;
+      }
+      if (nextLooseQty > 0 && !selectedCartItem.isLoose) {
+        cart.toggleLoose(selectedCartItem.itemKey, true);
+      }
+      cart.updateLooseQty(selectedCartItem.itemKey, nextLooseQty);
+      return;
+    }
+
+    if (cartEditField === 'discount') {
+      cart.setDiscountPercent(selectedCartItem.itemKey, Number(selectedCartItem.discountPercent ?? 0) + delta);
+    }
+  }, [addFromNextBatchIfAvailable, cart, cartEditField, selectedCartItem]);
+
+  const moveCustomerResult = useCallback((delta: number) => {
+    setCustomerResultIndex((current) => clampIndex(current + delta, customerSearchResults.length));
+  }, [customerSearchResults.length]);
+
+  const selectHighlightedCustomer = useCallback(() => {
+    const targetCustomer = customerSearchResults[customerResultIndex];
+    if (targetCustomer) {
+      void handleCustomerSelect(targetCustomer);
+    }
+  }, [customerResultIndex, customerSearchResults]);
+
+  const cyclePaymentFieldFocus = useCallback((direction: 1 | -1) => {
+    const fields: PaymentFieldFocus[] = cart.customerId
+      ? ['patient', 'doctor', 'loyalty']
+      : ['patient', 'doctor'];
+    const currentIndex = fields.indexOf(paymentFieldFocus);
+    const fallbackIndex = currentIndex >= 0 ? currentIndex : 0;
+    const nextField = fields[(fallbackIndex + direction + fields.length) % fields.length];
+    setPaymentFieldFocus(nextField);
+    focusKeyboardZone('payment-fields');
+  }, [cart.customerId, focusKeyboardZone, paymentFieldFocus]);
+
+  const handleKeyboardModeKeyDown = useCallback((event: KeyboardEvent) => {
+    if (!keyboardBillingMode) return;
+    if (showAddProduct || invoiceSnapshot) return;
+    if (showPayment) return;
+
+    const target = event.target as HTMLElement | null;
+    const tagName = target?.tagName;
+    const isTypingField = tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT';
+    const isDiscountField = target === activeDiscountInputRef.current;
+
+    if (event.key === 'Shift' && !event.repeat) {
+      if (!showPayment) {
+        if (keyboardZone === 'search' || keyboardZone === 'results') {
+          if (cart.items.length > 0) {
+            const lastIndex = cart.items.length - 1;
+            const lastItem = cart.items[lastIndex];
+            const canSellLoose = lastItem && lastItem.unit === 'strip' && Number(lastItem.totalUnits ?? 0) > 0;
+            setSelectedCartIndex(lastIndex);
+            setCartEditField(canSellLoose ? 'loose' : 'quantity');
+            focusKeyboardZone('cart');
+          }
+          return;
+        }
+        if (keyboardZone === 'cart') {
+          if (selectedCartIndex > 0) {
+            setSelectedCartIndex(selectedCartIndex - 1);
+            setCartEditField('quantity');
+          } else {
+            focusKeyboardZone('customer');
+          }
+          return;
+        }
+        if (keyboardZone === 'cart-action') {
+          if (cart.items.length > 0) {
+            setSelectedCartIndex(cart.items.length - 1);
+            setCartEditField('quantity');
+            focusKeyboardZone('cart');
+          }
+          return;
+        }
+      }
+    }
+
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      if (!showPayment) {
+        if (keyboardZone === 'search' || keyboardZone === 'results') {
+          if (cart.items.length > 0) {
+            setSelectedCartIndex(0);
+            setCartEditField('quantity');
+            focusKeyboardZone('cart');
+          }
+          return;
+        }
+        if (keyboardZone === 'cart' && selectedCartItem) {
+          if (selectedCartIndex < cart.items.length - 1) {
+            setSelectedCartIndex(selectedCartIndex + 1);
+            setCartEditField('quantity');
+          } else {
+            focusKeyboardZone('cart-action');
+          }
+          return;
+        }
+        if (keyboardZone === 'cart-action') {
+          focusKeyboardZone('cart-action');
+          return;
+        }
+        if (keyboardZone === 'customer') {
+          if (cart.items.length > 0) {
+            setSelectedCartIndex(0);
+            setCartEditField('quantity');
+            focusKeyboardZone('cart');
+          }
+          return;
+        }
+      }
+      return;
+    }
+
+    if (!showPayment) {
+      if (event.key === 'F2') {
+        event.preventDefault();
+        focusKeyboardZone('customer');
+        return;
+      }
+      if (event.key === 'F4') {
+        event.preventDefault();
+        openPaymentKeyboardFlow();
+        return;
+      }
+      if (keyboardZone === 'search') {
+        if (event.key === 'ArrowDown' && resultList.length > 0) {
+          event.preventDefault();
+          const firstProduct = resultList[0];
+          const firstBatches = firstProduct ? getSortedBatches(firstProduct) : [];
+          setSelectedResultIndex(0);
+          setBatchSelectionActive(firstBatches.length > 0);
+          setSelectedBatchIndex(0);
+          setKeyboardZone('results');
+          return;
+        }
+        if (event.key === 'Enter' && resultList.length > 0 && showingSearchResults) {
+          event.preventDefault();
+          addSelectedResultToCart();
+          focusKeyboardZone('search');
+          return;
+        }
+        if ((event.key === 'ArrowRight' || event.key === 'ArrowLeft') && resultList.length > 0 && showingSearchResults) {
+          const firstProduct = resultList[selectedResultIndex];
+          const firstBatches = firstProduct ? getSortedBatches(firstProduct) : [];
+          if (firstBatches.length > 1) {
+            event.preventDefault();
+            setSelectedBatchIndex((current) =>
+              event.key === 'ArrowRight'
+                ? Math.min(current + 1, firstBatches.length - 1)
+                : Math.max(current - 1, 0),
+            );
+          }
+          return;
+        }
+      }
+      if (keyboardZone === 'results') {
+        const curProduct = resultList[selectedResultIndex];
+        const curBatches = curProduct ? getSortedBatches(curProduct) : [];
+        if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          moveSelectedResult(1);
+          return;
+        }
+        if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          if (selectedResultIndex === 0) {
+            focusKeyboardZone('search');
+            return;
+          }
+          moveSelectedResult(-1);
+          return;
+        }
+        if (curBatches.length > 1 && event.key === 'ArrowRight') {
+          event.preventDefault();
+          setSelectedBatchIndex((i) => Math.min(i + 1, curBatches.length - 1));
+          return;
+        }
+        if (curBatches.length > 1 && event.key === 'ArrowLeft') {
+          event.preventDefault();
+          setSelectedBatchIndex((i) => Math.max(i - 1, 0));
+          return;
+        }
+        if (event.key === 'Enter' && curProduct) {
+          event.preventDefault();
+          addSelectedResultToCart();
+          focusKeyboardZone('search');
+          return;
+        }
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          focusKeyboardZone('search');
+          return;
+        }
+      }
+      if (keyboardZone === 'cart' && selectedCartItem && (isDiscountField || !isTypingField)) {
+        if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          adjustSelectedCartItem(1);
+          return;
+        }
+        if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          adjustSelectedCartItem(-1);
+          return;
+        }
+        if (event.key === 'ArrowRight') {
+          event.preventDefault();
+          moveCartEditField(1);
+          return;
+        }
+        if (event.key === 'ArrowLeft') {
+          event.preventDefault();
+          moveCartEditField(-1);
+          return;
+        }
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          if (cartEditField === 'loose' && selectedCartItem.unit === 'strip' && Number(selectedCartItem.totalUnits ?? 0) > 0) {
+            cart.toggleLoose(selectedCartItem.itemKey, !selectedCartItem.isLoose);
+          }
+          return;
+        }
+        if (isDeleteKey(event) && (!isDiscountField || isRecordDeleteKey(event))) {
+          event.preventDefault();
+          event.stopPropagation();
+          cart.removeItem(selectedCartItem.itemKey);
+          return;
+        }
+      }
+      if (keyboardZone === 'cart-action') {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          collectPaymentButtonRef.current?.click();
+          return;
+        }
+        if (event.key === 'ArrowUp' && cart.items.length > 0) {
+          event.preventDefault();
+          setSelectedCartIndex(cart.items.length - 1);
+          setCartEditField('quantity');
+          focusKeyboardZone('cart');
+          return;
+        }
+      }
+      if (keyboardZone === 'customer') {
+        if (cart.customerId && isDeleteKey(event)) {
+          event.preventDefault();
+          cart.setCustomer('', '', null);
+          setCustomerSearch('');
+          setPredefinedCustomerId(null);
+          return;
+        }
+        if (event.key === 'ArrowDown' && customerSearchResults.length > 0) {
+          event.preventDefault();
+          setShowCustomerDropdown(true);
+          moveCustomerResult(1);
+          return;
+        }
+        if (event.key === 'ArrowUp' && customerSearchResults.length > 0) {
+          event.preventDefault();
+          setShowCustomerDropdown(true);
+          moveCustomerResult(-1);
+          return;
+        }
+        if (event.key === 'Enter' && customerSearchResults.length > 0) {
+          event.preventDefault();
+          selectHighlightedCustomer();
+          focusKeyboardZone('search');
+          return;
+        }
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          setShowCustomerDropdown(false);
+          focusKeyboardZone('search');
+          return;
+        }
+      }
+    } else {
+      if (keyboardZone === 'cart' && selectedCartItem && (isDiscountField || !isTypingField)) {
+        if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          adjustSelectedCartItem(1);
+          return;
+        }
+        if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          adjustSelectedCartItem(-1);
+          return;
+        }
+        if (event.key === 'ArrowRight') {
+          event.preventDefault();
+          moveCartEditField(1);
+          return;
+        }
+        if (event.key === 'ArrowLeft') {
+          event.preventDefault();
+          moveCartEditField(-1);
+          return;
+        }
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          if (cartEditField === 'loose' && selectedCartItem.unit === 'strip' && Number(selectedCartItem.totalUnits ?? 0) > 0) {
+            cart.toggleLoose(selectedCartItem.itemKey, !selectedCartItem.isLoose);
+          }
+          return;
+        }
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setShowPayment(false);
+        focusKeyboardZone('search');
+        return;
+      }
+      if (event.key === 'F2') {
+        event.preventDefault();
+        setPaymentFieldFocus('patient');
+        focusKeyboardZone('payment-fields');
+        return;
+      }
+      if (event.key === 'F3') {
+        event.preventDefault();
+        setPaymentFieldFocus('doctor');
+        focusKeyboardZone('payment-fields');
+        return;
+      }
+      if (event.key === 'F6') {
+        event.preventDefault();
+        if (cart.customerId) {
+          setPaymentFieldFocus('loyalty');
+          focusKeyboardZone('payment-fields');
+        }
+        return;
+      }
+      if (keyboardZone === 'payment-fields') {
+        if (event.key === 'ArrowDown' || (event.key === 'Enter' && !event.ctrlKey)) {
+          event.preventDefault();
+          const isLastPaymentField = paymentFieldFocus === 'loyalty' || (!cart.customerId && paymentFieldFocus === 'doctor');
+          if (isLastPaymentField) {
+            focusKeyboardZone('payment-confirm');
+          } else {
+            cyclePaymentFieldFocus(1);
+          }
+          return;
+        }
+        if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          if (paymentFieldFocus === 'patient') {
+            focusKeyboardZone('payment-method');
+          } else {
+            cyclePaymentFieldFocus(-1);
+          }
+          return;
+        }
+      }
+      if (keyboardZone === 'payment-confirm' && (event.key === 'ArrowUp' || event.key === 'ArrowLeft')) {
+        event.preventDefault();
+        focusKeyboardZone('payment-fields');
+        return;
+      }
+      if ((event.ctrlKey && event.key === 'Enter') || event.key === 'F9') {
+        event.preventDefault();
+        if (!placeMutation.isPending) {
+          placeMutation.mutate(undefined);
+        }
+        return;
+      }
+      if (keyboardZone === 'payment-confirm' && event.key === 'Enter') {
+        event.preventDefault();
+        if (!placeMutation.isPending) {
+          placeMutation.mutate(undefined);
+        }
+      }
+    }
+  }, [activeDiscountInputRef, addToCart, adjustSelectedCartItem, cart, cartEditField, customerSearchResults.length, cyclePaymentFieldFocus, cyclePaymentMethod, focusedPaymentMethod, focusKeyboardZone, invoiceSnapshot, isMedicalStore, keyboardBillingMode, keyboardZone, moveCartEditField, moveCustomerResult, openPaymentKeyboardFlow, paymentFieldFocus, paymentMethod, placeMutation, resultList, selectHighlightedCustomer, selectedCartItem, selectedResultIndex, setShowCustomerDropdown, showAddProduct, showPayment, showingSearchResults]);
+
+  useEffect(() => {
+    if (resultList.length === 0) {
+      setSelectedResultIndex(0);
+      setBatchSelectionActive(false);
+      setSelectedBatchIndex(0);
+      return;
+    }
+
+    const firstProduct = resultList[0];
+    const firstBatches = firstProduct ? getSortedBatches(firstProduct) : [];
+    setSelectedResultIndex(0);
+    setBatchSelectionActive(firstBatches.length > 0);
+    setSelectedBatchIndex(0);
+  }, [resultList]);
+
+  useEffect(() => {
+    setSelectedCartIndex((current) => clampIndex(current, cart.items.length));
+  }, [cart.items.length]);
+
+  useEffect(() => {
+    setCustomerResultIndex((current) => clampIndex(current, customerSearchResults.length));
+  }, [customerSearchResults.length]);
+
+  useEffect(() => {
+    if (!keyboardBillingMode) return;
+    window.addEventListener('keydown', handleKeyboardModeKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyboardModeKeyDown);
+  }, [handleKeyboardModeKeyDown, keyboardBillingMode]);
+
+  useEffect(() => {
+    if (!showPayment || !keyboardBillingMode) return;
+
+    const METHODS: PaymentMethod[] = ['cash', 'upi', 'card', 'credit'];
+
+    const focusZone = (zone: KeyboardZone, field?: 'patient' | 'doctor') => {
+      setKeyboardZone(zone);
+      if (zone === 'payment-fields') {
+        setPaymentFieldFocus(field === 'doctor' ? 'doctor' : 'patient');
+      }
+      requestAnimationFrame(() => {
+        if (zone === 'payment-customer') { creditCustomerSearchRef.current?.focus(); return; }
+        if (zone === 'payment-fields') {
+          if (field === 'doctor') { doctorNameRef.current?.focus(); }
+          else { patientNameRef.current?.focus(); }
+          return;
+        }
+        if (zone === 'payment-confirm') { confirmPaymentBtnRef.current?.focus(); return; }
+        if (zone === 'payment-method') { (document.activeElement as HTMLElement)?.blur(); }
+      });
+    };
+
+    const goForward = () => {
+      if (keyboardZone === 'payment-method') {
+        if (paymentMethod === 'credit' && !cart.customerId) { focusZone('payment-customer'); return; }
+        if (isMedicalStore) { focusZone('payment-fields', 'patient'); return; }
+        focusZone('payment-confirm');
+        return;
+      }
+      if (keyboardZone === 'payment-customer') {
+        if (isMedicalStore) { focusZone('payment-fields', 'patient'); return; }
+        focusZone('payment-confirm');
+        return;
+      }
+      if (keyboardZone === 'payment-fields') {
+        const activeEl = document.activeElement;
+        if (activeEl === patientNameRef.current) { focusZone('payment-fields', 'doctor'); return; }
+        focusZone('payment-confirm');
+        return;
+      }
+      if (keyboardZone === 'payment-confirm') {
+        setPaymentMethodConfirmed(false);
+        setFocusedPaymentMethod('cash');
+        focusZone('payment-method');
+      }
+    };
+
+    const goBackward = () => {
+      if (keyboardZone === 'payment-confirm') {
+        if (isMedicalStore) { focusZone('payment-fields', 'doctor'); return; }
+        if (paymentMethod === 'credit' && !cart.customerId) { focusZone('payment-customer'); return; }
+        focusZone('payment-method');
+        return;
+      }
+      if (keyboardZone === 'payment-fields') {
+        const activeEl = document.activeElement;
+        if (activeEl === doctorNameRef.current) { focusZone('payment-fields', 'patient'); return; }
+        if (paymentMethod === 'credit' && !cart.customerId) { focusZone('payment-customer'); return; }
+        focusZone('payment-method');
+        return;
+      }
+      if (keyboardZone === 'payment-customer') { focusZone('payment-method'); return; }
+      if (keyboardZone === 'payment-method') {
+        if (isMedicalStore) { focusZone('payment-fields', 'doctor'); return; }
+        if (paymentMethod === 'credit' && !cart.customerId) { focusZone('payment-customer'); return; }
+        focusZone('payment-confirm');
+      }
+    };
+
+    const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      if (e.key === 'Escape') { setShowPayment(false); return; }
+
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        if (!paymentMethodConfirmed) {
+          const idx = METHODS.indexOf(focusedPaymentMethod);
+          setFocusedPaymentMethod(METHODS[(idx + 1) % METHODS.length]);
+        } else {
+          goForward();
+        }
+        return;
+      }
+
+      if (e.key === 'Shift' && !e.repeat) {
+        if (!paymentMethodConfirmed) {
+          const idx = METHODS.indexOf(focusedPaymentMethod);
+          setFocusedPaymentMethod(METHODS[(idx - 1 + METHODS.length) % METHODS.length]);
+        } else {
+          goBackward();
+        }
+        return;
+      }
+
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (!paymentMethodConfirmed) {
+          setPaymentMethod(focusedPaymentMethod);
+          setPaymentMethodConfirmed(true);
+          if (focusedPaymentMethod === 'credit' && !cart.customerId) { focusZone('payment-customer'); }
+          else if (isMedicalStore) { focusZone('payment-fields', 'patient'); }
+          else { focusZone('payment-confirm'); }
+          return;
+        }
+        if (keyboardZone === 'payment-confirm' && !placeMutation.isPending) {
+          placeMutation.mutate(undefined);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handler, true);
+    return () => window.removeEventListener('keydown', handler, true);
+  }, [showPayment, keyboardBillingMode, paymentMethodConfirmed, focusedPaymentMethod, paymentMethod, cart.customerId, isMedicalStore, keyboardZone, paymentFieldFocus, placeMutation, setShowPayment]);
+
+  useEffect(() => {
+    if (!keyboardBillingMode) return;
+    if (showPayment) {
+      setKeyboardZone('payment-method');
+      setFocusedPaymentMethod('cash');
+      setPaymentMethodConfirmed(false);
+      setPaymentFieldFocus('patient');
+    } else {
+      focusKeyboardZone('search');
+    }
+  }, [focusKeyboardZone, keyboardBillingMode, showPayment]);
+
+  useEffect(() => {
+    if (keyboardZone === 'cart' && cartEditField === 'discount') {
+      requestAnimationFrame(() => activeDiscountInputRef.current?.focus());
+    }
+  }, [cartEditField, keyboardZone, selectedCartIndex]);
+
+  useEffect(() => {
+    if (keyboardZone === 'cart' && cartEditField === 'discount') {
+      return;
+    }
+
+    const active = document.activeElement as HTMLElement | null;
+    if (
+      active?.tagName === 'INPUT' &&
+      active !== searchRef.current &&
+      active !== customerSearchRef.current
+    ) {
+      active.blur();
+    }
+  }, [cartEditField, keyboardZone, selectedCartIndex]);
+
+  useEffect(() => {
+    if (showPayment || showAddProduct || invoiceSnapshot) return;
+
+    const routeTypingToSearch = (event: KeyboardEvent) => {
+      if (isCustomerSearchActive) return;
+      if (showPayment) return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName;
+      const isTypingField = tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT';
+      const isSearchField = target === searchRef.current;
+      const isCustomerField = target === customerSearchRef.current;
+      const isDiscountField = target === activeDiscountInputRef.current;
+      const isCreditCustomerField = target === creditCustomerSearchRef.current;
+      const isDigitKey = /^\d$/.test(event.key);
+      const isAllowedField = isCustomerField || isDiscountField || isCreditCustomerField;
+      const isNavigationKey = [
+        'ArrowUp',
+        'ArrowDown',
+        'ArrowLeft',
+        'ArrowRight',
+        'Tab',
+        'Enter',
+        'Escape',
+        'Shift',
+        'Delete',
+        'Backspace',
+      ].includes(event.key);
+
+      if (keyboardZone === 'cart' && cartEditField === 'discount' && isDigitKey) {
+        requestAnimationFrame(() => activeDiscountInputRef.current?.focus());
+        return;
+      }
+
+      // Let customer search and cart discount inputs behave like normal inputs.
+      if (isAllowedField || isSearchField || isNavigationKey) {
+        return;
+      }
+
+      if (isTypingField && !isSearchField && !isAllowedField) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+
+      if (isPrintableKey(event.key)) {
+        event.preventDefault();
+        setKeyboardZone('search');
+        setShowCustomerDropdown(false);
+        setSearch((current) => current + event.key);
+        requestAnimationFrame(() => searchRef.current?.focus());
+        return;
+      }
+
+      if (event.key === 'Backspace' && !isSearchField) {
+        event.preventDefault();
+        setKeyboardZone('search');
+        setShowCustomerDropdown(false);
+        setSearch((current) => current.slice(0, -1));
+        requestAnimationFrame(() => searchRef.current?.focus());
+      }
+    };
+
+    window.addEventListener('keydown', routeTypingToSearch, true);
+    return () => window.removeEventListener('keydown', routeTypingToSearch, true);
+  }, [cartEditField, invoiceSnapshot, isCustomerSearchActive, keyboardZone, showAddProduct, showPayment]);
 
   return (
-    <div className="page-shell">
-      <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="section-label">Point Of Sale</p>
-          <h1 className="mt-3 text-balance">Checkout built like a modern product surface.</h1>
-        </div>
-        <div className="flex gap-2">
-          <span className="chip">Fast barcode lookup</span>
-          <span className="chip">Live cart totals</span>
-          <span className="chip">Hold / Resume carts</span>
-        </div>
+    <div className="w-full px-2 py-2 md:px-3 xl:px-4">
+      <div className="mb-1.5 flex items-center justify-between">
+        <p className="section-label">Point Of Sale</p>
+        {keyboardBillingMode && (
+          <p className="text-xs text-emerald-600">
+            Keyboard mode active — Tab moves zones, arrows navigate, Enter confirms, Esc backs out.
+          </p>
+        )}
       </div>
 
-      <div className="grid h-[calc(100vh-15rem)] min-h-[540px] gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="card flex h-full min-h-0 flex-col gap-4 overflow-hidden p-4 md:p-5">
+      <div className="grid h-[calc(100vh-3.5rem)] min-h-[540px] gap-2 xl:grid-cols-2">
+        <div className="card flex h-full min-h-0 flex-col gap-3 overflow-hidden p-3 md:p-4">
           <div className="flex flex-col gap-2">
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                ref={searchRef}
-                autoFocus
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={handleSearchKeyDown}
-                placeholder="Search product or scan barcode (press Enter for barcode)"
-                className="input py-3 pl-11 text-base"
-              />
+            <div className="flex gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  ref={searchRef}
+                  autoFocus
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
+                  placeholder="Search product or scan barcode (press Enter for barcode)"
+                  className="input py-3 pl-11 text-base"
+                />
+              </div>
+              {can('products', 'write') && (
+                <button className="btn-secondary shrink-0" onClick={handleOpenAddProduct}>
+                  <Plus className="h-4 w-4" />
+                  New Product
+                </button>
+              )}
             </div>
           </div>
 
           <div className="card-strong flex min-h-0 flex-1 flex-col overflow-hidden">
-            <div className="border-b border-slate-200/50 px-4 py-4">
-              <p className="text-sm font-semibold text-slate-950">{resultHeading}</p>
-              <p className="mt-1 text-xs leading-5 text-slate-500">{resultSubheading}</p>
-            </div>
+            {(resultHeading || resultSubheading) && (
+              <div className="border-b border-slate-200/50 px-4 py-4">
+                {resultHeading && <p className="text-sm font-semibold text-slate-950">{resultHeading}</p>}
+                {resultSubheading && <p className="mt-1 text-xs leading-5 text-slate-500">{resultSubheading}</p>}
+              </div>
+            )}
 
             <div className="flex-1 overflow-y-auto">
               {resultLoading && (
@@ -697,16 +1725,20 @@ export function POSPage() {
               {!resultLoading && resultList.length === 0 && (
                 <div className="p-4 text-center text-sm text-slate-400">No products found</div>
               )}
-              {resultList.map((p: any) => {
+              {resultList.map((p: any, index: number) => {
                 const batches = getSortedBatches(p);
                 const primaryBatch = batches[0];
-                const visibleBatchCards = showingSearchResults && batches.length > 0 ? batches : batches.slice(0, batches.length);
-
+                const visibleBatchCards = batches;
+                const isSelected = keyboardBillingMode && index === selectedResultIndex;
+                const isActiveRow = isSelected && (keyboardZone === 'results' || (keyboardZone === 'search' && showingSearchResults));
                 return (
                   <div
                     key={p.id ?? p.product_id}
-                    className="border-b border-slate-200/50 px-4 py-4 last:border-0 hover:bg-white/65"
+                    className={`border-b border-slate-200/50 px-4 py-4 last:border-0 transition-colors ${
+                      isActiveRow ? 'bg-emerald-50 border-l-2 border-emerald-500' : 'hover:bg-white/65'
+                    }`}
                   >
+                    {/* product info — text forced white when row is active */}
                     <button
                       onClick={() => addToCart(p, batches[0])}
                       className="flex w-full items-center justify-between text-left"
@@ -717,9 +1749,16 @@ export function POSPage() {
                           {p.sku} · {p.unit}
                           {!showingSearchResults && p.total_qty ? ` · Sold ${Number(p.total_qty).toFixed(0)}` : ''}
                         </p>
+                        {(p.attributes?.dosageForm || p.attributes?.dosage_form) && (
+                          <p className="mt-1 text-[11px] font-medium text-emerald-700">
+                            Dosage Form: {p.attributes?.dosageForm ?? p.attributes?.dosage_form}
+                          </p>
+                        )}
                         {isMedicalStore && batches.length > 0 && (
                           <p className="mt-1 text-[11px] text-slate-500">
-                            Batch-aware stock: {batches.length} batch{batches.length > 1 ? 'es' : ''} available
+                            {batches.length > 1
+                              ? `${batches.length} batches — press Enter to pick`
+                              : '1 batch available'}
                           </p>
                         )}
                         {isMedicalStore && showingSearchResults && (
@@ -753,21 +1792,36 @@ export function POSPage() {
                         </p>
                       </div>
                     </button>
+                    {/* batch cards — always natural colors; only the keyboard-active card gets blue */}
                     {isMedicalStore && visibleBatchCards.length > 0 && (
                       <div className="mt-3 flex flex-wrap gap-2">
-                        {visibleBatchCards.map((batch: any) => (
-                          <button
-                            key={`${p.id ?? p.product_id}-${batch.batchNo ?? batch.batch_no}`}
-                            type="button"
-                            onClick={() => addToCart(p, batch)}
-                            className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-left text-xs text-slate-600 hover:border-blue-300 hover:bg-blue-50"
-                          >
-                            <div className="font-semibold text-slate-900">{batch.batchNo ?? batch.batch_no}</div>
-                            <div>Mfg {batch.manufactureDate || batch.manufacture_date || '—'}</div>
-                            <div>Exp {batch.expiry || batch.expiry_date || '—'}</div>
-                            <div>Qty {Number(batch.quantity ?? 0).toFixed(0)}</div>
-                          </button>
-                        ))}
+                        {visibleBatchCards.map((batch: any, batchIdx: number) => {
+                          const isBatchActive =
+                            keyboardBillingMode &&
+                            isSelected &&
+                            batchIdx === selectedBatchIndex &&
+                            (
+                              (keyboardZone === 'results' && batchSelectionActive) ||
+                              (keyboardZone === 'search' && showingSearchResults)
+                            );
+                          return (
+                            <button
+                              key={`${p.id ?? p.product_id}-${batch.batchNo ?? batch.batch_no}`}
+                              type="button"
+                              onClick={() => addToCart(p, batch)}
+                              className={`rounded-2xl border px-3 py-2 text-left text-xs transition-colors ${
+                                isBatchActive
+                                  ? 'border-slate-900 bg-slate-900 text-white'
+                                  : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-300 hover:bg-emerald-50'
+                              }`}
+                            >
+                              <div className="font-semibold">{batch.batchNo ?? batch.batch_no}</div>
+                              <div>Mfg {batch.manufactureDate || batch.manufacture_date || '—'}</div>
+                              <div>Exp {batch.expiry || batch.expiry_date || '—'}</div>
+                              <div>Qty {Number(batch.quantity ?? 0).toFixed(0)}</div>
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -815,6 +1869,7 @@ export function POSPage() {
           cart={cart}
           customerSearch={customerSearch}
           setCustomerSearch={setCustomerSearch}
+          setIsCustomerSearchActive={setIsCustomerSearchActive}
           showCustomerDropdown={showCustomerDropdown}
           setShowCustomerDropdown={setShowCustomerDropdown}
           customerSearchResults={customerSearchResults}
@@ -824,41 +1879,32 @@ export function POSPage() {
           formatCurrency={formatCurrency}
           onCollectPayment={() => setShowPayment(true)}
           onClearCart={() => { setCustomerSearch(''); setPredefinedCustomerId(null); }}
+          keyboardBillingMode={keyboardBillingMode}
+          selectedCartIndex={selectedCartIndex}
+          keyboardZone={keyboardZone}
+          cartEditField={cartEditField}
+          customerResultIndex={customerResultIndex}
+          customerSearchRef={customerSearchRef}
+          activeDiscountInputRef={activeDiscountInputRef}
+          collectPaymentButtonRef={collectPaymentButtonRef}
+          onAddFromNextBatch={addFromNextBatchIfAvailable}
+          onActivateCartItem={(index) => {
+            setSelectedCartIndex(index);
+            setKeyboardZone('cart');
+          }}
         />
       </div>
 
       {showPayment && (
-        <div className="fixed inset-0 z-50 bg-slate-950/45 p-4 backdrop-blur-sm">
-          <div className="mx-auto grid h-full max-w-7xl gap-4 lg:grid-cols-[1.4fr_0.6fr]">
-            <CartPanel
-              cart={cart}
-              customerSearch={customerSearch}
-              setCustomerSearch={setCustomerSearch}
-              showCustomerDropdown={showCustomerDropdown}
-              setShowCustomerDropdown={setShowCustomerDropdown}
-              customerSearchResults={customerSearchResults}
-              isFetchingCustomers={isFetchingCustomers}
-              onCustomerSelect={handleCustomerSelect}
-              onClearCustomer={() => { setCustomerSearch(''); setPredefinedCustomerId(null); }}
-              formatCurrency={formatCurrency}
-              titleSuffix="Checkout"
-              footerContent={
-                <button
-                  onClick={() => setShowPayment(false)}
-                  className="btn-secondary w-full py-3 text-base"
-                >
-                  Back To Billing
-                </button>
-              }
-            />
-
-            <div className="card-strong flex h-full min-h-0 flex-col rounded-[2rem] p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+          <div className="card-strong flex w-full max-w-md min-h-0 flex-col rounded-[2rem] p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold">Payment</h3>
               <button onClick={() => setShowPayment(false)}>
                 <X className="h-5 w-5 text-slate-400" />
               </button>
             </div>
+
 
             <div className="mb-6 rounded-[1.5rem] border border-blue-100 bg-blue-50 px-5 py-6 text-center">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-500">Amount Due</p>
@@ -869,53 +1915,91 @@ export function POSPage() {
               {(['cash', 'upi', 'card', 'credit'] as PaymentMethod[]).map((m) => (
                 <button
                   key={m}
-                  onClick={() => setPaymentMethod(m)}
+                  onClick={() => { setPaymentMethod(m); setFocusedPaymentMethod(m); setPaymentMethodConfirmed(true); }}
                   className={`rounded-2xl border px-4 py-3 text-sm font-medium capitalize transition-colors ${
-                    paymentMethod === m
+                    paymentMethod === m && (!keyboardBillingMode || paymentMethodConfirmed)
                       ? 'border-blue-300 bg-blue-50 text-blue-700'
                       : 'border-slate-200 text-slate-600 hover:border-slate-300'
-                  }`}
+                  } ${keyboardBillingMode && keyboardZone === 'payment-method' && focusedPaymentMethod === m ? 'ring-2 ring-emerald-500' : ''}`}
                 >
                   {m === 'upi' ? 'UPI / QR' : m.charAt(0).toUpperCase() + m.slice(1)}
                 </button>
               ))}
             </div>
 
+            {paymentMethod === 'credit' && (
+              <div className="mb-6">
+                <p className="mb-2 text-sm font-medium text-slate-700">
+                  Customer <span className="text-rose-500">*</span>
+                </p>
+                {cart.customerId ? (
+                  <div className="flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                    <div>
+                      <p className="font-medium">{cart.customerName || 'Customer selected'}</p>
+                      {cart.customerPhone && <p className="text-xs text-emerald-600">{cart.customerPhone}</p>}
+                    </div>
+                    <button
+                      onClick={() => { setCreditCustomerSearch(''); cart.setCustomer('', '', null); }}
+                      className="ml-2 text-emerald-500 hover:text-emerald-700"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      ref={creditCustomerSearchRef}
+                      value={creditCustomerSearch}
+                      onChange={(e) => { setCreditCustomerSearch(e.target.value); setShowCreditCustomerDropdown(true); }}
+                      onFocus={() => setShowCreditCustomerDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowCreditCustomerDropdown(false), 150)}
+                      placeholder="Search customer…"
+                      className={`input pl-11 ${keyboardBillingMode && keyboardZone === 'payment-customer' ? 'ring-2 ring-emerald-500' : ''}`}
+                      autoComplete="off"
+                    />
+                    {showCreditCustomerDropdown && creditCustomerResults.length > 0 && (
+                      <div className="absolute z-10 mt-1 w-full rounded-2xl border border-slate-200 bg-white shadow-lg overflow-hidden">
+                        {creditCustomerResults.map((c: any) => (
+                          <button
+                            key={c.id}
+                            onMouseDown={() => {
+                              cart.setCustomer(c.id, c.name ?? c.phone ?? 'Customer', c.phone ?? null);
+                              setCreditCustomerSearch('');
+                              setShowCreditCustomerDropdown(false);
+                            }}
+                            className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-slate-50 border-b border-slate-100 last:border-0"
+                          >
+                            <div>
+                              <p className="font-medium text-slate-900">{c.name}</p>
+                              <p className="text-xs text-slate-500">{c.phone ?? '—'}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <p className="mt-1.5 text-xs text-amber-600">Select a customer to tag this order as credit.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {isMedicalStore && (
               <div className="mb-6 grid gap-3">
                 <input
+                  ref={patientNameRef}
                   value={patientName}
                   onChange={(e) => setPatientName(e.target.value)}
                   placeholder="Patient name"
-                  className="input"
+                  className={`input ${keyboardBillingMode && keyboardZone === 'payment-fields' && paymentFieldFocus === 'patient' ? 'ring-2 ring-emerald-500' : ''}`}
                 />
                 <input
+                  ref={doctorNameRef}
                   value={doctorName}
                   onChange={(e) => setDoctorName(e.target.value)}
                   placeholder="Doctor / Other"
-                  className="input"
+                  className={`input ${keyboardBillingMode && keyboardZone === 'payment-fields' && paymentFieldFocus === 'doctor' ? 'ring-2 ring-emerald-500' : ''}`}
                 />
-              </div>
-            )}
-
-            {cart.customerId && (
-              <div className="mb-6">
-                <label className="mb-2 block text-sm font-medium text-slate-700">Redeem Loyalty Points</label>
-                <input
-                  type="number"
-                  min="0"
-                  className="input"
-                  value={loyaltyPointsRedeemed}
-                  onChange={(e) => setLoyaltyPointsRedeemed(e.target.value)}
-                  placeholder="0"
-                />
-                <p className="mt-1 text-xs text-slate-500">10 points redeem as roughly Rs 1 discount.</p>
-              </div>
-            )}
-
-            {paymentMethod === 'credit' && !cart.customerId && (
-              <div className="mb-4 rounded-2xl bg-amber-50 px-3 py-2 text-sm text-amber-700">
-                Attach a customer in the cart before selling on credit.
               </div>
             )}
 
@@ -936,9 +2020,10 @@ export function POSPage() {
               </div>
 
               <button
+                ref={confirmPaymentBtnRef}
                 onClick={() => placeMutation.mutate(undefined)}
                 disabled={placeMutation.isPending}
-                className="btn-primary w-full py-3 text-base"
+                className={`btn-primary w-full py-3 text-base ${keyboardBillingMode && keyboardZone === 'payment-confirm' ? 'ring-2 ring-offset-2 ring-slate-950' : ''}`}
               >
                 <CheckCircle className="h-5 w-5" />
                 {placeMutation.isPending
@@ -947,7 +2032,6 @@ export function POSPage() {
                     ? 'Sell On Credit'
                     : 'Confirm Payment'}
               </button>
-            </div>
             </div>
           </div>
         </div>
@@ -975,7 +2059,13 @@ export function POSPage() {
                   <MessageCircle className="h-4 w-4" />
                   {isSendingInvoiceWhatsapp ? 'Sending…' : 'WhatsApp'}
                 </button>
-                <button className="btn-secondary" onClick={() => setInvoiceSnapshot(null)}>
+                <button
+                  className="btn-secondary"
+                  onClick={() => {
+                    setInvoiceSnapshot(null);
+                    setInvoiceDateTime('');
+                  }}
+                >
                   Close
                 </button>
               </div>
@@ -1011,7 +2101,25 @@ export function POSPage() {
 
                 <div className="grid gap-3 border-b-2 border-blue-900 px-6 py-4 text-sm text-blue-900 md:grid-cols-2">
                   <div><span className="font-bold">DL Number.</span> {invoiceSnapshot.dlNumbers || '-'}</div>
-                  <div><span className="font-bold">Date.</span> {new Date(invoiceSnapshot.createdAt).toLocaleString('en-IN')}</div>
+                  <div className="space-y-2">
+                    <div><span className="font-bold">Date.</span> {getInvoiceDisplayDate(invoiceSnapshot, invoiceDateTime, canEditInvoiceDateTime).toLocaleString('en-IN')}</div>
+                    {canEditInvoiceDateTime && (
+                      <div className="flex flex-wrap gap-2">
+                        <input
+                          type="date"
+                          className="input h-9 min-w-[148px] px-3 py-1 text-sm"
+                          value={invoiceDateTime.slice(0, 10)}
+                          onChange={(e) => setInvoiceDateTime((current) => mergeInvoiceDatePart(current, e.target.value, 'date'))}
+                        />
+                        <input
+                          type="time"
+                          className="input h-9 min-w-[120px] px-3 py-1 text-sm"
+                          value={invoiceDateTime.slice(11, 16)}
+                          onChange={(e) => setInvoiceDateTime((current) => mergeInvoiceDatePart(current, e.target.value, 'time'))}
+                        />
+                      </div>
+                    )}
+                  </div>
                   <div><span className="font-bold">Name of Patient.</span> {invoiceSnapshot.patientName || invoiceSnapshot.customerName || '-'}</div>
                   <div><span className="font-bold">Rx. by Doctor / Other.</span> {invoiceSnapshot.doctorName || '-'}</div>
                 </div>
@@ -1020,12 +2128,11 @@ export function POSPage() {
                   <table className="w-full min-w-[720px] border-collapse text-sm text-blue-900">
                     <thead className="sticky top-0 bg-white">
                       <tr className="border-b-2 border-blue-900">
-                        <th className="border-r border-blue-900 px-4 py-3 text-left">Name of Drug</th>
-                        <th className="border-r border-blue-900 px-4 py-3 text-left">Batch No</th>
-                        <th className="border-r border-blue-900 px-4 py-3 text-left">Expiry Date</th>
+                        <th className="border-r border-blue-900 px-4 py-3 text-left">Product</th>
                         <th className="border-r border-blue-900 px-4 py-3 text-center">Qty</th>
+                        <th className="border-r border-blue-900 px-4 py-3 text-right">MRP</th>
+                        <th className="border-r border-blue-900 px-4 py-3 text-right">Value</th>
                         <th className="border-r border-blue-900 px-4 py-3 text-right">GST%</th>
-                        <th className="border-r border-blue-900 px-4 py-3 text-right">GST Amt</th>
                         <th className="border-r border-blue-900 px-4 py-3 text-right">Discount</th>
                         <th className="px-4 py-3 text-right">Amount</th>
                       </tr>
@@ -1034,46 +2141,42 @@ export function POSPage() {
                       {invoiceSnapshot.items.map((item, index) => (
                         <tr key={`${item.name}-${index}`} className="border-b border-blue-200 align-top">
                           <td className="border-r border-blue-200 px-4 py-3 break-words">{item.name}</td>
-                          <td className="border-r border-blue-200 px-4 py-3 break-words">{item.batchNo || '-'}</td>
-                          <td className="border-r border-blue-200 px-4 py-3 break-words">
-                            {item.expiry || '-'}
-                          </td>
                           <td className="border-r border-blue-200 px-4 py-3 text-center whitespace-nowrap">
                             {item.quantityLabel}
+                          </td>
+                          <td className="border-r border-blue-200 px-4 py-3 text-right whitespace-nowrap">
+                            ₹{item.unitPrice.toFixed(2)}
+                          </td>
+                          <td className="border-r border-blue-200 px-4 py-3 text-right whitespace-nowrap">
+                            ₹{getInvoiceItemValueAmount(item).toFixed(2)}
                           </td>
                           <td className="border-r border-blue-200 px-4 py-3 text-right whitespace-nowrap">
                             {item.gstRate > 0 ? `${item.gstRate}%` : '—'}
                           </td>
                           <td className="border-r border-blue-200 px-4 py-3 text-right whitespace-nowrap">
-                            {item.gstRate > 0 ? (
-                              <div className="flex flex-col gap-0.5">
-                                <span className="text-xs text-blue-500">₹{(item.unitPrice * item.gstRate / (100 + item.gstRate)).toFixed(2)}/unit</span>
-                                <span className="font-medium">₹{(item.amount * item.gstRate / (100 + item.gstRate)).toFixed(2)}</span>
-                              </div>
-                            ) : '—'}
-                          </td>
-                          <td className="border-r border-blue-200 px-4 py-3 text-right whitespace-nowrap">
                             {item.discountAmount > 0 ? `₹${item.discountAmount.toFixed(2)}` : '—'}
                           </td>
-                          <td className="px-4 py-3 text-right font-semibold whitespace-nowrap">{item.amount.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right font-semibold whitespace-nowrap">
+                            ₹{getInvoiceItemTotalAmount(item).toFixed(2)}
+                          </td>
                         </tr>
                       ))}
                       {invoiceSnapshot.totalDiscount > 0 && (
                         <tr className="border-b border-blue-200">
-                          <td colSpan={6} className="px-4 py-2 text-right text-xs text-blue-600">{invoiceSnapshot.footerNote}</td>
+                          <td colSpan={5} className="px-4 py-2 text-right text-xs text-blue-600">{invoiceSnapshot.footerNote}</td>
                           <td className="border-r border-blue-200 px-4 py-2 text-right text-xs font-medium text-blue-700">Total Discount</td>
                           <td className="px-4 py-2 text-right text-xs font-semibold whitespace-nowrap">₹{invoiceSnapshot.totalDiscount.toFixed(2)}</td>
                         </tr>
                       )}
                       <tr className="border-b border-blue-200">
-                        <td colSpan={6} className={`px-4 py-2 ${invoiceSnapshot.totalDiscount > 0 ? '' : 'font-semibold'}`}>
+                        <td colSpan={5} className={`px-4 py-2 ${invoiceSnapshot.totalDiscount > 0 ? '' : 'font-semibold'}`}>
                           {invoiceSnapshot.totalDiscount > 0 ? '' : invoiceSnapshot.footerNote}
                         </td>
                         <td className="border-r border-blue-200 px-4 py-2 text-right text-xs font-medium text-blue-700">GST</td>
                         <td className="px-4 py-2 text-right text-xs font-semibold whitespace-nowrap">₹{invoiceSnapshot.gstAmount.toFixed(2)}</td>
                       </tr>
                       <tr>
-                        <td colSpan={6} className="px-4 py-4 font-semibold">
+                        <td colSpan={5} className="px-4 py-4 font-semibold">
                           {invoiceSnapshot.totalDiscount > 0 ? invoiceSnapshot.footerNote : ''}
                         </td>
                         <td className="border-r border-blue-900 px-4 py-4 text-right font-bold">Total</td>
@@ -1094,6 +2197,127 @@ export function POSPage() {
           </div>
         </div>
       )}
+
+      {showAddProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+          <div className="card-strong flex max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col rounded-[2rem] p-6">
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <p className="section-label">Billing</p>
+                <h2 className="mt-2 text-2xl">Add product</h2>
+                <p className="mt-2 text-sm text-slate-500">Save the product here, then continue directly into opening stock entry.</p>
+              </div>
+              <button className="btn-secondary" onClick={() => setShowAddProduct(false)}>Close</button>
+            </div>
+
+            <div className="grid gap-4 overflow-y-auto pr-1 md:grid-cols-2">
+              <div className="md:col-span-2">
+                <label className="mb-2 block text-sm font-medium text-slate-700">Name</label>
+                <input className="input" value={productForm.name} onChange={(e) => setProductForm((current) => ({ ...current, name: e.target.value }))} />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">Unit</label>
+                <select className="input" value={productForm.unit} onChange={(e) => setProductForm((current) => ({ ...current, unit: e.target.value }))}>
+                  {['ml', 'piece', 'strip', 'dozen', 'unit'].map((unit) => (
+                    <option key={unit} value={unit}>{unit}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">Dosage Form</label>
+                <select className="input" value={productForm.dosageForm} onChange={(e) => setProductForm((current) => ({ ...current, dosageForm: e.target.value }))}>
+                  <option value="">Select dosage form</option>
+                  {DOSAGE_FORM_OPTIONS.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </div>
+              {productForm.unit === 'ml' && (
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">Bottle Size (ml)</label>
+                  <select className="input" value={productForm.mlVolume} onChange={(e) => setProductForm((current) => ({ ...current, mlVolume: e.target.value }))}>
+                    <option value="">Select ml size</option>
+                    {ML_VOLUME_OPTIONS.map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {productForm.unit === 'strip' && (
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">Total Units</label>
+                  <input className="input" value={productForm.totalUnits} onChange={(e) => setProductForm((current) => ({ ...current, totalUnits: e.target.value }))} />
+                </div>
+              )}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">{productForm.unit === 'strip' ? 'Strip MRP' : 'MRP'}</label>
+                <input className="input" value={productForm.mrp} onChange={(e) => setProductForm((current) => ({ ...current, mrp: e.target.value }))} />
+              </div>
+              {productForm.unit === 'strip' && (
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">Loose MRP</label>
+                  <input className="input" value={productForm.looseSellingPrice} onChange={(e) => setProductForm((current) => ({ ...current, looseSellingPrice: e.target.value }))} />
+                </div>
+              )}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">GST Rate</label>
+                <select className="input" value={productForm.gstRate} onChange={(e) => setProductForm((current) => ({ ...current, gstRate: e.target.value }))}>
+                  {[0, 5, 12, 18, 28].map((rate) => (
+                    <option key={rate} value={rate}>{rate}%</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">Low Stock Quantity</label>
+                <input type="number" min="0" className="input" value={productForm.lowStockQuantity} onChange={(e) => setProductForm((current) => ({ ...current, lowStockQuantity: e.target.value }))} />
+              </div>
+              <div className="md:col-span-2 border-t border-slate-100 pt-4">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-400">Store Placement</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">Rack</label>
+                    <input className="input" value={productForm.locationSection} onChange={(e) => setProductForm((current) => ({ ...current, locationSection: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">Shelf</label>
+                    <input className="input" value={productForm.locationRack} onChange={(e) => setProductForm((current) => ({ ...current, locationRack: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">Container</label>
+                    <input className="input" value={productForm.locationShelf} onChange={(e) => setProductForm((current) => ({ ...current, locationShelf: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-slate-700">NRX</span>
+                <button
+                  type="button"
+                  onClick={() => setProductForm((current) => ({ ...current, nrx: !current.nrx }))}
+                  className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors ${
+                    productForm.nrx ? 'bg-emerald-500' : 'bg-slate-300'
+                  }`}
+                  aria-pressed={productForm.nrx}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      productForm.nrx ? 'translate-x-5' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+              <div className="flex gap-3">
+                <button className="btn-secondary" onClick={() => setShowAddProduct(false)}>Cancel</button>
+                <button className="btn-primary" onClick={() => createProductMutation.mutate()} disabled={createProductMutation.isPending}>
+                  {createProductMutation.isPending ? 'Saving…' : 'Save Product'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1102,6 +2326,7 @@ function CartPanel({
   cart,
   customerSearch,
   setCustomerSearch,
+  setIsCustomerSearchActive,
   showCustomerDropdown,
   setShowCustomerDropdown,
   customerSearchResults,
@@ -1113,10 +2338,21 @@ function CartPanel({
   onClearCart,
   titleSuffix,
   footerContent,
+  keyboardBillingMode,
+  selectedCartIndex,
+  keyboardZone,
+  cartEditField,
+  customerResultIndex,
+  customerSearchRef,
+  activeDiscountInputRef,
+  collectPaymentButtonRef,
+  onActivateCartItem,
+  onAddFromNextBatch,
 }: {
   cart: CartPanelStore;
   customerSearch: string;
   setCustomerSearch: (value: string) => void;
+  setIsCustomerSearchActive: (value: boolean) => void;
   showCustomerDropdown: boolean;
   setShowCustomerDropdown: (v: boolean) => void;
   customerSearchResults: any[];
@@ -1128,8 +2364,28 @@ function CartPanel({
   onClearCart?: () => void;
   titleSuffix?: string;
   footerContent?: ReactNode;
+  keyboardBillingMode?: boolean;
+  selectedCartIndex?: number;
+  keyboardZone?: KeyboardZone;
+  cartEditField?: CartEditField;
+  customerResultIndex?: number;
+  customerSearchRef?: React.RefObject<HTMLInputElement>;
+  activeDiscountInputRef?: React.RefObject<HTMLInputElement>;
+  collectPaymentButtonRef?: React.RefObject<HTMLButtonElement>;
+  onActivateCartItem?: (index: number) => void;
+  onAddFromNextBatch?: (item: CartItem) => boolean;
 }) {
+  const selectedCartItem = selectedCartIndex !== undefined ? cart.items[selectedCartIndex] : undefined;
+
   const handleQtyChange = (item: CartItem, nextQuantity: number) => {
+    if (
+      nextQuantity > item.quantity &&
+      !canApplyCartQuantityChange(item, { nextQuantity, nextLooseQty: item.looseQty ?? 0 })
+    ) {
+      if (onAddFromNextBatch?.(item)) {
+        return;
+      }
+    }
     if (!canApplyCartQuantityChange(item, { nextQuantity, nextLooseQty: item.looseQty ?? 0 })) {
       toast.error('Not enough stock available for this item');
       return;
@@ -1155,7 +2411,18 @@ function CartPanel({
   };
 
   return (
-    <div className="card flex h-full min-h-0 flex-col overflow-hidden">
+    <div
+      className="card flex h-full min-h-0 flex-col overflow-hidden"
+      onKeyDownCapture={(event) => {
+        if (!isDeleteKey(event.nativeEvent)) return;
+        if (!selectedCartItem) return;
+        if (event.target === customerSearchRef?.current) return;
+        if (event.target === activeDiscountInputRef?.current && !isRecordDeleteKey(event.nativeEvent)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        cart.removeItem(selectedCartItem.itemKey);
+      }}
+    >
       <div className="border-b border-slate-200/60 p-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-slate-950">
@@ -1187,10 +2454,17 @@ function CartPanel({
           <div className="relative mt-2">
             <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
             <input
+              ref={customerSearchRef}
               value={customerSearch}
               onChange={(e) => { setCustomerSearch(e.target.value); setShowCustomerDropdown(true); }}
-              onFocus={() => { if (customerSearch.trim().length > 1) setShowCustomerDropdown(true); }}
-              onBlur={() => setTimeout(() => setShowCustomerDropdown(false), 150)}
+              onFocus={() => {
+                setIsCustomerSearchActive(true);
+                if (customerSearch.trim().length > 1) setShowCustomerDropdown(true);
+              }}
+              onBlur={() => {
+                setIsCustomerSearchActive(false);
+                setTimeout(() => setShowCustomerDropdown(false), 150);
+              }}
               placeholder="Search customer by name or mobile…"
               className="input h-10 py-2 pl-9 text-sm"
             />
@@ -1206,7 +2480,11 @@ function CartPanel({
                   <button
                     key={customer.id}
                     type="button"
-                    className="flex w-full items-center justify-between px-4 py-2.5 text-left hover:bg-slate-50 first:rounded-t-xl last:rounded-b-xl"
+                    className={`flex w-full items-center justify-between px-4 py-2.5 text-left first:rounded-t-xl last:rounded-b-xl transition-colors ${
+                      keyboardBillingMode && keyboardZone === 'customer' && customerResultIndex === customerSearchResults.indexOf(customer)
+                        ? 'bg-emerald-50'
+                        : 'hover:bg-slate-50'
+                    }`}
                     onMouseDown={() => onCustomerSelect(customer)}
                   >
                     <div>
@@ -1229,21 +2507,53 @@ function CartPanel({
             <p className="text-sm">Cart is empty</p>
           </div>
         )}
-        {cart.items.map((item) => {
+        {cart.items.map((item, index) => {
           const canSellLoose = item.unit === 'strip' && Number(item.totalUnits ?? 0) > 0;
           const lineGross = item.unitPrice * item.quantity + (item.isLoose ? (item.looseUnitPrice ?? 0) * (item.looseQty ?? 0) : 0);
           const lineNet = lineGross - item.discount;
           const lineTax = (lineNet * item.gstRate) / 100;
           const lineTotal = lineNet + lineTax;
+          const isSelected = keyboardBillingMode && index === selectedCartIndex;
+          const editFieldBadge = cartEditField === 'quantity'
+            ? 'Qty'
+            : cartEditField === 'loose'
+              ? 'Loose'
+              : cartEditField === 'discount'
+                ? 'Discount'
+                : 'Remove';
 
+          const isActiveCartItem = isSelected && keyboardZone === 'cart';
+          const isQtyActive = isActiveCartItem && cartEditField === 'quantity';
+          const isLooseActive = isActiveCartItem && cartEditField === 'loose';
+          const isDiscountActive = isActiveCartItem && cartEditField === 'discount';
           return (
             <div key={item.itemKey} className="p-3">
-              <div className="rounded-xl border border-slate-200/70 bg-white/80 px-3 py-2">
+              <div
+                tabIndex={0}
+                onMouseDown={() => onActivateCartItem?.(index)}
+                onClick={() => onActivateCartItem?.(index)}
+                onFocus={() => onActivateCartItem?.(index)}
+                onKeyDown={(event) => {
+                  if (event.target === activeDiscountInputRef?.current && !isRecordDeleteKey(event.nativeEvent)) return;
+                  if (isDeleteKey(event.nativeEvent)) {
+                    event.preventDefault();
+                    cart.removeItem(item.itemKey);
+                  }
+                }}
+                className={`rounded-xl border px-3 py-2 transition-colors ${
+                isActiveCartItem ? 'border-emerald-400 bg-emerald-50 ring-1 ring-emerald-300' : 'border-slate-200/70 bg-white/80'
+              }`}
+              >
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 text-sm leading-5">
                       <p className="truncate font-semibold text-slate-950">{item.name}</p>
                       <span className="shrink-0 text-xs text-slate-400">{formatCurrency(item.unitPrice)}/{item.unit}</span>
+                      {isActiveCartItem && keyboardBillingMode && (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-700">
+                          {editFieldBadge}
+                        </span>
+                      )}
                     </div>
                     <p className="truncate text-[11px] leading-4 text-slate-500">
                       Batch {item.batchNo ?? '—'} · Mfg {item.manufactureDate ?? '—'} · Exp {item.expiryDate ?? '—'}
@@ -1262,27 +2572,35 @@ function CartPanel({
                   </button>
                 </div>
 
-                <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
-                  <div className="flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1">
-                    <span className="text-slate-500">Qty</span>
+                <div className="mt-2 flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+                  <div className={`flex shrink-0 items-center gap-1 rounded-full px-2 py-1 transition-colors ${
+                    isQtyActive ? 'bg-emerald-100 ring-1 ring-emerald-300' : 'bg-slate-50'
+                  }`}>
+                    <span className={isQtyActive ? 'text-emerald-800' : 'text-slate-500'}>Qty</span>
                     <button
                       onClick={() => handleQtyChange(item, item.quantity - 1)}
-                      className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white hover:bg-slate-50"
+                      className={`flex h-6 w-6 items-center justify-center rounded-full border bg-white ${
+                        isQtyActive ? 'border-emerald-300 hover:bg-emerald-50' : 'border-slate-200 hover:bg-slate-50'
+                      }`}
                     >
                       <Minus className="h-3 w-3" />
                     </button>
-                    <span className="w-7 text-center font-semibold text-slate-900">{item.quantity}</span>
+                    <span className={`w-7 text-center font-semibold ${isQtyActive ? 'text-emerald-900' : 'text-slate-900'}`}>{item.quantity}</span>
                     <button
                       onClick={() => handleQtyChange(item, item.quantity + 1)}
-                      className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white hover:bg-slate-50"
+                      className={`flex h-6 w-6 items-center justify-center rounded-full border bg-white ${
+                        isQtyActive ? 'border-emerald-300 hover:bg-emerald-50' : 'border-slate-200 hover:bg-slate-50'
+                      }`}
                     >
                       <Plus className="h-3 w-3" />
                     </button>
                   </div>
 
                   {canSellLoose && (
-                    <div className="flex items-center gap-2 rounded-full bg-emerald-50 px-2 py-1">
-                      <span className="text-emerald-700">Loose</span>
+                    <div className={`flex shrink-0 items-center gap-2 rounded-full px-2 py-1 transition-colors ${
+                      isLooseActive ? 'bg-emerald-100 ring-1 ring-emerald-300' : 'bg-emerald-50'
+                    }`}>
+                      <span className={isLooseActive ? 'text-emerald-800' : 'text-emerald-700'}>Loose</span>
                       <button
                         type="button"
                         onClick={() => handleLooseToggle(item, !item.isLoose)}
@@ -1299,32 +2617,47 @@ function CartPanel({
                       </button>
                       <button
                         onClick={() => handleLooseQtyChange(item, (item.looseQty ?? 0) - 1)}
-                        className="flex h-6 w-6 items-center justify-center rounded-full border border-emerald-200 bg-white hover:bg-emerald-50"
+                        className={`flex h-6 w-6 items-center justify-center rounded-full border bg-white ${
+                          isLooseActive ? 'border-emerald-300 hover:bg-emerald-50' : 'border-emerald-200 hover:bg-emerald-50'
+                        }`}
                       >
                         <Minus className="h-3 w-3" />
                       </button>
                       <span className="w-6 text-center font-semibold text-emerald-900">{item.looseQty ?? 0}</span>
                       <button
                         onClick={() => handleLooseQtyChange(item, (item.looseQty ?? 0) + 1)}
-                        className="flex h-6 w-6 items-center justify-center rounded-full border border-emerald-200 bg-white hover:bg-emerald-50"
+                        className={`flex h-6 w-6 items-center justify-center rounded-full border bg-white ${
+                          isLooseActive ? 'border-emerald-300 hover:bg-emerald-50' : 'border-emerald-200 hover:bg-emerald-50'
+                        }`}
                       >
                         <Plus className="h-3 w-3" />
                       </button>
                     </div>
                   )}
 
-                  <div className="ml-auto flex items-center gap-2 rounded-full bg-slate-50 px-2 py-1">
-                    <span className="text-slate-500">Disc %</span>
+                  <div className={`flex shrink-0 items-center gap-2 rounded-full px-2 py-1 transition-colors ${
+                    isDiscountActive ? 'bg-emerald-100 ring-1 ring-emerald-300' : 'bg-slate-50'
+                  }`}>
+                    <span className={isDiscountActive ? 'text-emerald-800' : 'text-slate-500'}>Disc %</span>
                     <input
+                      ref={isActiveCartItem && cartEditField === 'discount' ? activeDiscountInputRef : undefined}
                       type="number"
                       min={0}
                       max={100}
-                      step="0.01"
+                      step="1"
+                      inputMode="numeric"
                       value={item.discountPercent && item.discountPercent > 0 ? item.discountPercent : ''}
-                      onChange={(e) => cart.setDiscountPercent(item.itemKey, Number(e.target.value || 0))}
-                      className="input h-7 w-20 py-1 text-right text-xs"
+                      onChange={(e) => cart.setDiscountPercent(item.itemKey, Number.parseInt(e.target.value || '0', 10) || 0)}
+                      onKeyDown={(event) => {
+                        if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', 'Delete', 'Backspace'].includes(event.key)) {
+                          event.preventDefault();
+                        }
+                      }}
+                      className={`input h-7 w-20 py-1 text-right text-xs ${
+                        isDiscountActive ? 'border-emerald-300 bg-white ring-1 ring-emerald-200' : ''
+                      }`}
                     />
-                    <span className="text-slate-500">{formatCurrency(item.discount)}</span>
+                    <span className={isDiscountActive ? 'text-emerald-800' : 'text-slate-500'}>{formatCurrency(item.discount)}</span>
                   </div>
                 </div>
               </div>
@@ -1362,8 +2695,13 @@ function CartPanel({
             {footerContent ?? (
               onCollectPayment && (
                 <button
+                  ref={collectPaymentButtonRef}
                   onClick={onCollectPayment}
-                  className="btn-primary w-full py-3 text-base"
+                  className={`w-full py-3 text-base btn-primary ${
+                    keyboardBillingMode && keyboardZone === 'cart-action'
+                      ? 'ring-4 ring-blue-400 ring-offset-2'
+                      : ''
+                  }`}
                 >
                   <IndianRupee className="h-4 w-4" />
                   Collect Payment
@@ -1397,6 +2735,67 @@ function getSortedBatches(product: any) {
     const rightDate = right.expiry ? new Date(right.expiry).getTime() : Number.MAX_SAFE_INTEGER;
     return leftDate - rightDate;
   });
+}
+
+function toDateTimeLocalValue(date: Date) {
+  const offsetMs = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+}
+
+function mergeInvoiceDatePart(currentValue: string, nextValue: string, part: 'date' | 'time') {
+  const fallback = toDateTimeLocalValue(new Date());
+  const source = currentValue || fallback;
+  const datePart = part === 'date' ? nextValue : source.slice(0, 10);
+  const timePart = part === 'time' ? nextValue : source.slice(11, 16);
+  return `${datePart || fallback.slice(0, 10)}T${timePart || fallback.slice(11, 16)}`;
+}
+
+function getInvoiceDisplayDate(
+  invoiceSnapshot: InvoiceSnapshot,
+  invoiceDateTime: string,
+  canEditInvoiceDateTime: boolean,
+) {
+  if (canEditInvoiceDateTime && invoiceDateTime) {
+    const editedDate = new Date(invoiceDateTime);
+    if (!Number.isNaN(editedDate.getTime())) {
+      return editedDate;
+    }
+  }
+
+  const originalDate = new Date(invoiceSnapshot.createdAt);
+  if (!Number.isNaN(originalDate.getTime())) {
+    return originalDate;
+  }
+
+  return new Date();
+}
+
+function getInvoiceItemTaxAmount(item: Pick<InvoiceSnapshot['items'][number], 'amount' | 'gstRate'>) {
+  return Number(((item.amount * item.gstRate) / 100).toFixed(2));
+}
+
+function getInvoiceItemValueAmount(item: Pick<InvoiceSnapshot['items'][number], 'amount'>) {
+  return Number(item.amount.toFixed(2));
+}
+
+function getInvoiceItemTotalAmount(item: Pick<InvoiceSnapshot['items'][number], 'amount' | 'gstRate'>) {
+  return Number((getInvoiceItemValueAmount(item) + getInvoiceItemTaxAmount(item)).toFixed(2));
+}
+
+function isPrintableKey(key: string) {
+  return key.length === 1;
+}
+
+function isDeleteKey(event: Pick<KeyboardEvent, 'key' | 'code'>) {
+  return event.key === 'Delete' || event.key === 'Backspace' || event.code === 'Delete' || event.code === 'Backspace';
+}
+
+function isRecordDeleteKey(event: Pick<KeyboardEvent, 'key' | 'code'>) {
+  return event.key === 'Delete' || event.code === 'Delete';
+}
+
+function getCartItemBillableQuantity(item: Pick<CartItem, 'quantity' | 'isLoose' | 'looseQty' | 'totalUnits'>) {
+  return item.quantity + (item.isLoose && item.totalUnits ? (item.looseQty ?? 0) / item.totalUnits : 0);
 }
 
 function canApplyCartQuantityChange(

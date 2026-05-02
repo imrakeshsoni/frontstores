@@ -1,5 +1,5 @@
 import { Entity, Column, Index } from 'typeorm';
-import { BaseEntity } from '@shoposphere/common';
+import { BaseEntity } from '@frontstores/common';
 
 @Entity('subscription_plans')
 export class SubscriptionPlan extends BaseEntity {

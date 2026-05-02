@@ -1,5 +1,5 @@
 import { Entity, Column } from 'typeorm';
-import { TenantScopedEntity } from '@shoposphere/common';
+import { TenantScopedEntity } from '@frontstores/common';
 
 @Entity('suppliers')
 export class Supplier extends TenantScopedEntity {

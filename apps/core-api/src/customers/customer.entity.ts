@@ -1,5 +1,5 @@
 import { Entity, Column, Index } from 'typeorm';
-import { TenantScopedEntity } from '@shoposphere/common';
+import { TenantScopedEntity } from '@frontstores/common';
 
 @Entity('customers')
 @Index(['tenantId', 'phone'], { unique: true, where: 'phone IS NOT NULL' })

@@ -2,17 +2,22 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Plus, Search, Edit2, Trash2, Package } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/app/store/auth.store';
 import { PageIntro } from '@/components/ui/PageIntro';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { isMedicalShopType, useActiveShopType } from '@/lib/shop/shopType';
 
+type ProductSaveMode = 'close' | 'inventory' | 'new';
+
 type ProductForm = {
   name: string;
   sku: string;
   barcode: string;
   unit: string;
+  dosageForm: string;
+  mlVolume: string;
   mrp: string;
   sellingPrice: string;
   purchasePrice: string;
@@ -26,11 +31,15 @@ type ProductForm = {
   locationShelf: string;
 };
 
+const ML_VOLUME_OPTIONS = [30, 60, 80, 100, 120, 150, 180, 200, 220, 250, 300, 350, 400, 450, 500, 550, 600, 650, 900, 1000];
+
 const emptyForm: ProductForm = {
   name: '',
   sku: '',
   barcode: '',
   unit: 'piece',
+  dosageForm: '',
+  mlVolume: '',
   mrp: '',
   sellingPrice: '',
   purchasePrice: '',
@@ -43,6 +52,8 @@ const emptyForm: ProductForm = {
   locationRack: '',
   locationShelf: '',
 };
+
+const DOSAGE_FORM_OPTIONS = ['Tablet', 'Syrup', 'Powder', 'Drop', 'Injection', 'Opthalmic', 'Ointment', 'Inhalation'];
 
 export function ProductsPage() {
   const [search, setSearch] = useState('');
@@ -58,6 +69,7 @@ export function ProductsPage() {
     ? ['ml', 'piece', 'strip', 'dozen', 'unit']
     : ['kg', 'gram', 'litre', 'ml', 'piece', 'strip', 'box', 'pack', 'dozen', 'unit'];
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data, isLoading } = useQuery({
     queryKey: ['products', search, page, shopId],
@@ -74,6 +86,8 @@ export function ProductsPage() {
         sku: editing.sku ?? '',
         barcode: editing.barcode ?? '',
         unit: editing.unit ?? 'piece',
+        dosageForm: editing.attributes?.dosageForm ?? '',
+        mlVolume: editing.attributes?.mlVolume ? String(editing.attributes.mlVolume) : '',
         mrp: editing.mrp ? String(editing.mrp) : editing.sellingPrice ? String(editing.sellingPrice) : '',
         sellingPrice: editing.sellingPrice ? String(editing.sellingPrice) : editing.mrp ? String(editing.mrp) : '',
         purchasePrice: editing.purchasePrice ? String(editing.purchasePrice) : '',
@@ -108,7 +122,7 @@ export function ProductsPage() {
   }, [form.mrp, form.totalUnits, form.unit, isMedicalStore]);
 
   const saveMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (saveMode: ProductSaveMode) => {
       if (!shopId) throw new Error('Select a shop before creating products');
       const payload = {
         name: form.name.trim(),
@@ -131,6 +145,8 @@ export function ProductsPage() {
             ? { looseSellingPrice: Number(form.looseSellingPrice) }
             : {}),
           ...(isMedicalStore ? { nrx: form.nrx } : {}),
+          ...(isMedicalStore && form.dosageForm ? { dosageForm: form.dosageForm } : {}),
+          ...(form.unit === 'ml' && form.mlVolume ? { mlVolume: Number(form.mlVolume) } : {}),
           ...(form.locationSection ? { locationSection: form.locationSection } : {}),
           ...(form.locationRack.trim() ? { locationRack: form.locationRack.trim() } : {}),
           ...(form.locationShelf ? { locationShelf: form.locationShelf } : {}),
@@ -140,15 +156,45 @@ export function ProductsPage() {
       if (!payload.name) throw new Error('Product name is required');
 
       if (editing?.id) {
-        return apiClient.put(`/api/core/products/${editing.id}`, payload);
+        const response = await apiClient.put(`/api/core/products/${editing.id}`, payload);
+        return { response, saveMode };
       }
-      return apiClient.post('/api/core/products', payload);
+      const response = await apiClient.post('/api/core/products', payload);
+      return { response, saveMode };
     },
-    onSuccess: () => {
+    onSuccess: ({ response, saveMode }) => {
+      const product = response.data?.data;
       toast.success(editing ? 'Product updated' : 'Product created');
-      setShowForm(false);
-      setEditing(null);
-      setForm(emptyForm);
+
+      if (!editing && saveMode === 'inventory' && product?.id) {
+        setShowForm(false);
+        setEditing(null);
+        setForm(emptyForm);
+        queryClient.invalidateQueries({ queryKey: ['products'] });
+        queryClient.invalidateQueries({ queryKey: ['inventory'] });
+        queryClient.invalidateQueries({ queryKey: ['inventory-products'] });
+        queryClient.invalidateQueries({ queryKey: ['product-search'] });
+        queryClient.invalidateQueries({ queryKey: ['pos-top-products'] });
+        navigate('/inventory', {
+          state: {
+            openAdjustStock: true,
+            productId: product.id,
+            productName: product.name,
+            direction: 'add',
+            type: 'purchase',
+          },
+        });
+        return;
+      }
+
+      if (!editing && saveMode === 'new') {
+        setEditing(null);
+        setForm(emptyForm);
+      } else {
+        setShowForm(false);
+        setEditing(null);
+        setForm(emptyForm);
+      }
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-products'] });
@@ -249,10 +295,12 @@ export function ProductsPage() {
             {(data?.data ?? []).map((p: any) => {
               const loc = [p.attributes?.locationSection, p.attributes?.locationRack, p.attributes?.locationShelf]
                 .filter(Boolean).join(' · ');
+              const dosageForm = p.attributes?.dosageForm ?? p.attributes?.dosage_form;
               return (
               <tr key={p.id}>
                 <td>
                   <p className="font-semibold text-slate-950">{p.name}</p>
+                  {dosageForm && <p className="mt-0.5 text-xs font-medium text-emerald-700">{dosageForm}</p>}
                   {loc && <p className="mt-0.5 text-xs text-slate-400">{loc}</p>}
                 </td>
                 <td className="text-slate-500">{p.sku ?? '—'}</td>
@@ -323,7 +371,7 @@ export function ProductsPage() {
 
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-          <div className="card-strong w-full max-w-3xl rounded-[2rem] p-6">
+          <div className="card-strong flex max-h-[90vh] w-full max-w-3xl flex-col rounded-[2rem] p-6">
             <div className="mb-6 flex items-center justify-between">
               <div>
                 <p className="section-label">Products</p>
@@ -332,6 +380,7 @@ export function ProductsPage() {
               <button className="btn-secondary" onClick={() => setShowForm(false)}>Close</button>
             </div>
 
+            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="md:col-span-2">
                 <label className="mb-2 block text-sm font-medium text-slate-700">Name</label>
@@ -357,6 +406,28 @@ export function ProductsPage() {
                   ))}
                 </select>
               </div>
+              {isMedicalStore && (
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">Dosage Form</label>
+                  <select className="input" value={form.dosageForm} onChange={(e) => setForm((current) => ({ ...current, dosageForm: e.target.value }))}>
+                    <option value="">Select dosage form</option>
+                    {DOSAGE_FORM_OPTIONS.map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {form.unit === 'ml' && (
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">Volume (ml)</label>
+                  <select className="input" value={form.mlVolume} onChange={(e) => setForm((current) => ({ ...current, mlVolume: e.target.value }))}>
+                    <option value="">Select volume</option>
+                    {ML_VOLUME_OPTIONS.map((v) => (
+                      <option key={v} value={v}>{v} ml</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               {isMedicalStore && form.unit === 'strip' && (
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">Total Units</label>
@@ -425,7 +496,6 @@ export function ProductsPage() {
                   <input className="input" value={form.purchasePrice} onChange={(e) => setForm((current) => ({ ...current, purchasePrice: e.target.value }))} />
                 </div>
               )}
-
               <div className="md:col-span-2 border-t border-slate-100 pt-4">
                 <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-400">Store Placement</p>
                 <div className="grid grid-cols-3 gap-3">
@@ -456,6 +526,7 @@ export function ProductsPage() {
                 </div>
               </div>
             </div>
+            </div>
 
             <div className="mt-6 flex items-center justify-between gap-3">
               <div>
@@ -481,9 +552,23 @@ export function ProductsPage() {
               </div>
               <div className="flex gap-3">
               <button className="btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
-              <button className="btn-primary" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-                {saveMutation.isPending ? 'Saving…' : editing ? 'Update Product' : 'Create Product'}
-              </button>
+              {editing ? (
+                <button className="btn-primary" onClick={() => saveMutation.mutate('close')} disabled={saveMutation.isPending}>
+                  {saveMutation.isPending ? 'Saving…' : 'Update Product'}
+                </button>
+              ) : (
+                <>
+                  <button className="btn-secondary" onClick={() => saveMutation.mutate('new')} disabled={saveMutation.isPending}>
+                    {saveMutation.isPending ? 'Saving…' : 'Create And New'}
+                  </button>
+                  <button className="btn-secondary" onClick={() => saveMutation.mutate('inventory')} disabled={saveMutation.isPending}>
+                    {saveMutation.isPending ? 'Saving…' : 'Create And Add Inventory'}
+                  </button>
+                  <button className="btn-primary" onClick={() => saveMutation.mutate('close')} disabled={saveMutation.isPending}>
+                    {saveMutation.isPending ? 'Saving…' : 'Create Product'}
+                  </button>
+                </>
+              )}
               </div>
             </div>
           </div>

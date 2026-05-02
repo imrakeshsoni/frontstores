@@ -5,7 +5,7 @@
     "outDir": "dist",
     "baseUrl": ".",
     "paths": {
-      "@shoposphere/common": ["../../libs/common/dist"]
+      "@frontstores/common": ["../../libs/common/dist"]
     }
   },
   "include": ["src/**/*"],

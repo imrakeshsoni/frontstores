@@ -1,5 +1,5 @@
 import { Entity, Column, Index } from 'typeorm';
-import { BaseEntity } from '@shoposphere/common';
+import { BaseEntity } from '@frontstores/common';
 
 @Entity('tenants')
 export class Tenant extends BaseEntity {

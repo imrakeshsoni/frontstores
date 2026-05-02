@@ -1,13 +1,22 @@
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import JsBarcode from 'jsbarcode';
-import { AlertTriangle, Boxes, Download, FileSpreadsheet, PackageCheck, Plus, Printer, RotateCcw, Upload } from 'lucide-react';
+import { AlertTriangle, Boxes, Clock, Download, FileSpreadsheet, PackageCheck, Plus, Printer, RotateCcw, Upload } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/app/store/auth.store';
 import { PageIntro } from '@/components/ui/PageIntro';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { getShopTypeLabel, isMedicalShopType, useActiveShopType } from '@/lib/shop/shopType';
+
+type InventoryNavigationState = {
+  openAdjustStock?: boolean;
+  productId?: string;
+  productName?: string;
+  direction?: 'add' | 'remove';
+  type?: 'adjustment' | 'purchase' | 'return' | 'transfer' | 'sale';
+};
 
 export function InventoryPage() {
   const today = new Date().toISOString().slice(0, 10);
@@ -16,9 +25,12 @@ export function InventoryPage() {
   const activeShopType = useActiveShopType();
   const isMedicalStore = isMedicalShopType(activeShopType);
   const queryClient = useQueryClient();
+  const location = useLocation();
+  const navigate = useNavigate();
   const labelSheetRef = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAdjust, setShowAdjust] = useState(false);
+  const [showExpiryWatch, setShowExpiryWatch] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showAudit, setShowAudit] = useState(false);
   const [showLabels, setShowLabels] = useState(false);
@@ -42,6 +54,7 @@ export function InventoryPage() {
   const [productSearchInput, setProductSearchInput] = useState('');
   const [showProductDropdown, setShowProductDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const navigationState = (location.state ?? null) as InventoryNavigationState | null;
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -52,6 +65,32 @@ export function InventoryPage() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!navigationState?.openAdjustStock || !navigationState.productId) {
+      return;
+    }
+
+    setAdjustment((current) => ({
+      ...current,
+      productId: navigationState.productId ?? '',
+      direction: navigationState.direction ?? 'add',
+      type: navigationState.type ?? 'purchase',
+      quantity: '1',
+      supplierId: '',
+      challanNumber: '',
+      invoiceNumber: '',
+      batchNo: '',
+      manufactureDate: '',
+      expiryDate: '',
+      notes: '',
+      movementDate: today,
+    }));
+    setProductSearchInput(navigationState.productName ?? '');
+    setShowProductDropdown(false);
+    setShowAdjust(true);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.pathname, navigate, navigationState, today]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['inventory', shopId],
@@ -71,9 +110,18 @@ export function InventoryPage() {
     enabled: !!shopId && showAdjust && isMedicalStore,
   });
 
+  const { data: settingsContext } = useQuery({
+    queryKey: ['settings-context-inventory'],
+    queryFn: () => apiClient.get('/api/core/context/settings').then((r) => r.data.data),
+    enabled: !!shopId && isMedicalStore,
+  });
+
+  const tenantSlug = settingsContext?.tenant?.slug ?? '';
+  const expiryWatchDays = 120;
+
   const { data: expiryAlerts } = useQuery({
-    queryKey: ['expiry-alerts', shopId],
-    queryFn: () => apiClient.get(`/api/core/inventory/expiry-alerts?shopId=${shopId}&days=90`).then((r) => r.data.data),
+    queryKey: ['expiry-alerts', shopId, expiryWatchDays],
+    queryFn: () => apiClient.get(`/api/core/inventory/expiry-alerts?shopId=${shopId}&days=${expiryWatchDays}`).then((r) => r.data.data),
     enabled: !!shopId && isMedicalStore,
   });
 
@@ -82,11 +130,12 @@ export function InventoryPage() {
       if (!shopId) throw new Error('No active shop selected');
       const qty = Number(adjustment.quantity || 0);
       if (!adjustment.productId || qty <= 0) throw new Error('Select a product and quantity');
+      const isDelete = adjustment.direction === 'delete';
       return apiClient.post('/api/core/inventory/adjust', {
         shopId,
         productId: adjustment.productId,
-        quantity: adjustment.direction === 'remove' ? -qty : qty,
-        type: adjustment.type,
+        quantity: (adjustment.direction === 'remove' || isDelete) ? -qty : qty,
+        type: isDelete ? 'write-off' : adjustment.type,
         supplierId: adjustment.supplierId || undefined,
         movementDate: adjustment.movementDate || undefined,
         challanNumber: adjustment.challanNumber || undefined,
@@ -100,6 +149,7 @@ export function InventoryPage() {
     onSuccess: () => {
       toast.success('Inventory adjusted');
       setShowAdjust(false);
+      setProductSearchInput('');
       setAdjustment({
         productId: '',
         quantity: '1',
@@ -299,6 +349,12 @@ export function InventoryPage() {
                 <Printer className="h-4 w-4" />
                 Print Labels
               </button>
+              {isMedicalStore && (
+                <button className="btn-secondary" onClick={() => setShowExpiryWatch(true)}>
+                  <Clock className="h-4 w-4" />
+                  Expiry Watch
+                </button>
+              )}
               <button className="btn-primary" onClick={() => setShowAdjust(true)}>
                 <Plus className="h-4 w-4" />
                 Adjust Stock
@@ -397,64 +453,71 @@ export function InventoryPage() {
         </div>
       </div>
 
-      {isMedicalStore && (
-        <div className="card overflow-hidden">
-          <div className="border-b border-slate-200/60 px-5 py-4">
-            <h3 className="text-lg font-semibold text-slate-950">Expiry Watch</h3>
-            <p className="mt-1 text-sm text-slate-500">Batches expiring in the next 90 days so the store can discount, return, or clear them early.</p>
-          </div>
-          <div className="overflow-x-auto">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>Batch</th>
-                <th>Mfg</th>
-                <th>Exp</th>
-                <th className="text-right">Qty</th>
-                <th className="text-right">Days Left</th>
-                <th className="text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(expiryAlerts ?? []).length === 0 && (
-                <tr>
-                  <td colSpan={7} className="py-8 text-center text-sm text-slate-400">No near-expiry batches right now.</td>
-                </tr>
-              )}
-              {(expiryAlerts ?? []).map((alert: any) => (
-                <tr key={`${alert.product_id}-${alert.batch_no}-${alert.expiry_date}`}>
-                  <td className="font-semibold text-slate-950">{alert.product_name}</td>
-                  <td>{alert.batch_no || '—'}</td>
-                  <td>{alert.manufacture_date || '—'}</td>
-                  <td>{alert.expiry_date || '—'}</td>
-                  <td className="text-right">{Number(alert.batch_quantity ?? 0)}</td>
-                  <td className="text-right">
-                    <span className={`badge ${Number(alert.daysLeft) <= 30 ? 'badge-red' : 'badge-yellow'}`}>
-                      {alert.daysLeft} days
-                    </span>
-                  </td>
-                  <td className="text-right">
-                    <button
-                      className="btn-secondary"
-                      onClick={() => expiredReturnMutation.mutate(alert)}
-                      disabled={expiredReturnMutation.isPending}
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                      Return Batch
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+      {showExpiryWatch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+          <div className="card-strong flex max-h-[90vh] w-full max-w-4xl flex-col rounded-[2rem] p-6">
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <p className="section-label">Inventory</p>
+                <h2 className="mt-2 text-2xl">Expiry Watch</h2>
+                <p className="mt-1 text-sm text-slate-500">Stocks expiring in the next 4 months — discount, return, or clear early.</p>
+              </div>
+              <button className="btn-secondary" onClick={() => setShowExpiryWatch(false)}>Close</button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Product</th>
+                    <th>Batch No</th>
+                    <th>Mfg Date</th>
+                    <th>Expiry Date</th>
+                    <th className="text-right">Qty</th>
+                    <th className="text-right">Days Left</th>
+                    <th className="text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(expiryAlerts ?? []).length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="py-10 text-center text-sm text-slate-400">No stocks expiring in the next 4 months.</td>
+                    </tr>
+                  )}
+                  {(expiryAlerts ?? []).map((alert: any) => (
+                    <tr key={`${alert.product_id}-${alert.batch_no}-${alert.expiry_date}`}>
+                      <td className="font-semibold text-slate-950">{alert.product_name}</td>
+                      <td>{alert.batch_no || '—'}</td>
+                      <td>{alert.manufacture_date || '—'}</td>
+                      <td>{alert.expiry_date || '—'}</td>
+                      <td className="text-right">{Number(alert.batch_quantity ?? 0)}</td>
+                      <td className="text-right">
+                        <span className={`badge ${Number(alert.daysLeft) <= 30 ? 'badge-red' : Number(alert.daysLeft) <= 60 ? 'badge-yellow' : 'badge-slate'}`}>
+                          {alert.daysLeft} days
+                        </span>
+                      </td>
+                      <td className="text-right">
+                        <button
+                          className="btn-secondary"
+                          onClick={() => expiredReturnMutation.mutate(alert)}
+                          disabled={expiredReturnMutation.isPending}
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                          Return Batch
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
 
       {showAdjust && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-          <div className="card-strong w-full max-w-2xl rounded-[2rem] p-6">
+          <div className="card-strong flex max-h-[90vh] w-full max-w-2xl flex-col rounded-[2rem] p-6">
             <div className="mb-6 flex items-center justify-between">
               <div>
                 <p className="section-label">Inventory</p>
@@ -463,6 +526,7 @@ export function InventoryPage() {
               <button className="btn-secondary" onClick={() => setShowAdjust(false)}>Close</button>
             </div>
 
+            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="md:col-span-2">
                 <label className="mb-2 block text-sm font-medium text-slate-700">Product</label>
@@ -496,7 +560,20 @@ export function InventoryPage() {
                             }}
                           >
                             <div className="font-medium text-slate-900">{p.name}</div>
-                            {p.sku && <div className="text-xs text-slate-500">SKU: {p.sku}</div>}
+                            <div className="text-xs text-slate-500">
+                              {[
+                                p.attributes?.dosageForm ?? p.attributes?.dosage_form,
+                                (() => {
+                                  const batches = Array.isArray(p.batchDetails)
+                                    ? p.batchDetails
+                                    : Array.isArray(p.batch_details)
+                                      ? p.batch_details
+                                      : [];
+                                  const firstBatch = batches[0];
+                                  return firstBatch?.batchNo ?? firstBatch?.batch_no ?? null;
+                                })(),
+                              ].filter(Boolean).join(' · ') || 'No dosage form or batch'}
+                            </div>
                           </button>
                         ))
                       )}
@@ -509,6 +586,7 @@ export function InventoryPage() {
                 <select className="input" value={adjustment.direction} onChange={(e) => setAdjustment((current) => ({ ...current, direction: e.target.value }))}>
                   <option value="add">Add stock</option>
                   <option value="remove">Remove stock</option>
+                  <option value="delete">Delete / Write-off</option>
                 </select>
               </div>
               <div>
@@ -573,6 +651,7 @@ export function InventoryPage() {
                 <label className="mb-2 block text-sm font-medium text-slate-700">Notes</label>
                 <input className="input" value={adjustment.notes} onChange={(e) => setAdjustment((current) => ({ ...current, notes: e.target.value }))} />
               </div>
+            </div>
             </div>
 
             <div className="mt-6 flex justify-end gap-3">

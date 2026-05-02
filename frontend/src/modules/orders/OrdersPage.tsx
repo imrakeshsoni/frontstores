@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { Search, Eye, Ban, RotateCcw, Printer, MessageCircle } from 'lucide-react';
+import { Search, Eye, Ban, RotateCcw, Printer, MessageCircle, Trash2 } from 'lucide-react';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/app/store/auth.store';
 import { PageIntro } from '@/components/ui/PageIntro';
@@ -20,6 +20,8 @@ export function OrdersPage() {
   const [returnReason, setReturnReason] = useState('');
   const [partialReturnQuantities, setPartialReturnQuantities] = useState<Record<string, string>>({});
   const [quotationPaymentMethod, setQuotationPaymentMethod] = useState('cash');
+  const [showInvoicePreview, setShowInvoicePreview] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const orderQuery = useMemo(() => {
     const params = new URLSearchParams();
@@ -170,6 +172,24 @@ export function OrdersPage() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedOrderId) throw new Error('No order selected');
+      return apiClient.delete(`/api/orders/orders/${selectedOrderId}`);
+    },
+    onSuccess: () => {
+      toast.success('Order deleted');
+      setShowDeleteConfirm(false);
+      setSelectedOrderId(null);
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['sales-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['report-sales'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.message ?? err.response?.data?.message ?? 'Unable to delete order');
+    },
+  });
+
   const { data: settingsContext } = useQuery({
     queryKey: ['settings-context-orders'],
     queryFn: () => apiClient.get('/api/core/context/settings').then((r) => r.data.data),
@@ -182,6 +202,71 @@ export function OrdersPage() {
 
   const formatCurrency = (n: number) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(n);
+
+  const buildInvoicePreview = (): {
+    storeName: string;
+    address: string;
+    headerLeft: string;
+    headerRight: string;
+    dlNumbers: string;
+    whatsapp: string;
+    footerNote: string;
+    signatureLabel: string;
+    paymentMethod: string;
+    patientName: string;
+    doctorName: string;
+    totalDiscount: number;
+    items: Array<{
+      id: string;
+      name: string;
+      quantityLabel: string;
+      unitPrice: number;
+      amount: number;
+      gstRate: number;
+      discountAmount: number;
+      lineTotal: number;
+    }>;
+  } | null => {
+    if (!selectedOrder) return null;
+
+    const paymentMethod = selectedOrder.payments?.[0]?.method ?? 'cash';
+    const customerName = selectedOrder.customer?.name || '';
+    const patientName = selectedOrder.patientName || customerName || '-';
+    const doctorName = selectedOrder.doctorName || '-';
+
+    return {
+      storeName: invoiceTemplate.storeDisplayName || activeShop?.name || 'Store',
+      address: invoiceTemplate.addressLine || [shopAddress.line1, shopAddress.city].filter(Boolean).join(', ') || '',
+      headerLeft: invoiceTemplate.headerLeft || '',
+      headerRight: invoiceTemplate.headerRight || 'Cash/Credit Memo',
+      dlNumbers: invoiceTemplate.dlNumbers || '',
+      whatsapp: invoiceTemplate.whatsappNumber || '',
+      footerNote: invoiceTemplate.footerNote || 'Thanks for your purchase',
+      signatureLabel: invoiceTemplate.signatureLabel || 'Authorised Signature',
+      paymentMethod,
+      patientName,
+      doctorName,
+      totalDiscount: Number(selectedOrder.discount ?? 0),
+      items: (selectedOrder.items ?? []).map((item: any) => {
+        const quantityLabel = `${Number(item.quantity ?? 0)} units`;
+        const unitPrice = Number(item.unitPrice ?? 0);
+        const amount = Number(item.total ?? 0);
+        const gstRate = Number(item.gstRate ?? 0);
+        const discountAmount = Number(item.discount ?? 0);
+
+        return {
+          id: item.id,
+          name: item.product?.name ?? 'Product',
+          quantityLabel,
+          unitPrice,
+          amount,
+          gstRate,
+          discountAmount,
+          lineTotal: Number((amount + (amount * gstRate) / 100).toFixed(2)),
+        };
+      }),
+    };
+  };
 
   const handlePrint = () => {
     if (!selectedOrder) return;
@@ -488,10 +573,23 @@ export function OrdersPage() {
                       <Printer className="h-4 w-4" />
                       Print
                     </button>
+                    <button className="btn-secondary" onClick={() => setShowInvoicePreview(true)}>
+                      <Eye className="h-4 w-4" />
+                      View Invoice
+                    </button>
                     <button className="btn-secondary" onClick={handleWhatsApp}>
                       <MessageCircle className="h-4 w-4" />
                       WhatsApp
                     </button>
+                    {can('orders', 'void') && (
+                      <button
+                        className="btn-secondary text-rose-600 hover:bg-rose-50"
+                        onClick={() => setShowDeleteConfirm(true)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete
+                      </button>
+                    )}
                   </>
                 )}
                 <button className="btn-secondary" onClick={() => setSelectedOrderId(null)}>
@@ -696,6 +794,139 @@ export function OrdersPage() {
           </div>
         </div>
       )}
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+          <div className="card-strong w-full max-w-sm rounded-[2rem] p-6">
+            <h3 className="text-lg font-semibold text-slate-900">Delete order?</h3>
+            <p className="mt-2 text-sm text-slate-500">
+              This will permanently delete order <span className="font-medium text-slate-800">{selectedOrder?.billNumber}</span> and all its items. This cannot be undone.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button className="btn-secondary" onClick={() => setShowDeleteConfirm(false)} disabled={deleteMutation.isPending}>
+                Cancel
+              </button>
+              <button
+                className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50"
+                onClick={() => deleteMutation.mutate()}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? 'Deleting…' : 'Delete order'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedOrder && showInvoicePreview && (() => {
+        const invoice = buildInvoicePreview();
+        if (!invoice) return null;
+
+        return (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
+            <div className="card-strong max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-[2rem]">
+              <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+                <div>
+                  <p className="section-label">Invoice Preview</p>
+                  <h3 className="mt-2 text-2xl text-slate-950">{selectedOrder.billNumber}</h3>
+                </div>
+                <div className="flex gap-2">
+                  <button className="btn-secondary" onClick={handlePrint}>
+                    <Printer className="h-4 w-4" />
+                    Print
+                  </button>
+                  <button className="btn-secondary" onClick={() => setShowInvoicePreview(false)}>
+                    Close
+                  </button>
+                </div>
+              </div>
+
+              <div className="max-h-[calc(90vh-88px)] overflow-y-auto p-6">
+                <div className="min-w-0 overflow-hidden rounded-[1.75rem] border-2 border-blue-900 bg-white">
+                  <div className="flex items-start justify-between gap-6 border-b-2 border-blue-900 px-6 py-4 text-sm font-semibold text-blue-900">
+                    <div className="whitespace-pre-line">{invoice.headerLeft}</div>
+                    <div className="text-right">
+                      <div>{invoice.headerRight}</div>
+                      {invoice.whatsapp && <div className="mt-1 text-base">{invoice.whatsapp}</div>}
+                    </div>
+                  </div>
+
+                  <div className="border-b-2 border-blue-900 px-6 py-4 text-center text-blue-900">
+                    <div className="text-[2rem] font-black uppercase tracking-wide">{invoice.storeName}</div>
+                    <div className="mt-1 text-base font-semibold">{invoice.address}</div>
+                  </div>
+
+                  <div className="grid gap-3 border-b-2 border-blue-900 px-6 py-4 text-sm text-blue-900 md:grid-cols-2">
+                    <div><span className="font-bold">DL Number.</span> {invoice.dlNumbers || '-'}</div>
+                    <div><span className="font-bold">Date.</span> {format(new Date(selectedOrder.createdAt), 'dd MMM yyyy, HH:mm')}</div>
+                    <div><span className="font-bold">Name of Patient.</span> {invoice.patientName}</div>
+                    <div><span className="font-bold">Rx. by Doctor / Other.</span> {invoice.doctorName}</div>
+                    <div><span className="font-bold">Bill No.</span> {selectedOrder.billNumber}</div>
+                    <div><span className="font-bold">Payment.</span> {invoice.paymentMethod === 'credit' ? 'Credit' : invoice.paymentMethod.toUpperCase()}</div>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[720px] border-collapse text-sm text-blue-900">
+                      <thead className="sticky top-0 bg-white">
+                        <tr className="border-b-2 border-blue-900">
+                          <th className="border-r border-blue-900 px-4 py-3 text-left">Product</th>
+                          <th className="border-r border-blue-900 px-4 py-3 text-center">Qty</th>
+                          <th className="border-r border-blue-900 px-4 py-3 text-right">MRP</th>
+                          <th className="border-r border-blue-900 px-4 py-3 text-right">Value</th>
+                          <th className="border-r border-blue-900 px-4 py-3 text-right">GST%</th>
+                          <th className="border-r border-blue-900 px-4 py-3 text-right">Discount</th>
+                          <th className="px-4 py-3 text-right">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {invoice.items.map((item) => (
+                          <tr key={item.id} className="border-b border-blue-200 align-top">
+                            <td className="border-r border-blue-200 px-4 py-3 break-words">{item.name}</td>
+                            <td className="border-r border-blue-200 px-4 py-3 text-center whitespace-nowrap">{item.quantityLabel}</td>
+                            <td className="border-r border-blue-200 px-4 py-3 text-right whitespace-nowrap">₹{item.unitPrice.toFixed(2)}</td>
+                            <td className="border-r border-blue-200 px-4 py-3 text-right whitespace-nowrap">₹{item.amount.toFixed(2)}</td>
+                            <td className="border-r border-blue-200 px-4 py-3 text-right whitespace-nowrap">{item.gstRate > 0 ? `${item.gstRate}%` : '—'}</td>
+                            <td className="border-r border-blue-200 px-4 py-3 text-right whitespace-nowrap">{item.discountAmount > 0 ? `₹${item.discountAmount.toFixed(2)}` : '—'}</td>
+                            <td className="px-4 py-3 text-right font-semibold whitespace-nowrap">₹{item.lineTotal.toFixed(2)}</td>
+                          </tr>
+                        ))}
+                        {invoice.totalDiscount > 0 && (
+                          <tr className="border-b border-blue-200">
+                            <td colSpan={5} className="px-4 py-2 text-right text-xs text-blue-600">{invoice.footerNote}</td>
+                            <td className="border-r border-blue-200 px-4 py-2 text-right text-xs font-medium text-blue-700">Total Discount</td>
+                            <td className="px-4 py-2 text-right text-xs font-semibold whitespace-nowrap">₹{invoice.totalDiscount.toFixed(2)}</td>
+                          </tr>
+                        )}
+                        <tr className="border-b border-blue-200">
+                          <td colSpan={5} className={`px-4 py-2 ${invoice.totalDiscount > 0 ? '' : 'font-semibold'}`}>
+                            {invoice.totalDiscount > 0 ? '' : invoice.footerNote}
+                          </td>
+                          <td className="border-r border-blue-200 px-4 py-2 text-right text-xs font-medium text-blue-700">GST</td>
+                          <td className="px-4 py-2 text-right text-xs font-semibold whitespace-nowrap">₹{Number(selectedOrder.taxAmount ?? 0).toFixed(2)}</td>
+                        </tr>
+                        <tr>
+                          <td colSpan={5} className="px-4 py-4 font-semibold">
+                            {invoice.totalDiscount > 0 ? invoice.footerNote : ''}
+                          </td>
+                          <td className="border-r border-blue-900 px-4 py-4 text-right font-bold">Total</td>
+                          <td className="px-4 py-4 text-right text-lg font-black whitespace-nowrap">{Number(selectedOrder.total).toFixed(2)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="flex justify-end px-6 py-6 text-blue-900">
+                    <div className="min-w-40 text-right font-semibold">
+                      <div className="text-xs uppercase tracking-[0.2em] text-blue-500">For Store</div>
+                      <div className="mt-10">{invoice.signatureLabel}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

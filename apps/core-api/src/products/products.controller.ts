@@ -18,7 +18,7 @@ import {
   TenantContext,
   RequirePermission,
   successResponse,
-} from '@shoposphere/common';
+} from '@frontstores/common';
 
 @Controller('products')
 export class ProductsController {
