@@ -741,11 +741,12 @@ export function POSPage() {
     const signatureLabel = invoiceSnapshot.signatureLabel;
     const invoiceDate = getInvoiceDisplayDate(invoiceSnapshot, invoiceDateTime, canEditInvoiceDateTime);
 
-    const itemRows = invoiceSnapshot.items.map((item) => {
+    const itemRows = invoiceSnapshot.items.map((item, idx) => {
       const lineValueAmount = getInvoiceItemValueAmount(item);
       const lineTotalAmount = getInvoiceItemTotalAmount(item);
       return `
         <tr>
+          <td class="td-center">${idx + 1}</td>
           <td class="td-name">${item.name}</td>
           <td class="td-center">${item.quantityLabel}</td>
           <td class="td-amount">${item.unitPrice.toFixed(2)}</td>
@@ -840,11 +841,12 @@ export function POSPage() {
   <table>
     <thead>
       <tr>
-        <th style="width:30%">Product</th>
+        <th style="width:5%;text-align:center">Sr.</th>
+        <th style="width:27%">Product</th>
         <th style="width:12%;text-align:center;border-left:1px solid #bfdbfe">Qty</th>
         <th class="th-amount" style="width:12%;border-left:1px solid #bfdbfe">MRP</th>
-        <th class="th-amount" style="width:14%;border-left:1px solid #bfdbfe">Value</th>
-        <th style="width:10%;text-align:center;border-left:1px solid #bfdbfe">GST%</th>
+        <th class="th-amount" style="width:12%;border-left:1px solid #bfdbfe">Value</th>
+        <th style="width:8%;text-align:center;border-left:1px solid #bfdbfe">GST%</th>
         <th class="th-amount" style="width:10%;border-left:1px solid #bfdbfe">Discount</th>
         <th class="th-amount" style="width:12%;border-left:1px solid #bfdbfe">Amount</th>
       </tr>
@@ -852,7 +854,7 @@ export function POSPage() {
     <tbody>
       ${itemRows}
       <tr class="total-row">
-        <td colspan="5">${footerNote}</td>
+        <td colspan="6">${footerNote}</td>
         <td class="total-label">Total ₹</td>
         <td class="total-value">${invoiceSnapshot.total.toFixed(2)}</td>
       </tr>
@@ -2201,6 +2203,7 @@ export function POSPage() {
                   <table className="w-full min-w-[720px] border-collapse text-sm text-blue-900">
                     <thead className="sticky top-0 bg-white">
                       <tr className="border-b-2 border-blue-900">
+                        <th className="border-r border-blue-900 px-4 py-3 text-center">Sr.</th>
                         <th className="border-r border-blue-900 px-4 py-3 text-left">Product</th>
                         <th className="border-r border-blue-900 px-4 py-3 text-center">Qty</th>
                         <th className="border-r border-blue-900 px-4 py-3 text-right">MRP</th>
@@ -2213,6 +2216,7 @@ export function POSPage() {
                     <tbody>
                       {invoiceSnapshot.items.map((item, index) => (
                         <tr key={`${item.name}-${index}`} className="border-b border-blue-200 align-top">
+                          <td className="border-r border-blue-200 px-4 py-3 text-center text-slate-500">{index + 1}</td>
                           <td className="border-r border-blue-200 px-4 py-3 break-words">{item.name}</td>
                           <td className="border-r border-blue-200 px-4 py-3 text-center whitespace-nowrap">
                             {item.quantityLabel}
@@ -2236,20 +2240,20 @@ export function POSPage() {
                       ))}
                       {invoiceSnapshot.totalDiscount > 0 && (
                         <tr className="border-b border-blue-200">
-                          <td colSpan={5} className="px-4 py-2 text-right text-xs text-blue-600">{invoiceSnapshot.footerNote}</td>
+                          <td colSpan={6} className="px-4 py-2 text-right text-xs text-blue-600">{invoiceSnapshot.footerNote}</td>
                           <td className="border-r border-blue-200 px-4 py-2 text-right text-xs font-medium text-blue-700">Total Discount</td>
                           <td className="px-4 py-2 text-right text-xs font-semibold whitespace-nowrap">₹{invoiceSnapshot.totalDiscount.toFixed(2)}</td>
                         </tr>
                       )}
                       <tr className="border-b border-blue-200">
-                        <td colSpan={5} className={`px-4 py-2 ${invoiceSnapshot.totalDiscount > 0 ? '' : 'font-semibold'}`}>
+                        <td colSpan={6} className={`px-4 py-2 ${invoiceSnapshot.totalDiscount > 0 ? '' : 'font-semibold'}`}>
                           {invoiceSnapshot.totalDiscount > 0 ? '' : invoiceSnapshot.footerNote}
                         </td>
                         <td className="border-r border-blue-200 px-4 py-2 text-right text-xs font-medium text-blue-700">GST</td>
                         <td className="px-4 py-2 text-right text-xs font-semibold whitespace-nowrap">₹{invoiceSnapshot.gstAmount.toFixed(2)}</td>
                       </tr>
                       <tr>
-                        <td colSpan={5} className="px-4 py-4 font-semibold">
+                        <td colSpan={6} className="px-4 py-4 font-semibold">
                           {invoiceSnapshot.totalDiscount > 0 ? invoiceSnapshot.footerNote : ''}
                         </td>
                         <td className="border-r border-blue-900 px-4 py-4 text-right font-bold">Total</td>
