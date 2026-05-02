@@ -155,6 +155,9 @@ export function POSPage() {
   const activeDiscountInputRef = useRef<HTMLInputElement>(null);
   const collectPaymentButtonRef = useRef<HTMLButtonElement>(null);
   const confirmPaymentBtnRef = useRef<HTMLButtonElement>(null);
+  const newCustomerNameRef = useRef<HTMLInputElement>(null);
+  const newCustomerPhoneRef = useRef<HTMLInputElement>(null);
+  const saveCustomerBtnRef = useRef<HTMLButtonElement>(null);
   const creditCustomerSearchRef = useRef<HTMLInputElement>(null);
 
   const shopId = useAuthStore((s) => s.activeShopId);
@@ -464,7 +467,7 @@ export function POSPage() {
 
       return apiClient.post('/api/orders/orders', {
         shopId,
-        customerId: finalCustomerId ?? undefined,
+        customerId: finalCustomerId || undefined,
         items: cart.items
           .filter((i) => getCartItemBillableQuantity(i) > 0)
           .map((i) => ({
@@ -622,6 +625,7 @@ export function POSPage() {
       setNewCustomerName('');
       setNewCustomerPhone('');
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['pos-credit-customer-search'] });
       toast.success('Customer created and selected.');
     },
     onError: (err: any) => {
@@ -1489,6 +1493,7 @@ export function POSPage() {
 
   useEffect(() => {
     if (!showPayment || !keyboardBillingMode) return;
+    if (showCreateCustomerForm) return;
 
     const METHODS: PaymentMethod[] = ['cash', 'upi', 'card', 'credit'];
 
@@ -1559,6 +1564,7 @@ export function POSPage() {
 
     const handler = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (showCreateCustomerForm) return;
 
       if (e.key === 'Escape') { setShowPayment(false); return; }
 
@@ -1607,6 +1613,11 @@ export function POSPage() {
               if (isMedicalStore) { focusZone('payment-fields', 'patient'); }
               else { focusZone('payment-confirm'); }
             }
+          } else if (creditCustomerSearch.trim().length > 0 && creditCustomerResults.length === 0) {
+            setShowCreateCustomerForm(true);
+            setNewCustomerName(creditCustomerSearch.trim());
+            setShowCreditCustomerDropdown(false);
+            requestAnimationFrame(() => newCustomerNameRef.current?.focus());
           } else {
             setShowCreditCustomerDropdown(true);
             requestAnimationFrame(() => creditCustomerSearchRef.current?.focus());
@@ -1637,7 +1648,7 @@ export function POSPage() {
 
     window.addEventListener('keydown', handler, true);
     return () => window.removeEventListener('keydown', handler, true);
-  }, [showPayment, keyboardBillingMode, paymentMethodConfirmed, focusedPaymentMethod, paymentMethod, cart.customerId, isMedicalStore, keyboardZone, paymentFieldFocus, placeMutation, setShowPayment, showCreditCustomerDropdown, creditCustomerResults, creditCustomerResultIndex]);
+  }, [showPayment, keyboardBillingMode, paymentMethodConfirmed, focusedPaymentMethod, paymentMethod, cart.customerId, isMedicalStore, keyboardZone, paymentFieldFocus, placeMutation, setShowPayment, showCreditCustomerDropdown, creditCustomerResults, creditCustomerResultIndex, showCreateCustomerForm]);
 
   useEffect(() => {
     if (!keyboardBillingMode) return;
@@ -1965,23 +1976,23 @@ export function POSPage() {
       </div>
 
       {showPayment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-          <div className="card-strong flex w-full max-w-md min-h-0 flex-col rounded-[2rem] p-6 shadow-2xl max-h-[calc(100vh-2rem)] overflow-y-auto">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Payment</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-6 backdrop-blur-sm">
+          <div className="card-strong flex w-full max-w-xl flex-col rounded-[2rem] shadow-2xl h-[calc(100vh-3rem)] overflow-y-auto">
+            <div className="sticky top-0 z-10 card-strong rounded-t-[2rem] px-8 pt-7 pb-4 flex items-center justify-between border-b border-slate-100">
+              <h3 className="text-xl font-semibold">Payment</h3>
               <button onClick={() => setShowPayment(false)}>
                 <X className="h-5 w-5 text-slate-400" />
               </button>
             </div>
 
             {/* Amount Due */}
-            <div className="mb-6 rounded-[1.5rem] border border-blue-100 bg-blue-50 px-5 py-6 text-center">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-500">Amount Due</p>
-              <p className="text-4xl font-semibold text-blue-700">{formatCurrency(cart.total())}</p>
+            <div className="mb-6 rounded-[1.5rem] border border-blue-100 bg-blue-50 px-6 py-7 text-center mt-6 mx-8">
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-blue-500">Amount Due</p>
+              <p className="text-5xl font-semibold text-blue-700 mt-1">{formatCurrency(cart.total())}</p>
             </div>
 
             {/* Payment method */}
-            <div className="mb-6 grid grid-cols-2 gap-3">
+            <div className="mb-6 grid grid-cols-4 gap-3 px-8">
               {(['cash', 'upi', 'card', 'credit'] as PaymentMethod[]).map((m) => (
                 <button
                   key={m}
@@ -1998,144 +2009,87 @@ export function POSPage() {
             </div>
 
             {/* Customer — mandatory for credit, optional for others */}
-            <div className="mb-6">
-                <p className="mb-2 text-sm font-medium text-slate-700">
-                  Customer {paymentMethod === 'credit' && <span className="text-rose-500">*</span>}
-                </p>
-                {cart.customerId ? (
-                  <div className="flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                    <div>
-                      <p className="font-medium">{cart.customerName || 'Customer selected'}</p>
-                      {cart.customerPhone && <p className="text-xs text-emerald-600">{cart.customerPhone}</p>}
-                    </div>
-                    <button
-                      onClick={() => { setCreditCustomerSearch(''); cart.setCustomer('', '', null); }}
-                      className="ml-2 text-emerald-500 hover:text-emerald-700"
-                    >
-                      <X className="h-4 w-4" />
+            <div className="mb-6 px-8">
+              <p className="mb-2 text-sm font-medium text-slate-700">
+                Customer {paymentMethod === 'credit' && <span className="text-rose-500">*</span>}
+              </p>
+              {cart.customerId ? (
+                <div className="flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                  <div>
+                    <p className="font-medium">{cart.customerName || 'Customer selected'}</p>
+                    {cart.customerPhone && <p className="text-xs text-emerald-600">{cart.customerPhone}</p>}
+                  </div>
+                  <button onClick={() => { setCreditCustomerSearch(''); cart.setCustomer('', '', null); }} className="ml-2 text-emerald-500 hover:text-emerald-700">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : showCreateCustomerForm ? (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                  <p className="text-sm font-medium text-slate-700">New customer</p>
+                  <input ref={newCustomerNameRef} value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} placeholder="Name *" className="input" autoFocus onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); newCustomerPhoneRef.current?.focus(); } }} />
+                  <input ref={newCustomerPhoneRef} value={newCustomerPhone} onChange={(e) => setNewCustomerPhone(e.target.value)} placeholder="Mobile number" className="input" inputMode="numeric" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); if (newCustomerName.trim()) saveCustomerBtnRef.current?.click(); } }} />
+                  <div className="flex gap-2">
+                    <button ref={saveCustomerBtnRef} onClick={() => createCreditCustomerMutation.mutate({ name: newCustomerName, phone: newCustomerPhone })} disabled={createCreditCustomerMutation.isPending || !newCustomerName.trim()} className="btn-primary flex-1 py-2 text-sm">
+                      {createCreditCustomerMutation.isPending ? 'Saving…' : 'Save & Select'}
                     </button>
+                    <button onClick={() => { setShowCreateCustomerForm(false); setNewCustomerName(''); setNewCustomerPhone(''); }} className="btn-secondary px-4 py-2 text-sm">Cancel</button>
                   </div>
-                ) : showCreateCustomerForm ? (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-                    <p className="text-sm font-medium text-slate-700">New customer</p>
-                    <input
-                      value={newCustomerName}
-                      onChange={(e) => setNewCustomerName(e.target.value)}
-                      placeholder="Name *"
-                      className="input"
-                      autoFocus
-                    />
-                    <input
-                      value={newCustomerPhone}
-                      onChange={(e) => setNewCustomerPhone(e.target.value)}
-                      placeholder="Mobile number"
-                      className="input"
-                      inputMode="numeric"
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => createCreditCustomerMutation.mutate({ name: newCustomerName, phone: newCustomerPhone })}
-                        disabled={createCreditCustomerMutation.isPending || !newCustomerName.trim()}
-                        className="btn-primary flex-1 py-2 text-sm"
-                      >
-                        {createCreditCustomerMutation.isPending ? 'Saving…' : 'Save & Select'}
-                      </button>
-                      <button
-                        onClick={() => { setShowCreateCustomerForm(false); setNewCustomerName(''); setNewCustomerPhone(''); }}
-                        className="btn-secondary px-4 py-2 text-sm"
-                      >
-                        Cancel
-                      </button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    ref={creditCustomerSearchRef}
+                    value={creditCustomerSearch}
+                    onChange={(e) => { setCreditCustomerSearch(e.target.value); setShowCreditCustomerDropdown(true); setCreditCustomerResultIndex(0); }}
+                    onFocus={() => setShowCreditCustomerDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowCreditCustomerDropdown(false), 150)}
+                    placeholder="Search customer…"
+                    className={`input pl-11 ${keyboardBillingMode && keyboardZone === 'payment-customer' ? 'ring-2 ring-emerald-500' : ''}`}
+                    autoComplete="off"
+                  />
+                  {showCreditCustomerDropdown && (
+                    <div className="absolute z-10 mt-1 w-full rounded-2xl border border-slate-200 bg-white shadow-lg overflow-hidden">
+                      {creditCustomerResults.length > 0 ? (
+                        creditCustomerResults.map((c: any, idx: number) => (
+                          <button key={c.id} onMouseDown={() => { cart.setCustomer(c.id, c.name ?? c.phone ?? 'Customer', c.phone ?? null); setCreditCustomerSearch(''); setShowCreditCustomerDropdown(false); setCreditCustomerResultIndex(0); }} className={`flex w-full items-center gap-3 px-4 py-3 text-left text-sm border-b border-slate-100 last:border-0 ${idx === creditCustomerResultIndex ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
+                            <div>
+                              <p className="font-medium text-slate-900">{c.name}</p>
+                              <p className="text-xs text-slate-500">{c.phone ?? '—'}</p>
+                            </div>
+                          </button>
+                        ))
+                      ) : creditCustomerSearch.trim().length > 0 ? (
+                        <div className="px-4 py-3">
+                          <p className="text-sm text-slate-500 mb-2">No customer found.</p>
+                          <button onMouseDown={() => { setShowCreateCustomerForm(true); setNewCustomerName(creditCustomerSearch.trim()); setShowCreditCustomerDropdown(false); }} className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800">
+                            <span className="text-lg leading-none">+</span> Create "{creditCustomerSearch.trim()}"
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
-                  </div>
-                ) : (
-                  <div className="relative">
-                    <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <input
-                      ref={creditCustomerSearchRef}
-                      value={creditCustomerSearch}
-                      onChange={(e) => { setCreditCustomerSearch(e.target.value); setShowCreditCustomerDropdown(true); setCreditCustomerResultIndex(0); }}
-                      onFocus={() => setShowCreditCustomerDropdown(true)}
-                      onBlur={() => setTimeout(() => setShowCreditCustomerDropdown(false), 150)}
-                      placeholder="Search customer…"
-                      className={`input pl-11 ${keyboardBillingMode && keyboardZone === 'payment-customer' ? 'ring-2 ring-emerald-500' : ''}`}
-                      autoComplete="off"
-                    />
-                    {showCreditCustomerDropdown && (
-                      <div className="absolute z-10 mt-1 w-full rounded-2xl border border-slate-200 bg-white shadow-lg overflow-hidden">
-                        {creditCustomerResults.length > 0 ? (
-                          creditCustomerResults.map((c: any, idx: number) => (
-                            <button
-                              key={c.id}
-                              onMouseDown={() => {
-                                cart.setCustomer(c.id, c.name ?? c.phone ?? 'Customer', c.phone ?? null);
-                                setCreditCustomerSearch('');
-                                setShowCreditCustomerDropdown(false);
-                                setCreditCustomerResultIndex(0);
-                              }}
-                              className={`flex w-full items-center gap-3 px-4 py-3 text-left text-sm border-b border-slate-100 last:border-0 ${idx === creditCustomerResultIndex ? 'bg-blue-50' : 'hover:bg-slate-50'}`}
-                            >
-                              <div>
-                                <p className="font-medium text-slate-900">{c.name}</p>
-                                <p className="text-xs text-slate-500">{c.phone ?? '—'}</p>
-                              </div>
-                            </button>
-                          ))
-                        ) : creditCustomerSearch.trim().length > 0 ? (
-                          <div className="px-4 py-3">
-                            <p className="text-sm text-slate-500 mb-2">No customer found.</p>
-                            <button
-                              onMouseDown={() => { setShowCreateCustomerForm(true); setNewCustomerName(creditCustomerSearch.trim()); setShowCreditCustomerDropdown(false); }}
-                              className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800"
-                            >
-                              <span className="text-lg leading-none">+</span> Create "{creditCustomerSearch.trim()}"
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
-                    )}
-                    {paymentMethod === 'credit' && (
-                      <p className="mt-1.5 text-xs text-amber-600">Select a customer to tag this order as credit.</p>
-                    )}
-                  </div>
-                )}
-              </div>
+                  )}
+                  {paymentMethod === 'credit' && (
+                    <p className="mt-1.5 text-xs text-amber-600">Select a customer to tag this order as credit.</p>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Patient & Doctor (Medical Store only) */}
             {isMedicalStore && (
-              <div className="mb-6 grid gap-3">
-                <input
-                  ref={patientNameRef}
-                  value={patientName}
-                  onChange={(e) => setPatientName(e.target.value)}
-                  placeholder="Patient name"
-                  className={`input ${keyboardBillingMode && keyboardZone === 'payment-fields' && paymentFieldFocus === 'patient' ? 'ring-2 ring-emerald-500' : ''}`}
-                />
-                <input
-                  ref={doctorNameRef}
-                  value={doctorName}
-                  onChange={(e) => setDoctorName(e.target.value)}
-                  placeholder="Doctor / Other"
-                  className={`input ${keyboardBillingMode && keyboardZone === 'payment-fields' && paymentFieldFocus === 'doctor' ? 'ring-2 ring-emerald-500' : ''}`}
-                />
+              <div className="mb-6 grid gap-3 px-8">
+                <input ref={patientNameRef} value={patientName} onChange={(e) => setPatientName(e.target.value)} placeholder="Patient name" className={`input ${keyboardBillingMode && keyboardZone === 'payment-fields' && paymentFieldFocus === 'patient' ? 'ring-2 ring-emerald-500' : ''}`} />
+                <input ref={doctorNameRef} value={doctorName} onChange={(e) => setDoctorName(e.target.value)} placeholder="Doctor / Other" className={`input ${keyboardBillingMode && keyboardZone === 'payment-fields' && paymentFieldFocus === 'doctor' ? 'ring-2 ring-emerald-500' : ''}`} />
               </div>
             )}
 
             {/* Order summary + Confirm */}
-            <div className="mt-auto space-y-3">
+            <div className="mt-auto space-y-3 px-8 pb-8">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-                <div className="flex justify-between text-slate-600">
-                  <span>Items</span>
-                  <span>{cart.itemCount()}</span>
-                </div>
-                <div className="mt-2 flex justify-between text-slate-600">
-                  <span>Subtotal</span>
-                  <span>{formatCurrency(cart.subtotal())}</span>
-                </div>
-                <div className="mt-2 flex justify-between text-slate-600">
-                  <span>GST</span>
-                  <span>{formatCurrency(cart.taxAmount())}</span>
-                </div>
+                <div className="flex justify-between text-slate-600"><span>Items</span><span>{cart.itemCount()}</span></div>
+                <div className="mt-2 flex justify-between text-slate-600"><span>Subtotal</span><span>{formatCurrency(cart.subtotal())}</span></div>
+                <div className="mt-2 flex justify-between text-slate-600"><span>GST</span><span>{formatCurrency(cart.taxAmount())}</span></div>
               </div>
 
               {paymentMethod === 'credit' && !cart.customerId && (
@@ -2149,11 +2103,7 @@ export function POSPage() {
                 className={`btn-primary w-full py-3 text-base disabled:opacity-40 ${keyboardBillingMode && keyboardZone === 'payment-confirm' ? 'ring-2 ring-offset-2 ring-slate-950' : ''}`}
               >
                 <CheckCircle className="h-5 w-5" />
-                {placeMutation.isPending
-                  ? 'Processing…'
-                  : paymentMethod === 'credit'
-                    ? 'Sell On Credit'
-                    : 'Confirm Payment'}
+                {placeMutation.isPending ? 'Processing…' : paymentMethod === 'credit' ? 'Sell On Credit' : 'Confirm Payment'}
               </button>
             </div>
           </div>
