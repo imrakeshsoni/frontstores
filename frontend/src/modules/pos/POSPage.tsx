@@ -124,6 +124,10 @@ export function POSPage() {
   const [creditCustomerSearch, setCreditCustomerSearch] = useState('');
   const [showCreditCustomerDropdown, setShowCreditCustomerDropdown] = useState(false);
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [showCreateCustomerForm, setShowCreateCustomerForm] = useState(false);
+  const [newCustomerName, setNewCustomerName] = useState('');
+  const [newCustomerPhone, setNewCustomerPhone] = useState('');
+  const [creditCustomerResultIndex, setCreditCustomerResultIndex] = useState(0);
   const [loyaltyPointsRedeemed, setLoyaltyPointsRedeemed] = useState('0');
   const [patientName, setPatientName] = useState('');
   const [doctorName, setDoctorName] = useState('');
@@ -599,6 +603,30 @@ export function POSPage() {
     onError: (err: any) => {
       const msg = err.response?.data?.message;
       toast.error(Array.isArray(msg) ? msg.join(', ') : (msg ?? err.message ?? 'Unable to save product'));
+    },
+  });
+
+  const createCreditCustomerMutation = useMutation({
+    mutationFn: async ({ name, phone }: { name: string; phone: string }) => {
+      if (!name.trim()) throw new Error('Customer name is required');
+      const res = await apiClient.post('/api/core/customers', {
+        name: name.trim(),
+        phone: phone.trim() || undefined,
+      });
+      return res.data?.data;
+    },
+    onSuccess: (customer) => {
+      cart.setCustomer(customer.id, customer.name ?? customer.phone ?? 'Customer', customer.phone ?? null);
+      setCreditCustomerSearch('');
+      setShowCreateCustomerForm(false);
+      setNewCustomerName('');
+      setNewCustomerPhone('');
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      toast.success('Customer created and selected.');
+    },
+    onError: (err: any) => {
+      const msg = err.response?.data?.message;
+      toast.error(Array.isArray(msg) ? msg.join(', ') : (msg ?? err.message ?? 'Unable to create customer'));
     },
   });
 
@@ -1469,6 +1497,12 @@ export function POSPage() {
       if (zone === 'payment-fields') {
         setPaymentFieldFocus(field === 'doctor' ? 'doctor' : 'patient');
       }
+      if (zone === 'payment-customer') {
+        setCreditCustomerSearch('');
+        setShowCreditCustomerDropdown(false);
+        setCreditCustomerResultIndex(0);
+        cart.setCustomer('', '', null);
+      }
       requestAnimationFrame(() => {
         if (zone === 'payment-customer') { creditCustomerSearchRef.current?.focus(); return; }
         if (zone === 'payment-fields') {
@@ -1483,10 +1517,7 @@ export function POSPage() {
 
     const goForward = () => {
       if (keyboardZone === 'payment-method') {
-        if (paymentMethod === 'credit' && !cart.customerId) { focusZone('payment-customer'); return; }
-        if (isMedicalStore) { focusZone('payment-fields', 'patient'); return; }
-        focusZone('payment-confirm');
-        return;
+        focusZone('payment-customer'); return;
       }
       if (keyboardZone === 'payment-customer') {
         if (isMedicalStore) { focusZone('payment-fields', 'patient'); return; }
@@ -1499,31 +1530,29 @@ export function POSPage() {
         focusZone('payment-confirm');
         return;
       }
-      if (keyboardZone === 'payment-confirm') {
-        setPaymentMethodConfirmed(false);
-        setFocusedPaymentMethod('cash');
-        focusZone('payment-method');
-      }
+    };
+
+    const backToPaymentMethod = () => {
+      setPaymentMethodConfirmed(false);
+      setFocusedPaymentMethod(paymentMethod);
+      focusZone('payment-method');
     };
 
     const goBackward = () => {
       if (keyboardZone === 'payment-confirm') {
         if (isMedicalStore) { focusZone('payment-fields', 'doctor'); return; }
-        if (paymentMethod === 'credit' && !cart.customerId) { focusZone('payment-customer'); return; }
-        focusZone('payment-method');
+        focusZone('payment-customer');
         return;
       }
       if (keyboardZone === 'payment-fields') {
         const activeEl = document.activeElement;
         if (activeEl === doctorNameRef.current) { focusZone('payment-fields', 'patient'); return; }
-        if (paymentMethod === 'credit' && !cart.customerId) { focusZone('payment-customer'); return; }
-        focusZone('payment-method');
+        focusZone('payment-customer');
         return;
       }
-      if (keyboardZone === 'payment-customer') { focusZone('payment-method'); return; }
+      if (keyboardZone === 'payment-customer') { backToPaymentMethod(); return; }
       if (keyboardZone === 'payment-method') {
         if (isMedicalStore) { focusZone('payment-fields', 'doctor'); return; }
-        if (paymentMethod === 'credit' && !cart.customerId) { focusZone('payment-customer'); return; }
         focusZone('payment-confirm');
       }
     };
@@ -1554,14 +1583,50 @@ export function POSPage() {
         return;
       }
 
+      if (keyboardZone === 'payment-customer') {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (!showCreditCustomerDropdown) { setShowCreditCustomerDropdown(true); return; }
+          setCreditCustomerResultIndex((i) => Math.min(i + 1, creditCustomerResults.length - 1));
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setCreditCustomerResultIndex((i) => Math.max(i - 1, 0));
+          return;
+        }
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (showCreditCustomerDropdown && creditCustomerResults.length > 0) {
+            const c = creditCustomerResults[creditCustomerResultIndex];
+            if (c) {
+              cart.setCustomer(c.id, c.name ?? c.phone ?? 'Customer', c.phone ?? null);
+              setCreditCustomerSearch('');
+              setShowCreditCustomerDropdown(false);
+              setCreditCustomerResultIndex(0);
+              if (isMedicalStore) { focusZone('payment-fields', 'patient'); }
+              else { focusZone('payment-confirm'); }
+            }
+          } else {
+            setShowCreditCustomerDropdown(true);
+            requestAnimationFrame(() => creditCustomerSearchRef.current?.focus());
+          }
+          return;
+        }
+      }
+
       if (e.key === 'Enter') {
         e.preventDefault();
         if (!paymentMethodConfirmed) {
           setPaymentMethod(focusedPaymentMethod);
           setPaymentMethodConfirmed(true);
-          if (focusedPaymentMethod === 'credit' && !cart.customerId) { focusZone('payment-customer'); }
-          else if (isMedicalStore) { focusZone('payment-fields', 'patient'); }
-          else { focusZone('payment-confirm'); }
+          focusZone('payment-customer');
+          return;
+        }
+        if (keyboardZone === 'payment-fields') {
+          const activeEl = document.activeElement;
+          if (activeEl === patientNameRef.current) { focusZone('payment-fields', 'doctor'); return; }
+          focusZone('payment-confirm');
           return;
         }
         if (keyboardZone === 'payment-confirm' && !placeMutation.isPending) {
@@ -1572,7 +1637,7 @@ export function POSPage() {
 
     window.addEventListener('keydown', handler, true);
     return () => window.removeEventListener('keydown', handler, true);
-  }, [showPayment, keyboardBillingMode, paymentMethodConfirmed, focusedPaymentMethod, paymentMethod, cart.customerId, isMedicalStore, keyboardZone, paymentFieldFocus, placeMutation, setShowPayment]);
+  }, [showPayment, keyboardBillingMode, paymentMethodConfirmed, focusedPaymentMethod, paymentMethod, cart.customerId, isMedicalStore, keyboardZone, paymentFieldFocus, placeMutation, setShowPayment, showCreditCustomerDropdown, creditCustomerResults, creditCustomerResultIndex]);
 
   useEffect(() => {
     if (!keyboardBillingMode) return;
@@ -1581,10 +1646,14 @@ export function POSPage() {
       setFocusedPaymentMethod('cash');
       setPaymentMethodConfirmed(false);
       setPaymentFieldFocus('patient');
+      setShowCreateCustomerForm(false);
+      setNewCustomerName('');
+      setNewCustomerPhone('');
     } else {
-      focusKeyboardZone('search');
+      setKeyboardZone('search');
+      requestAnimationFrame(() => searchRef.current?.focus());
     }
-  }, [focusKeyboardZone, keyboardBillingMode, showPayment]);
+  }, [keyboardBillingMode, showPayment]);
 
   useEffect(() => {
     if (keyboardZone === 'cart' && cartEditField === 'discount') {
@@ -1897,7 +1966,7 @@ export function POSPage() {
 
       {showPayment && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-          <div className="card-strong flex w-full max-w-md min-h-0 flex-col rounded-[2rem] p-6 shadow-2xl">
+          <div className="card-strong flex w-full max-w-md min-h-0 flex-col rounded-[2rem] p-6 shadow-2xl max-h-[calc(100vh-2rem)] overflow-y-auto">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold">Payment</h3>
               <button onClick={() => setShowPayment(false)}>
@@ -1905,12 +1974,13 @@ export function POSPage() {
               </button>
             </div>
 
-
+            {/* Amount Due */}
             <div className="mb-6 rounded-[1.5rem] border border-blue-100 bg-blue-50 px-5 py-6 text-center">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-500">Amount Due</p>
               <p className="text-4xl font-semibold text-blue-700">{formatCurrency(cart.total())}</p>
             </div>
 
+            {/* Payment method */}
             <div className="mb-6 grid grid-cols-2 gap-3">
               {(['cash', 'upi', 'card', 'credit'] as PaymentMethod[]).map((m) => (
                 <button
@@ -1927,10 +1997,10 @@ export function POSPage() {
               ))}
             </div>
 
-            {paymentMethod === 'credit' && (
-              <div className="mb-6">
+            {/* Customer — mandatory for credit, optional for others */}
+            <div className="mb-6">
                 <p className="mb-2 text-sm font-medium text-slate-700">
-                  Customer <span className="text-rose-500">*</span>
+                  Customer {paymentMethod === 'credit' && <span className="text-rose-500">*</span>}
                 </p>
                 {cart.customerId ? (
                   <div className="flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
@@ -1945,45 +2015,93 @@ export function POSPage() {
                       <X className="h-4 w-4" />
                     </button>
                   </div>
+                ) : showCreateCustomerForm ? (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                    <p className="text-sm font-medium text-slate-700">New customer</p>
+                    <input
+                      value={newCustomerName}
+                      onChange={(e) => setNewCustomerName(e.target.value)}
+                      placeholder="Name *"
+                      className="input"
+                      autoFocus
+                    />
+                    <input
+                      value={newCustomerPhone}
+                      onChange={(e) => setNewCustomerPhone(e.target.value)}
+                      placeholder="Mobile number"
+                      className="input"
+                      inputMode="numeric"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => createCreditCustomerMutation.mutate({ name: newCustomerName, phone: newCustomerPhone })}
+                        disabled={createCreditCustomerMutation.isPending || !newCustomerName.trim()}
+                        className="btn-primary flex-1 py-2 text-sm"
+                      >
+                        {createCreditCustomerMutation.isPending ? 'Saving…' : 'Save & Select'}
+                      </button>
+                      <button
+                        onClick={() => { setShowCreateCustomerForm(false); setNewCustomerName(''); setNewCustomerPhone(''); }}
+                        className="btn-secondary px-4 py-2 text-sm"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   <div className="relative">
                     <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <input
                       ref={creditCustomerSearchRef}
                       value={creditCustomerSearch}
-                      onChange={(e) => { setCreditCustomerSearch(e.target.value); setShowCreditCustomerDropdown(true); }}
+                      onChange={(e) => { setCreditCustomerSearch(e.target.value); setShowCreditCustomerDropdown(true); setCreditCustomerResultIndex(0); }}
                       onFocus={() => setShowCreditCustomerDropdown(true)}
                       onBlur={() => setTimeout(() => setShowCreditCustomerDropdown(false), 150)}
                       placeholder="Search customer…"
                       className={`input pl-11 ${keyboardBillingMode && keyboardZone === 'payment-customer' ? 'ring-2 ring-emerald-500' : ''}`}
                       autoComplete="off"
                     />
-                    {showCreditCustomerDropdown && creditCustomerResults.length > 0 && (
+                    {showCreditCustomerDropdown && (
                       <div className="absolute z-10 mt-1 w-full rounded-2xl border border-slate-200 bg-white shadow-lg overflow-hidden">
-                        {creditCustomerResults.map((c: any) => (
-                          <button
-                            key={c.id}
-                            onMouseDown={() => {
-                              cart.setCustomer(c.id, c.name ?? c.phone ?? 'Customer', c.phone ?? null);
-                              setCreditCustomerSearch('');
-                              setShowCreditCustomerDropdown(false);
-                            }}
-                            className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-slate-50 border-b border-slate-100 last:border-0"
-                          >
-                            <div>
-                              <p className="font-medium text-slate-900">{c.name}</p>
-                              <p className="text-xs text-slate-500">{c.phone ?? '—'}</p>
-                            </div>
-                          </button>
-                        ))}
+                        {creditCustomerResults.length > 0 ? (
+                          creditCustomerResults.map((c: any, idx: number) => (
+                            <button
+                              key={c.id}
+                              onMouseDown={() => {
+                                cart.setCustomer(c.id, c.name ?? c.phone ?? 'Customer', c.phone ?? null);
+                                setCreditCustomerSearch('');
+                                setShowCreditCustomerDropdown(false);
+                                setCreditCustomerResultIndex(0);
+                              }}
+                              className={`flex w-full items-center gap-3 px-4 py-3 text-left text-sm border-b border-slate-100 last:border-0 ${idx === creditCustomerResultIndex ? 'bg-blue-50' : 'hover:bg-slate-50'}`}
+                            >
+                              <div>
+                                <p className="font-medium text-slate-900">{c.name}</p>
+                                <p className="text-xs text-slate-500">{c.phone ?? '—'}</p>
+                              </div>
+                            </button>
+                          ))
+                        ) : creditCustomerSearch.trim().length > 0 ? (
+                          <div className="px-4 py-3">
+                            <p className="text-sm text-slate-500 mb-2">No customer found.</p>
+                            <button
+                              onMouseDown={() => { setShowCreateCustomerForm(true); setNewCustomerName(creditCustomerSearch.trim()); setShowCreditCustomerDropdown(false); }}
+                              className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800"
+                            >
+                              <span className="text-lg leading-none">+</span> Create "{creditCustomerSearch.trim()}"
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
                     )}
-                    <p className="mt-1.5 text-xs text-amber-600">Select a customer to tag this order as credit.</p>
+                    {paymentMethod === 'credit' && (
+                      <p className="mt-1.5 text-xs text-amber-600">Select a customer to tag this order as credit.</p>
+                    )}
                   </div>
                 )}
               </div>
-            )}
 
+            {/* Patient & Doctor (Medical Store only) */}
             {isMedicalStore && (
               <div className="mb-6 grid gap-3">
                 <input
@@ -2003,6 +2121,7 @@ export function POSPage() {
               </div>
             )}
 
+            {/* Order summary + Confirm */}
             <div className="mt-auto space-y-3">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
                 <div className="flex justify-between text-slate-600">
@@ -2019,11 +2138,15 @@ export function POSPage() {
                 </div>
               </div>
 
+              {paymentMethod === 'credit' && !cart.customerId && (
+                <p className="text-center text-xs text-rose-500">Select a customer to proceed with credit sale.</p>
+              )}
+
               <button
                 ref={confirmPaymentBtnRef}
                 onClick={() => placeMutation.mutate(undefined)}
-                disabled={placeMutation.isPending}
-                className={`btn-primary w-full py-3 text-base ${keyboardBillingMode && keyboardZone === 'payment-confirm' ? 'ring-2 ring-offset-2 ring-slate-950' : ''}`}
+                disabled={placeMutation.isPending || (paymentMethod === 'credit' && !cart.customerId)}
+                className={`btn-primary w-full py-3 text-base disabled:opacity-40 ${keyboardBillingMode && keyboardZone === 'payment-confirm' ? 'ring-2 ring-offset-2 ring-slate-950' : ''}`}
               >
                 <CheckCircle className="h-5 w-5" />
                 {placeMutation.isPending
