@@ -1,7 +1,21 @@
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/app/store/auth.store';
 
-const AI_BACKEND = 'http://localhost:3001';
+const DEFAULT_AI_BACKEND = 'http://localhost:3001';
+const AI_BACKEND_KEY = 'shopai_backend_url';
+
+export function getAIBackendURL(): string {
+  return localStorage.getItem(AI_BACKEND_KEY) || DEFAULT_AI_BACKEND;
+}
+
+export function setAIBackendURL(url: string) {
+  const clean = url.replace(/\/$/, '');
+  localStorage.setItem(AI_BACKEND_KEY, clean);
+}
+
+export function resetAIBackendURL() {
+  localStorage.removeItem(AI_BACKEND_KEY);
+}
 
 export type AIStatus = 'idle' | 'listening' | 'thinking' | 'speaking' | 'error';
 
@@ -128,7 +142,7 @@ export async function sendToShopAI(
   if (message) body.message = message;
   if (toolResult) body.toolResult = toolResult;
 
-  const res = await fetch(`${AI_BACKEND}/api/shop-ai`, {
+  const res = await fetch(`${getAIBackendURL()}/api/shop-ai`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -151,7 +165,7 @@ export async function sendToShopAI(
 
 // Call Kokoro TTS and return a playable audio URL
 export async function synthesize(text: string, voice = 'heart', signal?: AbortSignal): Promise<string> {
-  const res = await fetch(`${AI_BACKEND}/api/tts`, {
+  const res = await fetch(`${getAIBackendURL()}/api/tts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text, voice, speed: 1.0 }),
@@ -163,5 +177,5 @@ export async function synthesize(text: string, voice = 'heart', signal?: AbortSi
 }
 
 export async function clearShopSession(sessionId: string) {
-  await fetch(`${AI_BACKEND}/api/shop-ai/${sessionId}`, { method: 'DELETE' }).catch(() => {});
+  await fetch(`${getAIBackendURL()}/api/shop-ai/${sessionId}`, { method: 'DELETE' }).catch(() => {});
 }

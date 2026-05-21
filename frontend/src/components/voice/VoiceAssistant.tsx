@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Mic, MicOff, X, Bot, Loader2, Volume2, AlertCircle } from 'lucide-react';
+import { Mic, MicOff, X, Bot, Loader2, Volume2, AlertCircle, Settings } from 'lucide-react';
 import { useAuthStore } from '@/app/store/auth.store';
 import {
   fetchShopContext,
   sendToShopAI,
   synthesize,
   clearShopSession,
+  getAIBackendURL,
+  setAIBackendURL,
   ShopContext,
   AIStatus,
   AITurn,
@@ -46,6 +48,8 @@ export function VoiceAssistant() {
   const [errorMsg, setErrorMsg] = useState('');
   const [voice, setVoice] = useState<VoiceName>('heart');
   const [shopCtx, setShopCtx] = useState<ShopContext | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [urlInput, setUrlInput] = useState(getAIBackendURL);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recRef = useRef<any>(null);
@@ -257,6 +261,13 @@ export function VoiceAssistant() {
                 <MicOff className="h-4 w-4" />
               </button>
               <button
+                onClick={() => setShowSettings((s) => !s)}
+                title="AI settings"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: showSettings ? 'var(--accent)' : 'var(--text-tertiary)', borderRadius: '6px' }}
+              >
+                <Settings className="h-4 w-4" />
+              </button>
+              <button
                 onClick={handleClose}
                 title="Close"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'var(--text-tertiary)', borderRadius: '6px' }}
@@ -289,6 +300,50 @@ export function VoiceAssistant() {
               </button>
             ))}
           </div>
+
+          {/* Settings panel */}
+          {showSettings && (
+            <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--surface-border)', background: 'var(--surface-2)' }}>
+              <p style={{ margin: '0 0 6px', fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                AI Backend URL
+              </p>
+              <p style={{ margin: '0 0 8px', fontSize: '10px', color: 'var(--text-tertiary)' }}>
+                Local: http://localhost:3001 · Remote: paste your Cloudflare tunnel URL
+              </p>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <input
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  placeholder="http://localhost:3001"
+                  style={{
+                    flex: 1,
+                    fontSize: '11px',
+                    padding: '5px 8px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--surface-border)',
+                    background: 'var(--surface)',
+                    color: 'var(--text-primary)',
+                    outline: 'none',
+                  }}
+                />
+                <button
+                  onClick={() => { setAIBackendURL(urlInput); setShowSettings(false); setErrorMsg(''); }}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'var(--accent)',
+                    color: 'white',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Conversation */}
           <div
