@@ -463,7 +463,7 @@ export function VoiceAssistant() {
               }
             </button>
             <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-tertiary)', letterSpacing: '0.02em' }}>
-              {statusLabel(status)}{micOn && status === 'idle' ? ' — mic on' : ''}
+              {statusLabel(status)}{micOn && !isBusy && status !== 'listening' ? ' — mic on' : ''}
             </p>
           </div>
         </div>
