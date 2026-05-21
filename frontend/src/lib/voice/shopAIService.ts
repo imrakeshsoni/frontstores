@@ -36,6 +36,58 @@ export interface AITurn {
   text: string;
 }
 
+// ── Auto URL management ───────────────────────────────────────────────────
+
+// Fetch AI backend URL from cloud settings (works on any device)
+export async function fetchCloudAIUrl(): Promise<string | null> {
+  try {
+    const res = await apiClient.get('/api/core/context/settings');
+    return (res.data?.data?.shop?.settings?.aiBackendUrl as string) ?? null;
+  } catch { return null; }
+}
+
+// Save AI backend URL to cloud settings so all devices pick it up automatically
+export async function pushCloudAIUrl(url: string): Promise<void> {
+  try {
+    const settingsRes = await apiClient.get('/api/core/context/settings');
+    const tenantName = settingsRes.data?.data?.tenant?.name ?? 'My Store';
+    await apiClient.put('/api/core/context/settings', {
+      tenantName,
+      shopSettings: { aiBackendUrl: url },
+    });
+    setAIBackendURL(url);
+  } catch { /* non-fatal */ }
+}
+
+// On the Mac (server machine): detect localhost tunnel URL and auto-push to cloud
+export async function autoSyncTunnelUrl(): Promise<string | null> {
+  try {
+    const res = await fetch('http://localhost:3001/api/tunnel-url', { signal: AbortSignal.timeout(3000) });
+    if (!res.ok) return null;
+    const data = await res.json() as { url: string | null };
+    if (!data.url) return null;
+    const current = getAIBackendURL();
+    if (current !== data.url) {
+      await pushCloudAIUrl(data.url);
+    }
+    return data.url;
+  } catch { return null; }
+}
+
+// Bootstrap: figure out which AI URL to use, in priority order:
+// 1. localhost tunnel (Mac server) — auto-pushes to cloud
+// 2. Cloud-stored URL (all other devices)
+// 3. localStorage fallback
+export async function bootstrapAIUrl(): Promise<string> {
+  const tunnel = await autoSyncTunnelUrl();
+  if (tunnel) return tunnel;
+  const cloud = await fetchCloudAIUrl();
+  if (cloud) { setAIBackendURL(cloud); return cloud; }
+  return getAIBackendURL();
+}
+
+// ── Shop context ──────────────────────────────────────────────────────────
+
 // Fetch lightweight shop context to send with each AI request
 export async function fetchShopContext(): Promise<ShopContext> {
   const shopId = useAuthStore.getState().activeShopId;

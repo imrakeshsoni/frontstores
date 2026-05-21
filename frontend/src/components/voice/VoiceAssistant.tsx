@@ -8,6 +8,8 @@ import {
   clearShopSession,
   getAIBackendURL,
   setAIBackendURL,
+  pushCloudAIUrl,
+  bootstrapAIUrl,
   ShopContext,
   AIStatus,
   AITurn,
@@ -50,6 +52,7 @@ export function VoiceAssistant() {
   const [shopCtx, setShopCtx] = useState<ShopContext | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [urlInput, setUrlInput] = useState(getAIBackendURL);
+  const [urlSynced, setUrlSynced] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recRef = useRef<any>(null);
@@ -59,11 +62,12 @@ export function VoiceAssistant() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const sessionId = useRef(SESSION_ID());
 
-  // Load shop context once when panel opens
+  // Load shop context + auto-configure AI URL when panel opens
   useEffect(() => {
-    if (open && !shopCtx) {
-      fetchShopContext().then(setShopCtx);
-    }
+    if (!open) return;
+    if (!shopCtx) fetchShopContext().then(setShopCtx);
+    // Auto-detect best AI URL (Mac server → cloud → localStorage)
+    bootstrapAIUrl().then((url) => setUrlInput(url));
   }, [open, shopCtx]);
 
   // Auto-scroll conversation
@@ -338,44 +342,46 @@ export function VoiceAssistant() {
           {/* Settings panel */}
           {showSettings && (
             <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--surface-border)', background: 'var(--surface-2)' }}>
-              <p style={{ margin: '0 0 6px', fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+              <p style={{ margin: '0 0 4px', fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)' }}>
                 AI Backend URL
+                {urlSynced === 'synced' && <span style={{ color: '#10b981', marginLeft: '6px', fontWeight: 400 }}>✓ synced to all devices</span>}
+                {urlSynced === 'syncing' && <span style={{ color: '#f59e0b', marginLeft: '6px', fontWeight: 400 }}>syncing…</span>}
+                {urlSynced === 'error' && <span style={{ color: '#ef4444', marginLeft: '6px', fontWeight: 400 }}>sync failed</span>}
               </p>
               <p style={{ margin: '0 0 8px', fontSize: '10px', color: 'var(--text-tertiary)' }}>
-                Local: http://localhost:3001 · Remote: paste your Cloudflare tunnel URL
+                Auto-detected on start. "Sync" makes it available on all devices instantly.
               </p>
-              <div style={{ display: 'flex', gap: '6px' }}>
+              <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
                 <input
                   value={urlInput}
                   onChange={(e) => setUrlInput(e.target.value)}
                   placeholder="http://localhost:3001"
                   style={{
-                    flex: 1,
-                    fontSize: '11px',
-                    padding: '5px 8px',
-                    borderRadius: '8px',
-                    border: '1px solid var(--surface-border)',
-                    background: 'var(--surface)',
-                    color: 'var(--text-primary)',
-                    outline: 'none',
+                    flex: 1, fontSize: '11px', padding: '5px 8px', borderRadius: '8px',
+                    border: '1px solid var(--surface-border)', background: 'var(--surface)',
+                    color: 'var(--text-primary)', outline: 'none',
                   }}
                 />
                 <button
                   onClick={() => { setAIBackendURL(urlInput); setShowSettings(false); setErrorMsg(''); }}
-                  style={{
-                    padding: '5px 12px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    background: 'var(--accent)',
-                    color: 'white',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
+                  style={{ padding: '5px 10px', borderRadius: '8px', border: 'none', background: 'var(--surface-border)', color: 'var(--text-primary)', fontSize: '11px', cursor: 'pointer' }}
                 >
                   Save
                 </button>
               </div>
+              <button
+                onClick={async () => {
+                  setUrlSynced('syncing');
+                  try {
+                    await pushCloudAIUrl(urlInput);
+                    setUrlSynced('synced');
+                    setTimeout(() => setUrlSynced('idle'), 4000);
+                  } catch { setUrlSynced('error'); }
+                }}
+                style={{ width: '100%', padding: '6px', borderRadius: '8px', border: 'none', background: 'var(--accent)', color: 'white', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Sync to all devices
+              </button>
             </div>
           )}
 
