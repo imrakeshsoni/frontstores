@@ -55,6 +55,7 @@ export function VoiceAssistant() {
   const recRef = useRef<any>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const micOnRef = useRef(false); // user intent: mic toggled on
   const scrollRef = useRef<HTMLDivElement>(null);
   const sessionId = useRef(SESSION_ID());
 
@@ -76,21 +77,55 @@ export function VoiceAssistant() {
     audioRef.current = null;
   }, []);
 
-  const stopListening = useCallback(() => {
+  const stopRec = useCallback(() => {
     recRef.current?.stop();
     recRef.current = null;
   }, []);
 
-  const abort = useCallback(() => {
-    abortRef.current?.abort();
-    abortRef.current = null;
-    stopAudio();
-    stopListening();
-    setStatus('idle');
-  }, [stopAudio, stopListening]);
+  // Start one recognition instance; auto-restarts on silence if micOn
+  const startRec = useCallback(() => {
+    if (!micOnRef.current) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const w = window as any;
+    const SR = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    if (!SR) { setErrorMsg('Voice not supported. Use Chrome.'); micOnRef.current = false; setStatus('error'); return; }
+
+    const rec = new SR();
+    rec.lang = 'en-IN';
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    recRef.current = rec;
+    setStatus('listening');
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rec.onresult = (e: any) => {
+      const transcript = e.results[0][0].transcript;
+      rec.stop();
+      processTranscriptRef.current(transcript);
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rec.onerror = (e: any) => {
+      if (e.error === 'no-speech') {
+        // Silence timeout — restart if mic is still on
+        if (micOnRef.current) setTimeout(() => startRec(), 300);
+      } else if (e.error !== 'aborted') {
+        setErrorMsg(`Mic error: ${e.error}`);
+        micOnRef.current = false;
+        setStatus('error');
+      }
+    };
+    rec.onend = () => {
+      // If still in listening state and mic is on, restart (handles browser auto-stop)
+      if (micOnRef.current && recRef.current === rec) setTimeout(() => startRec(), 300);
+    };
+    rec.start();
+  }, []); // stable ref — deps managed via processTranscriptRef
+
+  // Stable ref so startRec closure always calls latest processTranscript
+  const processTranscriptRef = useRef<(t: string) => void>(() => {});
 
   const processTranscript = useCallback(async (transcript: string) => {
-    if (!transcript.trim()) return;
+    if (!transcript.trim()) { if (micOnRef.current) startRec(); return; }
     setTurns((t) => [...t, { role: 'user', text: transcript }]);
     setStatus('thinking');
     setErrorMsg('');
@@ -106,67 +141,66 @@ export function VoiceAssistant() {
       const url = await synthesize(text, voice, abortRef.current.signal);
       const audio = new Audio(url);
       audioRef.current = audio;
-      audio.onended = () => { URL.revokeObjectURL(url); setStatus('idle'); };
-      audio.onerror = () => { setStatus('idle'); };
-      audio.play().catch(() => setStatus('idle'));
+      audio.onended = () => {
+        URL.revokeObjectURL(url);
+        // Auto-restart listening after AI speaks if mic is still on
+        if (micOnRef.current) { startRec(); } else { setStatus('idle'); }
+      };
+      audio.onerror = () => { if (micOnRef.current) startRec(); else setStatus('idle'); };
+      audio.play().catch(() => { if (micOnRef.current) startRec(); else setStatus('idle'); });
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') return;
       const msg = err instanceof Error ? err.message : 'Error';
       setErrorMsg(msg);
       setStatus('error');
-      setTurns((t) => [...t, { role: 'assistant', text: `Sorry, ${msg.includes('offline') ? 'the AI is offline. Please start it from the Samsung USB.' : 'something went wrong. Please try again.'}` }]);
+      micOnRef.current = false;
+      setTurns((t) => [...t, { role: 'assistant', text: msg.includes('offline') ? 'The AI is offline. Please start it from the Samsung USB.' : 'Sorry, something went wrong. Please try again.' }]);
     }
-  }, [shopCtx, voice]);
+  }, [shopCtx, voice, startRec]);
 
-  const startListening = useCallback(() => {
-    if (status !== 'idle') { abort(); return; }
+  // Keep ref in sync with latest callback
+  useEffect(() => { processTranscriptRef.current = processTranscript; }, [processTranscript]);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const w = window as any;
-    const SR = w.SpeechRecognition ?? w.webkitSpeechRecognition;
-
-    if (!SR) {
-      setErrorMsg('Voice input not supported. Use Chrome or Edge.');
-      setStatus('error');
-      return;
+  // Toggle mic on/off
+  const toggleMic = useCallback(() => {
+    if (micOnRef.current) {
+      // Turn off
+      micOnRef.current = false;
+      stopRec();
+      stopAudio();
+      abortRef.current?.abort();
+      abortRef.current = null;
+      setStatus('idle');
+    } else {
+      // Turn on
+      micOnRef.current = true;
+      setErrorMsg('');
+      startRec();
     }
-
-    const rec = new SR();
-    rec.lang = 'en-IN';
-    rec.interimResults = false;
-    rec.maxAlternatives = 1;
-    recRef.current = rec;
-    setStatus('listening');
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    rec.onresult = (e: any) => {
-      const transcript = e.results[0][0].transcript;
-      processTranscript(transcript);
-    };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    rec.onerror = (e: any) => {
-      if (e.error !== 'aborted') { setErrorMsg(`Mic: ${e.error}`); setStatus('error'); }
-    };
-    rec.onend = () => {
-      setStatus((s: AIStatus) => s === 'listening' ? 'idle' : s);
-    };
-    rec.start();
-  }, [status, abort, processTranscript]);
+  }, [stopRec, stopAudio, startRec]);
 
   const handleClose = useCallback(() => {
-    abort();
+    micOnRef.current = false;
+    stopRec();
+    stopAudio();
+    abortRef.current?.abort();
+    setStatus('idle');
     setOpen(false);
-  }, [abort]);
+  }, [stopRec, stopAudio]);
 
   const handleClear = useCallback(() => {
-    abort();
+    micOnRef.current = false;
+    stopRec();
+    stopAudio();
+    abortRef.current?.abort();
     clearShopSession(sessionId.current);
     sessionId.current = SESSION_ID();
     setTurns([]);
     setErrorMsg('');
     setStatus('idle');
-  }, [abort]);
+  }, [stopRec, stopAudio]);
 
+  const micOn = status === 'listening' || status === 'thinking' || status === 'speaking';
   const isBusy = status === 'thinking' || status === 'speaking';
 
   return (
@@ -401,38 +435,37 @@ export function VoiceAssistant() {
           )}
 
           {/* Mic button */}
-          <div style={{ padding: '14px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'center' }}>
+          <div style={{ padding: '14px', borderTop: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
             <button
-              onClick={isBusy ? abort : startListening}
+              onClick={toggleMic}
               style={{
                 width: '64px',
                 height: '64px',
                 borderRadius: '50%',
-                border: 'none',
+                border: micOn ? '3px solid white' : 'none',
                 cursor: 'pointer',
                 background: statusColor(status),
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                transition: 'background 0.2s, transform 0.1s',
-                boxShadow: status === 'listening' ? `0 0 0 8px ${statusColor(status)}30` : '0 2px 8px rgba(0,0,0,0.15)',
-                transform: status === 'listening' ? 'scale(1.05)' : 'scale(1)',
+                transition: 'background 0.2s, box-shadow 0.2s',
+                boxShadow: micOn
+                  ? `0 0 0 6px ${statusColor(status)}40, 0 4px 16px rgba(0,0,0,0.2)`
+                  : '0 2px 8px rgba(0,0,0,0.15)',
               }}
-              title={isBusy ? 'Stop' : 'Start speaking'}
+              title={micOn ? 'Click to turn mic off' : 'Click to turn mic on'}
             >
               {isBusy
                 ? <Loader2 className="h-7 w-7 text-white animate-spin" />
-                : status === 'listening'
+                : micOn
                   ? <Mic className="h-7 w-7 text-white" />
-                  : <Mic className="h-7 w-7 text-white" />
+                  : <MicOff className="h-7 w-7 text-white" />
               }
             </button>
+            <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-tertiary)', letterSpacing: '0.02em' }}>
+              {statusLabel(status)}{micOn && status === 'idle' ? ' — mic on' : ''}
+            </p>
           </div>
-
-          {/* Status label */}
-          <p style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text-tertiary)', margin: '0 0 12px', letterSpacing: '0.02em' }}>
-            {statusLabel(status)}
-          </p>
         </div>
       )}
     </>

@@ -110,6 +110,28 @@ export async function executeToolCall(toolCall: ToolCall): Promise<{ name: strin
         return { name, result: low.map((i) => ({ name: i.productName, qty: i.quantity, reorder: i.reorderLevel })) };
       }
 
+      case 'create_product': {
+        await apiClient.post('/api/core/products', {
+          shopId,
+          name: String(args.name),
+          unit: String(args.unit || 'strip'),
+          mrp: Number(args.mrp || 0),
+          sellingPrice: Number(args.mrp || 0),
+          gstRate: Number(args.gstRate || 0),
+        });
+        return { name, result: { success: true, message: `Product ${args.name} created` } };
+      }
+
+      case 'web_search': {
+        const res = await fetch(`${getAIBackendURL()}/api/web-search`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: args.query }),
+        });
+        const data = await res.json() as { result: string };
+        return { name, result: data.result };
+      }
+
       case 'get_sales_summary': {
         const period = String(args.period || 'today');
         const now = new Date();
