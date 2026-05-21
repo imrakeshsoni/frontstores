@@ -14,10 +14,12 @@ import {
   LogOut,
   Store,
   Shield,
+  Car,
 } from 'lucide-react';
 import { useAuthStore } from '@/app/store/auth.store';
 import { apiClient } from '@/lib/api/client';
 import { getShopTypeLabel, useActiveShop } from '@/lib/shop/shopType';
+import { VoiceAssistant } from '@/components/voice/VoiceAssistant';
 
 export const NAV_ITEMS = [
   { to: '/dashboard', lockKey: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -49,8 +51,38 @@ export function AppLayout() {
         shops: bootstrap.shops,
         activeShopId: bootstrap.activeShopId,
       });
+      const shopType = bootstrap.shops?.find((s: any) => s.id === bootstrap.activeShopId)?.type ?? bootstrap.shops?.[0]?.type;
+      if (shopType === 'restaurant') navigate('/restaurant', { replace: true });
+      else if (shopType === 'vehicle') navigate('/vehicles', { replace: true });
+      else if (shopType === 'stocks') navigate('/stocks', { replace: true });
+      else if (shopType === 'roaster') navigate('/roaster', { replace: true });
     }
   }, [bootstrap, hydrateContext]);
+
+  useEffect(() => {
+    const isMedical = activeShop?.type === 'medical';
+    if (!isMedical) return;
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+      <rect width="32" height="32" rx="8" fill="#10b981"/>
+      <rect x="13" y="6" width="6" height="20" rx="2" fill="white"/>
+      <rect x="6" y="13" width="20" height="6" rx="2" fill="white"/>
+    </svg>`;
+    const url = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+
+    let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      document.head.appendChild(link);
+    }
+    link.href = url;
+    document.title = `➕ FrontStores — Medical Store`;
+
+    return () => {
+      document.title = 'FrontStores — Retail Management';
+    };
+  }, [activeShop?.type]);
 
   const handleLogout = async () => {
     try { await apiClient.post('/api/auth/logout'); } catch {}
@@ -194,6 +226,9 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Voice AI assistant — local LLM, fully private */}
+      <VoiceAssistant />
     </div>
   );
 }
