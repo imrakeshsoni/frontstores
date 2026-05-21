@@ -47,7 +47,8 @@ export function VoiceAssistant() {
   const [voice, setVoice] = useState<VoiceName>('heart');
   const [shopCtx, setShopCtx] = useState<ShopContext | null>(null);
 
-  const recRef = useRef<SpeechRecognition | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recRef = useRef<any>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -116,8 +117,9 @@ export function VoiceAssistant() {
   const startListening = useCallback(() => {
     if (status !== 'idle') { abort(); return; }
 
-    const SR = (window as unknown as { SpeechRecognition?: typeof SpeechRecognition; webkitSpeechRecognition?: typeof SpeechRecognition }).SpeechRecognition
-      ?? (window as unknown as { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const w = window as any;
+    const SR = w.SpeechRecognition ?? w.webkitSpeechRecognition;
 
     if (!SR) {
       setErrorMsg('Voice input not supported. Use Chrome or Edge.');
@@ -132,15 +134,17 @@ export function VoiceAssistant() {
     recRef.current = rec;
     setStatus('listening');
 
-    rec.onresult = (e) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rec.onresult = (e: any) => {
       const transcript = e.results[0][0].transcript;
       processTranscript(transcript);
     };
-    rec.onerror = (e) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rec.onerror = (e: any) => {
       if (e.error !== 'aborted') { setErrorMsg(`Mic: ${e.error}`); setStatus('error'); }
     };
     rec.onend = () => {
-      if (status === 'listening') setStatus('idle');
+      setStatus((s: AIStatus) => s === 'listening' ? 'idle' : s);
     };
     rec.start();
   }, [status, abort, processTranscript]);

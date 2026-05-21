@@ -37,7 +37,7 @@ export async function fetchShopContext(): Promise<ShopContext> {
       (i) => typeof i.reorderLevel === 'number' && typeof i.quantity === 'number' && i.quantity <= i.reorderLevel
     ).length;
 
-    const shopName = useAuthStore.getState().activeShop?.name ?? 'Medical Store';
+    const shopName = 'Medical Store';
     return { shopName, productCount, lowStockCount, todaySales: 0 };
   } catch {
     return { shopName: 'Medical Store', productCount: 0, lowStockCount: 0, todaySales: 0 };
