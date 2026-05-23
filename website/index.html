@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FrontStores — Billing & inventory software for Indian shops</title>
+  <meta name="description" content="GST billing, inventory and reports for medical stores, grocery shops, restaurants, vehicle showrooms and more. 30-day free trial. ₹999/month." />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #080c14;
+      --surface: #0f1623;
+      --surface2: #161e2e;
+      --border: rgba(255,255,255,0.07);
+      --border-hover: rgba(255,255,255,0.15);
+      --text: #f0f4ff;
+      --muted: #6b7898;
+      --accent: #4f8ef7;
+      --accent2: #7c6af7;
+      --green: #22c55e;
+      --gold: #f59e0b;
+    }
+    html { scroll-behavior: smooth; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+    a { color: inherit; text-decoration: none; }
+
+    /* NAV */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 40px; height: 64px;
+      background: rgba(8,12,20,0.88); backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; }
+    .nav-logo span { background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .nav-links { display: flex; gap: 32px; font-size: 14px; color: var(--muted); }
+    .nav-links a:hover { color: var(--text); }
+    .nav-cta { background: var(--accent); color: #fff; font-size: 14px; font-weight: 600; padding: 8px 20px; border-radius: 10px; transition: opacity .15s; }
+    .nav-cta:hover { opacity: .85; }
+
+    /* HERO */
+    .hero {
+      min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center; padding: 100px 24px 80px;
+      background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(79,142,247,.12) 0%, transparent 70%);
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.3);
+      color: var(--gold); font-size: 13px; font-weight: 600; padding: 5px 16px;
+      border-radius: 999px; margin-bottom: 32px;
+    }
+    h1 { font-size: clamp(2.4rem, 6vw, 4.2rem); font-weight: 900; line-height: 1.08; letter-spacing: -0.03em; max-width: 800px; }
+    h1 .grad { background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 60%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero-sub { margin-top: 24px; font-size: 1.15rem; color: var(--muted); max-width: 560px; line-height: 1.7; }
+
+    .pricing-pill {
+      margin-top: 40px; display: inline-flex; align-items: center; gap: 0;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 20px; overflow: hidden;
+    }
+    .pp-free { padding: 16px 28px; border-right: 1px solid var(--border); }
+    .pp-free .pp-top { font-size: 22px; font-weight: 900; color: var(--green); }
+    .pp-free .pp-bot { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .pp-then { padding: 16px 28px; }
+    .pp-then .pp-top { font-size: 22px; font-weight: 900; color: var(--text); }
+    .pp-then .pp-top sub { font-size: 13px; font-weight: 500; color: var(--muted); }
+    .pp-then .pp-bot { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    .hero-actions { margin-top: 40px; display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff; font-size: 16px; font-weight: 700; padding: 14px 32px; border-radius: 14px;
+      box-shadow: 0 0 40px rgba(79,142,247,.3); transition: transform .15s, box-shadow .15s;
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 0 60px rgba(79,142,247,.45); }
+    .btn-ghost {
+      display: inline-flex; align-items: center; gap: 8px;
+      border: 1px solid var(--border-hover); color: var(--muted);
+      font-size: 15px; font-weight: 500; padding: 14px 28px; border-radius: 14px; transition: border-color .15s, color .15s;
+    }
+    .btn-ghost:hover { border-color: rgba(255,255,255,.3); color: var(--text); }
+
+    .hero-stats { margin-top: 64px; display: flex; gap: 48px; flex-wrap: wrap; justify-content: center; }
+    .stat { text-align: center; }
+    .stat-num { font-size: 2rem; font-weight: 800; letter-spacing: -0.02em; }
+    .stat-label { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+    /* COMMON */
+    section { padding: 100px 24px; }
+    .section-label { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin-bottom: 16px; }
+    .section-title { font-size: clamp(1.6rem, 3vw, 2.4rem); font-weight: 800; letter-spacing: -0.02em; }
+    .section-sub { margin-top: 12px; font-size: 1.05rem; color: var(--muted); max-width: 560px; }
+    .center { text-align: center; }
+    .center .section-sub { margin-left: auto; margin-right: auto; }
+    .container { max-width: 1100px; margin: 0 auto; }
+
+    /* STORE TYPES */
+    #stores { background: var(--bg); }
+    .stores-intro { margin-bottom: 64px; }
+    .stores-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px; }
+    .store-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 24px; padding: 32px; transition: border-color .2s, transform .2s;
+      display: flex; flex-direction: column;
+    }
+    .store-card:hover { border-color: var(--border-hover); transform: translateY(-4px); }
+    .store-icon { font-size: 42px; margin-bottom: 20px; }
+    .store-name { font-size: 1.25rem; font-weight: 800; letter-spacing: -0.01em; }
+    .store-desc { margin-top: 8px; font-size: 14px; color: var(--muted); line-height: 1.6; flex: 1; }
+    .store-features { margin-top: 20px; display: flex; flex-direction: column; gap: 8px; }
+    .sf { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #94a3b8; }
+    .sf::before { content: '✓'; color: var(--green); font-weight: 700; flex-shrink: 0; }
+    .store-dl { margin-top: 28px; }
+    .dl-win {
+      width: 100%; display: flex; align-items: center; gap: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff; font-size: 14px; font-weight: 700; padding: 12px 20px; border-radius: 12px;
+      border: none; cursor: pointer; transition: opacity .15s; text-decoration: none; justify-content: center;
+    }
+    .dl-win:hover { opacity: .88; }
+    .dl-meta { margin-top: 8px; text-align: center; font-size: 12px; color: var(--muted); }
+
+    /* FEATURES */
+    #features { background: linear-gradient(180deg, var(--bg) 0%, var(--surface) 100%); }
+    .features-grid { margin-top: 64px; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+    .feat {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 20px; padding: 28px; transition: border-color .2s;
+    }
+    .feat:hover { border-color: var(--border-hover); }
+    .feat-icon { font-size: 30px; margin-bottom: 16px; }
+    .feat h3 { font-size: 1rem; font-weight: 700; margin-bottom: 8px; }
+    .feat p { font-size: 14px; color: var(--muted); line-height: 1.6; }
+
+    /* PRICING */
+    #pricing { background: var(--surface); }
+    .pricing-card {
+      max-width: 480px; margin: 48px auto 0;
+      background: var(--bg); border: 1px solid rgba(79,142,247,.3);
+      border-radius: 28px; padding: 48px; text-align: center;
+      box-shadow: 0 0 80px rgba(79,142,247,.08);
+    }
+    .price-trial { font-size: 13px; font-weight: 700; color: var(--green); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 12px; }
+    .price-main { font-size: 4rem; font-weight: 900; letter-spacing: -0.03em; color: var(--text); }
+    .price-main sub { font-size: 1.2rem; font-weight: 600; color: var(--muted); vertical-align: middle; }
+    .price-main sup { font-size: 1.5rem; font-weight: 700; vertical-align: top; margin-top: 12px; display: inline-block; }
+    .price-desc { margin-top: 8px; color: var(--muted); font-size: 15px; }
+    .price-includes { margin-top: 32px; text-align: left; display: flex; flex-direction: column; gap: 12px; }
+    .pi { display: flex; align-items: center; gap: 12px; font-size: 14px; color: #cbd5e1; }
+    .pi-check { width: 20px; height: 20px; background: rgba(34,197,94,.15); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--green); font-size: 11px; font-weight: 700; flex-shrink: 0; }
+    .price-cta { margin-top: 36px; }
+    .price-cta .btn-primary { width: 100%; justify-content: center; font-size: 15px; }
+    .price-note { margin-top: 16px; font-size: 12px; color: var(--muted); }
+
+    /* HOW */
+    #how { background: var(--bg); }
+    .steps { margin-top: 64px; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 24px; }
+    .step { text-align: center; }
+    .step-num {
+      width: 52px; height: 52px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: 900; margin: 0 auto 20px; color: #fff;
+    }
+    .step h3 { font-size: 1rem; font-weight: 700; margin-bottom: 8px; }
+    .step p { font-size: 14px; color: var(--muted); line-height: 1.6; }
+
+    /* DOWNLOAD */
+    #download { background: var(--surface); }
+    .dl-box {
+      max-width: 640px; margin: 48px auto 0;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 28px; padding: 40px;
+    }
+    .dl-top-note { text-align: center; margin-bottom: 24px; }
+    .dl-top-note strong { color: var(--green); }
+    .dl-list { display: flex; flex-direction: column; gap: 12px; }
+    .dl-row {
+      display: flex; align-items: center; gap: 16px;
+      background: var(--surface2); border: 1px solid var(--border);
+      padding: 16px 20px; border-radius: 14px;
+      transition: border-color .15s, background .15s;
+    }
+    .dl-row:hover { border-color: var(--accent); background: rgba(79,142,247,.05); }
+    .dl-row-icon { font-size: 26px; flex-shrink: 0; }
+    .dl-row-info { flex: 1; }
+    .dl-row-label { font-size: 15px; font-weight: 600; }
+    .dl-row-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .dl-badge { display: inline-block; background: rgba(34,197,94,.12); border: 1px solid rgba(34,197,94,.2); color: var(--green); font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 999px; margin-left: 8px; }
+    .dl-row-arrow { color: var(--muted); font-size: 20px; }
+    .dl-version { margin-top: 20px; text-align: center; font-size: 12px; color: var(--muted); }
+
+    /* FAQ */
+    #faq { background: var(--bg); }
+    .faq-list { max-width: 720px; margin: 48px auto 0; display: flex; flex-direction: column; gap: 12px; }
+    .faq-item { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+    .faq-q { padding: 20px 24px; font-size: 15px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none; }
+    .faq-q:hover { color: var(--accent); }
+    .faq-a { padding: 0 24px 20px; font-size: 14px; color: var(--muted); line-height: 1.7; }
+    .faq-chevron { transition: transform .2s; flex-shrink: 0; margin-left: 12px; }
+    .faq-item.open .faq-chevron { transform: rotate(180deg); }
+    .faq-item:not(.open) .faq-a { display: none; }
+
+    /* FOOTER */
+    footer {
+      border-top: 1px solid var(--border); padding: 40px;
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px;
+      background: var(--bg);
+    }
+    .footer-brand { font-size: 16px; font-weight: 800; }
+    .footer-brand span { background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .footer-links { display: flex; gap: 24px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+    .footer-links a:hover { color: var(--text); }
+    .footer-copy { font-size: 12px; color: var(--muted); }
+
+    @media (max-width: 640px) {
+      nav { padding: 0 20px; }
+      .nav-links { display: none; }
+      .hero-stats { gap: 28px; }
+      footer { flex-direction: column; text-align: center; }
+      .pricing-card { padding: 32px 24px; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">Front<span>Stores</span></div>
+  <div class="nav-links">
+    <a href="#stores">Shop Types</a>
+    <a href="#features">Features</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#faq">FAQ</a>
+  </div>
+  <a href="#download" class="nav-cta">Download Free</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">🎁 30-day free trial · No card required</div>
+  <h1>Billing software built for<br><span class="grad">every Indian shop</span></h1>
+  <p class="hero-sub">GST billing, inventory, customers and reports — running on your computer. No internet needed. Cancel anytime.</p>
+
+  <div class="pricing-pill">
+    <div class="pp-free">
+      <div class="pp-top">Free</div>
+      <div class="pp-bot">First 30 days</div>
+    </div>
+    <div class="pp-then">
+      <div class="pp-top">₹999 <sub>/ month</sub></div>
+      <div class="pp-bot">After trial ends</div>
+    </div>
+  </div>
+
+  <div class="hero-actions">
+    <a href="#download" class="btn-primary">
+      <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm-7 4h14v-2H5v2z"/></svg>
+      Download Free — Try 30 Days
+    </a>
+    <a href="#stores" class="btn-ghost">See all shop types ↓</a>
+  </div>
+
+  <div class="hero-stats">
+    <div class="stat"><div class="stat-num" style="color:var(--green)">30</div><div class="stat-label">Day free trial</div></div>
+    <div class="stat"><div class="stat-num">₹999</div><div class="stat-label">Per month after</div></div>
+    <div class="stat"><div class="stat-num">6+</div><div class="stat-label">Shop types</div></div>
+    <div class="stat"><div class="stat-num">100%</div><div class="stat-label">Works offline</div></div>
+  </div>
+</section>
+
+<!-- STORE TYPES -->
+<section id="stores">
+  <div class="container">
+    <div class="stores-intro center">
+      <div class="section-label">Shop Types</div>
+      <h2 class="section-title">Built for your business, exactly</h2>
+      <p class="section-sub">One download. Choose your shop type during setup. The app configures features, GST rates, and invoice format for your business automatically.</p>
+    </div>
+    <div class="stores-grid">
+
+      <div class="store-card">
+        <div class="store-icon">💊</div>
+        <div class="store-name">Medical Store / Pharmacy</div>
+        <div class="store-desc">Complete pharmacy billing with batch numbers, expiry tracking, drug license, and prescription records.</div>
+        <div class="store-features">
+          <div class="sf">Batch & expiry date tracking</div>
+          <div class="sf">Drug license on invoice</div>
+          <div class="sf">Prescription records</div>
+          <div class="sf">Supplier & purchase management</div>
+          <div class="sf">GST 0%, 5%, 12%, 18% rates</div>
+        </div>
+        <div class="store-dl">
+          <a href="#" class="dl-win win-dl-btn">
+            <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm-7 4h14v-2H5v2z"/></svg>
+            Download — 30 Days Free
+          </a>
+          <div class="dl-meta">Windows 10 / 11 · 64-bit · ₹999/month after trial</div>
+        </div>
+      </div>
+
+      <div class="store-card">
+        <div class="store-icon">🛒</div>
+        <div class="store-name">Grocery / Kirana Store</div>
+        <div class="store-desc">Fast checkout for kirana shops. Manage hundreds of products, daily stock, supplier bills, and cash / UPI payments.</div>
+        <div class="store-features">
+          <div class="sf">Barcode scanning support</div>
+          <div class="sf">Fast keyboard billing mode</div>
+          <div class="sf">Daily stock & reorder alerts</div>
+          <div class="sf">Supplier purchase tracking</div>
+          <div class="sf">Credit customer accounts</div>
+        </div>
+        <div class="store-dl">
+          <a href="#" class="dl-win win-dl-btn">
+            <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm-7 4h14v-2H5v2z"/></svg>
+            Download — 30 Days Free
+          </a>
+          <div class="dl-meta">Windows 10 / 11 · 64-bit · ₹999/month after trial</div>
+        </div>
+      </div>
+
+      <div class="store-card">
+        <div class="store-icon">🍽️</div>
+        <div class="store-name">Restaurant / Café</div>
+        <div class="store-desc">Table billing, KOT printing, menu management and daily revenue reports. Handles dine-in, takeaway and delivery.</div>
+        <div class="store-features">
+          <div class="sf">Table-wise billing & KOT</div>
+          <div class="sf">Menu with categories</div>
+          <div class="sf">SGST + CGST invoice</div>
+          <div class="sf">Daily revenue dashboard</div>
+          <div class="sf">Multiple payment modes</div>
+        </div>
+        <div class="store-dl">
+          <a href="#" class="dl-win win-dl-btn">
+            <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm-7 4h14v-2H5v2z"/></svg>
+            Download — 30 Days Free
+          </a>
+          <div class="dl-meta">Windows 10 / 11 · 64-bit · ₹999/month after trial</div>
+        </div>
+      </div>
+
+      <div class="store-card">
+        <div class="store-icon">🚗</div>
+        <div class="store-name">Vehicle Showroom</div>
+        <div class="store-desc">Manage vehicle inventory, customer inquiries, test drives, and sales pipeline. Generate quotations and booking receipts.</div>
+        <div class="store-features">
+          <div class="sf">Vehicle stock & VIN tracking</div>
+          <div class="sf">Customer inquiry pipeline</div>
+          <div class="sf">Quotation & booking receipts</div>
+          <div class="sf">Test drive records</div>
+          <div class="sf">Sales reports by model</div>
+        </div>
+        <div class="store-dl">
+          <a href="#" class="dl-win win-dl-btn">
+            <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm-7 4h14v-2H5v2z"/></svg>
+            Download — 30 Days Free
+          </a>
+          <div class="dl-meta">Windows 10 / 11 · 64-bit · ₹999/month after trial</div>
+        </div>
+      </div>
+
+      <div class="store-card">
+        <div class="store-icon">🏪</div>
+        <div class="store-name">General Retail</div>
+        <div class="store-desc">Flexible POS for any retail shop — clothing, electronics, hardware, stationery. Customisable GST rates and invoice format.</div>
+        <div class="store-features">
+          <div class="sf">Customisable product categories</div>
+          <div class="sf">GST invoice with HSN code</div>
+          <div class="sf">Discount & coupon support</div>
+          <div class="sf">Customer loyalty points</div>
+          <div class="sf">Monthly GST summary report</div>
+        </div>
+        <div class="store-dl">
+          <a href="#" class="dl-win win-dl-btn">
+            <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm-7 4h14v-2H5v2z"/></svg>
+            Download — 30 Days Free
+          </a>
+          <div class="dl-meta">Windows 10 / 11 · 64-bit · ₹999/month after trial</div>
+        </div>
+      </div>
+
+      <div class="store-card">
+        <div class="store-icon">📈</div>
+        <div class="store-name">Stocks & Trading</div>
+        <div class="store-desc">Track your stock portfolio, record trades, calculate P&amp;L, and generate tax-ready capital gains reports. Fully offline.</div>
+        <div class="store-features">
+          <div class="sf">Portfolio tracking</div>
+          <div class="sf">Trade entry & history</div>
+          <div class="sf">Realised / unrealised P&L</div>
+          <div class="sf">Capital gains tax report</div>
+          <div class="sf">Broker-wise breakdown</div>
+        </div>
+        <div class="store-dl">
+          <a href="#" class="dl-win win-dl-btn">
+            <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm-7 4h14v-2H5v2z"/></svg>
+            Download — 30 Days Free
+          </a>
+          <div class="dl-meta">Windows 10 / 11 · 64-bit · ₹999/month after trial</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="container center">
+    <div class="section-label">Features</div>
+    <h2 class="section-title">Everything your shop needs</h2>
+    <p class="section-sub">Designed for shop owners, not accountants. Simple, fast, and reliable.</p>
+    <div class="features-grid">
+      <div class="feat"><div class="feat-icon">🔌</div><h3>100% Offline</h3><p>Works without internet every day. Your billing never stops because of Wi-Fi issues or server downtime.</p></div>
+      <div class="feat"><div class="feat-icon">🧾</div><h3>GST Billing</h3><p>CGST + SGST invoices with correct rates. Print bills instantly. Bill numbers auto-increment per day.</p></div>
+      <div class="feat"><div class="feat-icon">📦</div><h3>Inventory Control</h3><p>Stock alerts when items run low. Expiry warnings 30/60/90 days in advance. Batch-level tracking.</p></div>
+      <div class="feat"><div class="feat-icon">👥</div><h3>Customer Records</h3><p>Save customer details, track credit accounts, and see full purchase history in one tap.</p></div>
+      <div class="feat"><div class="feat-icon">📊</div><h3>Sales Reports</h3><p>Daily, weekly, monthly revenue. GST summary for filing returns. Payment-wise breakdown.</p></div>
+      <div class="feat"><div class="feat-icon">⌨️</div><h3>Keyboard Billing</h3><p>Counter mode — add items, apply discounts, and print bills without ever touching the mouse.</p></div>
+      <div class="feat"><div class="feat-icon">🔄</div><h3>Auto Updates</h3><p>New features arrive silently in the background whenever your computer is online.</p></div>
+      <div class="feat"><div class="feat-icon">🔒</div><h3>Your Data, Only Yours</h3><p>All data stored on your own computer. Nothing is sent to any server. Total privacy guaranteed.</p></div>
+      <div class="feat"><div class="feat-icon">🖨️</div><h3>Print & Share Bills</h3><p>Print thermal or A4 invoices. Share bills on WhatsApp directly from the app.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing">
+  <div class="container center">
+    <div class="section-label">Pricing</div>
+    <h2 class="section-title">Simple, honest pricing</h2>
+    <p class="section-sub">One plan. All features included. No surprise charges.</p>
+    <div class="pricing-card">
+      <div class="price-trial">🎁 Start free — no card needed</div>
+      <div class="price-main"><sup>₹</sup>999<sub> / month</sub></div>
+      <div class="price-desc">After your 30-day free trial ends</div>
+      <div class="price-includes">
+        <div class="pi"><div class="pi-check">✓</div>All shop types included</div>
+        <div class="pi"><div class="pi-check">✓</div>Unlimited bills & products</div>
+        <div class="pi"><div class="pi-check">✓</div>GST invoices & reports</div>
+        <div class="pi"><div class="pi-check">✓</div>Inventory & expiry tracking</div>
+        <div class="pi"><div class="pi-check">✓</div>Customer & supplier management</div>
+        <div class="pi"><div class="pi-check">✓</div>Auto software updates</div>
+        <div class="pi"><div class="pi-check">✓</div>Works 100% offline</div>
+        <div class="pi"><div class="pi-check">✓</div>Your data stays on your machine</div>
+      </div>
+      <div class="price-cta">
+        <a href="#download" class="btn-primary">
+          <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm-7 4h14v-2H5v2z"/></svg>
+          Download & Start Free Trial
+        </a>
+      </div>
+      <div class="price-note">No credit card required during trial · Cancel anytime</div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <div class="container center">
+    <div class="section-label">How It Works</div>
+    <h2 class="section-title">Up and running in 3 minutes</h2>
+    <p class="section-sub">No IT person needed. No server setup. Just download and start billing.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <h3>Download & Install</h3>
+        <p>Download the .exe for Windows. Double-click to install — takes under 2 minutes. No internet needed after install.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <h3>Set Up Your Shop</h3>
+        <p>Enter shop name, GSTIN, and address. Choose your shop type. Trial starts automatically — no card needed.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <h3>Add Products</h3>
+        <p>Add your products with prices and stock quantities. Or start billing immediately and add as you go.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <h3>Start Billing</h3>
+        <p>Open POS, search products, choose payment mode, and print the GST bill. Done in under 30 seconds per customer.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DOWNLOAD -->
+<section id="download">
+  <div class="container center">
+    <div class="section-label">Download</div>
+    <h2 class="section-title">Try FrontStores free for <span style="color:var(--green)">30 days</span></h2>
+    <p class="section-sub">One installer for all shop types. Choose your shop during first launch.</p>
+    <div class="dl-box">
+      <div class="dl-top-note"><strong>Free 30-day trial</strong> · No credit card · ₹999/month after</div>
+      <div class="dl-list">
+        <a href="#" class="dl-row" id="dl-win">
+          <div class="dl-row-icon">🪟</div>
+          <div class="dl-row-info">
+            <div class="dl-row-label">Windows <span class="dl-badge">FREE TRIAL</span></div>
+            <div class="dl-row-meta">Windows 10 / 11 · 64-bit · .msi installer</div>
+          </div>
+          <div class="dl-row-arrow">↓</div>
+        </a>
+        <a href="#" class="dl-row" id="dl-mac-arm">
+          <div class="dl-row-icon">🍎</div>
+          <div class="dl-row-info">
+            <div class="dl-row-label">Mac — Apple Silicon <span class="dl-badge">FREE TRIAL</span></div>
+            <div class="dl-row-meta">MacBook M1 / M2 / M3 / M4 · .dmg</div>
+          </div>
+          <div class="dl-row-arrow">↓</div>
+        </a>
+        <a href="#" class="dl-row" id="dl-mac-intel">
+          <div class="dl-row-icon">🍎</div>
+          <div class="dl-row-info">
+            <div class="dl-row-label">Mac — Intel <span class="dl-badge">FREE TRIAL</span></div>
+            <div class="dl-row-meta">Older MacBook / iMac · .dmg</div>
+          </div>
+          <div class="dl-row-arrow">↓</div>
+        </a>
+      </div>
+      <div class="dl-version" id="dl-version">Fetching latest version…</div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq">
+  <div class="container center">
+    <div class="section-label">FAQ</div>
+    <h2 class="section-title">Common questions</h2>
+    <div class="faq-list">
+      <div class="faq-item open">
+        <div class="faq-q" onclick="toggleFaq(this)">How does the free trial work? <span class="faq-chevron">▾</span></div>
+        <div class="faq-a">Download and install the app — no credit card needed. You get full access to all features for 30 days completely free. After 30 days, a subscription of ₹999/month is required to continue using the app.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">Does it work without internet? <span class="faq-chevron">▾</span></div>
+        <div class="faq-a">Yes. FrontStores runs completely offline. All data is stored on your computer. You can bill customers, manage inventory, and view reports with no internet. Internet is only used for software updates and subscription verification.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">What happens to my data if I cancel? <span class="faq-chevron">▾</span></div>
+        <div class="faq-a">Your data stays on your computer forever — it is never deleted. If you cancel your subscription, the app stops accepting new bills but you can still view all your old records and reports.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">Can I use it on multiple computers? <span class="faq-chevron">▾</span></div>
+        <div class="faq-a">One subscription covers one shop installation. If you have multiple computers or shops, each needs a separate subscription. Multi-device sync is on the roadmap as a future feature.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">Is GST filing supported? <span class="faq-chevron">▾</span></div>
+        <div class="faq-a">FrontStores generates GSTR-ready sales summaries with CGST, SGST, and taxable value breakdowns by period. Use these to fill your GSTR-1 and GSTR-3B manually. Direct e-filing integration is planned.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">Which Windows versions are supported? <span class="faq-chevron">▾</span></div>
+        <div class="faq-a">Windows 10 and Windows 11, 64-bit. Windows 7 and 8 are not supported. For Mac: macOS 12 (Monterey) and above, both Intel and Apple Silicon (M1/M2/M3/M4).</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-brand">Front<span>Stores</span></div>
+  <div class="footer-links">
+    <a href="#stores">Shop Types</a>
+    <a href="#features">Features</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#download">Download</a>
+    <a href="mailto:support@frontstores.com">support@frontstores.com</a>
+  </div>
+  <div class="footer-copy">© 2025 FrontStores · Made for Indian shop owners</div>
+</footer>
+
+<script>
+  const REPO = 'imrakeshsoni/frontstores';
+
+  async function loadRelease() {
+    try {
+      const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`);
+      const data = await res.json();
+      if (!data.tag_name) throw new Error('no release');
+      const assets = data.assets || [];
+      const find = (re) => assets.find(a => re.test(a.name))?.browser_download_url || null;
+      const winUrl = find(/x64[_-]en-US\.msi$/i) || find(/\.msi$/i) || find(/x64.*setup\.exe$/i);
+      const macArm = find(/aarch64\.dmg$/i);
+      const macIntel = find(/x86_64\.dmg$/i);
+      if (winUrl) {
+        document.getElementById('dl-win').href = winUrl;
+        document.querySelectorAll('.win-dl-btn').forEach(b => { b.href = winUrl; });
+      }
+      if (macArm) document.getElementById('dl-mac-arm').href = macArm;
+      if (macIntel) document.getElementById('dl-mac-intel').href = macIntel;
+      document.getElementById('dl-version').textContent = `Latest: ${data.tag_name} · Free 30-day trial`;
+    } catch {
+      document.getElementById('dl-version').textContent = 'Coming soon — first release dropping shortly';
+    }
+  }
+
+  loadRelease();
+
+  function toggleFaq(el) {
+    el.parentElement.classList.toggle('open');
+  }
+</script>
+</body>
+</html>
