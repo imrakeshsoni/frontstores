@@ -6,11 +6,7 @@ import { toast } from 'sonner';
 
 const SHOP_TYPES = [
   { value: 'medical',    label: 'Medical / Pharmacy',     icon: '💊', desc: 'Medicines, prescriptions, drug inventory' },
-  { value: 'grocery',    label: 'Grocery / Kirana',       icon: '🛒', desc: 'Daily essentials, FMCG, perishables' },
   { value: 'restaurant', label: 'Restaurant / Café',      icon: '🍽️', desc: 'Food orders, tables, kitchen management' },
-  { value: 'vehicle',    label: 'Vehicle Showroom',       icon: '🚗', desc: 'Cars, bikes, service jobs, spare parts' },
-  { value: 'retail',     label: 'General Retail',         icon: '🏪', desc: 'Clothing, electronics, any retail shop' },
-  { value: 'stocks',     label: 'Stocks & Trading',       icon: '📈', desc: 'Portfolio, trades, market tracking' },
 ];
 
 interface FormData {

@@ -23,17 +23,11 @@ Website: frontstores.com
 Which app are you working on?
 
 1) Medical Store (medical)
-2) Grocery / Kirana (grocery)
-3) Restaurant / Café (restaurant)
-4) Vehicle Showroom (vehicle)
-5) General Retail (retail)
-6) Stocks & Trading (stocks)
-7) Roaster (roaster)
-8) Relax / Wellness (relax)
-9) Core / Shared (affects all apps)
-10) Website — frontstores.com
-11) Admin Panel (tools/update-server, admin-app)
-12) ➕ Create new app
+2) Restaurant / Café (restaurant)
+3) Core / Shared (affects all apps)
+4) Website — frontstores.com
+5) Admin Panel (tools/update-server, admin-app)
+6) ➕ Create new app
 ```
 
 ---
@@ -75,16 +69,10 @@ User picks one or more numbers. Then proceed with the task scoped to those tenan
 
 frontstores.com hosts multiple separate apps. Each app is a different downloadable product for a different business type:
 
-| App | Download link | Shop type tag |
-|-----|---------------|---------------|
-| Medical Store | frontstores.com/medical | `medical` |
-| Grocery / Kirana | frontstores.com/grocery | `grocery` |
-| Restaurant | frontstores.com/restaurant | `restaurant` |
-| Vehicle Showroom | frontstores.com/vehicle | `vehicle` |
-| General Retail | frontstores.com/retail | `retail` |
-| Stocks & Trading | frontstores.com/stocks | `stocks` |
-| Roaster | frontstores.com/roaster | `roaster` |
-| Relax / Wellness | frontstores.com/relax | `relax` |
+| App | Download link | Shop type tag | Status |
+|-----|---------------|---------------|--------|
+| Medical Store | frontstores.com/medical | `medical` | ✅ Active |
+| Restaurant | frontstores.com/restaurant | `restaurant` | ✅ Active |
 
 All apps are built from this single codebase. The `shopType` field in `app_config` controls which features are visible.
 
