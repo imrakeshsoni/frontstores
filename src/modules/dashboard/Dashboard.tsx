@@ -1,11 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { TrendingUp, ShoppingCart, AlertTriangle, IndianRupee, Activity } from 'lucide-react';
-import { format, subDays } from 'date-fns';
+import { TrendingUp, ShoppingCart, AlertTriangle, IndianRupee, Activity, CalendarCheck, Clock } from 'lucide-react';
+import { format, subDays, differenceInDays } from 'date-fns';
+import { useState } from 'react';
 import { useAppStore } from '@/app/store/app.store';
 import { getSalesSummary, listOrders } from '@/lib/db/orders';
-import { getLowStockAlerts } from '@/lib/db/inventory';
+import { getLowStockAlerts, getExpiryAlerts } from '@/lib/db/inventory';
 import { PageIntro } from '@/components/ui/PageIntro';
+import { DailyClosingReport } from '@/modules/reports/DailyClosingReport';
 
 function StatCard({ label, value, icon: Icon, iconBg, meta }: {
   label: string; value: string; icon: React.ElementType; iconBg: string; meta: string;
@@ -30,6 +32,7 @@ export function Dashboard() {
   const tenantId = useAppStore((s) => s.config?.tenant_id ?? '');
   const from30 = format(subDays(new Date(), 30), 'yyyy-MM-dd');
   const today = format(new Date(), 'yyyy-MM-dd');
+  const [showClosing, setShowClosing] = useState(false);
 
   const { data: summary } = useQuery({
     queryKey: ['sales-summary', tenantId, from30, today],
@@ -47,6 +50,12 @@ export function Dashboard() {
   const { data: lowStockItems } = useQuery({
     queryKey: ['low-stock', tenantId],
     queryFn: () => getLowStockAlerts(tenantId),
+    enabled: !!tenantId,
+  });
+
+  const { data: expiringBatches } = useQuery({
+    queryKey: ['expiring-batches', tenantId],
+    queryFn: () => getExpiryAlerts(tenantId, 90),
     enabled: !!tenantId,
   });
 
@@ -72,15 +81,18 @@ export function Dashboard() {
     <div className="page-shell page-stack">
       <PageIntro
         eyebrow="Overview"
-        title="A retail dashboard with more calm, less clutter."
-        description={`Today is ${format(new Date(), 'dd MMMM yyyy')}. Monitor revenue, orders, stock risk, and product momentum.`}
+        title={`Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'} 👋`}
+        description={`${format(new Date(), 'dd MMMM yyyy')} · Medical Store Dashboard`}
         actions={
           <>
-            <span className="chip">Offline first</span>
-            <span className="chip">30-day view</span>
+            <button onClick={() => setShowClosing(true)} className="btn-secondary flex items-center gap-1.5 text-sm">
+              <CalendarCheck size={14} /> Daily Closing
+            </button>
+            <span className="chip"><Clock size={12} className="mr-1" />Live</span>
           </>
         }
       />
+      {showClosing && <DailyClosingReport onClose={() => setShowClosing(false)} />}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
@@ -199,6 +211,39 @@ export function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* Expiry Alerts */}
+      {(expiringBatches?.length ?? 0) > 0 && (
+        <div className="card p-6">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <p className="section-label">Expiry Alerts</p>
+              <h2 className="mt-2">
+                Medicines expiring within 90 days
+                <span className="ml-2 badge badge-red">{expiringBatches?.length}</span>
+              </h2>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {(expiringBatches ?? []).slice(0, 9).map((b: any) => {
+              const daysLeft = differenceInDays(new Date(b.expiry_date), new Date());
+              const color = daysLeft <= 30 ? 'badge-red' : daysLeft <= 60 ? 'bg-orange-950 text-orange-300' : 'bg-yellow-950 text-yellow-300';
+              return (
+                <div key={b.id} className="card-strong flex items-center justify-between gap-4 p-4 text-sm">
+                  <div>
+                    <p className="font-medium text-slate-950">{b.product_name}</p>
+                    <p className="text-xs text-slate-500">Batch: {b.batch_no || '—'} · Qty: {b.quantity}</p>
+                  </div>
+                  <div className="text-right">
+                    <span className={`badge ${color}`}>{daysLeft}d</span>
+                    <p className="mt-1 text-xs text-slate-400">{b.expiry_date}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="card p-6">
         <p className="section-label">Recent Bills</p>

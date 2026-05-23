@@ -40,7 +40,7 @@ export async function listProducts(tenantId: string, opts: {
   const offset = (page - 1) * perPage;
   const conditions = [`tenant_id = ?`, `deleted_at IS NULL`, `is_active = 1`];
   const params: any[] = [tenantId];
-  if (search) { conditions.push(`(name LIKE ? OR barcode = ? OR sku LIKE ?)`); params.push(`%${search}%`, search, `%${search}%`); }
+  if (search) { conditions.push(`(name LIKE ? OR barcode = ? OR sku LIKE ? OR salt_composition LIKE ? OR manufacturer LIKE ?)`); params.push(`%${search}%`, search, `%${search}%`, `%${search}%`, `%${search}%`); }
   if (lowStock) { conditions.push(`stock_qty <= min_stock_qty`); }
   const where = conditions.join(' AND ');
   const [{ total }] = await db.select<{ total: number }[]>(`SELECT COUNT(*) as total FROM products WHERE ${where}`, params);

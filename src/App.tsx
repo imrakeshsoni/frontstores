@@ -15,8 +15,9 @@ const CustomersPage = lazy(() => import('@/modules/customers/CustomersPage').the
 const SuppliersPage = lazy(() => import('@/modules/suppliers/SuppliersPage').then(m => ({ default: m.SuppliersPage })));
 const ReportsPage   = lazy(() => import('@/modules/reports/ReportsPage').then(m => ({ default: m.ReportsPage })));
 const SettingsPage  = lazy(() => import('@/modules/settings/SettingsPage').then(m => ({ default: m.SettingsPage })));
-const KhataPage     = lazy(() => import('@/modules/khata/KhataPage').then(m => ({ default: m.KhataPage })));
-const ExpensesPage  = lazy(() => import('@/modules/expenses/ExpensesPage').then(m => ({ default: m.ExpensesPage })));
+const KhataPage           = lazy(() => import('@/modules/khata/KhataPage').then(m => ({ default: m.KhataPage })));
+const ExpensesPage        = lazy(() => import('@/modules/expenses/ExpensesPage').then(m => ({ default: m.ExpensesPage })));
+const PurchaseOrdersPage  = lazy(() => import('@/modules/purchase-orders/PurchaseOrdersPage').then(m => ({ default: m.PurchaseOrdersPage })));
 
 function Loading() {
   return (
@@ -50,7 +51,8 @@ export default function App() {
             <Route path="customers"  element={<CustomersPage />} />
             <Route path="khata"      element={<KhataPage />} />
             <Route path="expenses"   element={<ExpensesPage />} />
-            <Route path="suppliers"  element={<SuppliersPage />} />
+            <Route path="suppliers"        element={<SuppliersPage />} />
+            <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
             <Route path="reports"    element={<ReportsPage />} />
             <Route path="settings"   element={<SettingsPage />} />
           </Route>

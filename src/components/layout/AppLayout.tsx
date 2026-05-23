@@ -14,6 +14,7 @@ import {
   BookOpen,
   Wallet,
   LogOut,
+  ClipboardList,
 } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { getShopTypeLabel } from '@/lib/shop/shopType';
@@ -28,6 +29,7 @@ export const NAV_ITEMS = [
   { to: '/khata', icon: BookOpen, label: 'Khata' },
   { to: '/expenses', icon: Wallet, label: 'Expenses' },
   { to: '/suppliers', icon: Truck, label: 'Suppliers' },
+  { to: '/purchase-orders', icon: ClipboardList, label: 'Purchase Orders' },
   { to: '/reports', icon: BarChart3, label: 'Reports' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
