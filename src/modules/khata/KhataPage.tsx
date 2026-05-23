@@ -26,11 +26,12 @@ export function KhataPage() {
     enabled: !!tenantId && !!selectedCustomer,
   });
 
-  const { data: customers = [] } = useQuery({
+  const { data: customersData } = useQuery({
     queryKey: ['customers', tenantId],
     queryFn: () => listCustomers(tenantId),
     enabled: !!tenantId && showAdd,
   });
+  const customers: import('@/lib/db/customers').Customer[] = customersData?.items ?? [];
 
   const addMutation = useMutation({
     mutationFn: () => addKhataEntry(tenantId, {
