@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect } from 'react';
 import { useAppStore } from '@/app/store/app.store';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { SetupWizard } from '@/modules/setup/SetupWizard';
+import { AppLoginScreen } from '@/modules/auth/AppLoginScreen';
 import { SubscriptionGate } from '@/modules/subscription/SubscriptionGate';
 
 const Dashboard     = lazy(() => import('@/modules/dashboard/Dashboard').then(m => ({ default: m.Dashboard })));
@@ -26,12 +27,13 @@ function Loading() {
 }
 
 export default function App() {
-  const { isLoading, isSetupComplete, loadConfig } = useAppStore();
+  const { isLoading, isSetupComplete, isAuthenticated, loadConfig } = useAppStore();
 
   useEffect(() => { loadConfig(); }, [loadConfig]);
 
   if (isLoading) return <Loading />;
   if (!isSetupComplete) return <SetupWizard />;
+  if (!isAuthenticated) return <AppLoginScreen />;
 
   return (
     <SubscriptionGate>

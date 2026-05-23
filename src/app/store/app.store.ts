@@ -7,15 +7,18 @@ interface AppState {
   config: AppConfig | null;
   isLoading: boolean;
   isSetupComplete: boolean;
+  isAuthenticated: boolean;
 
   loadConfig: () => Promise<void>;
   setConfig: (config: AppConfig) => void;
+  setAuthenticated: (v: boolean) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
   config: null,
   isLoading: true,
   isSetupComplete: false,
+  isAuthenticated: false,
 
   loadConfig: async () => {
     set({ isLoading: true });
@@ -36,4 +39,5 @@ export const useAppStore = create<AppState>((set) => ({
   },
 
   setConfig: (config) => { setReporterTenantId(config.tenant_id); set({ config, isSetupComplete: config.is_setup_complete }); },
+  setAuthenticated: (v) => set({ isAuthenticated: v }),
 }));

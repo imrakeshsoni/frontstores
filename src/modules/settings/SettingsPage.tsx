@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { Sun, Moon } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { updateAppConfig } from '@/lib/db/config';
+import { changePassword, changeUsername, getAuthUsername } from '@/lib/db/auth';
 import { PageIntro } from '@/components/ui/PageIntro';
 import { useTheme } from '@/lib/theme/useTheme';
 
@@ -30,6 +31,38 @@ export function SettingsPage() {
   const config = useAppStore((s) => s.config);
   const { loadConfig } = useAppStore();
   const { theme, toggleTheme } = useTheme();
+  const tenantId = config?.tenant_id ?? '';
+
+  // Password change state
+  const [currentUsername, setCurrentUsername] = useState('');
+  const [newUsername, setNewUsername] = useState('');
+  const [currentPass, setCurrentPass] = useState('');
+  const [newPass, setNewPass] = useState('');
+  const [confirmPass, setConfirmPass] = useState('');
+
+  useEffect(() => {
+    if (tenantId) getAuthUsername(tenantId).then(u => { if (u) setCurrentUsername(u); });
+  }, [tenantId]);
+
+  async function handleChangePassword() {
+    if (!newPass || newPass.length < 4) { toast.error('New password must be at least 4 characters'); return; }
+    if (newPass !== confirmPass) { toast.error('Passwords do not match'); return; }
+    const result = await changePassword(tenantId, currentPass, newPass);
+    if (result.ok) {
+      toast.success('Password changed successfully');
+      setCurrentPass(''); setNewPass(''); setConfirmPass('');
+    } else {
+      toast.error(result.error ?? 'Failed to change password');
+    }
+  }
+
+  async function handleChangeUsername() {
+    if (!newUsername.trim() || newUsername.trim().length < 3) { toast.error('Username must be at least 3 characters'); return; }
+    await changeUsername(tenantId, newUsername.trim());
+    setCurrentUsername(newUsername.trim().toLowerCase());
+    setNewUsername('');
+    toast.success('Username changed successfully');
+  }
   const [form, setForm] = useState<SettingsForm>({
     shop_name: '', owner_name: '', phone: '', email: '', gstin: '', drug_license_no: '',
     address_line1: '', city: '',
@@ -236,6 +269,35 @@ export function SettingsPage() {
           </button>
         </div>
         <p className="text-xs text-slate-500 mt-3">💡 Tip: Take a backup weekly and store it somewhere safe. Your data is only on this computer.</p>
+      </div>
+
+      {/* Security */}
+      <div className="card">
+        <p className="section-label mb-1">Security — Login & Password</p>
+        <p className="text-xs text-slate-400 mb-4">Your password is stored only on this device and never sent anywhere.</p>
+        <p className="text-xs text-slate-500 mb-4">Current username: <span className="font-semibold text-slate-300">{currentUsername || '—'}</span></p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Change Username */}
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-slate-300">Change Username</p>
+            <input className="input w-full" placeholder="New username (min 3 chars)" value={newUsername} onChange={e => setNewUsername(e.target.value)} />
+            <button onClick={handleChangeUsername} disabled={newUsername.trim().length < 3} className="btn-secondary w-full disabled:opacity-40">
+              Update Username
+            </button>
+          </div>
+
+          {/* Change Password */}
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-slate-300">Change Password</p>
+            <input className="input w-full" type="password" placeholder="Current password" value={currentPass} onChange={e => setCurrentPass(e.target.value)} />
+            <input className="input w-full" type="password" placeholder="New password (min 4 chars)" value={newPass} onChange={e => setNewPass(e.target.value)} />
+            <input className="input w-full" type="password" placeholder="Confirm new password" value={confirmPass} onChange={e => setConfirmPass(e.target.value)} />
+            <button onClick={handleChangePassword} disabled={!currentPass || !newPass || !confirmPass} className="btn-secondary w-full disabled:opacity-40">
+              Change Password
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="flex justify-end">

@@ -119,6 +119,49 @@ const publicServer = http.createServer(async (req, res) => {
 
   if (req.method === 'GET' && pathname === '/update') { res.writeHead(204); res.end(); return; }
 
+  // POST /reset-request — customer app sends this when user clicks "Forgot password"
+  if (req.method === 'POST' && pathname === '/reset-request') {
+    const body = await readBody(req);
+    try {
+      const { tenant_id, shop_name, requested_at } = JSON.parse(body);
+      if (!tenant_id) { res.writeHead(400); res.end('Missing tenant_id'); return; }
+      const subs = loadSubs();
+      if (subs[tenant_id]) {
+        subs[tenant_id].reset_requested_at = requested_at || new Date().toISOString();
+        subs[tenant_id].reset_token = null;
+        subs[tenant_id].reset_token_expires = null;
+        saveSubs(subs);
+        console.log(`🔑 Reset request from ${shop_name || tenant_id.substring(0, 8)}`);
+      }
+      json(res, { ok: true });
+    } catch { res.writeHead(400); res.end('Bad request'); }
+    return;
+  }
+
+  // POST /verify-reset-code — customer app verifies code + resets password
+  if (req.method === 'POST' && pathname === '/verify-reset-code') {
+    const body = await readBody(req);
+    try {
+      const { tenant_id, code } = JSON.parse(body);
+      if (!tenant_id || !code) { res.writeHead(400); res.end('Missing fields'); return; }
+      const subs = loadSubs();
+      const sub = subs[tenant_id];
+      if (!sub || !sub.reset_token) { json(res, { ok: false, error: 'No reset code found' }); return; }
+      if (sub.reset_token !== String(code)) { json(res, { ok: false, error: 'Invalid code' }); return; }
+      if (sub.reset_token_expires && new Date(sub.reset_token_expires) < new Date()) {
+        json(res, { ok: false, error: 'Code has expired' }); return;
+      }
+      // Clear token after use
+      subs[tenant_id].reset_token = null;
+      subs[tenant_id].reset_token_expires = null;
+      subs[tenant_id].reset_requested_at = null;
+      saveSubs(subs);
+      console.log(`✅ Password reset approved for ${sub.shop_name}`);
+      json(res, { ok: true });
+    } catch { res.writeHead(400); res.end('Bad request'); }
+    return;
+  }
+
   // Block any attempt to reach admin from public port
   if (pathname.startsWith('/admin')) { res.writeHead(403); res.end('Forbidden'); return; }
 
@@ -186,6 +229,21 @@ const adminServer = http.createServer(async (req, res) => {
     }
     saveSubs(subs);
     json(res, { ok: true, expires_at: subs[tenantId].expires_at }); return;
+  }
+
+  // POST /admin/api/customers/:id/set-reset-code
+  const resetCodeAction = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/set-reset-code$/);
+  if (req.method === 'POST' && resetCodeAction) {
+    const tenantId = resetCodeAction[1];
+    const body = await readBody(req);
+    const { code, expires } = JSON.parse(body);
+    const subs = loadSubs();
+    if (!subs[tenantId]) { json(res, {ok:false,error:'Not found'}, 404); return; }
+    subs[tenantId].reset_token = code || null;
+    subs[tenantId].reset_token_expires = expires || null;
+    saveSubs(subs);
+    if (code) console.log(`🔑 Reset code set for ${subs[tenantId].shop_name}: ${code}`);
+    json(res, { ok: true }); return;
   }
 
   // GET /admin/api/errors

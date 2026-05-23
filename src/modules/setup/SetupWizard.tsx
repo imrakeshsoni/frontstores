@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAppStore } from '@/app/store/app.store';
 import { createAppConfig } from '@/lib/db/config';
+import { createAuth } from '@/lib/db/auth';
 import { enqueue } from '@/lib/syncQueue';
 import { toast } from 'sonner';
 
@@ -24,7 +25,7 @@ interface FormData {
 }
 
 export function SetupWizard() {
-  const setConfig = useAppStore((s) => s.setConfig);
+  const { setConfig, setAuthenticated } = useAppStore();
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [tcAgreed, setTcAgreed] = useState(false);
@@ -34,11 +35,21 @@ export function SetupWizard() {
     pincode: '', gstin: '', drug_license_no: '',
   });
 
+  // Step 5 — password setup
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPass, setShowPass] = useState(false);
+
   const update = (key: keyof FormData, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
   const canProceedStep1 = form.shop_type !== '';
   const canProceedStep2 = form.shop_name.trim() !== '' && form.owner_name.trim() !== '';
+  const canProceedStep5 =
+    username.trim().length >= 3 &&
+    password.length >= 4 &&
+    password === confirmPassword;
 
   const handleFinish = async () => {
     setSaving(true);
@@ -56,9 +67,10 @@ export function SetupWizard() {
         gstin: form.gstin || undefined,
         drug_license_no: form.drug_license_no || undefined,
       });
+      await createAuth(config.tenant_id, username.trim(), password);
       setConfig(config);
+      setAuthenticated(true);
       toast.success('Setup complete! Welcome to FrontStores.');
-      // Queue registration — syncs when internet is available
       enqueue('register', config.tenant_id, {
         tenant_id: config.tenant_id,
         shop_name: form.shop_name.trim(),
@@ -69,9 +81,8 @@ export function SetupWizard() {
         city: form.city || '',
         gstin: form.gstin || '',
       }).catch(() => {});
-    } catch (e: any) {
-      console.error('Setup error:', e);
-      toast.error(String(e?.message ?? e ?? 'Setup failed'));
+    } catch (e: unknown) {
+      toast.error(String((e as Error)?.message ?? e ?? 'Setup failed'));
     } finally {
       setSaving(false);
     }
@@ -85,7 +96,7 @@ export function SetupWizard() {
           <h1 className="text-3xl font-bold text-white">FrontStores</h1>
           <p className="text-slate-400 mt-2">Set up your shop — takes 2 minutes</p>
           <div className="flex items-center justify-center gap-2 mt-4">
-            {[1, 2, 3, 4].map((s) => (
+            {[1, 2, 3, 4, 5].map((s) => (
               <div key={s} className={`h-2 rounded-full transition-all ${s === step ? 'w-8 bg-indigo-500' : s < step ? 'w-4 bg-indigo-400' : 'w-4 bg-slate-600'}`} />
             ))}
           </div>
@@ -114,11 +125,8 @@ export function SetupWizard() {
                   </button>
                 ))}
               </div>
-              <button
-                onClick={() => setStep(2)}
-                disabled={!canProceedStep1}
-                className="mt-6 w-full btn-primary py-3 text-base disabled:opacity-40 disabled:cursor-not-allowed"
-              >
+              <button onClick={() => setStep(2)} disabled={!canProceedStep1}
+                className="mt-6 w-full btn-primary py-3 text-base disabled:opacity-40 disabled:cursor-not-allowed">
                 Continue →
               </button>
             </div>
@@ -203,8 +211,6 @@ export function SetupWizard() {
             <div>
               <h2 className="text-xl font-semibold text-slate-800 mb-1">Terms & Subscription</h2>
               <p className="text-slate-500 text-sm mb-4">Please read and agree to continue.</p>
-
-              {/* Subscription info */}
               <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 mb-4">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-lg">🎁</span>
@@ -212,34 +218,91 @@ export function SetupWizard() {
                 </div>
                 <p className="text-sm text-indigo-700">You get full access to all features for 30 days — completely free. After your trial ends, a subscription of <strong>₹999/month</strong> is required to continue using FrontStores.</p>
                 <div className="mt-3 pt-3 border-t border-indigo-200 text-sm text-indigo-700">
-                  <p>💳 <strong>How to subscribe:</strong> Contact us on WhatsApp or email after your trial. Pay via UPI, cash, or bank transfer. We'll activate your subscription within hours.</p>
+                  <p>💳 <strong>How to subscribe:</strong> Contact us on WhatsApp or email after your trial.</p>
                   <p className="mt-1">📱 <strong>WhatsApp:</strong> +91 99999 99999</p>
                   <p>📧 <strong>Email:</strong> support@frontstores.com</p>
                 </div>
               </div>
-
-              {/* T&C scroll box */}
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 h-36 overflow-y-auto text-xs text-slate-600 leading-relaxed mb-4">
                 <p className="font-semibold text-slate-800 mb-2">Terms & Conditions — FrontStores</p>
-                <p><strong>1. License:</strong> FrontStores grants you a non-transferable license to use this software for your shop. One license per installation.</p>
-                <p className="mt-1"><strong>2. Data:</strong> All your shop data is stored locally on your computer. FrontStores does not access, collect, or transmit your business data to any server.</p>
-                <p className="mt-1"><strong>3. Subscription:</strong> After the 30-day free trial, a monthly subscription of ₹999 is required. Non-payment will restrict access to billing features.</p>
-                <p className="mt-1"><strong>4. Updates:</strong> Software updates are delivered automatically. Updates will never modify, delete, or alter your existing data.</p>
-                <p className="mt-1"><strong>5. Cancellation:</strong> You may stop using the software at any time. Your data remains on your computer and is never deleted remotely.</p>
-                <p className="mt-1"><strong>6. Liability:</strong> FrontStores is not liable for any business losses arising from software use. Always maintain your own data backups.</p>
-                <p className="mt-1"><strong>7. Support:</strong> Support is available via WhatsApp and email during business hours (Mon–Sat, 10am–6pm IST).</p>
+                <p><strong>1. License:</strong> FrontStores grants you a non-transferable license to use this software for your shop.</p>
+                <p className="mt-1"><strong>2. Data:</strong> All your shop data is stored locally on your computer. FrontStores does not access, collect, or transmit your business data.</p>
+                <p className="mt-1"><strong>3. Subscription:</strong> After the 30-day free trial, ₹999/month is required.</p>
+                <p className="mt-1"><strong>4. Updates:</strong> Updates will never modify, delete, or alter your existing data.</p>
+                <p className="mt-1"><strong>5. Cancellation:</strong> Your data remains on your computer and is never deleted remotely.</p>
+                <p className="mt-1"><strong>6. Liability:</strong> FrontStores is not liable for any business losses. Always maintain your own data backups.</p>
               </div>
-
-              {/* Agree checkbox */}
               <label className="flex items-start gap-3 cursor-pointer">
                 <input type="checkbox" checked={tcAgreed} onChange={(e) => setTcAgreed(e.target.checked)}
                   className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600" />
-                <span className="text-sm text-slate-700">I have read and agree to the Terms & Conditions. I understand this software requires a subscription of ₹999/month after the 30-day free trial.</span>
+                <span className="text-sm text-slate-700">I have read and agree to the Terms & Conditions.</span>
               </label>
-
               <div className="flex gap-3 mt-6">
                 <button onClick={() => setStep(3)} className="btn-secondary py-3 flex-1">← Back</button>
-                <button onClick={handleFinish} disabled={saving || !tcAgreed}
+                <button onClick={() => setStep(5)} disabled={!tcAgreed}
+                  className="btn-primary py-3 flex-1 text-base disabled:opacity-40 disabled:cursor-not-allowed">
+                  Continue →
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 5: Set username + password */}
+          {step === 5 && (
+            <div>
+              <h2 className="text-xl font-semibold text-slate-800 mb-1">Set your login password</h2>
+              <p className="text-slate-500 text-sm mb-6">
+                This protects your shop data. Only you will know this password — it is stored on your computer only and never sent anywhere.
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Username *</label>
+                  <input
+                    className="input"
+                    placeholder="e.g. rakesh"
+                    value={username}
+                    onChange={e => setUsername(e.target.value)}
+                    autoFocus
+                  />
+                  <p className="text-xs text-slate-400 mt-1">Minimum 3 characters. Lowercase only.</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Password *</label>
+                  <div className="relative">
+                    <input
+                      className="input pr-16"
+                      type={showPass ? 'text' : 'password'}
+                      placeholder="Create a password"
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                    />
+                    <button type="button" onClick={() => setShowPass(s => !s)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-700">
+                      {showPass ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">Minimum 4 characters.</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Confirm password *</label>
+                  <input
+                    className="input"
+                    type="password"
+                    placeholder="Re-enter password"
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                  />
+                  {confirmPassword && password !== confirmPassword && (
+                    <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
+                  )}
+                </div>
+              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-4 text-xs text-amber-700">
+                🔒 Your password is stored only on this device. If you forget it, contact FrontStores support to reset it.
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button onClick={() => setStep(4)} className="btn-secondary py-3 flex-1">← Back</button>
+                <button onClick={handleFinish} disabled={saving || !canProceedStep5}
                   className="btn-primary py-3 flex-1 text-base disabled:opacity-40 disabled:cursor-not-allowed">
                   {saving ? 'Setting up…' : '✓ Start Free Trial'}
                 </button>

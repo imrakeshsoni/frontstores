@@ -3,7 +3,7 @@ import { getDb, uuid, now } from './db/index';
 const SERVER = 'https://update.frontstores.com';
 const MAX_ATTEMPTS = 10;
 
-export type SyncType = 'register' | 'error';
+export type SyncType = 'register' | 'error' | 'reset_request';
 
 // Add an item to the local queue (always succeeds, even offline)
 export async function enqueue(type: SyncType, tenantId: string, payload: object) {
@@ -29,7 +29,7 @@ export async function flushQueue() {
 
   for (const item of pending) {
     try {
-      const endpoint = item.type === 'register' ? '/register' : '/error';
+      const endpoint = item.type === 'register' ? '/register' : item.type === 'reset_request' ? '/reset-request' : '/error';
       const res = await fetch(`${SERVER}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

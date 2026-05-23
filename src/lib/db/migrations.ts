@@ -3,6 +3,7 @@ import migration0002 from '../../../src-tauri/migrations/0002_subscription.sql?r
 import migration0003 from '../../../src-tauri/migrations/0003_sync_queue.sql?raw';
 import migration0004 from '../../../src-tauri/migrations/0004_last_verified.sql?raw';
 import migration0005 from '../../../src-tauri/migrations/0005_khata.sql?raw';
+import migration0006 from '../../../src-tauri/migrations/0006_app_auth.sql?raw';
 
 export interface Migration {
   name: string;
@@ -16,5 +17,6 @@ export async function readMigrations(): Promise<Migration[]> {
     { name: '0003_sync_queue', sql: migration0003 },
     { name: '0004_last_verified', sql: migration0004 },
     { name: '0005_khata', sql: migration0005 },
+    { name: '0006_app_auth', sql: migration0006 },
   ];
 }

@@ -13,6 +13,7 @@ import {
   Store,
   BookOpen,
   Wallet,
+  LogOut,
 } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { getShopTypeLabel } from '@/lib/shop/shopType';
@@ -32,7 +33,7 @@ export const NAV_ITEMS = [
 ];
 
 export function AppLayout() {
-  const config = useAppStore((s) => s.config);
+  const { config, setAuthenticated } = useAppStore();
 
   useEffect(() => {
     if (config?.shop_type === 'medical') {
@@ -110,6 +111,13 @@ export function AppLayout() {
                 {config?.shop_name ?? 'FrontStores'}
               </p>
             </div>
+            <button
+              onClick={() => setAuthenticated(false)}
+              title="Lock / Sign out"
+              className="flex-shrink-0 p-1.5 rounded-lg hover:bg-red-100 text-slate-400 hover:text-red-600 transition-colors"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
       </aside>

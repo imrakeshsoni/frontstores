@@ -1,0 +1,15 @@
+{
+  "a73720b9-3041-4c71-970c-2b7e977ffc64": {
+    "tenant_id": "a73720b9-3041-4c71-970c-2b7e977ffc64",
+    "shop_name": "Rakesh Medical Store",
+    "owner_name": "Rakesh Soni",
+    "shop_type": "medical",
+    "phone": "",
+    "email": "",
+    "city": "",
+    "gstin": "",
+    "expires_at": "2026-06-22 14:53:47",
+    "registered_at": "2026-05-23T14:53:47.089Z",
+    "account_status": "active"
+  }
+}
