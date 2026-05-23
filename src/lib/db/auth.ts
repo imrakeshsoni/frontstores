@@ -6,8 +6,18 @@ export interface AppAuth {
   username: string;
   password_hash: string;
   salt: string;
+  failed_attempts: number;
+  locked_until: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ExportLog {
+  id: string;
+  tenant_id: string;
+  export_type: string;
+  row_count: number;
+  exported_at: string;
 }
 
 async function hashPassword(password: string, salt: string): Promise<string> {
@@ -43,21 +53,67 @@ export async function createAuth(tenantId: string, username: string, password: s
   const salt = randomSalt();
   const hash = await hashPassword(password, salt);
   await db.execute(
-    `INSERT INTO app_auth (id, tenant_id, username, password_hash, salt, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO app_auth (id, tenant_id, username, password_hash, salt, failed_attempts, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, 0, ?, ?)`,
     [uuid(), tenantId, username.trim().toLowerCase(), hash, salt, now(), now()]
   );
 }
 
-export async function verifyAuth(tenantId: string, username: string, password: string): Promise<boolean> {
+export async function verifyAuth(
+  tenantId: string,
+  username: string,
+  password: string,
+  maxAttempts: number = 5
+): Promise<{ ok: boolean; locked?: boolean; lockedUntil?: string; attemptsLeft?: number }> {
   const db = await getDb();
   const rows = await db.select<AppAuth[]>(
-    'SELECT * FROM app_auth WHERE tenant_id = ? AND username = ? LIMIT 1',
-    [tenantId, username.trim().toLowerCase()]
+    'SELECT * FROM app_auth WHERE tenant_id = ? LIMIT 1', [tenantId]
   );
-  if (!rows[0]) return false;
-  const hash = await hashPassword(password, rows[0].salt);
-  return hash === rows[0].password_hash;
+  const auth = rows[0];
+  if (!auth) return { ok: false };
+
+  // Check if currently locked
+  if (auth.locked_until && new Date(auth.locked_until) > new Date()) {
+    return { ok: false, locked: true, lockedUntil: auth.locked_until };
+  }
+
+  // Username must match
+  if (auth.username !== username.trim().toLowerCase()) {
+    return { ok: false, attemptsLeft: maxAttempts - (auth.failed_attempts + 1) };
+  }
+
+  const hash = await hashPassword(password, auth.salt);
+  if (hash !== auth.password_hash) {
+    const newAttempts = (auth.failed_attempts ?? 0) + 1;
+    if (newAttempts >= maxAttempts) {
+      const lockUntil = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+      await db.execute(
+        'UPDATE app_auth SET failed_attempts = ?, locked_until = ?, updated_at = ? WHERE tenant_id = ?',
+        [newAttempts, lockUntil, now(), tenantId]
+      );
+      return { ok: false, locked: true, lockedUntil: lockUntil };
+    }
+    await db.execute(
+      'UPDATE app_auth SET failed_attempts = ?, updated_at = ? WHERE tenant_id = ?',
+      [newAttempts, now(), tenantId]
+    );
+    return { ok: false, attemptsLeft: maxAttempts - newAttempts };
+  }
+
+  // Correct password — reset counters
+  await db.execute(
+    'UPDATE app_auth SET failed_attempts = 0, locked_until = NULL, updated_at = ? WHERE tenant_id = ?',
+    [now(), tenantId]
+  );
+  return { ok: true };
+}
+
+export async function clearLockout(tenantId: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    'UPDATE app_auth SET failed_attempts = 0, locked_until = NULL, updated_at = ? WHERE tenant_id = ?',
+    [now(), tenantId]
+  );
 }
 
 export async function changePassword(tenantId: string, currentPassword: string, newPassword: string): Promise<{ ok: boolean; error?: string }> {
@@ -71,7 +127,7 @@ export async function changePassword(tenantId: string, currentPassword: string, 
   const newSalt = randomSalt();
   const newHash = await hashPassword(newPassword, newSalt);
   await db.execute(
-    'UPDATE app_auth SET password_hash = ?, salt = ?, updated_at = ? WHERE tenant_id = ?',
+    'UPDATE app_auth SET password_hash = ?, salt = ?, failed_attempts = 0, locked_until = NULL, updated_at = ? WHERE tenant_id = ?',
     [newHash, newSalt, now(), tenantId]
   );
   return { ok: true };
@@ -85,7 +141,7 @@ export async function changeUsername(tenantId: string, newUsername: string): Pro
   );
 }
 
-// Reset via admin-issued code — replaces password with new one if code is valid
+// Reset via admin-issued code — replaces password and clears lockout
 export async function resetPasswordWithCode(
   tenantId: string, code: string, newPassword: string
 ): Promise<{ ok: boolean; error?: string }> {
@@ -102,11 +158,51 @@ export async function resetPasswordWithCode(
     const salt = randomSalt();
     const hash = await hashPassword(newPassword, salt);
     await db.execute(
-      'UPDATE app_auth SET password_hash = ?, salt = ?, updated_at = ? WHERE tenant_id = ?',
+      'UPDATE app_auth SET password_hash = ?, salt = ?, failed_attempts = 0, locked_until = NULL, updated_at = ? WHERE tenant_id = ?',
       [hash, salt, now(), tenantId]
     );
     return { ok: true };
   } catch {
     return { ok: false, error: 'Cannot reach server. Check your internet connection.' };
   }
+}
+
+// Unlock via admin-issued code — clears lockout WITHOUT changing password
+export async function unlockWithCode(
+  tenantId: string, code: string
+): Promise<{ ok: boolean; error?: string }> {
+  const SERVER = 'https://update.frontstores.com';
+  try {
+    const res = await fetch(`${SERVER}/verify-unlock-code`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tenant_id: tenantId, code }),
+    });
+    const data = await res.json() as { ok: boolean; error?: string };
+    if (!data.ok) return { ok: false, error: data.error || 'Invalid or expired code' };
+    await clearLockout(tenantId);
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'Cannot reach server. Check your internet connection.' };
+  }
+}
+
+// ── Export audit log ─────────────────────────────────────────────────────────
+
+export async function logExport(tenantId: string, exportType: string, rowCount: number): Promise<void> {
+  try {
+    const db = await getDb();
+    await db.execute(
+      'INSERT INTO export_logs (id, tenant_id, export_type, row_count, exported_at) VALUES (?, ?, ?, ?, ?)',
+      [uuid(), tenantId, exportType, rowCount, now()]
+    );
+  } catch { /* non-critical — never block an export */ }
+}
+
+export async function getExportLogs(tenantId: string, limit = 30): Promise<ExportLog[]> {
+  const db = await getDb();
+  return db.select<ExportLog[]>(
+    'SELECT * FROM export_logs WHERE tenant_id = ? ORDER BY exported_at DESC LIMIT ?',
+    [tenantId, limit]
+  );
 }

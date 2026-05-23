@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Sun, Moon } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { updateAppConfig } from '@/lib/db/config';
-import { changePassword, changeUsername, getAuthUsername } from '@/lib/db/auth';
+import { changePassword, changeUsername, getAuthUsername, getExportLogs, logExport } from '@/lib/db/auth';
 import { PageIntro } from '@/components/ui/PageIntro';
 import { useTheme } from '@/lib/theme/useTheme';
 
@@ -25,6 +25,8 @@ type SettingsForm = {
   invoiceFooterNote: string;
   invoiceSignatureLabel: string;
   enableKeyboardBillingMode: boolean;
+  idleTimeoutMinutes: number;
+  maxLoginAttempts: number;
 };
 
 export function SettingsPage() {
@@ -63,6 +65,12 @@ export function SettingsPage() {
     setNewUsername('');
     toast.success('Username changed successfully');
   }
+  const { data: exportLogs } = useQuery({
+    queryKey: ['export-logs', tenantId],
+    queryFn: () => getExportLogs(tenantId),
+    enabled: !!tenantId,
+  });
+
   const [form, setForm] = useState<SettingsForm>({
     shop_name: '', owner_name: '', phone: '', email: '', gstin: '', drug_license_no: '',
     address_line1: '', city: '',
@@ -70,6 +78,8 @@ export function SettingsPage() {
     invoiceWhatsappNumber: '', invoiceStoreDisplayName: '', invoiceAddressLine: '',
     invoiceFooterNote: 'Thanks for your visit', invoiceSignatureLabel: 'Authorised Signature',
     enableKeyboardBillingMode: false,
+    idleTimeoutMinutes: 15,
+    maxLoginAttempts: 5,
   });
 
   useEffect(() => {
@@ -92,6 +102,8 @@ export function SettingsPage() {
         invoiceFooterNote: s.invoiceFooterNote ?? 'Thanks for your visit',
         invoiceSignatureLabel: s.invoiceSignatureLabel ?? 'Authorised Signature',
         enableKeyboardBillingMode: s.enableKeyboardBillingMode === true,
+        idleTimeoutMinutes: (s.idleTimeoutMinutes as number) ?? 15,
+        maxLoginAttempts: (s.maxLoginAttempts as number) ?? 5,
       });
     }
   }, [config]);
@@ -118,6 +130,8 @@ export function SettingsPage() {
           invoiceFooterNote: form.invoiceFooterNote.trim(),
           invoiceSignatureLabel: form.invoiceSignatureLabel.trim(),
           enableKeyboardBillingMode: form.enableKeyboardBillingMode,
+          idleTimeoutMinutes: form.idleTimeoutMinutes,
+          maxLoginAttempts: form.maxLoginAttempts,
         } as Record<string, unknown>,
       });
       await loadConfig();
@@ -226,17 +240,18 @@ export function SettingsPage() {
               try {
                 const { getDb } = await import('@/lib/db/index');
                 const db = await getDb();
-                const products = await db.select('SELECT * FROM products WHERE tenant_id = ? AND deleted_at IS NULL', [config?.tenant_id]);
-                const orders = await db.select('SELECT * FROM orders WHERE tenant_id = ? AND deleted_at IS NULL', [config?.tenant_id]);
-                const customers = await db.select('SELECT * FROM customers WHERE tenant_id = ? AND deleted_at IS NULL', [config?.tenant_id]);
-                const expenses = await db.select('SELECT * FROM expenses WHERE tenant_id = ? AND deleted_at IS NULL', [config?.tenant_id]);
-                const khata = await db.select('SELECT * FROM khata_entries WHERE tenant_id = ? AND deleted_at IS NULL', [config?.tenant_id]);
+                const products  = await db.select('SELECT * FROM products WHERE tenant_id = ? AND deleted_at IS NULL', [tenantId]);
+                const orders    = await db.select('SELECT * FROM orders WHERE tenant_id = ? AND deleted_at IS NULL', [tenantId]);
+                const customers = await db.select('SELECT * FROM customers WHERE tenant_id = ? AND deleted_at IS NULL', [tenantId]);
+                const expenses  = await db.select('SELECT * FROM expenses WHERE tenant_id = ? AND deleted_at IS NULL', [tenantId]);
+                const khata     = await db.select('SELECT * FROM khata_entries WHERE tenant_id = ? AND deleted_at IS NULL', [tenantId]);
                 const backup = { exported_at: new Date().toISOString(), shop: config?.shop_name, products, orders, customers, expenses, khata };
                 const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(blob);
                 a.download = `frontstores_backup_${new Date().toISOString().slice(0, 10)}.json`;
                 a.click();
+                await logExport(tenantId, 'full_backup_json', (orders as any[]).length);
                 toast.success('Backup downloaded');
               } catch (e: any) {
                 toast.error('Backup failed: ' + e?.message);
@@ -251,7 +266,7 @@ export function SettingsPage() {
               try {
                 const { getDb } = await import('@/lib/db/index');
                 const db = await getDb();
-                const orders = await db.select<any[]>('SELECT o.*, GROUP_CONCAT(oi.product_name || " x" || oi.quantity, "; ") as items FROM orders o LEFT JOIN order_items oi ON oi.order_id = o.id WHERE o.tenant_id = ? AND o.deleted_at IS NULL GROUP BY o.id ORDER BY o.order_date DESC', [config?.tenant_id]);
+                const orders = await db.select<any[]>('SELECT o.*, GROUP_CONCAT(oi.product_name || " x" || oi.quantity, "; ") as items FROM orders o LEFT JOIN order_items oi ON oi.order_id = o.id WHERE o.tenant_id = ? AND o.deleted_at IS NULL GROUP BY o.id ORDER BY o.order_date DESC', [tenantId]);
                 const rows = [['Bill No', 'Date', 'Customer', 'Items', 'Total', 'Payment'], ...orders.map((o: any) => [o.bill_number, o.order_date?.slice(0, 10), o.customer_name || '', o.items || '', o.total, o.payment_method])];
                 const csv = rows.map(r => r.map((v: any) => `"${v}"`).join(',')).join('\n');
                 const blob = new Blob([csv], { type: 'text/csv' });
@@ -259,6 +274,7 @@ export function SettingsPage() {
                 a.href = URL.createObjectURL(blob);
                 a.download = `orders_${new Date().toISOString().slice(0, 10)}.csv`;
                 a.click();
+                await logExport(tenantId, 'orders_csv', orders.length);
                 toast.success('Orders CSV downloaded');
               } catch (e: any) {
                 toast.error('Export failed: ' + e?.message);
@@ -271,14 +287,58 @@ export function SettingsPage() {
         <p className="text-xs text-slate-500 mt-3">💡 Tip: Take a backup weekly and store it somewhere safe. Your data is only on this computer.</p>
       </div>
 
-      {/* Security */}
-      <div className="card">
-        <p className="section-label mb-1">Security — Login & Password</p>
-        <p className="text-xs text-slate-400 mb-4">Your password is stored only on this device and never sent anywhere.</p>
-        <p className="text-xs text-slate-500 mb-4">Current username: <span className="font-semibold text-slate-300">{currentUsername || '—'}</span></p>
+      {/* Security — Lock settings */}
+      <div className="card p-6">
+        <p className="section-label mb-1">Security — Auto-Lock & Login Protection</p>
+        <p className="text-xs text-slate-400 mb-5">Protect your data when you step away from the computer.</p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Change Username */}
+          {/* Idle timeout */}
+          <div>
+            <p className="text-sm font-semibold text-slate-200 mb-1">Auto-lock after idle</p>
+            <p className="text-xs text-slate-500 mb-3">App will lock itself after this much inactivity. 0 = disabled.</p>
+            <select
+              className="input w-full"
+              value={form.idleTimeoutMinutes}
+              onChange={e => set('idleTimeoutMinutes', Number(e.target.value))}
+            >
+              <option value={0}>Disabled</option>
+              <option value={5}>5 minutes</option>
+              <option value={15}>15 minutes</option>
+              <option value={30}>30 minutes</option>
+              <option value={60}>60 minutes</option>
+            </select>
+          </div>
+
+          {/* Max login attempts */}
+          <div>
+            <p className="text-sm font-semibold text-slate-200 mb-1">Max login attempts</p>
+            <p className="text-xs text-slate-500 mb-3">Account locks for 30 min after this many wrong passwords.</p>
+            <select
+              className="input w-full"
+              value={form.maxLoginAttempts}
+              onChange={e => set('maxLoginAttempts', Number(e.target.value))}
+            >
+              <option value={3}>3 attempts</option>
+              <option value={5}>5 attempts</option>
+              <option value={10}>10 attempts</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-4 p-3 bg-slate-800/60 rounded-xl text-xs text-slate-400">
+          🔒 When locked: app shows login screen. Your data stays safe on disk and is never deleted.
+          If you get locked out, contact FrontStores support to get an unlock code.
+        </div>
+      </div>
+
+      {/* Security — Login & Password */}
+      <div className="card p-6">
+        <p className="section-label mb-1">Security — Login & Password</p>
+        <p className="text-xs text-slate-400 mb-4">Your password is stored only on this device and never sent anywhere.</p>
+        <p className="text-xs text-slate-500 mb-5">Current username: <span className="font-semibold text-slate-300">{currentUsername || '—'}</span></p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-3">
             <p className="text-sm font-medium text-slate-300">Change Username</p>
             <input className="input w-full" placeholder="New username (min 3 chars)" value={newUsername} onChange={e => setNewUsername(e.target.value)} />
@@ -287,7 +347,6 @@ export function SettingsPage() {
             </button>
           </div>
 
-          {/* Change Password */}
           <div className="space-y-3">
             <p className="text-sm font-medium text-slate-300">Change Password</p>
             <input className="input w-full" type="password" placeholder="Current password" value={currentPass} onChange={e => setCurrentPass(e.target.value)} />
@@ -298,6 +357,27 @@ export function SettingsPage() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Export Audit Log */}
+      <div className="card p-6">
+        <p className="section-label mb-1">Export Audit Log</p>
+        <p className="text-xs text-slate-400 mb-4">Every backup and CSV export is recorded here with a timestamp.</p>
+        {(exportLogs?.length ?? 0) === 0 ? (
+          <p className="text-sm text-slate-500">No exports yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {exportLogs?.map(log => (
+              <div key={log.id} className="card-strong flex items-center justify-between gap-4 p-3 text-sm">
+                <div>
+                  <p className="font-medium text-slate-200 capitalize">{log.export_type.replace(/_/g, ' ')}</p>
+                  <p className="text-xs text-slate-500">{log.row_count} rows</p>
+                </div>
+                <p className="text-xs text-slate-400 shrink-0">{new Date(log.exported_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="flex justify-end">

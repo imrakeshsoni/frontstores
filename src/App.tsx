@@ -6,6 +6,9 @@ import { SetupWizard } from '@/modules/setup/SetupWizard';
 import { AppLoginScreen } from '@/modules/auth/AppLoginScreen';
 import { hasAuth } from '@/lib/db/auth';
 import { SubscriptionGate } from '@/modules/subscription/SubscriptionGate';
+import { useIdleTimer } from '@/lib/hooks/useIdleTimer';
+
+function IdleTimerProvider() { useIdleTimer(); return null; }
 
 const Dashboard     = lazy(() => import('@/modules/dashboard/Dashboard').then(m => ({ default: m.Dashboard })));
 const POSPage       = lazy(() => import('@/modules/pos/POSPage').then(m => ({ default: m.POSPage })));
@@ -52,6 +55,7 @@ export default function App() {
 
   return (
     <SubscriptionGate>
+    <IdleTimerProvider />
     <HashRouter>
       <Suspense fallback={<Loading />}>
         <Routes>

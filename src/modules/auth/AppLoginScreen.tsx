@@ -1,36 +1,66 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAppStore } from '@/app/store/app.store';
-import { verifyAuth, resetPasswordWithCode, getAuthUsername } from '@/lib/db/auth';
+import { verifyAuth, resetPasswordWithCode, unlockWithCode, getAuthUsername } from '@/lib/db/auth';
 import { enqueue } from '@/lib/syncQueue';
 import { uuid, now } from '@/lib/db/index';
 import { toast } from 'sonner';
 
-type Screen = 'login' | 'forgot' | 'reset-code';
+type Screen = 'login' | 'forgot' | 'reset-code' | 'locked' | 'unlock-code';
+
+function minutesLeft(lockedUntil: string): number {
+  return Math.max(1, Math.ceil((new Date(lockedUntil).getTime() - Date.now()) / 60_000));
+}
 
 export function AppLoginScreen() {
   const { config, setAuthenticated } = useAppStore();
   const tenantId = config?.tenant_id ?? '';
   const shopName = config?.shop_name ?? 'FrontStores';
+  const maxAttempts: number = ((config?.settings as Record<string, unknown>)?.maxLoginAttempts as number) ?? 5;
 
   const [screen, setScreen] = useState<Screen>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [lockedUntil, setLockedUntil] = useState('');
+  const [minsLeft, setMinsLeft] = useState(0);
 
   // Reset flow
   const [resetCode, setResetCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
+  // Unlock flow
+  const [unlockCode, setUnlockCode] = useState('');
+
+  // Countdown when locked
+  useEffect(() => {
+    if (screen !== 'locked' || !lockedUntil) return;
+    const update = () => {
+      const m = minutesLeft(lockedUntil);
+      setMinsLeft(m);
+      if (new Date(lockedUntil) <= new Date()) setScreen('login');
+    };
+    update();
+    const t = setInterval(update, 30_000);
+    return () => clearInterval(t);
+  }, [screen, lockedUntil]);
+
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     if (!username || !password) return;
     setLoading(true);
     try {
-      const ok = await verifyAuth(tenantId, username, password);
-      if (ok) {
+      const result = await verifyAuth(tenantId, username, password, maxAttempts);
+      if (result.ok) {
         setAuthenticated(true);
+      } else if (result.locked) {
+        setLockedUntil(result.lockedUntil!);
+        setScreen('locked');
+      } else if (result.attemptsLeft !== undefined && result.attemptsLeft <= 0) {
+        toast.error('Too many failed attempts. Account locked for 30 minutes.');
+      } else if (result.attemptsLeft !== undefined) {
+        toast.error(`Incorrect username or password. ${result.attemptsLeft} attempt${result.attemptsLeft !== 1 ? 's' : ''} left.`);
       } else {
         toast.error('Incorrect username or password');
       }
@@ -57,6 +87,24 @@ export function AppLoginScreen() {
     }
   }
 
+  async function handleUnlockRequest() {
+    setLoading(true);
+    try {
+      const storedUsername = await getAuthUsername(tenantId);
+      await enqueue('unlock_request', tenantId, {
+        tenant_id: tenantId,
+        shop_name: shopName,
+        username: storedUsername,
+        requested_at: now(),
+        request_id: uuid(),
+      });
+      toast.success('Unlock request sent. Contact FrontStores support for your unlock code.');
+      setScreen('unlock-code');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleResetPassword(e: React.FormEvent) {
     e.preventDefault();
     if (!resetCode.trim()) { toast.error('Enter the reset code'); return; }
@@ -68,12 +116,27 @@ export function AppLoginScreen() {
       if (result.ok) {
         toast.success('Password reset successfully. Please log in.');
         setScreen('login');
-        setPassword('');
-        setResetCode('');
-        setNewPassword('');
-        setConfirmPassword('');
+        setPassword(''); setResetCode(''); setNewPassword(''); setConfirmPassword('');
       } else {
         toast.error(result.error ?? 'Reset failed');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleUnlock(e: React.FormEvent) {
+    e.preventDefault();
+    if (!unlockCode.trim()) { toast.error('Enter the unlock code'); return; }
+    setLoading(true);
+    try {
+      const result = await unlockWithCode(tenantId, unlockCode.trim());
+      if (result.ok) {
+        toast.success('Account unlocked. Please log in.');
+        setUnlockCode('');
+        setScreen('login');
+      } else {
+        toast.error(result.error ?? 'Invalid unlock code');
       }
     } finally {
       setLoading(false);
@@ -83,7 +146,6 @@ export function AppLoginScreen() {
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
-        {/* Logo */}
         <div className="text-center mb-8">
           <div className="text-3xl mb-2">💊</div>
           <h1 className="text-xl font-bold text-white">{shopName}</h1>
@@ -136,6 +198,72 @@ export function AppLoginScreen() {
               className="w-full text-center text-xs text-slate-500 hover:text-slate-300 pt-1"
             >
               Forgot password?
+            </button>
+          </form>
+        )}
+
+        {/* ── LOCKED — too many attempts ── */}
+        {screen === 'locked' && (
+          <div className="bg-slate-900 rounded-2xl p-6 space-y-4 border border-red-900/50">
+            <div className="text-center">
+              <div className="text-4xl mb-3">🔒</div>
+              <h2 className="text-white font-semibold">Account Locked</h2>
+              <p className="text-slate-400 text-sm mt-2">
+                Too many failed login attempts.<br />
+                Try again in <strong className="text-red-400">{minsLeft} minute{minsLeft !== 1 ? 's' : ''}</strong>.
+              </p>
+            </div>
+            <div className="bg-slate-800 rounded-xl p-3 text-center">
+              <p className="text-slate-400 text-xs">Contact FrontStores support to unlock immediately</p>
+              <p className="text-slate-300 text-xs font-semibold mt-1">+91 93404 19566 · WhatsApp</p>
+            </div>
+            <button
+              onClick={handleUnlockRequest}
+              disabled={loading}
+              className="btn-primary w-full py-2.5 disabled:opacity-50"
+            >
+              {loading ? 'Sending…' : 'Send Unlock Request'}
+            </button>
+            <button
+              onClick={() => setScreen('unlock-code')}
+              className="w-full text-center text-xs text-slate-400 hover:text-white"
+            >
+              Already have an unlock code? Enter it here
+            </button>
+          </div>
+        )}
+
+        {/* ── UNLOCK CODE — enter code to clear lockout ── */}
+        {screen === 'unlock-code' && (
+          <form onSubmit={handleUnlock} className="bg-slate-900 rounded-2xl p-6 space-y-4 border border-slate-800">
+            <h2 className="text-white font-semibold text-center">Enter Unlock Code</h2>
+            <p className="text-slate-400 text-sm text-center">
+              Enter the 6-digit code provided by FrontStores support to unlock your account.
+            </p>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Unlock Code</label>
+              <input
+                className="input w-full text-center tracking-widest text-lg"
+                placeholder="000000"
+                maxLength={6}
+                value={unlockCode}
+                onChange={e => setUnlockCode(e.target.value.replace(/\D/g, ''))}
+                autoFocus
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading || unlockCode.length !== 6}
+              className="btn-primary w-full py-2.5 disabled:opacity-50"
+            >
+              {loading ? 'Verifying…' : 'Unlock Account'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setScreen('login')}
+              className="w-full text-center text-xs text-slate-500 hover:text-slate-300"
+            >
+              ← Back to login
             </button>
           </form>
         )}

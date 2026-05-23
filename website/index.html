@@ -395,53 +395,50 @@
     <div class="stores-intro center">
       <div class="section-label">Shop Types</div>
       <h2 class="section-title">Built for your business, exactly</h2>
-      <p class="section-sub">One download. Choose your shop type during setup. The app configures features, GST rates, and invoice format for your business automatically.</p>
+      <p class="section-sub">Choose your shop type during first setup. The app configures the right features, GST rates, and invoice format for you automatically.</p>
     </div>
     <div class="stores-grid">
 
-      <div class="store-card">
-        <div class="store-icon">💊</div>
-        <div class="store-name">Medical Store / Pharmacy</div>
-        <div class="store-desc">Complete pharmacy billing with batch numbers, expiry tracking, drug license, and prescription records.</div>
+      <!-- ✅ LIVE -->
+      <div class="store-card" style="border-color:rgba(79,142,247,.3)">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+          <div class="store-icon" style="margin:0;font-size:36px">💊</div>
+          <div>
+            <div class="store-name">Medical Store / Pharmacy</div>
+            <span style="display:inline-block;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.2);color:#22c55e;font-size:11px;font-weight:700;padding:2px 10px;border-radius:999px;margin-top:4px">✓ Available Now</span>
+          </div>
+        </div>
+        <div class="store-desc">Complete pharmacy billing — batch numbers, expiry alerts, drug license, purchase orders and GST invoices. Offline-first.</div>
         <div class="store-features">
           <div class="sf">Batch & expiry date tracking</div>
-          <div class="sf">Drug license on invoice</div>
-          <div class="sf">Prescription records</div>
-          <div class="sf">Supplier & purchase management</div>
+          <div class="sf">Drug license number on invoice</div>
+          <div class="sf">Purchase orders with suppliers</div>
+          <div class="sf">Khata / credit ledger per customer</div>
           <div class="sf">GST 0%, 5%, 12%, 18% rates</div>
+          <div class="sf">Daily closing report</div>
         </div>
-        <div class="store-dl">
-          <a href="#" class="dl-win win-dl-btn">
-            <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm-7 4h14v-2H5v2z"/></svg>
-            Download — 30 Days Free
+        <div class="store-dl" style="margin-top:20px;display:flex;flex-direction:column;gap:8px">
+          <a href="#" class="dl-win win-dl-btn" id="medical-win-btn">
+            <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm-7 4h14v-2H5v2z"/></svg>
+            Windows — Download Free
           </a>
-          <div class="dl-meta">Windows 10 / 11 · 64-bit · ₹999/month after trial</div>
+          <div style="display:flex;gap:8px">
+            <a href="#" class="dl-win" id="medical-mac-arm-btn" style="flex:1;font-size:13px;padding:9px 12px">🍎 Mac (M1/M2/M3)</a>
+            <a href="#" class="dl-win" id="medical-mac-intel-btn" style="flex:1;font-size:13px;padding:9px 12px">🍎 Mac (Intel)</a>
+          </div>
+          <div class="dl-meta">30-day free trial · ₹999/month after · No card needed</div>
         </div>
       </div>
 
-      <div class="store-card">
-        <div class="store-icon">🛒</div>
-        <div class="store-name">Grocery / Kirana Store</div>
-        <div class="store-desc">Fast checkout for kirana shops. Manage hundreds of products, daily stock, supplier bills, and cash / UPI payments.</div>
-        <div class="store-features">
-          <div class="sf">Barcode scanning support</div>
-          <div class="sf">Fast keyboard billing mode</div>
-          <div class="sf">Daily stock & reorder alerts</div>
-          <div class="sf">Supplier purchase tracking</div>
-          <div class="sf">Credit customer accounts</div>
+      <!-- 🔜 COMING SOON: Restaurant -->
+      <div class="store-card" style="opacity:.65">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+          <div class="store-icon" style="margin:0;font-size:36px">🍽️</div>
+          <div>
+            <div class="store-name">Restaurant / Café</div>
+            <span style="display:inline-block;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);color:#f59e0b;font-size:11px;font-weight:700;padding:2px 10px;border-radius:999px;margin-top:4px">Coming Soon</span>
+          </div>
         </div>
-        <div class="store-dl">
-          <a href="#" class="dl-win win-dl-btn">
-            <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm-7 4h14v-2H5v2z"/></svg>
-            Download — 30 Days Free
-          </a>
-          <div class="dl-meta">Windows 10 / 11 · 64-bit · ₹999/month after trial</div>
-        </div>
-      </div>
-
-      <div class="store-card">
-        <div class="store-icon">🍽️</div>
-        <div class="store-name">Restaurant / Café</div>
         <div class="store-desc">Table billing, KOT printing, menu management and daily revenue reports. Handles dine-in, takeaway and delivery.</div>
         <div class="store-features">
           <div class="sf">Table-wise billing & KOT</div>
@@ -450,72 +447,33 @@
           <div class="sf">Daily revenue dashboard</div>
           <div class="sf">Multiple payment modes</div>
         </div>
-        <div class="store-dl">
-          <a href="#" class="dl-win win-dl-btn">
-            <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm-7 4h14v-2H5v2z"/></svg>
-            Download — 30 Days Free
+        <div class="store-dl" style="margin-top:20px">
+          <a href="https://wa.me/919340419566?text=Hi, I want to be notified when FrontStores Restaurant app is ready" class="dl-win" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.3);color:#fcd34d;justify-content:center;display:flex;align-items:center;gap:8px;padding:11px 16px;border-radius:12px;font-weight:700;font-size:14px">
+            💬 Notify me on WhatsApp
           </a>
-          <div class="dl-meta">Windows 10 / 11 · 64-bit · ₹999/month after trial</div>
+          <div class="dl-meta">Join waitlist — launching soon</div>
         </div>
       </div>
 
-      <div class="store-card">
-        <div class="store-icon">🚗</div>
-        <div class="store-name">Vehicle Showroom</div>
-        <div class="store-desc">Manage vehicle inventory, customer inquiries, test drives, and sales pipeline. Generate quotations and booking receipts.</div>
+      <!-- 🔜 COMING SOON: Grocery -->
+      <div class="store-card" style="opacity:.55">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+          <div class="store-icon" style="margin:0;font-size:36px">🛒</div>
+          <div>
+            <div class="store-name">Grocery / Kirana Store</div>
+            <span style="display:inline-block;background:rgba(107,114,128,.15);border:1px solid rgba(107,114,128,.2);color:#9ca3af;font-size:11px;font-weight:700;padding:2px 10px;border-radius:999px;margin-top:4px">Coming Soon</span>
+          </div>
+        </div>
+        <div class="store-desc">Fast checkout for kirana shops. Manage hundreds of products, daily stock, supplier bills, and cash / UPI payments.</div>
         <div class="store-features">
-          <div class="sf">Vehicle stock & VIN tracking</div>
-          <div class="sf">Customer inquiry pipeline</div>
-          <div class="sf">Quotation & booking receipts</div>
-          <div class="sf">Test drive records</div>
-          <div class="sf">Sales reports by model</div>
+          <div class="sf">Barcode scanning support</div>
+          <div class="sf">Fast keyboard billing mode</div>
+          <div class="sf">Daily stock & reorder alerts</div>
+          <div class="sf">Supplier purchase tracking</div>
+          <div class="sf">Credit customer accounts</div>
         </div>
-        <div class="store-dl">
-          <a href="#" class="dl-win win-dl-btn">
-            <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm-7 4h14v-2H5v2z"/></svg>
-            Download — 30 Days Free
-          </a>
-          <div class="dl-meta">Windows 10 / 11 · 64-bit · ₹999/month after trial</div>
-        </div>
-      </div>
-
-      <div class="store-card">
-        <div class="store-icon">🏪</div>
-        <div class="store-name">General Retail</div>
-        <div class="store-desc">Flexible POS for any retail shop — clothing, electronics, hardware, stationery. Customisable GST rates and invoice format.</div>
-        <div class="store-features">
-          <div class="sf">Customisable product categories</div>
-          <div class="sf">GST invoice with HSN code</div>
-          <div class="sf">Discount & coupon support</div>
-          <div class="sf">Customer loyalty points</div>
-          <div class="sf">Monthly GST summary report</div>
-        </div>
-        <div class="store-dl">
-          <a href="#" class="dl-win win-dl-btn">
-            <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm-7 4h14v-2H5v2z"/></svg>
-            Download — 30 Days Free
-          </a>
-          <div class="dl-meta">Windows 10 / 11 · 64-bit · ₹999/month after trial</div>
-        </div>
-      </div>
-
-      <div class="store-card">
-        <div class="store-icon">📈</div>
-        <div class="store-name">Stocks & Trading</div>
-        <div class="store-desc">Track your stock portfolio, record trades, calculate P&amp;L, and generate tax-ready capital gains reports. Fully offline.</div>
-        <div class="store-features">
-          <div class="sf">Portfolio tracking</div>
-          <div class="sf">Trade entry & history</div>
-          <div class="sf">Realised / unrealised P&L</div>
-          <div class="sf">Capital gains tax report</div>
-          <div class="sf">Broker-wise breakdown</div>
-        </div>
-        <div class="store-dl">
-          <a href="#" class="dl-win win-dl-btn">
-            <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm-7 4h14v-2H5v2z"/></svg>
-            Download — 30 Days Free
-          </a>
-          <div class="dl-meta">Windows 10 / 11 · 64-bit · ₹999/month after trial</div>
+        <div class="store-dl" style="margin-top:20px">
+          <div class="dl-meta" style="text-align:center;padding:12px;background:var(--surface2);border-radius:10px">In development — coming soon</div>
         </div>
       </div>
 
@@ -838,15 +796,20 @@
       if (!data.tag_name) throw new Error('no release');
       const assets = data.assets || [];
       const find = (re) => assets.find(a => re.test(a.name))?.browser_download_url || null;
-      const winUrl = find(/x64[_-]en-US\.msi$/i) || find(/\.msi$/i) || find(/x64.*setup\.exe$/i);
-      const macArm = find(/aarch64\.dmg$/i);
+      const winUrl    = find(/x64[_-]en-US\.msi$/i) || find(/\.msi$/i) || find(/x64.*setup\.exe$/i);
+      const macArm   = find(/aarch64\.dmg$/i);
       const macIntel = find(/x86_64\.dmg$/i);
-      if (winUrl) {
-        document.getElementById('dl-win').href = winUrl;
-        document.querySelectorAll('.win-dl-btn').forEach(b => { b.href = winUrl; });
-      }
-      if (macArm) document.getElementById('dl-mac-arm').href = macArm;
-      if (macIntel) document.getElementById('dl-mac-intel').href = macIntel;
+
+      // Main download section
+      if (winUrl)    { document.getElementById('dl-win').href = winUrl; }
+      if (macArm)    { document.getElementById('dl-mac-arm').href = macArm; }
+      if (macIntel)  { document.getElementById('dl-mac-intel').href = macIntel; }
+
+      // Medical store card buttons
+      if (winUrl)    { const b = document.getElementById('medical-win-btn');       if (b) b.href = winUrl; }
+      if (macArm)    { const b = document.getElementById('medical-mac-arm-btn');   if (b) b.href = macArm; }
+      if (macIntel)  { const b = document.getElementById('medical-mac-intel-btn'); if (b) b.href = macIntel; }
+
       document.getElementById('dl-version').textContent = `Latest: ${data.tag_name} · Free 30-day trial`;
     } catch {
       document.getElementById('dl-version').textContent = 'Coming soon — first release dropping shortly';

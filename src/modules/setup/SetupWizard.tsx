@@ -6,8 +6,7 @@ import { enqueue } from '@/lib/syncQueue';
 import { toast } from 'sonner';
 
 const SHOP_TYPES = [
-  { value: 'medical',    label: 'Medical / Pharmacy',     icon: '💊', desc: 'Medicines, prescriptions, drug inventory' },
-  { value: 'restaurant', label: 'Restaurant / Café',      icon: '🍽️', desc: 'Food orders, tables, kitchen management' },
+  { value: 'medical', label: 'Medical / Pharmacy', icon: '💊', desc: 'Medicines, prescriptions, drug inventory' },
 ];
 
 interface FormData {
@@ -108,7 +107,7 @@ export function SetupWizard() {
             <div>
               <h2 className="text-xl font-semibold text-slate-800 mb-1">What kind of shop do you run?</h2>
               <p className="text-slate-500 text-sm mb-6">We'll set up the right features for your business.</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3">
                 {SHOP_TYPES.map((t) => (
                   <button
                     key={t.value}

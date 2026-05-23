@@ -138,6 +138,48 @@ const publicServer = http.createServer(async (req, res) => {
     return;
   }
 
+  // POST /unlock-request — customer app sends this when account is locked out
+  if (req.method === 'POST' && pathname === '/unlock-request') {
+    const body = await readBody(req);
+    try {
+      const { tenant_id, shop_name, requested_at } = JSON.parse(body);
+      if (!tenant_id) { res.writeHead(400); res.end('Missing tenant_id'); return; }
+      const subs = loadSubs();
+      if (subs[tenant_id]) {
+        subs[tenant_id].unlock_requested_at = requested_at || new Date().toISOString();
+        subs[tenant_id].unlock_token = null;
+        subs[tenant_id].unlock_token_expires = null;
+        saveSubs(subs);
+        console.log(`🔓 Unlock request from ${shop_name || tenant_id.substring(0, 8)}`);
+      }
+      json(res, { ok: true });
+    } catch { res.writeHead(400); res.end('Bad request'); }
+    return;
+  }
+
+  // POST /verify-unlock-code — customer app verifies unlock code (no password change)
+  if (req.method === 'POST' && pathname === '/verify-unlock-code') {
+    const body = await readBody(req);
+    try {
+      const { tenant_id, code } = JSON.parse(body);
+      if (!tenant_id || !code) { res.writeHead(400); res.end('Missing fields'); return; }
+      const subs = loadSubs();
+      const sub = subs[tenant_id];
+      if (!sub || !sub.unlock_token) { json(res, { ok: false, error: 'No unlock code found' }); return; }
+      if (sub.unlock_token !== String(code)) { json(res, { ok: false, error: 'Invalid code' }); return; }
+      if (sub.unlock_token_expires && new Date(sub.unlock_token_expires) < new Date()) {
+        json(res, { ok: false, error: 'Code has expired' }); return;
+      }
+      subs[tenant_id].unlock_token = null;
+      subs[tenant_id].unlock_token_expires = null;
+      subs[tenant_id].unlock_requested_at = null;
+      saveSubs(subs);
+      console.log(`✅ Account unlocked for ${sub.shop_name}`);
+      json(res, { ok: true });
+    } catch { res.writeHead(400); res.end('Bad request'); }
+    return;
+  }
+
   // POST /verify-reset-code — customer app verifies code + resets password
   if (req.method === 'POST' && pathname === '/verify-reset-code') {
     const body = await readBody(req);
@@ -229,6 +271,22 @@ const adminServer = http.createServer(async (req, res) => {
     }
     saveSubs(subs);
     json(res, { ok: true, expires_at: subs[tenantId].expires_at }); return;
+  }
+
+  // POST /admin/api/customers/:id/set-unlock-code
+  const unlockCodeAction = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/set-unlock-code$/);
+  if (req.method === 'POST' && unlockCodeAction) {
+    const tenantId = unlockCodeAction[1];
+    const body = await readBody(req);
+    const { code, expires } = JSON.parse(body);
+    const subs = loadSubs();
+    if (!subs[tenantId]) { json(res, {ok:false,error:'Not found'}, 404); return; }
+    subs[tenantId].unlock_token = code || null;
+    subs[tenantId].unlock_token_expires = expires || null;
+    if (!code) subs[tenantId].unlock_requested_at = null;
+    saveSubs(subs);
+    if (code) console.log(`🔓 Unlock code set for ${subs[tenantId].shop_name}: ${code}`);
+    json(res, { ok: true }); return;
   }
 
   // POST /admin/api/customers/:id/set-reset-code
