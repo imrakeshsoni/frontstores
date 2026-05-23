@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "tauri dev",
     "build": "tsc && vite build",
+    "tauri": "tauri",
     "preview": "vite preview",
     "lint": "eslint src --ext .ts,.tsx"
   },
