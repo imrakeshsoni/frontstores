@@ -19,6 +19,8 @@
       --accent2: #7c6af7;
       --green: #22c55e;
       --gold: #f59e0b;
+      --purple: #a855f7;
+      --purple2: #ec4899;
     }
     html { scroll-behavior: smooth; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
@@ -192,6 +194,122 @@
     .dl-row-arrow { color: var(--muted); font-size: 20px; }
     .dl-version { margin-top: 20px; text-align: center; font-size: 12px; color: var(--muted); }
 
+    /* AI SECTION */
+    #ai {
+      background: var(--bg);
+      position: relative; overflow: hidden;
+    }
+    #ai::before {
+      content: ''; position: absolute; top: -200px; left: 50%; transform: translateX(-50%);
+      width: 800px; height: 600px;
+      background: radial-gradient(ellipse, rgba(168,85,247,.1) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .ai-hero {
+      max-width: 720px; margin: 0 auto 64px; text-align: center;
+    }
+    .ai-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(168,85,247,.1); border: 1px solid rgba(168,85,247,.3);
+      color: #c084fc; font-size: 12px; font-weight: 700; padding: 4px 14px;
+      border-radius: 999px; margin-bottom: 20px; letter-spacing: .05em; text-transform: uppercase;
+    }
+    .ai-title { font-size: clamp(1.8rem, 4vw, 3rem); font-weight: 900; letter-spacing: -0.03em; line-height: 1.1; }
+    .ai-title .ai-grad { background: linear-gradient(135deg, var(--purple), var(--purple2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .ai-sub { margin-top: 16px; font-size: 1.05rem; color: var(--muted); line-height: 1.7; }
+
+    .ai-demo {
+      max-width: 780px; margin: 0 auto 64px;
+      background: var(--surface); border: 1px solid rgba(168,85,247,.2);
+      border-radius: 28px; overflow: hidden;
+      box-shadow: 0 0 80px rgba(168,85,247,.08);
+    }
+    .ai-demo-bar {
+      background: var(--surface2); padding: 14px 20px;
+      display: flex; align-items: center; gap: 8px;
+      border-bottom: 1px solid rgba(168,85,247,.1);
+    }
+    .ai-demo-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .ai-demo-title { font-size: 13px; font-weight: 600; color: var(--muted); margin-left: 8px; }
+    .ai-chat { padding: 28px; display: flex; flex-direction: column; gap: 16px; }
+    .ai-msg { display: flex; gap: 12px; align-items: flex-start; }
+    .ai-msg.user { flex-direction: row-reverse; }
+    .ai-avatar {
+      width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 700;
+    }
+    .ai-avatar.bot { background: linear-gradient(135deg, var(--purple), var(--purple2)); color: #fff; }
+    .ai-avatar.usr { background: var(--surface2); border: 1px solid var(--border); }
+    .ai-bubble {
+      max-width: 75%; padding: 12px 16px; border-radius: 16px;
+      font-size: 14px; line-height: 1.6;
+    }
+    .ai-bubble.bot { background: var(--surface2); border: 1px solid rgba(168,85,247,.15); border-radius: 4px 16px 16px 16px; }
+    .ai-bubble.usr { background: rgba(168,85,247,.15); border: 1px solid rgba(168,85,247,.2); border-radius: 16px 4px 16px 16px; color: #e2d9ff; }
+    .ai-bubble strong { color: #c084fc; }
+    .ai-input-row {
+      margin: 0 28px 28px; display: flex; gap: 10px;
+      background: var(--surface2); border: 1px solid rgba(168,85,247,.2);
+      border-radius: 14px; padding: 10px 16px; align-items: center;
+    }
+    .ai-input-text { flex: 1; font-size: 13px; color: var(--muted); }
+    .ai-input-mic { font-size: 18px; }
+
+    .ai-features-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px;
+      margin-bottom: 64px;
+    }
+    .ai-feat {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 20px; padding: 28px; transition: border-color .2s;
+      position: relative; overflow: hidden;
+    }
+    .ai-feat:hover { border-color: rgba(168,85,247,.3); }
+    .ai-feat::after {
+      content: ''; position: absolute; top: 0; right: 0;
+      width: 80px; height: 80px;
+      background: radial-gradient(circle, rgba(168,85,247,.08) 0%, transparent 70%);
+    }
+    .ai-feat-icon { font-size: 28px; margin-bottom: 14px; }
+    .ai-feat h3 { font-size: .95rem; font-weight: 700; margin-bottom: 8px; }
+    .ai-feat p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+    .ai-pricing-row {
+      display: flex; gap: 20px; flex-wrap: wrap; justify-content: center;
+    }
+    .ai-plan {
+      flex: 1; min-width: 260px; max-width: 340px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 24px; padding: 36px; text-align: center;
+    }
+    .ai-plan.featured {
+      border-color: rgba(168,85,247,.4);
+      background: linear-gradient(135deg, rgba(168,85,247,.06), rgba(236,72,153,.04));
+      box-shadow: 0 0 60px rgba(168,85,247,.1);
+    }
+    .ai-plan-badge { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 16px; color: var(--muted); }
+    .ai-plan.featured .ai-plan-badge { color: #c084fc; }
+    .ai-plan-name { font-size: 1.2rem; font-weight: 800; margin-bottom: 8px; }
+    .ai-plan-price { font-size: 2.4rem; font-weight: 900; letter-spacing: -0.03em; margin: 12px 0 4px; }
+    .ai-plan-price sub { font-size: 14px; font-weight: 500; color: var(--muted); }
+    .ai-plan-note { font-size: 12px; color: var(--muted); margin-bottom: 24px; }
+    .ai-plan-feats { text-align: left; display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }
+    .ai-pf { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #cbd5e1; }
+    .ai-pf::before { content: '✓'; color: var(--purple); font-weight: 700; flex-shrink: 0; }
+    .ai-plan-cta {
+      display: block; width: 100%; padding: 12px;
+      border-radius: 12px; font-size: 14px; font-weight: 700; text-align: center;
+      border: 1px solid var(--border); color: var(--muted); transition: all .15s;
+    }
+    .ai-plan-cta:hover { border-color: var(--border-hover); color: var(--text); }
+    .ai-plan.featured .ai-plan-cta {
+      background: linear-gradient(135deg, var(--purple), var(--purple2));
+      border: none; color: #fff;
+    }
+    .ai-plan.featured .ai-plan-cta:hover { opacity: .88; }
+    .ai-coming { display: inline-block; background: rgba(168,85,247,.1); border: 1px solid rgba(168,85,247,.25); color: #c084fc; font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 999px; margin-left: 8px; }
+
     /* FAQ */
     #faq { background: var(--bg); }
     .faq-list { max-width: 720px; margin: 48px auto 0; display: flex; flex-direction: column; gap: 12px; }
@@ -232,6 +350,7 @@
     <a href="#stores">Shop Types</a>
     <a href="#features">Features</a>
     <a href="#pricing">Pricing</a>
+    <a href="#ai">AI Assistant</a>
     <a href="#faq">FAQ</a>
   </div>
   <a href="#download" class="nav-cta">Download Free</a>
@@ -521,6 +640,125 @@
         </a>
       </div>
       <div class="dl-version" id="dl-version">Fetching latest version…</div>
+    </div>
+  </div>
+</section>
+
+<!-- AI SECTION -->
+<section id="ai">
+  <div class="container">
+    <div class="ai-hero">
+      <div class="ai-badge">✦ Coming Soon</div>
+      <h2 class="ai-title">Meet your <span class="ai-grad">AI Shop Assistant</span></h2>
+      <p class="ai-sub">An intelligent assistant built into FrontStores. Talk to it, type to it — it knows your shop, your products, and your customers. It works for you so you can focus on your business.</p>
+    </div>
+
+    <!-- Chat demo -->
+    <div class="ai-demo">
+      <div class="ai-demo-bar">
+        <div class="ai-demo-dot" style="background:#ff5f57"></div>
+        <div class="ai-demo-dot" style="background:#febc2e"></div>
+        <div class="ai-demo-dot" style="background:#28c840"></div>
+        <div class="ai-demo-title">FrontStores AI · Your Shop Assistant</div>
+      </div>
+      <div class="ai-chat">
+        <div class="ai-msg">
+          <div class="ai-avatar bot">AI</div>
+          <div class="ai-bubble bot">Good morning! 🌅 Today's snapshot — <strong>₹12,840</strong> revenue so far, <strong>34 bills</strong> done. Paracetamol 500mg is running low (only 12 strips left). Want me to draft a reorder message for your supplier?</div>
+        </div>
+        <div class="ai-msg user">
+          <div class="ai-avatar usr">👤</div>
+          <div class="ai-bubble usr">What was last month's GST total?</div>
+        </div>
+        <div class="ai-msg">
+          <div class="ai-avatar bot">AI</div>
+          <div class="ai-bubble bot">April 2025 GST collected — <strong>CGST ₹4,210</strong> + <strong>SGST ₹4,210</strong> = <strong>₹8,420 total</strong>. Taxable value was ₹70,160. I can export the GSTR-1 summary as a PDF — should I?</div>
+        </div>
+        <div class="ai-msg user">
+          <div class="ai-avatar usr">👤</div>
+          <div class="ai-bubble usr">Bill karo — Rahul Kumar, Dolo 650 × 2, Wikoryl × 1</div>
+        </div>
+        <div class="ai-msg">
+          <div class="ai-avatar bot">AI</div>
+          <div class="ai-bubble bot">Bill created ✅<br>Customer: <strong>Rahul Kumar</strong><br>Dolo 650mg × 2 — ₹28<br>Wikoryl × 1 — ₹42<br><strong>Total: ₹70</strong> (GST incl.)<br>Print this bill or send on WhatsApp?</div>
+        </div>
+      </div>
+      <div class="ai-input-row">
+        <div class="ai-input-text">Ask anything about your shop…</div>
+        <div class="ai-input-mic">🎙️</div>
+      </div>
+    </div>
+
+    <!-- AI features -->
+    <div class="ai-features-grid">
+      <div class="ai-feat">
+        <div class="ai-feat-icon">🎙️</div>
+        <h3>Voice Billing</h3>
+        <p>Just speak — "Paracetamol ek strip, Crocin do strip, UPI se bill karo" — the AI creates the bill and prints it. Hands-free billing at the counter.</p>
+      </div>
+      <div class="ai-feat">
+        <div class="ai-feat-icon">📊</div>
+        <h3>Instant Business Insights</h3>
+        <p>Ask "Which products sold most this week?" or "How much credit is pending?" — get clear answers instantly, without opening any report.</p>
+      </div>
+      <div class="ai-feat">
+        <div class="ai-feat-icon">📦</div>
+        <h3>Smart Stock Alerts</h3>
+        <p>AI monitors your inventory 24/7 and proactively tells you what's running low, what's expiring soon, and when to reorder — before you run out.</p>
+      </div>
+      <div class="ai-feat">
+        <div class="ai-feat-icon">🧾</div>
+        <h3>GST & Reports on Demand</h3>
+        <p>"Generate my GSTR-1 for March" — done in seconds. The AI understands tax rules and prepares filing-ready summaries automatically.</p>
+      </div>
+      <div class="ai-feat">
+        <div class="ai-feat-icon">👥</div>
+        <h3>Customer Intelligence</h3>
+        <p>"Who are my top 10 customers?" or "Which customers haven't visited in 30 days?" — the AI digs into your data and answers instantly.</p>
+      </div>
+      <div class="ai-feat">
+        <div class="ai-feat-icon">🌐</div>
+        <h3>Hindi + English Support</h3>
+        <p>Talk and type in Hindi, Hinglish, or English. The AI understands your language and responds naturally — no special commands to remember.</p>
+      </div>
+    </div>
+
+    <!-- AI Pricing -->
+    <div class="center" style="margin-bottom: 40px;">
+      <div class="section-label" style="color: #a855f7;">AI Add-on Pricing</div>
+      <h3 class="section-title">Add AI to your subscription</h3>
+      <p class="section-sub" style="margin: 12px auto 0;">Base subscription gives you the full billing app. Add AI on top for the intelligent assistant experience.</p>
+    </div>
+    <div class="ai-pricing-row">
+      <div class="ai-plan">
+        <div class="ai-plan-badge">Base Plan</div>
+        <div class="ai-plan-name">FrontStores</div>
+        <div class="ai-plan-price">₹999<sub>/mo</sub></div>
+        <div class="ai-plan-note">Full billing app · All shop types</div>
+        <div class="ai-plan-feats">
+          <div class="ai-pf">GST billing & invoices</div>
+          <div class="ai-pf">Inventory & stock alerts</div>
+          <div class="ai-pf">Customer & supplier management</div>
+          <div class="ai-pf">Sales reports & GST summary</div>
+          <div class="ai-pf">100% offline · Auto updates</div>
+        </div>
+        <a href="#download" class="ai-plan-cta">Download & Start Trial</a>
+      </div>
+      <div class="ai-plan featured">
+        <div class="ai-plan-badge">✦ Most Powerful <span class="ai-coming">Coming Soon</span></div>
+        <div class="ai-plan-name">FrontStores + AI</div>
+        <div class="ai-plan-price">₹1,499<sub>/mo</sub></div>
+        <div class="ai-plan-note">Everything in base + AI assistant</div>
+        <div class="ai-plan-feats">
+          <div class="ai-pf">Everything in base plan</div>
+          <div class="ai-pf">Voice billing in Hindi & English</div>
+          <div class="ai-pf">Ask questions about your shop</div>
+          <div class="ai-pf">Smart stock & expiry alerts</div>
+          <div class="ai-pf">GST reports on demand</div>
+          <div class="ai-pf">Customer insights & analytics</div>
+        </div>
+        <a href="mailto:support@frontstores.com?subject=AI Waitlist" class="ai-plan-cta">Join the Waitlist →</a>
+      </div>
     </div>
   </div>
 </section>
