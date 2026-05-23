@@ -3,12 +3,14 @@ name: Deploy Website to Cloudflare Pages
 on:
   push:
     branches: [main]
-    paths:
-      - 'website/**'
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
     steps:
       - uses: actions/checkout@v4
 
