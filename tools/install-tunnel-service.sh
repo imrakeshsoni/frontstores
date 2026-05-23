@@ -23,6 +23,7 @@ cat > "$PLIST_DIR/com.frontstores.server.plist" << EOF
   <key>EnvironmentVariables</key>
   <dict>
     <key>PORT</key>             <string>3001</string>
+    <key>ADMIN_PORT</key>       <string>3002</string>
     <key>ADMIN_PASSWORD</key>   <string>frontstores2025</string>
   </dict>
   <key>WorkingDirectory</key>   <string>${PROJECT_DIR}/tools</string>
