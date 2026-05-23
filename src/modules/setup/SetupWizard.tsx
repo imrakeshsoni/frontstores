@@ -61,6 +61,22 @@ export function SetupWizard() {
       });
       setConfig(config);
       toast.success('Setup complete! Welcome to FrontStores.');
+      // Auto-register with server (fire and forget — offline is fine)
+      fetch('https://update.frontstores.com/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenant_id: config.tenant_id,
+          shop_name: form.shop_name.trim(),
+          owner_name: form.owner_name.trim(),
+          shop_type: form.shop_type,
+          phone: form.phone || '',
+          email: form.email || '',
+          city: form.city || '',
+          gstin: form.gstin || '',
+        }),
+        signal: AbortSignal.timeout(5000),
+      }).catch(() => {});
     } catch (e: any) {
       console.error('Setup error:', e);
       toast.error(String(e?.message ?? e ?? 'Setup failed'));

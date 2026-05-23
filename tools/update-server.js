@@ -133,6 +133,48 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
+  // ── Public: Auto-register new customer ────────────────────────────
+  if (req.method === 'POST' && pathname === '/register') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const data = JSON.parse(body);
+        const { tenant_id, shop_name, owner_name, shop_type, phone, email, city, gstin } = data;
+        if (!tenant_id) { res.writeHead(400); res.end('Missing tenant_id'); return; }
+        const subs = loadSubs();
+        if (!subs[tenant_id]) {
+          // New customer — give 30-day trial
+          subs[tenant_id] = {
+            tenant_id,
+            shop_name: shop_name || 'Unknown',
+            owner_name: owner_name || '',
+            shop_type: shop_type || '',
+            phone: phone || '',
+            email: email || '',
+            city: city || '',
+            gstin: gstin || '',
+            expires_at: addDays(new Date().toISOString(), 30),
+            registered_at: new Date().toISOString(),
+            subscription_status: 'trial',
+          };
+          saveSubs(subs);
+          console.log(`🆕 New customer registered: ${shop_name} (${tenant_id.substring(0,8)})`);
+        } else {
+          // Update contact details if changed
+          Object.assign(subs[tenant_id], { shop_name, owner_name, shop_type, phone, email, city, gstin });
+          saveSubs(subs);
+        }
+        const sub = subs[tenant_id];
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, expires_at: sub.expires_at }));
+      } catch (e) {
+        res.writeHead(400); res.end('Bad request');
+      }
+    });
+    return;
+  }
+
   // ── Public: License check (called by the app) ──────────────────────
   if (req.method === 'GET' && pathname.startsWith('/license/')) {
     const tenantId = pathname.split('/')[2];
@@ -163,6 +205,15 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && pathname === '/admin') {
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(adminPage(loadSubs())); return;
+    }
+
+    // JSON API for admin app
+    if (req.method === 'GET' && pathname === '/admin/api/customers') {
+      const subs = loadSubs();
+      const list = Object.entries(subs).map(([id, s]) => ({ tenant_id: id, ...s }));
+      list.sort((a, b) => new Date(b.registered_at || 0) - new Date(a.registered_at || 0));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(list)); return;
     }
 
     if (req.method === 'POST' && pathname === '/admin/extend') {
