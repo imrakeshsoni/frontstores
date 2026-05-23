@@ -804,6 +804,54 @@ export function POSPage() {
     printWindow.document.close();
   };
 
+  const handlePrintThermal = () => {
+    if (!invoiceSnapshot) return;
+    const printWindow = window.open('', '_blank', 'width=400,height=600');
+    if (!printWindow) { toast.error('Unable to open print window'); return; }
+    const storeName = invoiceSnapshot.storeName || 'Store';
+    const invoiceDate = getInvoiceDisplayDate(invoiceSnapshot, invoiceDateTime, canEditInvoiceDateTime);
+    const dateStr = invoiceDate.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const itemRows = invoiceSnapshot.items.map((item, idx) =>
+      `<div class="item"><span class="item-name">${idx + 1}. ${item.name}</span><span class="item-amt">₹${getInvoiceItemTotalAmount(item).toFixed(2)}</span></div>
+       <div class="item-sub">${item.quantityLabel} × ₹${item.unitPrice.toFixed(2)}${item.discountAmount > 0 ? ` | Disc ₹${item.discountAmount.toFixed(2)}` : ''}</div>`
+    ).join('');
+    printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${invoiceSnapshot.billNumber}</title>
+<style>
+  @page { size: 58mm auto; margin: 2mm 3mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Courier New', monospace; font-size: 10px; color: #000; width: 52mm; }
+  .center { text-align: center; }
+  .bold { font-weight: bold; }
+  .store { font-size: 13px; font-weight: 900; text-transform: uppercase; text-align: center; margin-bottom: 2px; }
+  .divider { border-top: 1px dashed #000; margin: 3px 0; }
+  .row { display: flex; justify-content: space-between; margin: 1px 0; }
+  .item { display: flex; justify-content: space-between; margin-top: 3px; font-weight: bold; }
+  .item-name { flex: 1; padding-right: 4px; }
+  .item-amt { white-space: nowrap; }
+  .item-sub { font-size: 9px; color: #444; margin-bottom: 2px; }
+  .total { display: flex; justify-content: space-between; font-size: 13px; font-weight: 900; margin: 3px 0; }
+  .footer { text-align: center; font-size: 9px; margin-top: 4px; color: #555; }
+</style></head><body>
+<div class="store">${storeName}</div>
+${invoiceSnapshot.storeAddress ? `<div class="center" style="font-size:9px">${invoiceSnapshot.storeAddress}</div>` : ''}
+${invoiceSnapshot.whatsappNumber ? `<div class="center" style="font-size:9px">${invoiceSnapshot.whatsappNumber}</div>` : ''}
+<div class="divider"></div>
+<div class="row"><span>Bill: ${invoiceSnapshot.billNumber}</span><span>${dateStr}</span></div>
+${invoiceSnapshot.customerName ? `<div>Customer: ${invoiceSnapshot.customerName}</div>` : ''}
+<div class="divider"></div>
+${itemRows}
+<div class="divider"></div>
+${invoiceSnapshot.totalDiscount > 0 ? `<div class="row"><span>Discount</span><span>-₹${invoiceSnapshot.totalDiscount.toFixed(2)}</span></div>` : ''}
+${invoiceSnapshot.gstAmount > 0 ? `<div class="row"><span>GST</span><span>₹${invoiceSnapshot.gstAmount.toFixed(2)}</span></div>` : ''}
+<div class="total"><span>TOTAL</span><span>₹${invoiceSnapshot.total.toFixed(2)}</span></div>
+<div class="row"><span>Payment</span><span>${invoiceSnapshot.paymentMethod === 'credit' ? 'Credit' : invoiceSnapshot.paymentMethod.toUpperCase()}</span></div>
+<div class="divider"></div>
+<div class="footer">Thank you! Visit again.</div>
+<script>window.onload = () => { window.print(); }<\/script>
+</body></html>`);
+    printWindow.document.close();
+  };
+
   const resultList = showingSearchResults ? (searchResults ?? []) : [];
   const resultHeading = showingSearchResults ? 'Search results' : '';
   const resultSubheading = showingSearchResults ? 'Tap any matching item to add it directly to the bill.' : '';
@@ -2050,7 +2098,10 @@ export function POSPage() {
                   Download
                 </button>
                 <button className="btn-secondary" onClick={handlePrintInvoiceA5}>
-                  Print
+                  🖨 A5 Print
+                </button>
+                <button className="btn-secondary" onClick={handlePrintThermal}>
+                  🧾 Thermal
                 </button>
                 <button className="btn-secondary" onClick={() => void handleShareWhatsApp()}>
                   WhatsApp

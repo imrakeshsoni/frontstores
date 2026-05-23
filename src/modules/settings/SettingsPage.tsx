@@ -182,6 +182,62 @@ export function SettingsPage() {
         </div>
       </div>
 
+      {/* Data Backup */}
+      <div className="card p-6">
+        <p className="section-label mb-1">Data Backup</p>
+        <p className="text-xs text-slate-400 mb-4">Export all your data as a backup file. Store it on a USB drive or Google Drive.</p>
+        <div className="flex gap-3 flex-wrap">
+          <button
+            className="btn-secondary"
+            onClick={async () => {
+              try {
+                const { getDb } = await import('@/lib/db/index');
+                const db = await getDb();
+                const products = await db.select('SELECT * FROM products WHERE tenant_id = ? AND deleted_at IS NULL', [config?.tenant_id]);
+                const orders = await db.select('SELECT * FROM orders WHERE tenant_id = ? AND deleted_at IS NULL', [config?.tenant_id]);
+                const customers = await db.select('SELECT * FROM customers WHERE tenant_id = ? AND deleted_at IS NULL', [config?.tenant_id]);
+                const expenses = await db.select('SELECT * FROM expenses WHERE tenant_id = ? AND deleted_at IS NULL', [config?.tenant_id]);
+                const khata = await db.select('SELECT * FROM khata_entries WHERE tenant_id = ? AND deleted_at IS NULL', [config?.tenant_id]);
+                const backup = { exported_at: new Date().toISOString(), shop: config?.shop_name, products, orders, customers, expenses, khata };
+                const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `frontstores_backup_${new Date().toISOString().slice(0, 10)}.json`;
+                a.click();
+                toast.success('Backup downloaded');
+              } catch (e: any) {
+                toast.error('Backup failed: ' + e?.message);
+              }
+            }}
+          >
+            ↓ Download Backup (JSON)
+          </button>
+          <button
+            className="btn-secondary"
+            onClick={async () => {
+              try {
+                const { getDb } = await import('@/lib/db/index');
+                const db = await getDb();
+                const orders = await db.select<any[]>('SELECT o.*, GROUP_CONCAT(oi.product_name || " x" || oi.quantity, "; ") as items FROM orders o LEFT JOIN order_items oi ON oi.order_id = o.id WHERE o.tenant_id = ? AND o.deleted_at IS NULL GROUP BY o.id ORDER BY o.order_date DESC', [config?.tenant_id]);
+                const rows = [['Bill No', 'Date', 'Customer', 'Items', 'Total', 'Payment'], ...orders.map((o: any) => [o.bill_number, o.order_date?.slice(0, 10), o.customer_name || '', o.items || '', o.total, o.payment_method])];
+                const csv = rows.map(r => r.map((v: any) => `"${v}"`).join(',')).join('\n');
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `orders_${new Date().toISOString().slice(0, 10)}.csv`;
+                a.click();
+                toast.success('Orders CSV downloaded');
+              } catch (e: any) {
+                toast.error('Export failed: ' + e?.message);
+              }
+            }}
+          >
+            ↓ Export Orders (CSV)
+          </button>
+        </div>
+        <p className="text-xs text-slate-500 mt-3">💡 Tip: Take a backup weekly and store it somewhere safe. Your data is only on this computer.</p>
+      </div>
+
       <div className="flex justify-end">
         <button className="btn-primary" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
           {saveMutation.isPending ? 'Saving…' : 'Save Settings'}

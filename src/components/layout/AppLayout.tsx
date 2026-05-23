@@ -11,6 +11,8 @@ import {
   BarChart3,
   Settings,
   Store,
+  BookOpen,
+  Wallet,
 } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { getShopTypeLabel } from '@/lib/shop/shopType';
@@ -22,6 +24,8 @@ export const NAV_ITEMS = [
   { to: '/inventory', icon: Boxes, label: 'Inventory' },
   { to: '/orders', icon: Receipt, label: 'Orders' },
   { to: '/customers', icon: Users, label: 'Customers' },
+  { to: '/khata', icon: BookOpen, label: 'Khata' },
+  { to: '/expenses', icon: Wallet, label: 'Expenses' },
   { to: '/suppliers', icon: Truck, label: 'Suppliers' },
   { to: '/reports', icon: BarChart3, label: 'Reports' },
   { to: '/settings', icon: Settings, label: 'Settings' },

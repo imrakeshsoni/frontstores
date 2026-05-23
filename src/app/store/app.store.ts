@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { AppConfig, getAppConfig } from '@/lib/db/config';
 import { setReporterTenantId } from '@/lib/errorReporter';
+import { runStartupChecks } from '@/lib/startupChecks';
 
 interface AppState {
   config: AppConfig | null;
@@ -20,7 +21,10 @@ export const useAppStore = create<AppState>((set) => ({
     set({ isLoading: true });
     try {
       const config = await getAppConfig();
-      if (config?.tenant_id) setReporterTenantId(config.tenant_id);
+      if (config?.tenant_id) {
+        setReporterTenantId(config.tenant_id);
+        if (config.is_setup_complete) runStartupChecks(config.tenant_id).catch(() => {});
+      }
       set({
         config,
         isSetupComplete: config?.is_setup_complete ?? false,
