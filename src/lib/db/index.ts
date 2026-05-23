@@ -24,7 +24,23 @@ async function runMigrations(db: Database) {
       'SELECT id FROM _migrations WHERE name = ?', [name]
     );
     if (existing.length === 0) {
-      await db.execute(sql);
+      // Strip comment lines, then split by semicolon
+      const stripped = sql
+        .split('\n')
+        .filter((line) => !line.trimStart().startsWith('--'))
+        .join('\n');
+      const statements = stripped
+        .split(';')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      for (const stmt of statements) {
+        try {
+          await db.execute(stmt + ';');
+        } catch (e: any) {
+          // Ignore "already exists" errors so migrations are idempotent
+          if (!String(e).includes('already exists')) throw e;
+        }
+      }
       await db.execute('INSERT INTO _migrations (name) VALUES (?)', [name]);
     }
   }

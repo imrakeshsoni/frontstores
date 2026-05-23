@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect } from 'react';
 import { useAppStore } from '@/app/store/app.store';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { SetupWizard } from '@/modules/setup/SetupWizard';
+import { SubscriptionGate } from '@/modules/subscription/SubscriptionGate';
 
 const Dashboard     = lazy(() => import('@/modules/dashboard/Dashboard').then(m => ({ default: m.Dashboard })));
 const POSPage       = lazy(() => import('@/modules/pos/POSPage').then(m => ({ default: m.POSPage })));
@@ -31,6 +32,7 @@ export default function App() {
   if (!isSetupComplete) return <SetupWizard />;
 
   return (
+    <SubscriptionGate>
     <HashRouter>
       <Suspense fallback={<Loading />}>
         <Routes>
@@ -50,5 +52,6 @@ export default function App() {
         </Routes>
       </Suspense>
     </HashRouter>
+    </SubscriptionGate>
   );
 }

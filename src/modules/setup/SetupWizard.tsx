@@ -30,6 +30,7 @@ export function SetupWizard() {
   const setConfig = useAppStore((s) => s.setConfig);
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [tcAgreed, setTcAgreed] = useState(false);
   const [form, setForm] = useState<FormData>({
     shop_type: '', shop_name: '', owner_name: '', phone: '',
     email: '', address_line1: '', city: '', state: '',
@@ -60,8 +61,9 @@ export function SetupWizard() {
       });
       setConfig(config);
       toast.success('Setup complete! Welcome to FrontStores.');
-    } catch (e) {
-      toast.error('Setup failed. Please try again.');
+    } catch (e: any) {
+      console.error('Setup error:', e);
+      toast.error(String(e?.message ?? e ?? 'Setup failed'));
     } finally {
       setSaving(false);
     }
@@ -75,7 +77,7 @@ export function SetupWizard() {
           <h1 className="text-3xl font-bold text-white">FrontStores</h1>
           <p className="text-slate-400 mt-2">Set up your shop — takes 2 minutes</p>
           <div className="flex items-center justify-center gap-2 mt-4">
-            {[1, 2, 3].map((s) => (
+            {[1, 2, 3, 4].map((s) => (
               <div key={s} className={`h-2 rounded-full transition-all ${s === step ? 'w-8 bg-indigo-500' : s < step ? 'w-4 bg-indigo-400' : 'w-4 bg-slate-600'}`} />
             ))}
           </div>
@@ -183,8 +185,55 @@ export function SetupWizard() {
               </div>
               <div className="flex gap-3 mt-6">
                 <button onClick={() => setStep(2)} className="btn-secondary py-3 flex-1">← Back</button>
-                <button onClick={handleFinish} disabled={saving} className="btn-primary py-3 flex-1 text-base disabled:opacity-40">
-                  {saving ? 'Setting up…' : '✓ Finish Setup'}
+                <button onClick={() => setStep(4)} className="btn-primary py-3 flex-1 text-base">Continue →</button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 4: T&C + Subscription */}
+          {step === 4 && (
+            <div>
+              <h2 className="text-xl font-semibold text-slate-800 mb-1">Terms & Subscription</h2>
+              <p className="text-slate-500 text-sm mb-4">Please read and agree to continue.</p>
+
+              {/* Subscription info */}
+              <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-lg">🎁</span>
+                  <span className="font-semibold text-indigo-800">30-Day Free Trial</span>
+                </div>
+                <p className="text-sm text-indigo-700">You get full access to all features for 30 days — completely free. After your trial ends, a subscription of <strong>₹999/month</strong> is required to continue using FrontStores.</p>
+                <div className="mt-3 pt-3 border-t border-indigo-200 text-sm text-indigo-700">
+                  <p>💳 <strong>How to subscribe:</strong> Contact us on WhatsApp or email after your trial. Pay via UPI, cash, or bank transfer. We'll activate your subscription within hours.</p>
+                  <p className="mt-1">📱 <strong>WhatsApp:</strong> +91 99999 99999</p>
+                  <p>📧 <strong>Email:</strong> support@frontstores.com</p>
+                </div>
+              </div>
+
+              {/* T&C scroll box */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 h-36 overflow-y-auto text-xs text-slate-600 leading-relaxed mb-4">
+                <p className="font-semibold text-slate-800 mb-2">Terms & Conditions — FrontStores</p>
+                <p><strong>1. License:</strong> FrontStores grants you a non-transferable license to use this software for your shop. One license per installation.</p>
+                <p className="mt-1"><strong>2. Data:</strong> All your shop data is stored locally on your computer. FrontStores does not access, collect, or transmit your business data to any server.</p>
+                <p className="mt-1"><strong>3. Subscription:</strong> After the 30-day free trial, a monthly subscription of ₹999 is required. Non-payment will restrict access to billing features.</p>
+                <p className="mt-1"><strong>4. Updates:</strong> Software updates are delivered automatically. Updates will never modify, delete, or alter your existing data.</p>
+                <p className="mt-1"><strong>5. Cancellation:</strong> You may stop using the software at any time. Your data remains on your computer and is never deleted remotely.</p>
+                <p className="mt-1"><strong>6. Liability:</strong> FrontStores is not liable for any business losses arising from software use. Always maintain your own data backups.</p>
+                <p className="mt-1"><strong>7. Support:</strong> Support is available via WhatsApp and email during business hours (Mon–Sat, 10am–6pm IST).</p>
+              </div>
+
+              {/* Agree checkbox */}
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input type="checkbox" checked={tcAgreed} onChange={(e) => setTcAgreed(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600" />
+                <span className="text-sm text-slate-700">I have read and agree to the Terms & Conditions. I understand this software requires a subscription of ₹999/month after the 30-day free trial.</span>
+              </label>
+
+              <div className="flex gap-3 mt-6">
+                <button onClick={() => setStep(3)} className="btn-secondary py-3 flex-1">← Back</button>
+                <button onClick={handleFinish} disabled={saving || !tcAgreed}
+                  className="btn-primary py-3 flex-1 text-base disabled:opacity-40 disabled:cursor-not-allowed">
+                  {saving ? 'Setting up…' : '✓ Start Free Trial'}
                 </button>
               </div>
             </div>

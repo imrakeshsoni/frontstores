@@ -16,6 +16,10 @@ export interface AppConfig {
   settings: Record<string, unknown>;
   is_setup_complete: boolean;
   app_version: string;
+  trial_started_at: string | null;
+  subscription_expires_at: string | null;
+  subscription_status: 'trial' | 'active' | 'expired' | 'grace';
+  tc_agreed_at: string | null;
 }
 
 export async function getAppConfig(): Promise<AppConfig | null> {
@@ -45,14 +49,19 @@ export async function createAppConfig(data: {
 }): Promise<AppConfig> {
   const db = await getDb();
   const tenant_id = uuid();
+  const trialStart = now();
+  const trialExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    .toISOString().replace('T', ' ').substring(0, 19);
   await db.execute(
     `INSERT INTO app_config (id, tenant_id, shop_type, shop_name, owner_name, phone, email,
-      address_line1, city, state, pincode, gstin, drug_license_no, is_setup_complete)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+      address_line1, city, state, pincode, gstin, drug_license_no, is_setup_complete,
+      trial_started_at, subscription_expires_at, subscription_status, tc_agreed_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 'trial', ?)`,
     [uuid(), tenant_id, data.shop_type, data.shop_name, data.owner_name,
      data.phone ?? null, data.email ?? null, data.address_line1 ?? null,
      data.city ?? null, data.state ?? null, data.pincode ?? null,
-     data.gstin ?? null, data.drug_license_no ?? null]
+     data.gstin ?? null, data.drug_license_no ?? null,
+     trialStart, trialExpiry, trialStart]
   );
   await db.execute(
     `INSERT INTO bill_sequences (id, tenant_id, sequence_type, prefix, current_number)

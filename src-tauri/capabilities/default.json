@@ -6,6 +6,17 @@
     "main"
   ],
   "permissions": [
-    "core:default"
+    "core:default",
+    "sql:default",
+    "sql:allow-load",
+    "sql:allow-execute",
+    "sql:allow-select",
+    "sql:allow-close",
+    "store:default",
+    "updater:default",
+    "notification:default",
+    "dialog:default",
+    "fs:default",
+    "shell:default"
   ]
 }
