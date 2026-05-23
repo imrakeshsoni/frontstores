@@ -640,6 +640,25 @@
         </a>
       </div>
       <div class="dl-version" id="dl-version">Fetching latest version…</div>
+
+      <!-- Mac installation note -->
+      <div id="mac-install-note" style="display:none;margin-top:20px;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);border-radius:16px;padding:18px 20px;text-align:left">
+        <p style="font-size:13px;font-weight:700;color:#fcd34d;margin-bottom:8px">⚠️ Mac Installation — One extra step required</p>
+        <p style="font-size:13px;color:#94a3b8;line-height:1.7">macOS may show <strong style="color:#f0f4ff">"App is damaged"</strong> when you first open it. This is a security warning for apps not sold on the App Store — FrontStores is safe.<br><br>
+        <strong style="color:#f0f4ff">To fix it:</strong><br>
+        1. Copy the app to your <strong>Applications</strong> folder<br>
+        2. Open <strong>Terminal</strong> (search in Spotlight)<br>
+        3. Paste this command and press Enter:<br>
+        <code style="display:inline-block;background:#0f1623;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:8px 14px;margin-top:8px;font-size:12px;color:#93c5fd;user-select:all">xattr -cr /Applications/FrontStores.app</code><br><br>
+        Then double-click the app — it will open normally. You only need to do this once.</p>
+      </div>
+
+      <!-- Windows SmartScreen note -->
+      <div id="win-install-note" style="display:none;margin-top:20px;background:rgba(79,142,247,.07);border:1px solid rgba(79,142,247,.2);border-radius:16px;padding:18px 20px;text-align:left">
+        <p style="font-size:13px;font-weight:700;color:#93c5fd;margin-bottom:8px">ℹ️ Windows Installation Note</p>
+        <p style="font-size:13px;color:#94a3b8;line-height:1.7">Windows SmartScreen may show <strong style="color:#f0f4ff">"Windows protected your PC"</strong>. This is normal for new apps not yet widely distributed.<br><br>
+        Click <strong style="color:#f0f4ff">More info</strong> → then <strong style="color:#f0f4ff">Run anyway</strong> to install.</p>
+      </div>
     </div>
   </div>
 </section>
@@ -835,6 +854,20 @@
   }
 
   loadRelease();
+
+  // Show platform-specific install note when download is clicked
+  document.getElementById('dl-mac-arm').addEventListener('click', () => {
+    document.getElementById('mac-install-note').style.display = 'block';
+    document.getElementById('win-install-note').style.display = 'none';
+  });
+  document.getElementById('dl-mac-intel').addEventListener('click', () => {
+    document.getElementById('mac-install-note').style.display = 'block';
+    document.getElementById('win-install-note').style.display = 'none';
+  });
+  document.getElementById('dl-win').addEventListener('click', () => {
+    document.getElementById('win-install-note').style.display = 'block';
+    document.getElementById('mac-install-note').style.display = 'none';
+  });
 
   function toggleFaq(el) {
     el.parentElement.classList.toggle('open');
