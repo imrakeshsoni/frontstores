@@ -28,6 +28,8 @@
   },
   "plugins": {
     "updater": {
+      "active": true,
+      "dialog": true,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY0RDk2QTE5NEY4MjYwMTAKUldRUVlJSlBHV3JaOUVrOCtvcmRWSDRzM3pwL0FFcGFsc1djNDZ5K3N1a2Q2eS85MnVtTXN5b2IK",
       "endpoints": [
         "https://github.com/imrakeshsoni/frontstores/releases/latest/download/latest.json"
