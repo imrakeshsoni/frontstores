@@ -5,6 +5,13 @@ import { Toaster } from 'sonner';
 import App from './App';
 import './index.css';
 import { reportError } from './lib/errorReporter';
+import { flushQueue } from './lib/syncQueue';
+
+// Flush queued sync items on start and whenever internet comes back
+flushQueue();
+window.addEventListener('online', () => flushQueue());
+// Also retry every 5 minutes while app is open
+setInterval(() => flushQueue(), 5 * 60 * 1000);
 
 // Global error capture — sends unhandled errors to admin server
 window.onerror = (message, _source, _line, _col, error) => {
