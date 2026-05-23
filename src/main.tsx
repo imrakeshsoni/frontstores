@@ -4,6 +4,15 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import App from './App';
 import './index.css';
+import { reportError } from './lib/errorReporter';
+
+// Global error capture — sends unhandled errors to admin server
+window.onerror = (message, _source, _line, _col, error) => {
+  reportError(String(message), error?.stack, 'window.onerror');
+};
+window.onunhandledrejection = (event) => {
+  reportError(String(event.reason?.message || event.reason), event.reason?.stack, 'unhandledrejection');
+};
 
 // Apply saved theme before first render to avoid flash
 const savedTheme = localStorage.getItem('theme');

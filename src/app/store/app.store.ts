@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { AppConfig, getAppConfig } from '@/lib/db/config';
+import { setReporterTenantId } from '@/lib/errorReporter';
 
 interface AppState {
   config: AppConfig | null;
@@ -19,6 +20,7 @@ export const useAppStore = create<AppState>((set) => ({
     set({ isLoading: true });
     try {
       const config = await getAppConfig();
+      if (config?.tenant_id) setReporterTenantId(config.tenant_id);
       set({
         config,
         isSetupComplete: config?.is_setup_complete ?? false,
@@ -29,5 +31,5 @@ export const useAppStore = create<AppState>((set) => ({
     }
   },
 
-  setConfig: (config) => set({ config, isSetupComplete: config.is_setup_complete }),
+  setConfig: (config) => { setReporterTenantId(config.tenant_id); set({ config, isSetupComplete: config.is_setup_complete }); },
 }));
