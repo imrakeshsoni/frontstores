@@ -33,7 +33,7 @@ Which app are you working on?
 9) Core / Shared (affects all apps)
 10) Website — frontstores.com
 11) Admin Panel (tools/update-server, admin-app)
-12) New app — describe it
+12) ➕ Create new app
 ```
 
 ---
@@ -87,6 +87,15 @@ frontstores.com hosts multiple separate apps. Each app is a different downloadab
 | Relax / Wellness | frontstores.com/relax | `relax` |
 
 All apps are built from this single codebase. The `shopType` field in `app_config` controls which features are visible.
+
+**When user picks "➕ Create new app":**
+1. Ask: what is the business type / name?
+2. Ask: what are the core features needed?
+3. Add it to the app table above
+4. Add a new `shopType` value
+5. Scaffold the module folder under `src/modules/<appname>/`
+6. Add it to the nav in `AppLayout.tsx` guarded by `{shopType === '<appname>' && ...}`
+7. Add the download page section to `website/index.html`
 
 **Tenant = one shop = one installation.** Multiple shops can download the same app (e.g., 50 medical stores all use the medical app). Each has a unique `tenant_id`.
 
