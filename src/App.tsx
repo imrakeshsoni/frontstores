@@ -1,9 +1,10 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useAppStore } from '@/app/store/app.store';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { SetupWizard } from '@/modules/setup/SetupWizard';
 import { AppLoginScreen } from '@/modules/auth/AppLoginScreen';
+import { hasAuth } from '@/lib/db/auth';
 import { SubscriptionGate } from '@/modules/subscription/SubscriptionGate';
 
 const Dashboard     = lazy(() => import('@/modules/dashboard/Dashboard').then(m => ({ default: m.Dashboard })));
@@ -28,13 +29,26 @@ function Loading() {
 }
 
 export default function App() {
-  const { isLoading, isSetupComplete, isAuthenticated, loadConfig } = useAppStore();
+  const { isLoading, isSetupComplete, isAuthenticated, config, loadConfig, setAuthenticated } = useAppStore();
+  const [authChecked, setAuthChecked] = useState(false);
+  const [authExists, setAuthExists] = useState(false);
 
   useEffect(() => { loadConfig(); }, [loadConfig]);
 
+  useEffect(() => {
+    if (!isSetupComplete || !config?.tenant_id) return;
+    hasAuth(config.tenant_id).then(exists => {
+      setAuthExists(exists);
+      // If no password has been set yet, auto-authenticate (upgrade path for existing users)
+      if (!exists) setAuthenticated(true);
+      setAuthChecked(true);
+    });
+  }, [isSetupComplete, config?.tenant_id, setAuthenticated]);
+
   if (isLoading) return <Loading />;
   if (!isSetupComplete) return <SetupWizard />;
-  if (!isAuthenticated) return <AppLoginScreen />;
+  if (!authChecked) return <Loading />;
+  if (authExists && !isAuthenticated) return <AppLoginScreen />;
 
   return (
     <SubscriptionGate>

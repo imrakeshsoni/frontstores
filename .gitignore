@@ -17,3 +17,10 @@ src-tauri/target/
 
 # Deployment logs
 .deploy-logs/
+
+# Server data — customer data must never be in git
+tools/data/
+tools/subscriptions.json
+tools/errors.json
+tools/server.log
+tools/tunnel.log

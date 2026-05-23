@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { useAppStore } from '@/app/store/app.store';
 import { getDb, now } from '@/lib/db/index';
 
-const WHATSAPP = '919999999999';
-const EMAIL = 'support@frontstores.com';
+const WHATSAPP = '919340419566';
+const EMAIL = 'imrakeshsoni@gmail.com';
 const SERVER = 'https://update.frontstores.com';
 const OFFLINE_GRACE_DAYS = 7; // days after expiry before locking when offline
 
