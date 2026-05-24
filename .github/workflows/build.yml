@@ -17,12 +17,28 @@ jobs:
         include:
           - platform: macos-latest
             args: '--target aarch64-apple-darwin'
+            sig-artifact: sig-mac-aarch64
+            sig-path: src-tauri/target/aarch64-apple-darwin/release/bundle/macos/FrontStores.app.tar.gz.sig
+            update-url-suffix: FrontStores_aarch64.app.tar.gz
+            update-platform: darwin-aarch64
           - platform: macos-latest
             args: '--target x86_64-apple-darwin'
+            sig-artifact: sig-mac-x86_64
+            sig-path: src-tauri/target/x86_64-apple-darwin/release/bundle/macos/FrontStores.app.tar.gz.sig
+            update-url-suffix: FrontStores_x64.app.tar.gz
+            update-platform: darwin-x86_64
           - platform: windows-latest
             args: ''
+            sig-artifact: sig-win-x86_64
+            sig-path: ''
+            update-url-suffix: ''
+            update-platform: windows-x86_64
           - platform: ubuntu-22.04
             args: ''
+            sig-artifact: ''
+            sig-path: ''
+            update-url-suffix: ''
+            update-platform: ''
 
     runs-on: ${{ matrix.platform }}
 
@@ -95,3 +111,101 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+      # Upload the .sig file as an artifact so the consolidation job can read it
+      - name: Upload signature artifact (macOS)
+        if: matrix.platform == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.sig-artifact }}
+          path: ${{ matrix.sig-path }}
+          if-no-files-found: warn
+
+      - name: Find and upload Windows signature artifact
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          $sigFile = Get-ChildItem -Path "src-tauri/target/release/bundle/nsis" -Filter "*.sig" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($sigFile) {
+            Copy-Item $sigFile.FullName -Destination "win-update.sig"
+          } else {
+            $msiSig = Get-ChildItem -Path "src-tauri/target/release/bundle/msi" -Filter "*.sig" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($msiSig) { Copy-Item $msiSig.FullName -Destination "win-update.sig" }
+          }
+
+      - name: Upload Windows sig artifact
+        if: matrix.platform == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sig-win-x86_64
+          path: win-update.sig
+          if-no-files-found: warn
+
+  # Runs after all platform builds — creates and uploads latest.json for auto-update
+  create-update-manifest:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Mac aarch64 signature
+        uses: actions/download-artifact@v4
+        with:
+          name: sig-mac-aarch64
+          path: sigs/aarch64
+        continue-on-error: true
+
+      - name: Download Mac x86_64 signature
+        uses: actions/download-artifact@v4
+        with:
+          name: sig-mac-x86_64
+          path: sigs/x86_64
+        continue-on-error: true
+
+      - name: Download Windows signature
+        uses: actions/download-artifact@v4
+        with:
+          name: sig-win-x86_64
+          path: sigs/win
+        continue-on-error: true
+
+      - name: Generate latest.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          VERSION="${TAG#v}"
+          BASE="https://github.com/imrakeshsoni/frontstores/releases/download/${TAG}"
+          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          AARCH64_SIG=$(cat sigs/aarch64/*.sig 2>/dev/null || cat sigs/aarch64/FrontStores.app.tar.gz.sig 2>/dev/null || echo "")
+          X86_64_SIG=$(cat sigs/x86_64/*.sig 2>/dev/null || cat sigs/x86_64/FrontStores.app.tar.gz.sig 2>/dev/null || echo "")
+
+          PLATFORMS="{}"
+
+          if [ -n "$AARCH64_SIG" ]; then
+            PLATFORMS=$(echo "$PLATFORMS" | jq \
+              --arg sig "$AARCH64_SIG" \
+              --arg url "${BASE}/FrontStores_aarch64.app.tar.gz" \
+              '. + {"darwin-aarch64": {"signature": $sig, "url": $url}}')
+          fi
+
+          if [ -n "$X86_64_SIG" ]; then
+            PLATFORMS=$(echo "$PLATFORMS" | jq \
+              --arg sig "$X86_64_SIG" \
+              --arg url "${BASE}/FrontStores_x64.app.tar.gz" \
+              '. + {"darwin-x86_64": {"signature": $sig, "url": $url}}')
+          fi
+
+          echo "$PLATFORMS" | jq \
+            --arg version "$VERSION" \
+            --arg pub_date "$PUB_DATE" \
+            --arg notes "FrontStores $TAG — bug fixes and improvements" \
+            '{"version": $version, "notes": $notes, "pub_date": $pub_date, "platforms": .}' \
+            > latest.json
+
+          cat latest.json
+
+          gh release upload "${TAG}" latest.json \
+            --repo imrakeshsoni/frontstores \
+            --clobber
