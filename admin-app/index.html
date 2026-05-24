@@ -616,11 +616,10 @@ async function api(path, opts={}) {
   });
 }
 
-async function loadAll(isLogin=false) {
+async function loadAll(isLogin=false, silent=false) {
   const btn  = document.getElementById('refresh-btn');
   const icon = document.getElementById('refresh-icon');
-  if (btn)  btn.classList.add('loading');
-  if (icon) { icon.className = 'spin'; icon.textContent = '↻'; }
+  if (!silent) { if (btn) btn.classList.add('loading'); if (icon) { icon.className = 'spin'; icon.textContent = '↻'; } }
   try {
     const [cr, er, conr] = await Promise.all([
       api('/admin/api/customers'),
@@ -634,7 +633,7 @@ async function loadAll(isLogin=false) {
     if (isLogin) { document.getElementById('login-screen').style.display='none'; document.getElementById('app').classList.add('visible'); resetIdleTimer(); }
     updateStats(); renderCustomers(); renderErrors(); renderContacts(); updateBadge();
     if (openId) { const c = allCustomers.find(x=>x.tenant_id===openId); if (c) renderPanel(c); }
-    if (!isLogin) showToast('✓ Data refreshed');
+    if (!isLogin && !silent) showToast('✓ Data refreshed');
   } catch(e) {
     if (isLogin) document.getElementById('login-error').textContent = 'Cannot connect. Is server running?';
     else showToast('⚠ Could not connect to server', true);
@@ -1027,7 +1026,7 @@ function showToast(msg, err=false) {
   setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-setInterval(()=>{ if (password) loadAll(); }, 30000);
+setInterval(()=>{ if (password) loadAll(false, true); }, 120000);
 </script>
 </body>
 </html>

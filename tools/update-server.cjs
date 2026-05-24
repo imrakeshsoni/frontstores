@@ -367,7 +367,7 @@ const adminServer = http.createServer(async (req, res) => {
   }
 
   // POST /admin/api/customers/:id/extend|freeze|unfreeze|revoke
-  const customerAction = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/(extend|freeze|unfreeze|revoke)$/);
+  const customerAction = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/(extend|freeze|unfreeze|revoke|approve)$/);
   if (req.method === 'POST' && customerAction) {
     const [, tenantId, action] = customerAction;
     const subs = loadSubs();
