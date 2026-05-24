@@ -130,17 +130,16 @@ const publicServer = http.createServer(async (req, res) => {
           email:      sanitize(email,       200),
           city:       sanitize(city,        100),
           gstin:      sanitize(gstin,        15),
-          expires_at: addDays(new Date().toISOString(), 30),
+          expires_at: null,
           registered_at: new Date().toISOString(),
-          account_status: 'active',
+          account_status: 'pending',
         };
-        console.log(`🆕 New: ${shop_name} (${tenant_id.substring(0,8)})`);
+        console.log(`🆕 New registration (pending approval): ${sanitize(shop_name,50)} (${tenant_id.substring(0,8)})`);
       }
       // Existing tenant: never overwrite their data from a re-register payload.
-      // Contact info updates must go through the admin panel.
       saveSubs(subs);
       const sub = subs[tenant_id];
-      json(res, { ok: true, expires_at: sub.expires_at, account_status: sub.account_status||'active' });
+      json(res, { ok: true, account_status: sub.account_status });
     } catch { res.writeHead(400); res.end('Bad request'); }
     return;
   }
@@ -150,10 +149,11 @@ const publicServer = http.createServer(async (req, res) => {
     const tenantId = pathname.split('/')[2];
     const sub = loadSubs()[tenantId];
     const server_time = new Date().toISOString();
-    if (!sub)                              { json(res, { active: false, server_time }); return; }
-    if (sub.account_status === 'frozen')   { json(res, { active: false, reason: 'frozen', server_time }); return; }
+    if (!sub)                               { json(res, { active: false, server_time }); return; }
+    if (sub.account_status === 'pending')  { json(res, { active: false, reason: 'pending', server_time }); return; }
+    if (sub.account_status === 'frozen')   { json(res, { active: false, reason: 'frozen',  server_time }); return; }
     if (sub.account_status === 'revoked')  { json(res, { active: false, reason: 'revoked', server_time }); return; }
-    json(res, new Date(sub.expires_at) > new Date()
+    json(res, sub.expires_at && new Date(sub.expires_at) > new Date()
       ? { active: true,  expires_at: sub.expires_at, server_time }
       : { active: false, server_time });
     return;
@@ -369,6 +369,11 @@ const adminServer = http.createServer(async (req, res) => {
       subs[tenantId].account_status = 'revoked';
       subs[tenantId].revoked_at = new Date().toISOString();
       console.log(`🚫 Revoked: ${subs[tenantId].shop_name}`);
+    } else if (action === 'approve') {
+      subs[tenantId].account_status = 'active';
+      subs[tenantId].expires_at = addDays(new Date().toISOString(), 30);
+      subs[tenantId].approved_at = new Date().toISOString();
+      console.log(`✅ Approved: ${subs[tenantId].shop_name} → 30-day trial starts now`);
     }
     saveSubs(subs);
     json(res, { ok: true, expires_at: subs[tenantId].expires_at }); return;

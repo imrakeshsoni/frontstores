@@ -4,6 +4,7 @@ import { useAppStore } from '@/app/store/app.store';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { SetupWizard } from '@/modules/setup/SetupWizard';
 import { AppLoginScreen } from '@/modules/auth/AppLoginScreen';
+import { CreatePasswordScreen } from '@/modules/auth/CreatePasswordScreen';
 import { hasAuth } from '@/lib/db/auth';
 import { SubscriptionGate } from '@/modules/subscription/SubscriptionGate';
 import { useIdleTimer } from '@/lib/hooks/useIdleTimer';
@@ -42,16 +43,16 @@ export default function App() {
     if (!isSetupComplete || !config?.tenant_id) return;
     hasAuth(config.tenant_id).then(exists => {
       setAuthExists(exists);
-      // If no password has been set yet, auto-authenticate (upgrade path for existing users)
-      if (!exists) setAuthenticated(true);
       setAuthChecked(true);
     });
-  }, [isSetupComplete, config?.tenant_id, setAuthenticated]);
+  }, [isSetupComplete, config?.tenant_id]);
 
   if (isLoading) return <Loading />;
   if (!isSetupComplete) return <SetupWizard />;
   if (!authChecked) return <Loading />;
-  if (authExists && !isAuthenticated) return <AppLoginScreen />;
+  // No password set yet (user upgraded from old version) — force password creation
+  if (!authExists) return <CreatePasswordScreen onCreated={() => setAuthExists(true)} />;
+  if (!isAuthenticated) return <AppLoginScreen />;
 
   return (
     <SubscriptionGate>
