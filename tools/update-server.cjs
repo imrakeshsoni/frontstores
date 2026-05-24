@@ -62,17 +62,20 @@ setInterval(() => {
 }, 10 * 60 * 1000);
 
 // DATA_DIR — all tenant + error data lives here. Change this env var on Mac Mini if needed.
-const DATA_DIR   = process.env.DATA_DIR || path.join(__dirname, 'data');
-const SUBS_FILE  = path.join(DATA_DIR, 'subscriptions.json');
-const ERRORS_FILE = path.join(DATA_DIR, 'errors.json');
+const DATA_DIR      = process.env.DATA_DIR || path.join(__dirname, 'data');
+const SUBS_FILE     = path.join(DATA_DIR, 'subscriptions.json');
+const ERRORS_FILE   = path.join(DATA_DIR, 'errors.json');
+const CONTACTS_FILE = path.join(DATA_DIR, 'contacts.json');
 
 // Ensure data dir exists
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 // ── Data helpers ────────────────────────────────────────────────────────────
-function loadSubs()      { try { return JSON.parse(fs.readFileSync(SUBS_FILE,  'utf8')); } catch { return {}; } }
-function saveSubs(d)     { fs.writeFileSync(SUBS_FILE,  JSON.stringify(d, null, 2)); }
-function loadErrors()    { try { return JSON.parse(fs.readFileSync(ERRORS_FILE,'utf8')); } catch { return []; } }
+function loadSubs()         { try { return JSON.parse(fs.readFileSync(SUBS_FILE,      'utf8')); } catch { return {}; } }
+function saveSubs(d)        { fs.writeFileSync(SUBS_FILE,      JSON.stringify(d, null, 2)); }
+function loadErrors()       { try { return JSON.parse(fs.readFileSync(ERRORS_FILE,    'utf8')); } catch { return []; } }
+function loadContacts()     { try { return JSON.parse(fs.readFileSync(CONTACTS_FILE,  'utf8')); } catch { return []; } }
+function saveContacts(d)    { fs.writeFileSync(CONTACTS_FILE,  JSON.stringify(d, null, 2)); }
 function saveErrors(d)   { fs.writeFileSync(ERRORS_FILE, JSON.stringify(d, null, 2)); }
 
 function addDays(from, days) {
@@ -174,6 +177,31 @@ const publicServer = http.createServer(async (req, res) => {
       saveErrors(errors.slice(0,500));
       const shop = loadSubs()[tenant_id]?.shop_name || tenant_id.substring(0,8);
       console.log(`⚠️  Error from ${shop}: ${String(message).substring(0,80)}`);
+      json(res, { ok: true });
+    } catch { res.writeHead(400); res.end('Bad request'); }
+    return;
+  }
+
+  // POST /contact — website inquiry form — max 5 per IP per 15 minutes
+  if (req.method === 'POST' && pathname === '/contact') {
+    if (rateLimit(req, res, 'contact', 5, 15 * 60 * 1000)) return;
+    const body = await readBody(req);
+    try {
+      const { name, shop_type, mobile, email, message } = JSON.parse(body);
+      if (!mobile || !email) { res.writeHead(400); res.end('Mobile and email are required'); return; }
+      const contacts = loadContacts();
+      contacts.unshift({
+        id: crypto.randomBytes(8).toString('hex'),
+        name:      sanitize(name,      100),
+        shop_type: sanitize(shop_type,  50),
+        mobile:    sanitize(mobile,     20),
+        email:     sanitize(email,     200),
+        message:   sanitize(message,  1000),
+        received_at: new Date().toISOString(),
+        resolved: false,
+      });
+      saveContacts(contacts.slice(0, 1000));
+      console.log(`📩 Contact: ${sanitize(name,30)} (${sanitize(mobile,20)}) — ${sanitize(shop_type,30)}`);
       json(res, { ok: true });
     } catch { res.writeHead(400); res.end('Bad request'); }
     return;
@@ -394,6 +422,21 @@ const adminServer = http.createServer(async (req, res) => {
     const idx = errors.findIndex(e => e.id === errAction[1]);
     if (idx !== -1) errors[idx].resolved = true;
     saveErrors(errors);
+    json(res, { ok: true }); return;
+  }
+
+  // GET /admin/api/contacts
+  if (req.method === 'GET' && pathname === '/admin/api/contacts') {
+    json(res, loadContacts()); return;
+  }
+
+  // POST /admin/api/contacts/:id/resolve
+  const contactAction = pathname.match(/^\/admin\/api\/contacts\/([^/]+)\/resolve$/);
+  if (req.method === 'POST' && contactAction) {
+    const contacts = loadContacts();
+    const idx = contacts.findIndex(c => c.id === contactAction[1]);
+    if (idx !== -1) contacts[idx].resolved = true;
+    saveContacts(contacts);
     json(res, { ok: true }); return;
   }
 

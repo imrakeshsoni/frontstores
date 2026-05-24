@@ -362,24 +362,33 @@
 
     /* ── CONTACT ── */
     #contact { background: linear-gradient(135deg, var(--dark) 0%, #1e1b4b 100%); padding: 80px 24px; }
-    .contact-inner { max-width: 700px; margin: 0 auto; text-align: center; }
+    .contact-inner { max-width: 560px; margin: 0 auto; text-align: center; }
     .contact-inner h2 { font-size: clamp(1.8rem, 3vw, 2.4rem); font-weight: 900; color: #fff; letter-spacing: -0.02em; }
     .contact-inner p { margin-top: 12px; color: #94a3b8; font-size: 1rem; }
-    .contact-btns { margin-top: 36px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
-    .btn-wa {
-      display: inline-flex; align-items: center; gap: 10px;
-      background: #25d366; color: #fff; font-size: 15px; font-weight: 700;
-      padding: 14px 32px; border-radius: 14px;
-      box-shadow: 0 6px 24px rgba(37,211,102,.35); transition: opacity .15s;
+    .contact-form { margin-top: 36px; display: flex; flex-direction: column; gap: 14px; text-align: left; }
+    .cf-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 520px) { .cf-row { grid-template-columns: 1fr; } }
+    .cf-field { display: flex; flex-direction: column; gap: 6px; }
+    .cf-field label { font-size: 13px; font-weight: 600; color: #94a3b8; }
+    .cf-field label span { color: #f87171; }
+    .cf-input, .cf-select, .cf-textarea {
+      background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
+      border-radius: 12px; padding: 12px 16px; color: #f0f4ff; font-size: 15px;
+      outline: none; transition: border-color .15s; font-family: inherit; width: 100%;
     }
-    .btn-wa:hover { opacity: .88; }
-    .btn-email {
-      display: inline-flex; align-items: center; gap: 10px;
-      background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2);
-      color: #e2e8f0; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 14px;
-      transition: background .15s;
+    .cf-input:focus, .cf-select:focus, .cf-textarea:focus { border-color: #4f8ef7; }
+    .cf-input::placeholder, .cf-textarea::placeholder { color: rgba(255,255,255,.25); }
+    .cf-select option { background: #1e1b4b; color: #f0f4ff; }
+    .cf-textarea { resize: vertical; min-height: 100px; }
+    .cf-submit {
+      background: linear-gradient(135deg, #4f8ef7, #7c6af7); color: #fff;
+      border: none; border-radius: 14px; padding: 14px; font-size: 15px;
+      font-weight: 700; cursor: pointer; transition: opacity .15s; margin-top: 4px;
     }
-    .btn-email:hover { background: rgba(255,255,255,.15); }
+    .cf-submit:hover { opacity: .88; }
+    .cf-submit:disabled { opacity: .5; cursor: not-allowed; }
+    .cf-success { background: rgba(34,197,94,.12); border: 1px solid rgba(34,197,94,.25); border-radius: 14px; padding: 18px; color: #86efac; font-weight: 600; font-size: 15px; display: none; text-align: center; }
+    .cf-error { background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.25); border-radius: 12px; padding: 12px 16px; color: #fca5a5; font-size: 13px; display: none; }
 
     /* ── FOOTER ── */
     footer {
@@ -517,8 +526,8 @@
           <div class="sf">Multiple payment modes</div>
         </div>
         <div class="store-dl">
-          <a href="https://wa.me/919340419566?text=Hi, notify me when FrontStores Restaurant app is ready" class="notify-btn">
-            💬 Notify me when ready
+          <a href="#contact" class="notify-btn">
+            📩 Notify me when ready
           </a>
           <div class="dl-meta">In development — launching soon</div>
         </div>
@@ -659,7 +668,7 @@
       <h2 class="ai-title">Meet your <span class="ai-grad">AI Shop Assistant</span></h2>
       <p class="ai-sub">An intelligent assistant built right into FrontStores. Talk to it in Hindi or English — it knows your shop, your products, your customers. It works for you so you can focus on running your business.</p>
       <div class="ai-cta">
-        <a href="https://wa.me/919340419566?text=Hi, I want early access to FrontStores AI" class="btn-ai">💬 Join the waitlist</a>
+        <a href="#contact" class="btn-ai">📩 Join the waitlist</a>
       </div>
     </div>
     <div class="ai-feats">
@@ -811,7 +820,7 @@
       </div>
       <div class="faq-item">
         <div class="faq-q" onclick="toggleFaq(this)">How do I pay after the trial? <span class="faq-chevron">▾</span></div>
-        <div class="faq-a">Contact us on WhatsApp (+91 93404 19566) or email. We'll extend your subscription manually. No payment gateway, no auto-debit — you decide when to renew.</div>
+        <div class="faq-a">Use the contact form on this page. We'll extend your subscription manually within a few hours. No payment gateway, no auto-debit — you decide when to renew.</div>
       </div>
       <div class="faq-item">
         <div class="faq-q" onclick="toggleFaq(this)">Can I use it on multiple computers? <span class="faq-chevron">▾</span></div>
@@ -828,16 +837,43 @@
 <!-- CONTACT -->
 <div id="contact">
   <div class="contact-inner">
-    <h2>Questions? We're here to help.</h2>
-    <p>Talk to us directly on WhatsApp — fastest response, usually within an hour.</p>
-    <div class="contact-btns">
-      <a href="https://wa.me/919340419566?text=Hi, I want to know more about FrontStores" class="btn-wa" target="_blank">
-        💬 WhatsApp Us
-      </a>
-      <a href="mailto:imrakeshsoni@gmail.com?subject=FrontStores Enquiry" class="btn-email">
-        📧 imrakeshsoni@gmail.com
-      </a>
-    </div>
+    <h2>Get in touch</h2>
+    <p>Tell us about your shop and we'll reach out within a few hours.</p>
+    <form class="contact-form" id="contact-form" onsubmit="submitContact(event)">
+      <div class="cf-row">
+        <div class="cf-field">
+          <label>Your Name</label>
+          <input class="cf-input" type="text" name="name" placeholder="Amit Sharma" />
+        </div>
+        <div class="cf-field">
+          <label>Shop Type</label>
+          <select class="cf-select" name="shop_type">
+            <option value="">Select type</option>
+            <option value="Medical Store">Medical Store</option>
+            <option value="Restaurant / Café">Restaurant / Café</option>
+            <option value="Grocery">Grocery</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="cf-row">
+        <div class="cf-field">
+          <label>Mobile Number <span>*</span></label>
+          <input class="cf-input" type="tel" name="mobile" placeholder="9876543210" required maxlength="15" />
+        </div>
+        <div class="cf-field">
+          <label>Email ID <span>*</span></label>
+          <input class="cf-input" type="email" name="email" placeholder="you@example.com" required maxlength="200" />
+        </div>
+      </div>
+      <div class="cf-field">
+        <label>Message / Query</label>
+        <textarea class="cf-textarea" name="message" placeholder="Tell us about your shop or any questions you have…" maxlength="1000"></textarea>
+      </div>
+      <div class="cf-error" id="cf-error"></div>
+      <button class="cf-submit" type="submit" id="cf-btn">Send Message →</button>
+      <div class="cf-success" id="cf-success">✅ Message sent! We'll contact you on your mobile number soon.</div>
+    </form>
   </div>
 </div>
 
@@ -850,7 +886,7 @@
     <a href="#pricing">Pricing</a>
     <a href="#download">Download</a>
     <a href="#faq">FAQ</a>
-    <a href="https://wa.me/919340419566" target="_blank">Support</a>
+    <a href="#contact">Support</a>
   </div>
   <div class="footer-copy">© 2025 FrontStores · Made for Indian businesses</div>
 </footer>
@@ -903,6 +939,43 @@
   });
 
   function toggleFaq(el) { el.parentElement.classList.toggle('open'); }
+
+  async function submitContact(e) {
+    e.preventDefault();
+    const form = e.target;
+    const btn  = document.getElementById('cf-btn');
+    const errEl = document.getElementById('cf-error');
+    const okEl  = document.getElementById('cf-success');
+    const mobile = form.mobile.value.trim();
+    const email  = form.email.value.trim();
+    if (!mobile) { errEl.textContent = 'Mobile number is required.'; errEl.style.display='block'; return; }
+    if (!email)  { errEl.textContent = 'Email ID is required.'; errEl.style.display='block'; return; }
+    errEl.style.display = 'none';
+    btn.disabled = true; btn.textContent = 'Sending…';
+    try {
+      const res = await fetch('https://update.frontstores.com/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name:      form.name.value.trim(),
+          shop_type: form.shop_type.value,
+          mobile,
+          email,
+          message:   form.message.value.trim(),
+        }),
+      });
+      if (res.ok) {
+        form.style.display = 'none';
+        okEl.style.display = 'block';
+      } else {
+        throw new Error('Server error');
+      }
+    } catch {
+      errEl.textContent = 'Could not send. Please try again in a moment.';
+      errEl.style.display = 'block';
+      btn.disabled = false; btn.textContent = 'Send Message →';
+    }
+  }
 </script>
 </body>
 </html>

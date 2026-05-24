@@ -156,6 +156,9 @@
 
   <div class="tabs">
     <div class="tab active" id="tab-customers" onclick="switchTab('customers')">Customers</div>
+    <div class="tab" id="tab-contacts" onclick="switchTab('contacts')">
+      Contacts <span class="tab-badge" id="contact-badge" style="display:none">0</span>
+    </div>
     <div class="tab" id="tab-errors" onclick="switchTab('errors')">
       Errors <span class="tab-badge" id="error-badge" style="display:none">0</span>
     </div>
@@ -192,6 +195,17 @@
       </div>
     </div>
 
+    <!-- CONTACTS -->
+    <div class="tab-page" id="page-contacts">
+      <div class="errors-toolbar">
+        <input class="search-input" id="con-search" placeholder="Search contacts…" oninput="renderContacts()" style="max-width:300px" />
+        <button class="filter-btn active" id="cf-all"      onclick="setCFilter('all')">All</button>
+        <button class="filter-btn"        id="cf-open"     onclick="setCFilter('open')">Open</button>
+        <button class="filter-btn"        id="cf-resolved" onclick="setCFilter('resolved')">Resolved</button>
+      </div>
+      <div id="contacts-list"></div>
+    </div>
+
     <!-- ERRORS -->
     <div class="tab-page" id="page-errors">
       <div class="errors-toolbar">
@@ -224,7 +238,7 @@
 const API = 'http://localhost:3002';
 const ICONS = { medical:'💊', restaurant:'🍽️' };
 const CSRF_TOKEN = window.__CSRF_TOKEN__ || '';
-let password = '', allCustomers = [], allErrors = [], filter = 'all', eFilter = 'all', openId = null;
+let password = '', allCustomers = [], allErrors = [], allContacts = [], filter = 'all', eFilter = 'all', cFilter = 'all', openId = null;
 
 // ── Security helpers ─────────────────────────────────────────────────────────
 function escHtml(s) {
@@ -256,7 +270,7 @@ setInterval(() => {
 }, 1000);
 
 function switchTab(t) {
-  ['customers','errors'].forEach(x => {
+  ['customers','contacts','errors'].forEach(x => {
     document.getElementById('tab-'+x).classList.toggle('active', x===t);
     document.getElementById('page-'+x).classList.toggle('active', x===t);
   });
@@ -284,13 +298,17 @@ async function api(path, opts={}) {
 
 async function loadAll(isLogin=false) {
   try {
-    const [cr, er] = await Promise.all([api('/admin/api/customers'), api('/admin/api/errors')]);
+    const [cr, er, conr] = await Promise.all([
+      api('/admin/api/customers'),
+      api('/admin/api/errors'),
+      api('/admin/api/contacts'),
+    ]);
     if (cr.status === 401) { if (isLogin) document.getElementById('login-error').textContent = 'Wrong password'; return; }
     allCustomers = await cr.json();
-    allErrors = await er.json();
-    if (isLogin) { document.getElementById('login-screen').style.display='none'; document.getElementById('app').classList.add('visible'); }
-    updateStats(); renderCustomers(); renderErrors(); updateBadge();
-    // Refresh open panel
+    allErrors    = await er.json();
+    allContacts  = await conr.json();
+    if (isLogin) { document.getElementById('login-screen').style.display='none'; document.getElementById('app').classList.add('visible'); resetIdleTimer(); }
+    updateStats(); renderCustomers(); renderErrors(); renderContacts(); updateBadge();
     if (openId) { const c = allCustomers.find(x=>x.tenant_id===openId); if (c) renderPanel(c); }
   } catch(e) { if (isLogin) document.getElementById('login-error').textContent = 'Cannot connect. Is server running?'; }
 }
@@ -313,9 +331,12 @@ function updateStats() {
   document.getElementById('s-blocked').textContent = allCustomers.filter(c=>['frozen','revoked'].includes(subStatus(c))).length;
 }
 function updateBadge() {
-  const n = allErrors.filter(e=>!e.resolved).length;
-  const b = document.getElementById('error-badge');
-  b.textContent = n; b.style.display = n>0?'inline-flex':'none';
+  const ne = allErrors.filter(e=>!e.resolved).length;
+  const be = document.getElementById('error-badge');
+  be.textContent = ne; be.style.display = ne>0?'inline-flex':'none';
+  const nc = allContacts.filter(c=>!c.resolved).length;
+  const bc = document.getElementById('contact-badge');
+  bc.textContent = nc; bc.style.display = nc>0?'inline-flex':'none';
 }
 
 function setFilter(f) {
@@ -549,6 +570,57 @@ async function clearUnlockCode(id) {
   });
   showToast('Unlock code cleared');
   await loadAll();
+}
+
+// CONTACTS
+function setCFilter(f) {
+  cFilter = f;
+  ['all','open','resolved'].forEach(x=>document.getElementById('cf-'+x).classList.toggle('active',x===f));
+  renderContacts();
+}
+
+function renderContacts() {
+  const q = (document.getElementById('con-search')?.value||'').toLowerCase();
+  let list = allContacts.filter(c=>{
+    if (cFilter==='open' && c.resolved) return false;
+    if (cFilter==='resolved' && !c.resolved) return false;
+    if (q && !(c.name||'').toLowerCase().includes(q) && !(c.mobile||'').includes(q) && !(c.email||'').toLowerCase().includes(q) && !(c.shop_type||'').toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const el = document.getElementById('contacts-list');
+  if (!list.length) { el.innerHTML=`<div class="empty">No contact inquiries yet.</div>`; return; }
+  el.innerHTML = list.map(c=>{
+    const t = new Date(c.received_at).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+    const cid = escHtml(c.id);
+    return `<div class="error-card ${c.resolved?'resolved':''}">
+      <div class="error-top">
+        <div>
+          <span class="error-shop">${escHtml(c.name||'Unknown')}</span>
+          ${c.shop_type?` <span class="type-chip" style="font-size:11px">${escHtml(c.shop_type)}</span>`:''}
+        </div>
+        <div class="error-time">${t}</div>
+      </div>
+      <div style="display:flex;gap:20px;flex-wrap:wrap;margin:8px 0;font-size:13px">
+        <span>📱 <a href="tel:${escHtml(c.mobile)}" style="color:#93c5fd">${escHtml(c.mobile)}</a></span>
+        <span>📧 <a href="mailto:${escHtml(c.email)}" style="color:#93c5fd">${escHtml(c.email)}</a></span>
+      </div>
+      ${c.message?`<div class="error-msg" style="color:#e2e8f0">${escHtml(c.message)}</div>`:''}
+      <div class="error-btns">
+        ${!c.resolved
+          ? `<button class="btn-sm btn-sm-green" onclick="resolveContact('${cid}')">✓ Mark Done</button>`
+          : `<span style="font-size:12px;color:var(--muted)">✓ Resolved</span>`}
+        ${c.mobile?`<a href="https://wa.me/91${escHtml(c.mobile.replace(/\D/g,''))}" target="_blank" class="btn-sm" style="border-color:rgba(34,197,94,.2);color:var(--green)">💬 WhatsApp</a>`:''}
+        ${c.email?`<a href="mailto:${escHtml(c.email)}" class="btn-sm">📧 Email</a>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function resolveContact(id) {
+  await api(`/admin/api/contacts/${id}/resolve`, { method:'POST' });
+  const c = allContacts.find(x=>x.id===id);
+  if (c) c.resolved = true;
+  renderContacts(); updateBadge();
 }
 
 // ERRORS

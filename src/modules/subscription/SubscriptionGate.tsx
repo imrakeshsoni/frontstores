@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAppStore } from '@/app/store/app.store';
 import { getDb, now } from '@/lib/db/index';
 
-const WHATSAPP = '919340419566';
-const EMAIL = 'imrakeshsoni@gmail.com';
+const CONTACT_URL = 'https://frontstores.com/#contact';
 const SERVER = 'https://update.frontstores.com';
 const OFFLINE_GRACE_DAYS = 7;
 const ROLLBACK_TOLERANCE_MS = 60 * 60 * 1000;     // 1 hour
@@ -204,29 +203,19 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
             </div>
           )}
 
-          <p className="text-slate-300 text-sm font-medium mb-3">Contact us:</p>
-          <div className="space-y-3">
-            <a
-              href={`https://wa.me/${WHATSAPP}?text=Hi, ${isFrozen ? 'my account is frozen' : isRevoked ? 'my access was revoked' : 'I want to subscribe to FrontStores'}. My Shop ID is: ${config?.tenant_id?.substring(0, 8)}`}
-              className="flex items-center gap-3 bg-green-900 border border-green-700 rounded-2xl p-4 hover:bg-green-800 transition-colors"
-            >
-              <span className="text-2xl">💬</span>
-              <div>
-                <p className="text-white font-semibold text-sm">WhatsApp</p>
-                <p className="text-green-300 text-xs">Fastest response · Usually within 1 hour</p>
-              </div>
-            </a>
-            <a
-              href={`mailto:${EMAIL}?subject=FrontStores - ${isFrozen ? 'Account Frozen' : isRevoked ? 'Access Revoked' : 'Subscription'}&body=Hi, Shop ID: ${config?.tenant_id?.substring(0, 8)}`}
-              className="flex items-center gap-3 bg-slate-800 border border-slate-700 rounded-2xl p-4 hover:bg-slate-700 transition-colors"
-            >
-              <span className="text-2xl">📧</span>
-              <div>
-                <p className="text-white font-semibold text-sm">Email</p>
-                <p className="text-slate-400 text-xs">{EMAIL}</p>
-              </div>
-            </a>
-          </div>
+          <p className="text-slate-300 text-sm font-medium mb-3">Contact us to continue:</p>
+          <a
+            href={CONTACT_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-3 bg-indigo-900 border border-indigo-700 rounded-2xl p-4 hover:bg-indigo-800 transition-colors"
+          >
+            <span className="text-2xl">📩</span>
+            <div>
+              <p className="text-white font-semibold text-sm">Get in touch</p>
+              <p className="text-indigo-300 text-xs">frontstores.com · Usually within a few hours</p>
+            </div>
+          </a>
 
           <div className="mt-4 p-3 bg-slate-800 rounded-xl text-center">
             <p className="text-slate-500 text-xs">Your Shop ID</p>

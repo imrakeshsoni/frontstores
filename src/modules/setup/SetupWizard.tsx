@@ -217,9 +217,7 @@ export function SetupWizard() {
                 </div>
                 <p className="text-sm text-indigo-700">You get full access to all features for 30 days — completely free. After your trial ends, a subscription of <strong>₹999/month</strong> is required to continue using FrontStores.</p>
                 <div className="mt-3 pt-3 border-t border-indigo-200 text-sm text-indigo-700">
-                  <p>💳 <strong>How to subscribe:</strong> Contact us on WhatsApp or email after your trial.</p>
-                  <p className="mt-1">📱 <strong>WhatsApp:</strong> +91 93404 19566</p>
-                  <p>📧 <strong>Email:</strong> imrakeshsoni@gmail.com</p>
+                  <p>💳 <strong>How to subscribe:</strong> Use the contact form at frontstores.com after your trial to renew.</p>
                 </div>
               </div>
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 h-36 overflow-y-auto text-xs text-slate-600 leading-relaxed mb-4">
