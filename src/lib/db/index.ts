@@ -38,8 +38,13 @@ async function runMigrations(db: Database) {
         try {
           await db.execute(stmt + ';');
         } catch (e: any) {
-          // Ignore "already exists" errors so migrations are idempotent
-          if (!String(e).includes('already exists')) throw e;
+          const msg = String(e);
+          // Ignore errors that mean "already done" — idempotent migrations
+          if (
+            msg.includes('already exists') ||
+            msg.includes('duplicate column name')
+          ) continue;
+          throw e;
         }
       }
       await db.execute('INSERT INTO _migrations (name) VALUES (?)', [name]);

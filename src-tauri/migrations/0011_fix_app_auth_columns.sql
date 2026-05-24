@@ -1,0 +1,2 @@
+ALTER TABLE app_auth ADD COLUMN failed_attempts INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE app_auth ADD COLUMN locked_until TEXT;
