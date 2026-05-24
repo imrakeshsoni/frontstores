@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Sun, Moon } from 'lucide-react';
@@ -35,6 +35,30 @@ export function SettingsPage() {
   const { loadConfig } = useAppStore();
   const { theme, toggleTheme } = useTheme();
   const tenantId = config?.tenant_id ?? '';
+
+  // Update check state
+  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'found' | 'installing' | 'up-to-date'>('idle');
+  const [updateVersion, setUpdateVersion] = useState('');
+
+  const handleCheckUpdate = useCallback(async () => {
+    setUpdateStatus('checking');
+    try {
+      const { check } = await import('@tauri-apps/plugin-updater');
+      const update = await check();
+      if (!update) { setUpdateStatus('up-to-date'); return; }
+      setUpdateVersion(update.version);
+      setUpdateStatus('found');
+      toast.info(`Update v${update.version} found — installing…`, { duration: 6000 });
+      setUpdateStatus('installing');
+      await update.downloadAndInstall();
+      toast.success('Update installed! Relaunching…', { duration: 3000 });
+      const { relaunch } = await import('@tauri-apps/plugin-process');
+      await relaunch();
+    } catch {
+      setUpdateStatus('idle');
+      toast.error('Update check failed. Please try again later.');
+    }
+  }, []);
 
   // Password change state
   const [currentUsername, setCurrentUsername] = useState('');
@@ -170,6 +194,30 @@ export function SettingsPage() {
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             {theme === 'dark' ? 'Light mode' : 'Dark mode'}
           </button>
+        </div>
+      </div>
+
+      {/* App Updates */}
+      <div className="card p-6">
+        <p className="section-label mb-1">App Updates</p>
+        <p className="text-xs text-slate-400 mb-4">Updates only replace the app — your data, bills, and products are never touched.</p>
+        <div className="flex items-center gap-4 flex-wrap">
+          <button
+            onClick={handleCheckUpdate}
+            disabled={updateStatus === 'checking' || updateStatus === 'installing'}
+            className="btn-secondary disabled:opacity-50"
+          >
+            {updateStatus === 'checking' && '⏳ Checking…'}
+            {updateStatus === 'installing' && '⬇️ Installing…'}
+            {(updateStatus === 'idle' || updateStatus === 'found') && '🔄 Check for Updates'}
+            {updateStatus === 'up-to-date' && '✅ You\'re up to date'}
+          </button>
+          {updateStatus === 'up-to-date' && (
+            <p className="text-sm text-emerald-400">FrontStores is up to date.</p>
+          )}
+          {updateStatus === 'found' && (
+            <p className="text-sm text-indigo-400">v{updateVersion} found — installing…</p>
+          )}
         </div>
       </div>
 
