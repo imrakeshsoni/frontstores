@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Sun, Moon } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { updateAppConfig } from '@/lib/db/config';
 import { changePassword, changeUsername, getAuthUsername, getExportLogs, logExport } from '@/lib/db/auth';
+import { exportBackup } from '@/lib/db/backup';
 import { PageIntro } from '@/components/ui/PageIntro';
 import { useTheme } from '@/lib/theme/useTheme';
 
@@ -41,6 +42,11 @@ export function SettingsPage() {
   const [currentPass, setCurrentPass] = useState('');
   const [newPass, setNewPass] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
+
+  // Switch to new computer — export
+  const [exportPass, setExportPass] = useState('');
+  const [exportLoading, setExportLoading] = useState(false);
+  const exportPassRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (tenantId) getAuthUsername(tenantId).then(u => { if (u) setCurrentUsername(u); });
@@ -285,6 +291,53 @@ export function SettingsPage() {
           </button>
         </div>
         <p className="text-xs text-slate-500 mt-3">💡 Tip: Take a backup weekly and store it somewhere safe. Your data is only on this computer.</p>
+      </div>
+
+      {/* Switch to New Computer */}
+      <div className="card p-6 border border-amber-500/20">
+        <p className="section-label mb-1">🖥️ Switch to New Computer</p>
+        <p className="text-xs text-slate-400 mb-4">
+          Moving to a new computer? Download a secure backup file (.fsbak) and copy it to your new machine.
+          When you install FrontStores there, choose <strong className="text-slate-300">"Restore from backup"</strong> — all your data, products, bills, and customers will be restored instantly.
+        </p>
+        <div className="flex flex-col gap-3 max-w-sm">
+          <div>
+            <label className="block text-xs font-medium text-slate-400 mb-1.5">Enter your login password to secure the file</label>
+            <input
+              ref={exportPassRef}
+              type="password"
+              value={exportPass}
+              onChange={e => setExportPass(e.target.value)}
+              placeholder="Your current login password"
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+            />
+          </div>
+          <button
+            className="btn-secondary"
+            disabled={exportPass.length < 4 || exportLoading}
+            onClick={async () => {
+              if (!tenantId || exportPass.length < 4) return;
+              setExportLoading(true);
+              try {
+                const blob = await exportBackup(tenantId, exportPass);
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `frontstores_${config?.shop_name?.replace(/\s+/g, '_') ?? 'backup'}_${new Date().toISOString().slice(0, 10)}.fsbak`;
+                a.click();
+                await logExport(tenantId, 'full_encrypted_backup', 1);
+                toast.success('Backup file downloaded. Copy it to a USB drive or Google Drive.');
+                setExportPass('');
+              } catch (e: any) {
+                toast.error('Export failed: ' + (e?.message ?? String(e)));
+              } finally {
+                setExportLoading(false);
+              }
+            }}
+          >
+            {exportLoading ? '⏳ Creating backup…' : '↓ Download Encrypted Backup (.fsbak)'}
+          </button>
+        </div>
+        <p className="text-xs text-amber-400/80 mt-3">⚠ This file contains all your shop data. Keep it safe — anyone with this file and your password can access your data.</p>
       </div>
 
       {/* Security — Lock settings */}

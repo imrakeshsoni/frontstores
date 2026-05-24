@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useAppStore } from '@/app/store/app.store';
 import { createAppConfig } from '@/lib/db/config';
 import { createAuth } from '@/lib/db/auth';
+import { importBackup } from '@/lib/db/backup';
 import { enqueue } from '@/lib/syncQueue';
 import { toast } from 'sonner';
 
@@ -24,8 +25,9 @@ interface FormData {
 }
 
 export function SetupWizard() {
-  const { setConfig, setAuthenticated } = useAppStore();
-  const [step, setStep] = useState(1);
+  const { setConfig, setAuthenticated, loadConfig } = useAppStore();
+  // step 0 = choose: new setup vs restore from backup
+  const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [tcAgreed, setTcAgreed] = useState(false);
   const [form, setForm] = useState<FormData>({
@@ -40,8 +42,30 @@ export function SetupWizard() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
 
+  // Restore from backup
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [restorePass, setRestorePass] = useState('');
+  const [restoring, setRestoring] = useState(false);
+
   const update = (key: keyof FormData, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
+
+  async function handleRestore() {
+    if (!restoreFile || restorePass.length < 4) return;
+    setRestoring(true);
+    try {
+      const result = await importBackup(restoreFile, restorePass);
+      if (!result.ok) { toast.error(result.error ?? 'Restore failed'); return; }
+      toast.success(`Welcome back, ${result.shop_name ?? 'shop'}! All your data has been restored.`);
+      // Reload config from the restored DB then go to login
+      await loadConfig();
+    } catch (e) {
+      toast.error('Restore failed: ' + String(e));
+    } finally {
+      setRestoring(false);
+    }
+  }
 
   const canProceedStep1 = form.shop_type !== '';
   const canProceedStep2 = form.shop_name.trim() !== '' && form.owner_name.trim() !== '';
@@ -93,15 +117,85 @@ export function SetupWizard() {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-white">FrontStores</h1>
-          <p className="text-slate-400 mt-2">Set up your shop — takes 2 minutes</p>
-          <div className="flex items-center justify-center gap-2 mt-4">
-            {[1, 2, 3, 4, 5].map((s) => (
-              <div key={s} className={`h-2 rounded-full transition-all ${s === step ? 'w-8 bg-indigo-500' : s < step ? 'w-4 bg-indigo-400' : 'w-4 bg-slate-600'}`} />
-            ))}
-          </div>
+          <p className="text-slate-400 mt-2">
+            {step === 0 ? 'Welcome' : 'Set up your shop — takes 2 minutes'}
+          </p>
+          {step > 0 && (
+            <div className="flex items-center justify-center gap-2 mt-4">
+              {[1, 2, 3, 4, 5].map((s) => (
+                <div key={s} className={`h-2 rounded-full transition-all ${s === step ? 'w-8 bg-indigo-500' : s < step ? 'w-4 bg-indigo-400' : 'w-4 bg-slate-600'}`} />
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-3xl p-8 shadow-2xl">
+
+          {/* Step 0: New setup vs Restore */}
+          {step === 0 && (
+            <div>
+              <h2 className="text-xl font-semibold text-slate-800 mb-1">Is this a new setup?</h2>
+              <p className="text-slate-500 text-sm mb-6">If you're moving from another computer, restore your backup file instead.</p>
+              <div className="flex flex-col gap-3 mb-6">
+                <button
+                  onClick={() => setStep(1)}
+                  className="text-left p-4 rounded-2xl border-2 border-indigo-500 bg-indigo-50 hover:bg-indigo-100 transition-all"
+                >
+                  <div className="text-2xl mb-1">🆕</div>
+                  <div className="font-medium text-slate-800 text-sm">New Setup</div>
+                  <div className="text-slate-500 text-xs mt-0.5">First time using FrontStores on this computer</div>
+                </button>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-left p-4 rounded-2xl border-2 border-slate-200 hover:border-amber-400 hover:bg-amber-50 transition-all"
+                >
+                  <div className="text-2xl mb-1">📦</div>
+                  <div className="font-medium text-slate-800 text-sm">Restore from Backup</div>
+                  <div className="text-slate-500 text-xs mt-0.5">Moving from another computer — I have a .fsbak file</div>
+                </button>
+              </div>
+
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".fsbak"
+                className="hidden"
+                onChange={e => {
+                  const f = e.target.files?.[0];
+                  if (f) setRestoreFile(f);
+                }}
+              />
+
+              {/* Restore form — shown once file is picked */}
+              {restoreFile && (
+                <div className="border-t border-slate-100 pt-5 mt-2">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-green-500">✓</span>
+                    <span className="text-sm text-slate-700 font-medium">{restoreFile.name}</span>
+                    <button onClick={() => { setRestoreFile(null); setRestorePass(''); }} className="text-xs text-slate-400 hover:text-red-500 ml-auto">Remove</button>
+                  </div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1.5">Enter your old password to unlock this file</label>
+                  <input
+                    type="password"
+                    value={restorePass}
+                    onChange={e => setRestorePass(e.target.value)}
+                    placeholder="Password from your old computer"
+                    onKeyDown={e => { if (e.key === 'Enter') handleRestore(); }}
+                    className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 mb-3"
+                  />
+                  <button
+                    onClick={handleRestore}
+                    disabled={restorePass.length < 4 || restoring}
+                    className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl text-sm transition-colors"
+                  >
+                    {restoring ? '⏳ Restoring your data…' : '📦 Restore & Open App'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Step 1: Shop Type */}
           {step === 1 && (
             <div>
