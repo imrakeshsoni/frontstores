@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "FrontStores",
-  "version": "1.0.33",
+  "version": "1.0.34",
   "identifier": "com.frontstores.app",
   "build": {
     "frontendDist": "../dist",
@@ -29,7 +29,7 @@
   "plugins": {
     "updater": {
       "active": true,
-      "dialog": true,
+      "dialog": false,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY0RDk2QTE5NEY4MjYwMTAKUldRUVlJSlBHV3JaOUVrOCtvcmRWSDRzM3pwL0FFcGFsc1djNDZ5K3N1a2Q2eS85MnVtTXN5b2IK",
       "endpoints": [
         "https://github.com/imrakeshsoni/frontstores/releases/latest/download/latest.json"

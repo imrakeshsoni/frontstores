@@ -50,9 +50,16 @@ export function SettingsPage() {
       setUpdateVersion(update.version);
       setPendingUpdate(update);
       setUpdateStatus('found');
-    } catch {
+    } catch (err) {
       setUpdateStatus('idle');
-      toast.error('Update check failed. Please try again later.');
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('network') || msg.includes('fetch') || msg.includes('connect')) {
+        toast.error('No internet connection. Please check your network and try again.');
+      } else if (msg.includes('up to date') || msg.includes('UpToDate')) {
+        setUpdateStatus('up-to-date');
+      } else {
+        toast.error(`Update check failed: ${msg}`);
+      }
     }
   }, []);
 
@@ -63,9 +70,10 @@ export function SettingsPage() {
       await pendingUpdate.downloadAndInstall();
       const { relaunch } = await import('@tauri-apps/plugin-process');
       await relaunch();
-    } catch {
+    } catch (err) {
       setUpdateStatus('found');
-      toast.error('Update installation failed. Please try again.');
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Install failed: ${msg}`);
     }
   }, [pendingUpdate]);
 
