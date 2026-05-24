@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FrontStores Admin</title>
+  <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAACXBIWXMAAAsTAAALEwEAmpwYAAAExklEQVR4nMWX629TdRjHf3+FhJdkw7mBbwxeeIFhvgATEkGWTM2mAZYNEBAli0QlGCTGySUxZKgzSBgXQRFEtoZtXXt6OV3XrXRdz+5sY13bjdXee3o557T9mt+B/ba6aaLB9Zd8k/Pu81y+z3PyELLoDdXdWy3s0p25X8MP2OpsCb7OAf1eAW37R9Dy/gRuH/Dg54OPcOVQABc/iKHpcArn6hM49YmIk8djOHYygvqGIA6dDaD2nB/vffcIlRdmsKPZm9h61S28+ov71KZbU6vJcm9kd3u1sEcfd9TysNXa8LTg25t9eP0nDzbfdGPjnUm80DoeL2sbrloKr9Hn/ne4ZgJl7Q9QpB/JrdG7qhbKvhKZz8O5URRzgyjS9cXXdFpXEdrzlYYXc06s5XpRxFm+Jg5quALA13JWFOuNArHV2sRCwJ/lTFhr0MVJoeAlnB4lXDtIIeHPGTQgFO684sesKwWfkIZHkDAtKJgayGJyMIPx4Qw629Mq/OipIK5rRfQ/lOANKpiJKhBm07gmRFHR4l0C38CPQBeIQhcIQxcI4eK0Nw9eargDQjMfaYtCSedUyaqgSpJyqhz9kpq5fTiNtJxDal5KDskn8ogyXtNO5WV+fNSDRCaLRCajKq4o2Gw1Mnip4SYILftQm8jgsUAOTl7B/S4ZPd0SrD0SbmhENFyOMLg3rGD/b3M4cO8RJqMykgqFZPHFkD+v7PZInMHndXZyhMFLDddBaM+F9iTL3DuRXbbnZ26FWeaRVBaNvWFUanjYZ57BiX4/PnTOYlvvFINv6xlgUC4QQFRR1O8xMYqyJ/Ayw2UQajhnu8TKHgpkYTJI4ExpaC1JtPAJ1XB1F+YwG1Xyyk4zH49LaJoMYZN1Is9w37t9LIAjg/0wBv1IZGgQCqr6tCq8zHARhLrd0aHk9ZwqTSXnEE1kmdsP3/Vj0C8x+OP+PtYfkoK3HQ9UeKmhG55USoXTzF/mO3ByrJ8FcMM3qsLXGZtA6Kj1dMoMHApnwdtTMDpS0DmT0PSJeaNW/qsbNUYffhgLoS+cygvifiSujlqda6H83eEAXuI12GnXsgACUhIb+B+xztgIQufcql8IYGJaWXbOT3cFcXciDq1XxGd9c8ztn4/NsAAisqLOeevc3CLjKX+RrOrocAfWG78BoYYzGyVW9gceedklc94ZYmWnfS/vnlR73jA+H0AGzmgMr/BmRGT5H+FU5uBDbDSeBqFuN5jTrOejXnnZDbdFMwW3KOeVPCgrDC5mMjgguHBibIjBB2Ih7LS3ocLeigr776gf6lwUhIRqWyMIHbXOrqQKpxr2SX+7Xrdb3OACImJ5BsygPxrDPpdL3XCOaIhl/O3UAHM7NdzzpvPwpWJIZmQkMxKuPdSB/Jfdvt7oQrnVha02J17ku5as1/klsxhODUd7Tsu+xfQlKkwnsMt8DORp/lj+LfyQ+WOQQsI/NX8EUkj4V/xBkELCG/m9IG9c8sULBb9k3h0nW65ODxQC3szvwW2+SiD0XCoI3PIutHxlA6G3mnourTTcXBmzWN58Rr2O6K1Gz6WVgnfwb+W6LTveybsP6a1Gz6WVyHwJnAXRaV1Fz6VivclVwunEp+Z2fo94i6920Z6zsj95fwJ+Y5GjALTjBgAAAABJRU5ErkJggg=="/>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -397,7 +398,22 @@
 <!-- LOGIN -->
 <div id="login-screen">
   <div class="login-card">
-    <div class="login-logo">🏪</div>
+    <div class="login-logo" style="background:none;box-shadow:none;padding:0;overflow:hidden">
+      <svg width="64" height="64" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="lgl" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%"   stop-color="#ec4899"/>
+            <stop offset="25%"  stop-color="#8b5cf6"/>
+            <stop offset="50%"  stop-color="#06b6d4"/>
+            <stop offset="75%"  stop-color="#10b981"/>
+            <stop offset="100%" stop-color="#fbbf24"/>
+          </linearGradient>
+        </defs>
+        <rect width="256" height="256" rx="56" fill="url(#lgl)"/>
+        <rect width="256" height="256" rx="56" fill="white" opacity="0.12"/>
+        <text x="128" y="158" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="118" fill="white" text-anchor="middle" letter-spacing="-5" opacity="0.95">FSA</text>
+      </svg>
+    </div>
     <h1>Front<span>Stores</span></h1>
     <p>Admin Dashboard · Rakesh Soni</p>
     <input class="login-input" type="password" id="pwd-input" placeholder="Password" onkeydown="if(event.key==='Enter')login()" />
@@ -412,7 +428,22 @@
   <!-- SIDEBAR -->
   <div class="sidebar">
     <div class="sb-brand">
-      <div class="sb-logo">🏪</div>
+      <div class="sb-logo" style="background:none;box-shadow:none;padding:0;overflow:hidden">
+      <svg width="44" height="44" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="sbl" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%"   stop-color="#ec4899"/>
+            <stop offset="25%"  stop-color="#8b5cf6"/>
+            <stop offset="50%"  stop-color="#06b6d4"/>
+            <stop offset="75%"  stop-color="#10b981"/>
+            <stop offset="100%" stop-color="#fbbf24"/>
+          </linearGradient>
+        </defs>
+        <rect width="256" height="256" rx="56" fill="url(#sbl)"/>
+        <rect width="256" height="256" rx="56" fill="white" opacity="0.12"/>
+        <text x="128" y="158" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="118" fill="white" text-anchor="middle" letter-spacing="-5" opacity="0.95">FSA</text>
+      </svg>
+    </div>
       <div class="sb-brand-name">Front<span>Stores</span></div>
       <div class="sb-brand-sub">Admin Console</div>
     </div>
