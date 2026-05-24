@@ -41,6 +41,10 @@ export interface Order {
   updated_at: string;
 }
 
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
 export async function createOrder(tenantId: string, data: {
   customer_id?: string | null;
   customer_name?: string | null;
@@ -59,43 +63,102 @@ export async function createOrder(tenantId: string, data: {
   order_date?: string;
 }): Promise<Order> {
   const db = await getDb();
-  const orderId = uuid();
-  const billNumber = await getNextBillNumber(tenantId);
-  const orderDate = data.order_date ?? now();
+  const today = now().substring(0, 10);
 
-  await db.execute(
-    `INSERT INTO orders (id, tenant_id, bill_number, customer_id, customer_name, customer_phone,
-      patient_name, doctor_name, subtotal, discount, tax_total, total, payment_method,
-      payment_status, amount_paid, notes, order_date)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [orderId, tenantId, billNumber, data.customer_id ?? null, data.customer_name ?? null,
-     data.customer_phone ?? null, data.patient_name ?? null, data.doctor_name ?? null,
-     data.subtotal, data.discount, data.tax_total, data.total, data.payment_method,
-     data.payment_status, data.amount_paid, data.notes ?? null, orderDate]
-  );
-
+  // Validate each item before touching the DB
   for (const item of data.items) {
-    await db.execute(
-      `INSERT INTO order_items (id, tenant_id, order_id, product_id, product_name, quantity,
-        unit_price, mrp, discount, gst_rate, total, batch_no, expiry_date)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [uuid(), tenantId, orderId, item.product_id ?? null, item.product_name, item.quantity,
-       item.unit_price, item.mrp ?? null, item.discount, item.gst_rate, item.total,
-       item.batch_no ?? null, item.expiry_date ?? null]
-    );
-    // Deduct stock for each sold product
-    if (item.product_id) {
-      await updateStock(tenantId, item.product_id, -item.quantity);
-      await db.execute(
-        `INSERT INTO inventory_adjustments (id, tenant_id, product_id, quantity, type, reference_id)
-         VALUES (?,?,?,?,?,?)`,
-        [uuid(), tenantId, item.product_id, -item.quantity, 'sale', orderId]
-      );
+    if (item.unit_price < 0) throw new Error(`Invalid price for "${item.product_name}"`);
+    if (item.quantity <= 0)  throw new Error(`Invalid quantity for "${item.product_name}"`);
+    if (item.expiry_date && item.expiry_date < today) {
+      throw new Error(`"${item.product_name}" (batch ${item.batch_no ?? 'N/A'}) has expired and cannot be sold`);
     }
   }
 
-  const rows = await db.select<any[]>(`SELECT * FROM orders WHERE id = ?`, [orderId]);
-  return rows[0] as Order;
+  // Recalculate totals from items — never trust client-supplied totals
+  let calcSubtotal = 0;
+  let calcTaxTotal = 0;
+  let calcDiscount = 0;
+  const lineItems = data.items.map((item) => {
+    const gross      = round2(item.unit_price * item.quantity);
+    const disc       = round2(Math.max(0, Math.min(item.discount ?? 0, gross)));
+    const net        = round2(gross - disc);
+    const tax        = round2(net * ((item.gst_rate ?? 0) / 100));
+    const lineTotal  = round2(net + tax);
+    calcSubtotal += net;
+    calcTaxTotal += tax;
+    calcDiscount += disc;
+    return { ...item, discount: disc, total: lineTotal };
+  });
+  const calcTotal = round2(calcSubtotal + calcTaxTotal);
+  calcSubtotal    = round2(calcSubtotal);
+  calcTaxTotal    = round2(calcTaxTotal);
+  calcDiscount    = round2(calcDiscount);
+
+  // Credit limit check — fetch customer's current balance + limit
+  if (data.payment_method === 'credit' && data.customer_id) {
+    const [cust] = await db.select<{ credit_limit: number }[]>(
+      'SELECT credit_limit FROM customers WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL',
+      [data.customer_id, tenantId]
+    );
+    if (cust && cust.credit_limit > 0) {
+      const [bal] = await db.select<{ balance: number }[]>(
+        `SELECT COALESCE(SUM(CASE WHEN type='debit' THEN amount ELSE -amount END), 0) AS balance
+         FROM khata_entries WHERE tenant_id = ? AND customer_id = ? AND deleted_at IS NULL`,
+        [tenantId, data.customer_id]
+      );
+      const currentBalance = bal?.balance ?? 0;
+      if (currentBalance + calcTotal > cust.credit_limit) {
+        throw new Error(
+          `Credit limit exceeded. Limit: ₹${cust.credit_limit}, Used: ₹${currentBalance.toFixed(2)}, New total: ₹${calcTotal}`
+        );
+      }
+    }
+  }
+
+  // Everything valid — run atomically
+  await db.execute('BEGIN');
+  try {
+    const orderId    = uuid();
+    const billNumber = await getNextBillNumber(tenantId);
+    const orderDate  = data.order_date ?? now();
+
+    await db.execute(
+      `INSERT INTO orders (id, tenant_id, bill_number, customer_id, customer_name, customer_phone,
+        patient_name, doctor_name, subtotal, discount, tax_total, total, payment_method,
+        payment_status, amount_paid, notes, order_date)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [orderId, tenantId, billNumber, data.customer_id ?? null, data.customer_name ?? null,
+       data.customer_phone ?? null, data.patient_name ?? null, data.doctor_name ?? null,
+       calcSubtotal, calcDiscount, calcTaxTotal, calcTotal, data.payment_method,
+       data.payment_status, data.amount_paid, data.notes ?? null, orderDate]
+    );
+
+    for (const item of lineItems) {
+      await db.execute(
+        `INSERT INTO order_items (id, tenant_id, order_id, product_id, product_name, quantity,
+          unit_price, mrp, discount, gst_rate, total, batch_no, expiry_date)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [uuid(), tenantId, orderId, item.product_id ?? null, item.product_name, item.quantity,
+         item.unit_price, item.mrp ?? null, item.discount, item.gst_rate, item.total,
+         item.batch_no ?? null, item.expiry_date ?? null]
+      );
+      if (item.product_id) {
+        await updateStock(tenantId, item.product_id, -item.quantity);
+        await db.execute(
+          `INSERT INTO inventory_adjustments (id, tenant_id, product_id, quantity, type, reference_id)
+           VALUES (?,?,?,?,?,?)`,
+          [uuid(), tenantId, item.product_id, -item.quantity, 'sale', orderId]
+        );
+      }
+    }
+
+    await db.execute('COMMIT');
+    const rows = await db.select<any[]>(`SELECT * FROM orders WHERE id = ?`, [orderId]);
+    return rows[0] as Order;
+  } catch (err) {
+    await db.execute('ROLLBACK');
+    throw err;
+  }
 }
 
 export async function listOrders(tenantId: string, opts: {
@@ -122,7 +185,7 @@ export async function getOrderWithItems(tenantId: string, orderId: string): Prom
   const rows = await db.select<any[]>(`SELECT * FROM orders WHERE id = ? AND tenant_id = ?`, [orderId, tenantId]);
   if (!rows.length) return null;
   const order = rows[0] as Order;
-  order.items = await db.select<OrderItem[]>(`SELECT * FROM order_items WHERE order_id = ?`, [orderId]);
+  order.items = await db.select<OrderItem[]>(`SELECT * FROM order_items WHERE order_id = ? AND tenant_id = ?`, [orderId, tenantId]);
   return order;
 }
 
@@ -130,17 +193,27 @@ export async function voidOrder(tenantId: string, orderId: string): Promise<void
   const db = await getDb();
   const order = await getOrderWithItems(tenantId, orderId);
   if (!order) throw new Error('Order not found');
-  await db.execute(`UPDATE orders SET payment_status = 'cancelled', deleted_at = ?, updated_at = ? WHERE id = ? AND tenant_id = ?`, [now(), now(), orderId, tenantId]);
-  // Restore stock for each item
-  for (const item of order.items ?? []) {
-    if (item.product_id) {
-      await updateStock(tenantId, item.product_id, item.quantity);
-      await db.execute(
-        `INSERT INTO inventory_adjustments (id, tenant_id, product_id, quantity, type, reference_id, notes)
-         VALUES (?,?,?,?,?,?,?)`,
-        [uuid(), tenantId, item.product_id, item.quantity, 'return', orderId, 'Order voided']
-      );
+
+  await db.execute('BEGIN');
+  try {
+    await db.execute(
+      `UPDATE orders SET payment_status = 'cancelled', deleted_at = ?, updated_at = ? WHERE id = ? AND tenant_id = ?`,
+      [now(), now(), orderId, tenantId]
+    );
+    for (const item of order.items ?? []) {
+      if (item.product_id) {
+        await updateStock(tenantId, item.product_id, item.quantity);
+        await db.execute(
+          `INSERT INTO inventory_adjustments (id, tenant_id, product_id, quantity, type, reference_id, notes)
+           VALUES (?,?,?,?,?,?,?)`,
+          [uuid(), tenantId, item.product_id, item.quantity, 'return', orderId, 'Order voided']
+        );
+      }
     }
+    await db.execute('COMMIT');
+  } catch (err) {
+    await db.execute('ROLLBACK');
+    throw err;
   }
 }
 

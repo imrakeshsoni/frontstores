@@ -27,6 +27,34 @@ function hashCode(code) {
   return crypto.createHash('sha256').update(String(code)).digest('hex');
 }
 
+// ── Rate limiting ────────────────────────────────────────────────────────────
+// Simple in-memory rate limiter per IP. Resets after the window expires.
+const _rateBuckets = new Map(); // ip -> { [endpoint]: { count, resetAt } }
+
+function rateLimit(req, res, endpoint, maxPerWindow, windowMs) {
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+  const key = `${ip}:${endpoint}`;
+  const now = Date.now();
+  let bucket = _rateBuckets.get(key);
+  if (!bucket || now > bucket.resetAt) bucket = { count: 0, resetAt: now + windowMs };
+  bucket.count++;
+  _rateBuckets.set(key, bucket);
+  if (bucket.count > maxPerWindow) {
+    res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': Math.ceil((bucket.resetAt - now) / 1000) });
+    res.end(JSON.stringify({ error: 'Too many requests. Please try again later.' }));
+    return true; // blocked
+  }
+  return false; // allowed
+}
+
+// Purge stale rate buckets every 10 minutes to prevent memory growth
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, bucket] of _rateBuckets) {
+    if (now > bucket.resetAt) _rateBuckets.delete(key);
+  }
+}, 10 * 60 * 1000);
+
 // DATA_DIR — all tenant + error data lives here. Change this env var on Mac Mini if needed.
 const DATA_DIR   = process.env.DATA_DIR || path.join(__dirname, 'data');
 const SUBS_FILE  = path.join(DATA_DIR, 'subscriptions.json');
@@ -52,9 +80,16 @@ function json(res, data, status=200) {
   res.writeHead(status, {'Content-Type':'application/json'});
   res.end(JSON.stringify(data));
 }
+// Per-session CSRF token — regenerated on each server start
+const CSRF_TOKEN = crypto.randomBytes(32).toString('hex');
+
 function checkAuth(req) {
   const auth = req.headers['authorization'] || '';
   return auth === `Basic ${Buffer.from(`:${ADMIN_PASSWORD}`).toString('base64')}`;
+}
+
+function checkCsrf(req) {
+  return req.headers['x-csrf-token'] === CSRF_TOKEN;
 }
 
 // ── PUBLIC SERVER — port 3001 — tunneled to update.frontstores.com ──────────
@@ -66,8 +101,9 @@ const publicServer = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-  // POST /register
+  // POST /register — max 10 per IP per hour
   if (req.method === 'POST' && pathname === '/register') {
+    if (rateLimit(req, res, 'register', 10, 60 * 60 * 1000)) return;
     const body = await readBody(req);
     try {
       const { tenant_id, shop_name, owner_name, shop_type, phone, email, city, gstin } = JSON.parse(body);
@@ -107,8 +143,9 @@ const publicServer = http.createServer(async (req, res) => {
     return;
   }
 
-  // POST /error
+  // POST /error — max 20 per IP per minute
   if (req.method === 'POST' && pathname === '/error') {
+    if (rateLimit(req, res, 'error', 20, 60 * 1000)) return;
     const body = await readBody(req);
     try {
       const { tenant_id, message, stack, context, app_version } = JSON.parse(body);
@@ -131,8 +168,9 @@ const publicServer = http.createServer(async (req, res) => {
 
   if (req.method === 'GET' && pathname === '/update') { res.writeHead(204); res.end(); return; }
 
-  // POST /reset-request — customer app sends this when user clicks "Forgot password"
+  // POST /reset-request — max 5 per IP per 15 minutes
   if (req.method === 'POST' && pathname === '/reset-request') {
+    if (rateLimit(req, res, 'reset-request', 5, 15 * 60 * 1000)) return;
     const body = await readBody(req);
     try {
       const { tenant_id, shop_name, requested_at } = JSON.parse(body);
@@ -150,8 +188,9 @@ const publicServer = http.createServer(async (req, res) => {
     return;
   }
 
-  // POST /unlock-request — customer app sends this when account is locked out
+  // POST /unlock-request — max 5 per IP per 15 minutes
   if (req.method === 'POST' && pathname === '/unlock-request') {
+    if (rateLimit(req, res, 'unlock-request', 5, 15 * 60 * 1000)) return;
     const body = await readBody(req);
     try {
       const { tenant_id, shop_name, requested_at } = JSON.parse(body);
@@ -169,8 +208,9 @@ const publicServer = http.createServer(async (req, res) => {
     return;
   }
 
-  // POST /verify-unlock-code — customer app verifies unlock code (no password change)
+  // POST /verify-unlock-code — max 10 per IP per 15 minutes
   if (req.method === 'POST' && pathname === '/verify-unlock-code') {
+    if (rateLimit(req, res, 'verify-unlock', 10, 15 * 60 * 1000)) return;
     const body = await readBody(req);
     try {
       const { tenant_id, code } = JSON.parse(body);
@@ -192,8 +232,9 @@ const publicServer = http.createServer(async (req, res) => {
     return;
   }
 
-  // POST /verify-reset-code — customer app verifies code + resets password
+  // POST /verify-reset-code — max 10 per IP per 15 minutes
   if (req.method === 'POST' && pathname === '/verify-reset-code') {
+    if (rateLimit(req, res, 'verify-reset', 10, 15 * 60 * 1000)) return;
     const body = await readBody(req);
     try {
       const { tenant_id, code } = JSON.parse(body);
@@ -232,8 +273,10 @@ const adminServer = http.createServer(async (req, res) => {
   // Serve the admin panel HTML
   if (req.method === 'GET' && (pathname === '/' || pathname === '/admin' || pathname === '/index.html')) {
     if (fs.existsSync(ADMIN_HTML)) {
+      const html = fs.readFileSync(ADMIN_HTML, 'utf8')
+        .replace('</head>', `<script>window.__CSRF_TOKEN__="${CSRF_TOKEN}";</script></head>`);
       res.writeHead(200, {'Content-Type':'text/html'});
-      res.end(fs.readFileSync(ADMIN_HTML, 'utf8'));
+      res.end(html);
     } else {
       res.writeHead(404); res.end('Admin panel not found');
     }
@@ -247,6 +290,11 @@ const adminServer = http.createServer(async (req, res) => {
   if (!checkAuth(req)) {
     res.writeHead(401, {'WWW-Authenticate':'Basic realm="FrontStores Admin"'});
     res.end('Unauthorized'); return;
+  }
+
+  // CSRF check on all state-changing requests
+  if (req.method === 'POST' && !checkCsrf(req)) {
+    res.writeHead(403); res.end('Invalid CSRF token'); return;
   }
 
   // GET /admin/api/customers

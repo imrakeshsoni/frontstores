@@ -108,7 +108,7 @@ export async function verifyAuth(
   // Username must match
   if (auth.username !== username.trim().toLowerCase()) {
     _recordMemAttempt(tenantId, maxAttempts);
-    return { ok: false, attemptsLeft: maxAttempts - (auth.failed_attempts + 1) };
+    return { ok: false };
   }
 
   const hash = await hashPassword(password, auth.salt);
@@ -127,7 +127,7 @@ export async function verifyAuth(
       'UPDATE app_auth SET failed_attempts = ?, updated_at = ? WHERE tenant_id = ?',
       [newAttempts, now(), tenantId]
     );
-    return { ok: false, attemptsLeft: maxAttempts - newAttempts };
+    return { ok: false };
   }
 
   // Correct password — reset both in-memory and DB counters

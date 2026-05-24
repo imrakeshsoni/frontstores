@@ -150,6 +150,7 @@
     <div class="topbar-right">
       <span class="topbar-time" id="clock"></span>
       <button class="btn-icon" onclick="loadAll()">↻ Refresh</button>
+      <button class="btn-icon" onclick="logout()" style="color:var(--red);border-color:rgba(239,68,68,.3)">⎋ Logout</button>
     </div>
   </div>
 
@@ -222,7 +223,33 @@
 <script>
 const API = 'http://localhost:3002';
 const ICONS = { medical:'💊', restaurant:'🍽️' };
+const CSRF_TOKEN = window.__CSRF_TOKEN__ || '';
 let password = '', allCustomers = [], allErrors = [], filter = 'all', eFilter = 'all', openId = null;
+
+// ── Security helpers ─────────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function safeId(s) { return String(s||'').replace(/[^a-zA-Z0-9\-_]/g,''); }
+
+// ── Idle session timeout (30 minutes) ────────────────────────────────────────
+let _idleTimer = null;
+function resetIdleTimer() {
+  clearTimeout(_idleTimer);
+  if (!password) return;
+  _idleTimer = setTimeout(() => { logout(); showToast('Session expired due to inactivity', true); }, 30 * 60 * 1000);
+}
+['click','keydown','mousemove','touchstart'].forEach(e => document.addEventListener(e, resetIdleTimer, {passive:true}));
+
+function logout() {
+  password = '';
+  allCustomers = []; allErrors = []; openId = null;
+  clearTimeout(_idleTimer);
+  document.getElementById('app').classList.remove('visible');
+  document.getElementById('login-screen').style.display='';
+  document.getElementById('pwd-input').value='';
+  closePanel();
+}
 
 setInterval(() => {
   document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' });
@@ -244,7 +271,15 @@ function login() {
 }
 
 async function api(path, opts={}) {
-  return fetch(API+path, { ...opts, headers: { 'Authorization': `Basic ${btoa(':'+password)}`, 'Content-Type':'application/json', ...(opts.headers||{}) } });
+  return fetch(API+path, {
+    ...opts,
+    headers: {
+      'Authorization': `Basic ${btoa(':'+password)}`,
+      'Content-Type': 'application/json',
+      'X-CSRF-Token': CSRF_TOKEN,
+      ...(opts.headers||{})
+    }
+  });
 }
 
 async function loadAll(isLogin=false) {
@@ -315,10 +350,11 @@ function renderCustomers() {
     else if (st==='revoked')  { badge=`<span class="badge badge-revoked">🚫 Revoked</span>`; }
 
     const rowClass = st==='frozen'?'frozen-row':st==='revoked'?'revoked-row':'';
-    return `<tr class="${rowClass}" onclick="openPanel('${c.tenant_id}')">
-      <td><div class="shop-name">${c.shop_name||'Unknown'}</div><div class="shop-id">${(c.tenant_id||'').substring(0,20)}…</div></td>
-      <td><span class="type-chip">${icon} ${c.shop_type||'—'}</span></td>
-      <td><div style="font-size:13px">${c.owner_name||'—'}</div><div style="font-size:12px;color:var(--muted)">${c.phone||c.email||'—'}</div></td>
+    const tid = escHtml(c.tenant_id||'');
+    return `<tr class="${rowClass}" onclick="openPanel('${tid}')">
+      <td><div class="shop-name">${escHtml(c.shop_name||'Unknown')}</div><div class="shop-id">${tid.substring(0,20)}…</div></td>
+      <td><span class="type-chip">${icon} ${escHtml(c.shop_type||'—')}</span></td>
+      <td><div style="font-size:13px">${escHtml(c.owner_name||'—')}</div><div style="font-size:12px;color:var(--muted)">${escHtml(c.phone||c.email||'—')}</div></td>
       <td style="color:var(--muted);font-size:13px">${reg}</td>
       <td>${badge}${bar}</td>
     </tr>`;
@@ -348,27 +384,27 @@ function renderPanel(c) {
   else if (st==='revoked')  statusBadge=`<span class="badge badge-revoked">🚫 Revoked</span>`;
 
   document.getElementById('dp-title').textContent = c.shop_name||'Unknown';
-  document.getElementById('dp-sub').innerHTML = `${icon} ${c.shop_type||'—'} ${errs>0?`<span style="color:var(--red);margin-left:8px">⚠ ${errs} open error${errs>1?'s':''}</span>`:''}`;
+  document.getElementById('dp-sub').innerHTML = `${icon} ${escHtml(c.shop_type||'—')} ${errs>0?`<span style="color:var(--red);margin-left:8px">⚠ ${errs} open error${errs>1?'s':''}</span>`:''}`;
 
   document.getElementById('dp-body').innerHTML = `
     <div style="margin-bottom:16px">${statusBadge}</div>
 
-    <div class="dp-label">Owner</div><div class="dp-value">${c.owner_name||'—'}</div>
-    <div class="dp-label">Phone</div><div class="dp-value">${c.phone||'—'}</div>
-    <div class="dp-label">Email</div><div class="dp-value">${c.email||'—'}</div>
-    <div class="dp-label">City</div><div class="dp-value">${c.city||'—'}</div>
-    ${c.gstin?`<div class="dp-label">GSTIN</div><div class="dp-value">${c.gstin}</div>`:''}
+    <div class="dp-label">Owner</div><div class="dp-value">${escHtml(c.owner_name||'—')}</div>
+    <div class="dp-label">Phone</div><div class="dp-value">${escHtml(c.phone||'—')}</div>
+    <div class="dp-label">Email</div><div class="dp-value">${escHtml(c.email||'—')}</div>
+    <div class="dp-label">City</div><div class="dp-value">${escHtml(c.city||'—')}</div>
+    ${c.gstin?`<div class="dp-label">GSTIN</div><div class="dp-value">${escHtml(c.gstin)}</div>`:''}
 
     <div class="dp-section">
-      <div class="dp-label">Shop ID</div><div class="dp-value" style="font-family:monospace;font-size:12px">${c.tenant_id}</div>
+      <div class="dp-label">Shop ID</div><div class="dp-value" style="font-family:monospace;font-size:12px">${escHtml(c.tenant_id)}</div>
       <div class="dp-label">Registered</div><div class="dp-value">${c.registered_at?new Date(c.registered_at).toLocaleString('en-IN'):'—'}</div>
-      <div class="dp-label">Expires</div><div class="dp-value">${c.expires_at||'—'}</div>
+      <div class="dp-label">Expires</div><div class="dp-value">${escHtml(c.expires_at||'—')}</div>
     </div>
 
     <div class="dp-section">
       <div class="contact-row">
-        ${c.phone?`<a href="https://wa.me/91${c.phone.replace(/[^0-9]/g,'')}?text=Hi ${encodeURIComponent(c.owner_name||'')}, your FrontStores subscription is activated!" class="contact-btn wa">💬 WhatsApp</a>`:''}
-        ${c.email?`<a href="mailto:${c.email}?subject=FrontStores Subscription" class="contact-btn">📧 Email</a>`:''}
+        ${c.phone?`<a href="https://wa.me/91${encodeURIComponent(c.phone.replace(/[^0-9]/g,''))}?text=Hi+${encodeURIComponent(c.owner_name||'')},+your+FrontStores+subscription+is+activated!" class="contact-btn wa">💬 WhatsApp</a>`:''}
+        ${c.email?`<a href="mailto:${encodeURIComponent(c.email)}?subject=FrontStores+Subscription" class="contact-btn">📧 Email</a>`:''}
       </div>
     </div>
   `;
@@ -380,32 +416,33 @@ function renderPanel(c) {
   const hasResetCode = !!c.reset_token;
   const hasUnlockReq = !!c.unlock_requested_at && !c.unlock_token;
   const hasUnlockCode = !!c.unlock_token;
+  const tid = escHtml(c.tenant_id||'');
   document.getElementById('dp-actions').innerHTML = `
-    <button class="action-btn btn-extend-big" onclick="doAction('${c.tenant_id}','extend')" ${isRevoked?'disabled':''}>
+    <button class="action-btn btn-extend-big" onclick="doAction('${tid}','extend')" ${isRevoked?'disabled':''}>
       ➕ Extend 30 Days
     </button>
     ${isFrozen
-      ? `<button class="action-btn btn-unfreeze" onclick="doAction('${c.tenant_id}','unfreeze')">✅ Unfreeze Account</button>`
-      : `<button class="action-btn btn-freeze" onclick="doAction('${c.tenant_id}','freeze')" ${isRevoked?'disabled':''}>🧊 Freeze Account</button>`
+      ? `<button class="action-btn btn-unfreeze" onclick="doAction('${tid}','unfreeze')">✅ Unfreeze Account</button>`
+      : `<button class="action-btn btn-freeze" onclick="doAction('${tid}','freeze')" ${isRevoked?'disabled':''}>🧊 Freeze Account</button>`
     }
     ${!isRevoked
-      ? `<button class="action-btn btn-revoke" onclick="confirmRevoke('${c.tenant_id}','${(c.shop_name||'').replace(/'/g,"\\'")}')">🚫 Revoke Access</button>`
-      : `<button class="action-btn btn-unfreeze" onclick="doAction('${c.tenant_id}','unfreeze')">↩ Restore Access</button>`
+      ? `<button class="action-btn btn-revoke" onclick="confirmRevoke('${tid}')">🚫 Revoke Access</button>`
+      : `<button class="action-btn btn-unfreeze" onclick="doAction('${tid}','unfreeze')">↩ Restore Access</button>`
     }
 
     <div style="border-top:1px solid var(--border2);margin:8px 0"></div>
 
     ${hasUnlockCode
       ? `<div style="background:rgba(79,142,247,.08);border:1px solid rgba(79,142,247,.2);border-radius:12px;padding:14px;text-align:center">
-           <div style="font-size:12px;color:var(--muted);margin-bottom:6px">🔓 Unlock code (valid 2h) — share with customer:</div>
-           <div style="font-size:28px;font-weight:900;letter-spacing:6px;color:var(--accent)">${c.unlock_token}</div>
-           <button class="action-btn" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:#fca5a5;margin-top:10px;padding:8px" onclick="clearUnlockCode('${c.tenant_id}')">✕ Clear Code</button>
+           <div style="font-size:13px;font-weight:700;color:#93c5fd;margin-bottom:4px">🔓 Unlock code is active</div>
+           <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Code was shown when generated. Share it with the customer.</div>
+           <button class="action-btn" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:#fca5a5;padding:8px" onclick="clearUnlockCode('${tid}')">✕ Clear Code</button>
          </div>`
       : hasUnlockReq
-        ? `<button class="action-btn" style="background:rgba(79,142,247,.12);border:1px solid rgba(79,142,247,.25);color:#93c5fd" onclick="generateUnlockCode('${c.tenant_id}')">
+        ? `<button class="action-btn" style="background:rgba(79,142,247,.12);border:1px solid rgba(79,142,247,.25);color:#93c5fd" onclick="generateUnlockCode('${tid}')">
              🔓 Generate Unlock Code <span style="font-size:11px;display:block;font-weight:400;margin-top:2px;color:var(--muted)">Requested ${new Date(c.unlock_requested_at).toLocaleString('en-IN')}</span>
            </button>`
-        : `<button class="action-btn" style="background:var(--surface2);border:1px solid var(--border2);color:var(--muted)" onclick="generateUnlockCode('${c.tenant_id}')">
+        : `<button class="action-btn" style="background:var(--surface2);border:1px solid var(--border2);color:var(--muted)" onclick="generateUnlockCode('${tid}')">
              🔓 Unlock Account (too many attempts)
            </button>`
     }
@@ -414,15 +451,15 @@ function renderPanel(c) {
 
     ${hasResetCode
       ? `<div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:12px;padding:14px;text-align:center">
-           <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Reset code (valid 24h) — share with customer:</div>
-           <div style="font-size:28px;font-weight:900;letter-spacing:6px;color:var(--green)">${c.reset_token}</div>
-           <button class="action-btn" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:#fca5a5;margin-top:10px;padding:8px" onclick="clearResetCode('${c.tenant_id}')">✕ Clear Code</button>
+           <div style="font-size:13px;font-weight:700;color:var(--green);margin-bottom:4px">🔑 Reset code is active</div>
+           <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Code was shown when generated. Share it with the customer.</div>
+           <button class="action-btn" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:#fca5a5;padding:8px" onclick="clearResetCode('${tid}')">✕ Clear Code</button>
          </div>`
       : hasResetReq
-        ? `<button class="action-btn" style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.2);color:#fcd34d" onclick="generateResetCode('${c.tenant_id}')">
+        ? `<button class="action-btn" style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.2);color:#fcd34d" onclick="generateResetCode('${tid}')">
              🔑 Generate Reset Code <span style="font-size:11px;display:block;font-weight:400;margin-top:2px">Reset requested ${new Date(c.reset_requested_at).toLocaleString('en-IN')}</span>
            </button>`
-        : `<button class="action-btn" style="background:var(--surface2);border:1px solid var(--border2);color:var(--muted)" onclick="generateResetCode('${c.tenant_id}')">
+        : `<button class="action-btn" style="background:var(--surface2);border:1px solid var(--border2);color:var(--muted)" onclick="generateResetCode('${tid}')">
              🔑 Generate Password Reset Code
            </button>`
     }
@@ -443,20 +480,42 @@ async function doAction(id, action) {
   await loadAll();
 }
 
-function confirmRevoke(id, name) {
+function confirmRevoke(id) {
+  const c = allCustomers.find(x=>x.tenant_id===id);
+  const name = c?.shop_name || id.substring(0,8);
   if (!confirm(`Revoke access for "${name}"?\n\nTheir app will be locked immediately. This can be reversed by clicking "Restore Access".`)) return;
   doAction(id, 'revoke');
+}
+
+function showCodeModal(title, code) {
+  const old = document.getElementById('code-modal');
+  if (old) old.remove();
+  const m = document.createElement('div');
+  m.id = 'code-modal';
+  m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;display:flex;align-items:center;justify-content:center';
+  m.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border2);border-radius:20px;padding:36px 32px;width:340px;text-align:center">
+    <div style="font-size:13px;color:var(--muted);margin-bottom:14px">${escHtml(title)}</div>
+    <div style="font-size:40px;font-weight:900;letter-spacing:10px;color:var(--accent);font-family:monospace">${escHtml(code)}</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5">Share this with the customer.<br>This code will <strong>not</strong> be shown again.</div>
+    <button onclick="document.getElementById('code-modal').remove()" style="margin-top:20px;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">Done ✓</button>
+  </div>`;
+  m.addEventListener('click', e => { if (e.target === m) m.remove(); });
+  document.body.appendChild(m);
 }
 
 async function generateResetCode(id) {
   const code = String(Math.floor(100000 + Math.random() * 900000));
   const expires = new Date(Date.now() + 24*60*60*1000).toISOString();
-  await api(`/admin/api/customers/${id}/set-reset-code`, {
+  const r = await api(`/admin/api/customers/${id}/set-reset-code`, {
     method: 'POST',
     body: JSON.stringify({ code, expires })
   });
-  showToast('🔑 Reset code generated — share it with the customer');
-  await loadAll();
+  if (r.ok) {
+    showCodeModal('🔑 Password Reset Code (valid 24 hours)', code);
+    await loadAll();
+  } else {
+    showToast('Failed to generate reset code', true);
+  }
 }
 
 async function clearResetCode(id) {
@@ -470,13 +529,17 @@ async function clearResetCode(id) {
 
 async function generateUnlockCode(id) {
   const code = String(Math.floor(100000 + Math.random() * 900000));
-  const expires = new Date(Date.now() + 2*60*60*1000).toISOString(); // 2 hours
-  await api(`/admin/api/customers/${id}/set-unlock-code`, {
+  const expires = new Date(Date.now() + 2*60*60*1000).toISOString();
+  const r = await api(`/admin/api/customers/${id}/set-unlock-code`, {
     method: 'POST',
     body: JSON.stringify({ code, expires })
   });
-  showToast('🔓 Unlock code generated — share it with the customer');
-  await loadAll();
+  if (r.ok) {
+    showCodeModal('🔓 Unlock Code (valid 2 hours)', code);
+    await loadAll();
+  } else {
+    showToast('Failed to generate unlock code', true);
+  }
 }
 
 async function clearUnlockCode(id) {
@@ -511,7 +574,7 @@ function renderErrors() {
     const hasStack = e.stack && e.stack.trim();
     return `<div class="error-card ${e.resolved?'resolved':''}">
       <div class="error-top">
-        <div><span class="error-shop">${icon} ${e.shop_name||'Unknown'}</span>${e.app_version?` <span style="font-size:11px;color:var(--muted)">v${e.app_version}</span>`:''}</div>
+        <div><span class="error-shop">${icon} ${escHtml(e.shop_name||'Unknown')}</span>${e.app_version?` <span style="font-size:11px;color:var(--muted)">v${escHtml(e.app_version)}</span>`:''}</div>
         <div class="error-time">${t}</div>
       </div>
       <div class="error-msg">${escHtml(e.message)}</div>
@@ -525,7 +588,6 @@ function renderErrors() {
   }).join('');
 }
 
-function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function toggleStack(id) { document.getElementById('stack-'+id)?.classList.toggle('open'); }
 async function resolveErr(id) {
   await api(`/admin/api/errors/${id}/resolve`, { method:'POST' });

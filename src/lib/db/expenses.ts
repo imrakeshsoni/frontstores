@@ -28,6 +28,8 @@ export async function listExpenses(tenantId: string, from: string, to: string): 
 }
 
 export async function addExpense(tenantId: string, data: Omit<Expense, 'id' | 'tenant_id'>) {
+  if (!data.amount || data.amount <= 0) throw new Error('Expense amount must be greater than zero');
+  if (!EXPENSE_CATEGORIES.includes(data.category)) throw new Error('Invalid expense category');
   const db = await getDb();
   const id = uuid();
   await db.execute(
