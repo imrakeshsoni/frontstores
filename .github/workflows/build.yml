@@ -26,34 +26,27 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
-          VERSION: ${{ steps.ver.outputs.version }}
         run: |
+          cat > notes.md << 'NOTES'
+          Complete business management software for Indian shops. 30-day free trial · ₹999/month.
+
+          ### Windows
+          Download the .msi file and double-click to install.
+          If SmartScreen shows a warning, click More info then Run anyway.
+
+          ### Mac (Apple Silicon)
+          Download the aarch64.dmg file.
+
+          ### Mac (Intel)
+          Download the x86_64.dmg file.
+
+          Mac note: if macOS says "App is damaged", open Terminal and run:
+          xattr -cr /Applications/FrontStores.app
+          NOTES
+
           gh release create "$TAG" \
             --title "FrontStores $TAG" \
-            --notes "## FrontStores $TAG
-
-Complete business management software for Indian shops. 30-day free trial · ₹999/month.
-
----
-
-### 🪟 Windows
-1. Download the \`.msi\` file below
-2. Double-click to install
-3. If SmartScreen shows a warning → click **More info** → **Run anyway**
-
-### 🍎 Mac (Apple Silicon — M1/M2/M3/M4)
-Download \`aarch64.dmg\`
-
-### 🍎 Mac (Intel)
-Download \`x86_64.dmg\`
-
-**Mac installation note:** macOS may show "App is damaged" — this is a security warning for apps not on the App Store. To fix:
-1. Copy FrontStores.app to your Applications folder
-2. Open Terminal and run:
-\`\`\`
-xattr -cr /Applications/FrontStores.app
-\`\`\`
-3. Double-click the app — done. You only need to do this once." \
+            --notes-file notes.md \
             --draft=false \
             --prerelease=false
 
