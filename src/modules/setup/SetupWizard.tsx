@@ -3,8 +3,10 @@ import { useAppStore } from '@/app/store/app.store';
 import { createAppConfig } from '@/lib/db/config';
 import { createAuth } from '@/lib/db/auth';
 import { importBackup } from '@/lib/db/backup';
-import { enqueue } from '@/lib/syncQueue';
+import { enqueue, flushQueue } from '@/lib/syncQueue';
 import { toast } from 'sonner';
+
+const SERVER = 'https://update.frontstores.com';
 
 const SHOP_TYPES = [
   { value: 'medical', label: 'Medical / Pharmacy', icon: '💊', desc: 'Medicines, prescriptions, drug inventory' },
@@ -91,10 +93,9 @@ export function SetupWizard() {
         drug_license_no: form.drug_license_no || undefined,
       });
       await createAuth(config.tenant_id, username.trim(), password);
-      setConfig(config);
-      setAuthenticated(true);
-      toast.success('Setup complete! Welcome to FrontStores.');
-      enqueue('register', config.tenant_id, {
+
+      // Queue registration then flush immediately so server knows about this tenant
+      await enqueue('register', config.tenant_id, {
         tenant_id: config.tenant_id,
         shop_name: form.shop_name.trim(),
         owner_name: form.owner_name.trim(),
@@ -103,7 +104,30 @@ export function SetupWizard() {
         email: form.email || '',
         city: form.city || '',
         gstin: form.gstin || '',
-      }).catch(() => {});
+      });
+      await flushQueue().catch(() => {});
+
+      // Check what the server thinks — it will return 'pending' until admin approves
+      let serverStatus = 'pending';
+      try {
+        const res = await fetch(`${SERVER}/license/${config.tenant_id}`, {
+          signal: AbortSignal.timeout(6000),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          serverStatus = data.active ? 'active' : (data.reason ?? 'pending');
+        }
+      } catch { /* offline — stay pending */ }
+
+      setConfig(config);
+      // Only let user in if server already approved (unlikely on first reg, but handles future cases)
+      if (serverStatus === 'active' || serverStatus === 'extended') {
+        setAuthenticated(true);
+        toast.success('Setup complete! Welcome to FrontStores.');
+      } else {
+        // pending / offline — load config so SubscriptionGate can show the pending screen
+        await loadConfig();
+      }
     } catch (e: unknown) {
       toast.error(String((e as Error)?.message ?? e ?? 'Setup failed'));
     } finally {

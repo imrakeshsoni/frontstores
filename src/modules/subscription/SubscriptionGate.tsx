@@ -79,6 +79,7 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
 
       if (stale && navigator.onLine) {
         const serverResult = await tryServerCheck();
+        if (serverResult === 'pending')          { setStatus('pending');                        return; }
         if (serverResult === 'frozen')           { setLockReason('frozen');  setStatus('locked'); return; }
         if (serverResult === 'revoked')          { setLockReason('revoked'); setStatus('locked'); return; }
         if (serverResult === 'confirmed_expired'){ setLockReason('expired'); setStatus('locked'); return; }
@@ -86,8 +87,9 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Background check for freeze/revoke even when not stale
+      // Background check for freeze/revoke/pending even when not stale
       tryServerCheck().then((result) => {
+        if (result === 'pending')           { setStatus('pending'); }
         if (result === 'frozen')            { setLockReason('frozen');  setStatus('locked'); }
         if (result === 'revoked')           { setLockReason('revoked'); setStatus('locked'); }
         if (result === 'confirmed_expired') { setLockReason('expired'); setStatus('locked'); }

@@ -52,18 +52,18 @@ export async function createAppConfig(data: {
   const db = await getDb();
   const tenant_id = uuid();
   const trialStart = now();
-  const trialExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-    .toISOString().replace('T', ' ').substring(0, 19);
+  // Leave subscription_expires_at NULL — server sets it after admin approval.
+  // This forces SubscriptionGate to always check the server before granting access.
   await db.execute(
     `INSERT INTO app_config (id, tenant_id, shop_type, shop_name, owner_name, phone, email,
       address_line1, city, state, pincode, gstin, drug_license_no, is_setup_complete,
       trial_started_at, subscription_expires_at, subscription_status, tc_agreed_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 'trial', ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, NULL, 'pending', ?)`,
     [uuid(), tenant_id, data.shop_type, data.shop_name, data.owner_name,
      data.phone ?? null, data.email ?? null, data.address_line1 ?? null,
      data.city ?? null, data.state ?? null, data.pincode ?? null,
      data.gstin ?? null, data.drug_license_no ?? null,
-     trialStart, trialExpiry, trialStart]
+     trialStart, trialStart]
   );
   await db.execute(
     `INSERT INTO bill_sequences (id, tenant_id, sequence_type, prefix, current_number)
