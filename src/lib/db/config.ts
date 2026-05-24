@@ -20,6 +20,7 @@ export interface AppConfig {
   subscription_expires_at: string | null;
   subscription_status: 'trial' | 'active' | 'expired' | 'grace';
   tc_agreed_at: string | null;
+  last_server_time: string | null;
 }
 
 export async function getAppConfig(): Promise<AppConfig | null> {

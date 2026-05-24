@@ -86,12 +86,13 @@ const publicServer = http.createServer(async (req, res) => {
   if (req.method === 'GET' && pathname.startsWith('/license/')) {
     const tenantId = pathname.split('/')[2];
     const sub = loadSubs()[tenantId];
-    if (!sub)                              { json(res, { active: false }); return; }
-    if (sub.account_status === 'frozen')   { json(res, { active: false, reason: 'frozen' }); return; }
-    if (sub.account_status === 'revoked')  { json(res, { active: false, reason: 'revoked' }); return; }
+    const server_time = new Date().toISOString();
+    if (!sub)                              { json(res, { active: false, server_time }); return; }
+    if (sub.account_status === 'frozen')   { json(res, { active: false, reason: 'frozen', server_time }); return; }
+    if (sub.account_status === 'revoked')  { json(res, { active: false, reason: 'revoked', server_time }); return; }
     json(res, new Date(sub.expires_at) > new Date()
-      ? { active: true,  expires_at: sub.expires_at }
-      : { active: false });
+      ? { active: true,  expires_at: sub.expires_at, server_time }
+      : { active: false, server_time });
     return;
   }
 

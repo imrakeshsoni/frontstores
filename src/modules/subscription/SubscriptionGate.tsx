@@ -5,7 +5,9 @@ import { getDb, now } from '@/lib/db/index';
 const WHATSAPP = '919340419566';
 const EMAIL = 'imrakeshsoni@gmail.com';
 const SERVER = 'https://update.frontstores.com';
-const OFFLINE_GRACE_DAYS = 7; // days after expiry before locking when offline
+const OFFLINE_GRACE_DAYS = 7;
+// If local clock is more than 1 hour behind last known server time, treat as rollback
+const ROLLBACK_TOLERANCE_MS = 60 * 60 * 1000;
 
 type Status = 'loading' | 'active' | 'warning' | 'locked';
 
@@ -22,7 +24,6 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
     checkSubscription();
   }, [config]);
 
-  // Re-check whenever internet comes back
   useEffect(() => {
     const handler = () => checkSubscription();
     window.addEventListener('online', handler);
@@ -36,40 +37,53 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
       ? new Date(config.subscription_expires_at)
       : null;
 
-    // No expiry set = unlimited (dev/admin installs)
     if (!expires) { setStatus('active'); return; }
 
-    const daysUntilExpiry = Math.ceil((expires.getTime() - Date.now()) / 864e5);
+    // Detect clock rollback: local time is behind the last server timestamp we stored
+    const lastServerTime = config.last_server_time ? new Date(config.last_server_time).getTime() : null;
+    const clockRolledBack = lastServerTime !== null && (Date.now() < lastServerTime - ROLLBACK_TOLERANCE_MS);
 
-    // Still active locally — try a background server check to catch freeze/revoke
-    if (daysUntilExpiry > 0) {
-      setStatus('active');
-      tryServerCheck(); // silent background check, won't block the app
+    if (clockRolledBack) {
+      // Clock has been wound back — must verify with server, cannot trust local expiry
+      const serverResult = await tryServerCheck();
+      if (serverResult === 'extended') return;
+      if (serverResult === 'frozen') { setLockReason('frozen'); setStatus('locked'); return; }
+      if (serverResult === 'revoked') { setLockReason('revoked'); setStatus('locked'); return; }
+      if (serverResult === 'confirmed_expired') { setLockReason('expired'); setStatus('locked'); return; }
+      // Server unreachable and clock is suspicious — lock immediately, no grace
+      setLockReason('expired');
+      setStatus('locked');
       return;
     }
 
-    // Subscription expired locally — must verify with server
-    const serverResult = await tryServerCheck();
+    const daysUntilExpiry = Math.ceil((expires.getTime() - Date.now()) / 864e5);
 
-    if (serverResult === 'extended') return; // already reloaded config
-    if (serverResult === 'frozen') { setLockReason('frozen'); setStatus('locked'); return; }
-    if (serverResult === 'revoked') { setLockReason('revoked'); setStatus('locked'); return; }
-
-    if (serverResult === 'confirmed_expired') {
-      setLockReason('expired'); setStatus('locked'); return;
+    if (daysUntilExpiry > 0) {
+      setStatus('active');
+      // Background check — applies freeze/revoke immediately if server says so
+      tryServerCheck().then((result) => {
+        if (result === 'frozen') { setLockReason('frozen'); setStatus('locked'); }
+        if (result === 'revoked') { setLockReason('revoked'); setStatus('locked'); }
+      });
+      return;
     }
 
-    // Server unreachable (offline or Mac is off) — apply grace period
-    // Grace = 7 days from the expiry date
+    // Expired locally — must verify with server
+    const serverResult = await tryServerCheck();
+
+    if (serverResult === 'extended') return;
+    if (serverResult === 'frozen') { setLockReason('frozen'); setStatus('locked'); return; }
+    if (serverResult === 'revoked') { setLockReason('revoked'); setStatus('locked'); return; }
+    if (serverResult === 'confirmed_expired') { setLockReason('expired'); setStatus('locked'); return; }
+
+    // Server unreachable — apply grace period
     const daysSinceExpiry = Math.ceil((Date.now() - expires.getTime()) / 864e5);
     const graceLeft = OFFLINE_GRACE_DAYS - daysSinceExpiry;
 
     if (graceLeft > 0) {
-      // Still within grace — app works, show warning banner
       setGraceDaysLeft(graceLeft);
       setStatus('warning');
     } else {
-      // Grace exhausted — lock
       setLockReason('expired');
       setStatus('locked');
     }
@@ -85,11 +99,19 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
 
       const data = await res.json();
 
+      // Always persist the server's authoritative timestamp for rollback detection
+      if (data.server_time) {
+        const db = await getDb();
+        await db.execute(
+          `UPDATE app_config SET last_server_time = ?, updated_at = ? WHERE tenant_id = ?`,
+          [data.server_time, now(), config.tenant_id]
+        );
+      }
+
       if (data.reason === 'frozen') return 'frozen';
       if (data.reason === 'revoked') return 'revoked';
 
       if (data.active && data.expires_at) {
-        // Server has a valid (possibly extended) expiry — update local DB
         const db = await getDb();
         await db.execute(
           `UPDATE app_config SET subscription_expires_at = ?, subscription_status = 'active', last_verified_at = ?, updated_at = ? WHERE tenant_id = ?`,
@@ -100,7 +122,6 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
         return 'extended';
       }
 
-      // Server confirmed: expired
       return 'confirmed_expired';
     } catch {
       return 'unreachable';
@@ -115,7 +136,6 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
 
   if (status === 'loading' || status === 'active') return <>{children}</>;
 
-  // Warning banner — app still works, just a dismissible notice at top
   if (status === 'warning') {
     return (
       <>
@@ -138,7 +158,6 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Locked screen
   const isOfflineExpired = lockReason === 'expired';
   const isFrozen = lockReason === 'frozen';
   const isRevoked = lockReason === 'revoked';

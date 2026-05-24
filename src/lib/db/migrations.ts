@@ -7,6 +7,7 @@ import migration0006 from '../../../src-tauri/migrations/0006_app_auth.sql?raw';
 import migration0007 from '../../../src-tauri/migrations/0007_purchase_orders.sql?raw';
 import migration0008 from '../../../src-tauri/migrations/0008_supplier_payments.sql?raw';
 import migration0009 from '../../../src-tauri/migrations/0009_security.sql?raw';
+import migration0010 from '../../../src-tauri/migrations/0010_server_time.sql?raw';
 
 export interface Migration {
   name: string;
@@ -24,5 +25,6 @@ export async function readMigrations(): Promise<Migration[]> {
     { name: '0007_purchase_orders', sql: migration0007 },
     { name: '0008_supplier_payments', sql: migration0008 },
     { name: '0009_security', sql: migration0009 },
+    { name: '0010_server_time', sql: migration0010 },
   ];
 }
