@@ -1,13 +1,19 @@
 import Database from '@tauri-apps/plugin-sql';
 import { readMigrations } from './migrations';
+import { reportError } from '../errorReporter';
 
 let _db: Database | null = null;
 
 export async function getDb(): Promise<Database> {
   if (_db) return _db;
-  _db = await Database.load('sqlite:frontstores.db');
-  await _db.execute('PRAGMA foreign_keys = ON');
-  await runMigrations(_db);
+  try {
+    _db = await Database.load('sqlite:frontstores.db');
+    await _db.execute('PRAGMA foreign_keys = ON');
+    await runMigrations(_db);
+  } catch (e: any) {
+    reportError(String(e?.message || e), e?.stack, 'db.getDb');
+    throw e;
+  }
   return _db;
 }
 
@@ -44,6 +50,7 @@ async function runMigrations(db: Database) {
             msg.includes('already exists') ||
             msg.includes('duplicate column name')
           ) continue;
+          reportError(`Migration ${name} failed: ${msg}`, undefined, `migration.${name}`);
           throw e;
         }
       }
