@@ -48,7 +48,12 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
       }
       if (serverResult === 'frozen')  { setLockReason('frozen');  setStatus('locked'); return; }
       if (serverResult === 'revoked') { setLockReason('revoked'); setStatus('locked'); return; }
-      // confirmed_expired OR unreachable with no local expiry → lock
+      // confirmed_expired OR unreachable with no local expiry
+      // If locally marked pending, show pending screen (not locked) — server may be temporarily unreachable
+      if (serverResult === 'unreachable' && config.subscription_status === 'pending') {
+        setStatus('pending');
+        return;
+      }
       setLockReason('expired');
       setStatus('locked');
       return;
