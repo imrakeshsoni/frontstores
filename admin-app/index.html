@@ -383,6 +383,13 @@
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: rgba(139,92,246,.3); border-radius: 99px; }
     ::-webkit-scrollbar-thumb:hover { background: rgba(139,92,246,.5); }
+
+    /* ── SPINNER ─────────────────────────────────────────────────────────── */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { display: inline-block; animation: spin .7s linear infinite; }
+    .sb-btn.loading, .action-btn.loading { opacity: .6; pointer-events: none; }
+    .action-btn.loading { cursor: not-allowed; }
+    @keyframes pulse-glow { 0%,100%{ box-shadow: 0 4px 18px rgba(6,182,212,.35); } 50%{ box-shadow: 0 4px 28px rgba(6,182,212,.65); } }
   </style>
 </head>
 <body>
@@ -427,7 +434,7 @@
 
     <div class="sb-footer">
       <div class="sb-time" id="clock"></div>
-      <button class="sb-btn" onclick="loadAll()">↻ &nbsp;Refresh data</button>
+      <button class="sb-btn" id="refresh-btn" onclick="loadAll()"><span id="refresh-icon">↻</span> &nbsp;Refresh data</button>
       <button class="sb-btn sb-btn-danger" onclick="logout()">⎋ &nbsp;Logout</button>
     </div>
   </div>
@@ -585,6 +592,10 @@ async function api(path, opts={}) {
 }
 
 async function loadAll(isLogin=false) {
+  const btn  = document.getElementById('refresh-btn');
+  const icon = document.getElementById('refresh-icon');
+  if (btn)  btn.classList.add('loading');
+  if (icon) { icon.className = 'spin'; icon.textContent = '↻'; }
   try {
     const [cr, er, conr] = await Promise.all([
       api('/admin/api/customers'),
@@ -598,7 +609,14 @@ async function loadAll(isLogin=false) {
     if (isLogin) { document.getElementById('login-screen').style.display='none'; document.getElementById('app').classList.add('visible'); resetIdleTimer(); }
     updateStats(); renderCustomers(); renderErrors(); renderContacts(); updateBadge();
     if (openId) { const c = allCustomers.find(x=>x.tenant_id===openId); if (c) renderPanel(c); }
-  } catch(e) { if (isLogin) document.getElementById('login-error').textContent = 'Cannot connect. Is server running?'; }
+    if (!isLogin) showToast('✓ Data refreshed');
+  } catch(e) {
+    if (isLogin) document.getElementById('login-error').textContent = 'Cannot connect. Is server running?';
+    else showToast('⚠ Could not connect to server', true);
+  } finally {
+    if (btn)  btn.classList.remove('loading');
+    if (icon) { icon.className = ''; icon.textContent = '↻'; }
+  }
 }
 
 function daysLeft(exp) { return exp ? Math.ceil((new Date(exp)-Date.now())/(864e5)) : 0; }
@@ -735,51 +753,51 @@ function renderPanel(c) {
   const hasUnlockCode = !!c.unlock_token;
   const tid = escHtml(c.tenant_id||'');
   document.getElementById('dp-actions').innerHTML = `
-    ${isPending ? `<button class="action-btn" style="background:rgba(167,139,250,.2);border:1px solid rgba(167,139,250,.4);color:#c4b5fd;font-size:15px;padding:14px" onclick="doAction('${tid}','approve')">
-      ✅ Approve & Start 30-Day Trial
-    </button><div style="border-top:1px solid var(--border2);margin:8px 0"></div>` : ''}
-    <button class="action-btn btn-extend-big" onclick="doAction('${tid}','extend')" ${isRevoked?'disabled':''}>
+    ${isPending ? `<button class="action-btn" style="background:linear-gradient(135deg,#7c3aed,#9333ea);color:#fff;font-size:15px;padding:14px;box-shadow:0 4px 18px rgba(124,58,237,.4)" onclick="doAction('${tid}','approve',this)">
+      ✅ Approve &amp; Start 30-Day Trial
+    </button><div style="border-top:1px solid rgba(255,255,255,.07);margin:8px 0"></div>` : ''}
+    <button class="action-btn btn-extend-big" onclick="doAction('${tid}','extend',this)" ${isRevoked?'disabled':''}>
       ➕ Extend 30 Days
     </button>
     ${isFrozen
-      ? `<button class="action-btn btn-unfreeze" onclick="doAction('${tid}','unfreeze')">✅ Unfreeze Account</button>`
-      : `<button class="action-btn btn-freeze" onclick="doAction('${tid}','freeze')" ${isRevoked?'disabled':''}>🧊 Freeze Account</button>`
+      ? `<button class="action-btn btn-unfreeze" onclick="doAction('${tid}','unfreeze',this)">✅ Unfreeze Account</button>`
+      : `<button class="action-btn btn-freeze" onclick="doAction('${tid}','freeze',this)" ${isRevoked?'disabled':''}>🧊 Freeze Account</button>`
     }
     ${!isRevoked
       ? `<button class="action-btn btn-revoke" onclick="confirmRevoke('${tid}')">🚫 Revoke Access</button>`
-      : `<button class="action-btn btn-unfreeze" onclick="doAction('${tid}','unfreeze')">↩ Restore Access</button>`
+      : `<button class="action-btn btn-unfreeze" onclick="doAction('${tid}','unfreeze',this)">↩ Restore Access</button>`
     }
 
-    <div style="border-top:1px solid var(--border2);margin:8px 0"></div>
+    <div style="border-top:1px solid rgba(255,255,255,.07);margin:8px 0"></div>
 
     ${hasUnlockCode
-      ? `<div style="background:rgba(79,142,247,.08);border:1px solid rgba(79,142,247,.2);border-radius:12px;padding:14px;text-align:center">
-           <div style="font-size:13px;font-weight:700;color:#93c5fd;margin-bottom:4px">🔓 Unlock code is active</div>
+      ? `<div style="background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.2);border-radius:12px;padding:14px;text-align:center">
+           <div style="font-size:13px;font-weight:700;color:#22d3ee;margin-bottom:4px">🔓 Unlock code is active</div>
            <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Code was shown when generated. Share it with the customer.</div>
-           <button class="action-btn" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:#fca5a5;padding:8px" onclick="clearUnlockCode('${tid}')">✕ Clear Code</button>
+           <button class="action-btn btn-revoke" style="padding:8px" onclick="clearUnlockCode('${tid}')">✕ Clear Code</button>
          </div>`
       : hasUnlockReq
-        ? `<button class="action-btn" style="background:rgba(79,142,247,.12);border:1px solid rgba(79,142,247,.25);color:#93c5fd" onclick="generateUnlockCode('${tid}')">
+        ? `<button class="action-btn" style="background:rgba(6,182,212,.12);border:1px solid rgba(6,182,212,.25);color:#22d3ee" onclick="generateUnlockCode('${tid}')">
              🔓 Generate Unlock Code <span style="font-size:11px;display:block;font-weight:400;margin-top:2px;color:var(--muted)">Requested ${new Date(c.unlock_requested_at).toLocaleString('en-IN')}</span>
            </button>`
-        : `<button class="action-btn" style="background:var(--surface2);border:1px solid var(--border2);color:var(--muted)" onclick="generateUnlockCode('${tid}')">
+        : `<button class="action-btn" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:var(--muted)" onclick="generateUnlockCode('${tid}')">
              🔓 Unlock Account (too many attempts)
            </button>`
     }
 
-    <div style="border-top:1px solid var(--border2);margin:4px 0"></div>
+    <div style="border-top:1px solid rgba(255,255,255,.07);margin:4px 0"></div>
 
     ${hasResetCode
-      ? `<div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:12px;padding:14px;text-align:center">
-           <div style="font-size:13px;font-weight:700;color:var(--green);margin-bottom:4px">🔑 Reset code is active</div>
+      ? `<div style="background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);border-radius:12px;padding:14px;text-align:center">
+           <div style="font-size:13px;font-weight:700;color:#34d399;margin-bottom:4px">🔑 Reset code is active</div>
            <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Code was shown when generated. Share it with the customer.</div>
-           <button class="action-btn" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:#fca5a5;padding:8px" onclick="clearResetCode('${tid}')">✕ Clear Code</button>
+           <button class="action-btn btn-revoke" style="padding:8px" onclick="clearResetCode('${tid}')">✕ Clear Code</button>
          </div>`
       : hasResetReq
-        ? `<button class="action-btn" style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.2);color:#fcd34d" onclick="generateResetCode('${tid}')">
+        ? `<button class="action-btn" style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.2);color:#fbbf24" onclick="generateResetCode('${tid}')">
              🔑 Generate Reset Code <span style="font-size:11px;display:block;font-weight:400;margin-top:2px">Reset requested ${new Date(c.reset_requested_at).toLocaleString('en-IN')}</span>
            </button>`
-        : `<button class="action-btn" style="background:var(--surface2);border:1px solid var(--border2);color:var(--muted)" onclick="generateResetCode('${tid}')">
+        : `<button class="action-btn" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:var(--muted)" onclick="generateResetCode('${tid}')">
              🔑 Generate Password Reset Code
            </button>`
     }
@@ -792,12 +810,18 @@ function closePanel() {
   openId = null;
 }
 
-async function doAction(id, action) {
+async function doAction(id, action, el) {
   const c = allCustomers.find(x=>x.tenant_id===id);
-  const msgs = { extend:'Extended 30 days', freeze:'Account frozen', unfreeze:'Account unfrozen' };
-  await api(`/admin/api/customers/${id}/${action}`, { method:'POST' });
-  showToast(`✅ ${msgs[action]} — ${c?.shop_name||id.substring(0,8)}`);
-  await loadAll();
+  const msgs = { extend:'Extended 30 days', freeze:'Account frozen', unfreeze:'Account unfrozen', revoke:'Access revoked', approve:'Approved — trial started' };
+  const origText = el?.innerHTML;
+  if (el) { el.classList.add('loading'); el.innerHTML = `<span class="spin">↻</span> Working…`; }
+  try {
+    const r = await api(`/admin/api/customers/${id}/${action}`, { method:'POST' });
+    if (!r.ok) { showToast('Action failed', true); return; }
+    showToast(`✅ ${msgs[action] || action} — ${c?.shop_name||id.substring(0,8)}`);
+    await loadAll();
+  } catch { showToast('⚠ Connection error', true); }
+  finally { if (el) { el.classList.remove('loading'); el.innerHTML = origText; } }
 }
 
 function confirmRevoke(id) {
@@ -823,52 +847,48 @@ function showCodeModal(title, code) {
   document.body.appendChild(m);
 }
 
+async function withBtnLoad(btn, fn) {
+  const el = btn instanceof Element ? btn : event?.target?.closest('button');
+  const orig = el?.innerHTML;
+  if (el) { el.classList.add('loading'); el.innerHTML = `<span class="spin">↻</span> Working…`; }
+  try { await fn(); }
+  finally { if (el) { el.classList.remove('loading'); el.innerHTML = orig; } }
+}
+
 async function generateResetCode(id) {
-  const code = String(Math.floor(100000 + Math.random() * 900000));
-  const expires = new Date(Date.now() + 24*60*60*1000).toISOString();
-  const r = await api(`/admin/api/customers/${id}/set-reset-code`, {
-    method: 'POST',
-    body: JSON.stringify({ code, expires })
+  await withBtnLoad(null, async () => {
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const expires = new Date(Date.now() + 24*60*60*1000).toISOString();
+    const r = await api(`/admin/api/customers/${id}/set-reset-code`, { method:'POST', body: JSON.stringify({ code, expires }) });
+    if (r.ok) { showCodeModal('🔑 Password Reset Code (valid 24 hours)', code); await loadAll(); }
+    else showToast('Failed to generate reset code', true);
   });
-  if (r.ok) {
-    showCodeModal('🔑 Password Reset Code (valid 24 hours)', code);
-    await loadAll();
-  } else {
-    showToast('Failed to generate reset code', true);
-  }
 }
 
 async function clearResetCode(id) {
-  await api(`/admin/api/customers/${id}/set-reset-code`, {
-    method: 'POST',
-    body: JSON.stringify({ code: null, expires: null })
+  await withBtnLoad(null, async () => {
+    await api(`/admin/api/customers/${id}/set-reset-code`, { method:'POST', body: JSON.stringify({ code: null, expires: null }) });
+    showToast('Reset code cleared');
+    await loadAll();
   });
-  showToast('Reset code cleared');
-  await loadAll();
 }
 
 async function generateUnlockCode(id) {
-  const code = String(Math.floor(100000 + Math.random() * 900000));
-  const expires = new Date(Date.now() + 2*60*60*1000).toISOString();
-  const r = await api(`/admin/api/customers/${id}/set-unlock-code`, {
-    method: 'POST',
-    body: JSON.stringify({ code, expires })
+  await withBtnLoad(null, async () => {
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const expires = new Date(Date.now() + 2*60*60*1000).toISOString();
+    const r = await api(`/admin/api/customers/${id}/set-unlock-code`, { method:'POST', body: JSON.stringify({ code, expires }) });
+    if (r.ok) { showCodeModal('🔓 Unlock Code (valid 2 hours)', code); await loadAll(); }
+    else showToast('Failed to generate unlock code', true);
   });
-  if (r.ok) {
-    showCodeModal('🔓 Unlock Code (valid 2 hours)', code);
-    await loadAll();
-  } else {
-    showToast('Failed to generate unlock code', true);
-  }
 }
 
 async function clearUnlockCode(id) {
-  await api(`/admin/api/customers/${id}/set-unlock-code`, {
-    method: 'POST',
-    body: JSON.stringify({ code: null, expires: null })
+  await withBtnLoad(null, async () => {
+    await api(`/admin/api/customers/${id}/set-unlock-code`, { method:'POST', body: JSON.stringify({ code: null, expires: null }) });
+    showToast('Unlock code cleared');
+    await loadAll();
   });
-  showToast('Unlock code cleared');
-  await loadAll();
 }
 
 // CONTACTS
@@ -969,8 +989,17 @@ async function resolveErr(id) {
 
 function showToast(msg, err=false) {
   const t = document.getElementById('toast');
-  t.textContent=msg; t.style.background=err?'var(--red)':'var(--green)';
-  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000);
+  t.textContent = msg;
+  t.style.background = err
+    ? 'linear-gradient(135deg,#be123c,#f43f5e)'
+    : 'linear-gradient(135deg,#059669,#06b6d4)';
+  t.style.boxShadow = err
+    ? '0 8px 28px rgba(244,63,94,.45)'
+    : '0 8px 28px rgba(6,182,212,.4)';
+  t.classList.remove('show');
+  void t.offsetWidth; // force reflow so animation re-triggers
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
 }
 
 setInterval(()=>{ if (password) loadAll(); }, 30000);
