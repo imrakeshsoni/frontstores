@@ -233,38 +233,38 @@ export function SetupWizard() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Shop name *</label>
-                  <input className="input" placeholder="e.g. Roshan Medical Store" value={form.shop_name} onChange={(e) => update('shop_name', e.target.value)} />
+                  <input className="input" value={form.shop_name} onChange={(e) => update('shop_name', e.target.value)} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Owner name *</label>
-                  <input className="input" placeholder="Your full name" value={form.owner_name} onChange={(e) => update('owner_name', e.target.value)} />
+                  <input className="input" value={form.owner_name} onChange={(e) => update('owner_name', e.target.value)} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
-                    <input className="input" placeholder="9876543210" value={form.phone} onChange={(e) => update('phone', e.target.value)} />
+                    <input className="input" value={form.phone} onChange={(e) => update('phone', e.target.value)} />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                    <input className="input" type="email" placeholder="shop@email.com" value={form.email} onChange={(e) => update('email', e.target.value)} />
+                    <input className="input" type="email" value={form.email} onChange={(e) => update('email', e.target.value)} />
                   </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Address</label>
-                  <input className="input" placeholder="Shop address" value={form.address_line1} onChange={(e) => update('address_line1', e.target.value)} />
+                  <input className="input" value={form.address_line1} onChange={(e) => update('address_line1', e.target.value)} />
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">City</label>
-                    <input className="input" placeholder="City" value={form.city} onChange={(e) => update('city', e.target.value)} />
+                    <input className="input" value={form.city} onChange={(e) => update('city', e.target.value)} />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">State</label>
-                    <input className="input" placeholder="State" value={form.state} onChange={(e) => update('state', e.target.value)} />
+                    <input className="input" value={form.state} onChange={(e) => update('state', e.target.value)} />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Pincode</label>
-                    <input className="input" placeholder="400001" value={form.pincode} onChange={(e) => update('pincode', e.target.value)} />
+                    <input className="input" value={form.pincode} onChange={(e) => update('pincode', e.target.value)} />
                   </div>
                 </div>
               </div>
@@ -283,12 +283,12 @@ export function SetupWizard() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">GSTIN</label>
-                  <input className="input" placeholder="22AAAAA0000A1Z5" value={form.gstin} onChange={(e) => update('gstin', e.target.value.toUpperCase())} />
+                  <input className="input" value={form.gstin} onChange={(e) => update('gstin', e.target.value.toUpperCase())} />
                 </div>
                 {form.shop_type === 'medical' && (
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Drug License Number</label>
-                    <input className="input" placeholder="DL-MH-000000" value={form.drug_license_no} onChange={(e) => update('drug_license_no', e.target.value)} />
+                    <input className="input" value={form.drug_license_no} onChange={(e) => update('drug_license_no', e.target.value)} />
                   </div>
                 )}
               </div>
@@ -350,7 +350,6 @@ export function SetupWizard() {
                   <label className="block text-sm font-medium text-slate-700 mb-1">Username *</label>
                   <input
                     className="input"
-                    placeholder="e.g. rakesh"
                     value={username}
                     onChange={e => setUsername(e.target.value)}
                     autoFocus
@@ -363,7 +362,6 @@ export function SetupWizard() {
                     <input
                       className="input pr-16"
                       type={showPass ? 'text' : 'password'}
-                      placeholder="Create a password"
                       value={password}
                       onChange={e => setPassword(e.target.value)}
                     />
@@ -379,7 +377,6 @@ export function SetupWizard() {
                   <input
                     className="input"
                     type="password"
-                    placeholder="Re-enter password"
                     value={confirmPassword}
                     onChange={e => setConfirmPassword(e.target.value)}
                   />
