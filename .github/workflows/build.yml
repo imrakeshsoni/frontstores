@@ -143,25 +143,27 @@ jobs:
           ls -la "${APP_DIR}/"
 
           # tauri build creates the .app but not the .tar.gz updater bundle.
-          # Create it ourselves (same as what tauri-action does internally).
-          (cd "${APP_DIR}" && tar -czf FrontStores.app.tar.gz FrontStores.app)
-          echo "Created tar: $(du -h ${APP_DIR}/FrontStores.app.tar.gz | cut -f1)"
+          # Create and name it with the arch suffix so the URL in latest.json matches.
+          TAR="${APP_DIR}/FrontStores_${ARCH}.app.tar.gz"
+          SIG="${APP_DIR}/FrontStores_${ARCH}.app.tar.gz.sig"
 
-          # Sign using the Tauri CLI signer (requires TAURI_SIGNING_PRIVATE_KEY)
+          (cd "${APP_DIR}" && tar -czf "FrontStores_${ARCH}.app.tar.gz" FrontStores.app)
+          echo "Created tar: $(du -h ${TAR} | cut -f1)"
+
+          # Sign the arch-named file directly
           npx tauri signer sign \
             --private-key "$TAURI_SIGNING_PRIVATE_KEY" \
-            "${APP_DIR}/FrontStores.app.tar.gz" || true
-
-          TAR="${APP_DIR}/FrontStores.app.tar.gz"
-          SIG="${APP_DIR}/FrontStores.app.tar.gz.sig"
+            "${TAR}" || true
 
           echo "=== After signing ==="
           ls -la "${APP_DIR}/"
 
-          # Upload to release with arch-tagged names
+          # Upload DMG and arch-named tar (filenames now match latest.json URLs)
+          DMG_NAME="FrontStores_${ARCH}.dmg"
+          cp "${DMG}" "${DMG_NAME}"
           gh release upload "$TAG" \
-            "${DMG}#FrontStores_${ARCH}.dmg" \
-            "${TAR}#FrontStores_${ARCH}.app.tar.gz" \
+            "${DMG_NAME}" \
+            "${TAR}" \
             --clobber
 
           # Capture the sig
