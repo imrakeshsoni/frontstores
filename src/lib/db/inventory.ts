@@ -38,6 +38,11 @@ export async function addStock(tenantId: string, data: {
   notes?: string;
   type?: string;
 }): Promise<void> {
+  if (!data.quantity || data.quantity <= 0) throw new Error('Stock quantity must be greater than zero');
+  const today = new Date().toISOString().substring(0, 10);
+  if (data.expiry_date && data.expiry_date < today) {
+    throw new Error(`Cannot add expired stock (expiry: ${data.expiry_date}). Expired medicines cannot be added to inventory.`);
+  }
   const db = await getDb();
   const batchId = uuid();
   await db.execute(
@@ -65,6 +70,7 @@ export async function adjustStock(tenantId: string, data: {
   invoice_number?: string;
   notes?: string;
 }): Promise<void> {
+  if (!data.quantity || data.quantity <= 0) throw new Error('Adjustment quantity must be greater than zero');
   const db = await getDb();
   const delta = data.direction === 'add' ? Math.abs(data.quantity) : -Math.abs(data.quantity);
   await updateStock(tenantId, data.product_id, delta);

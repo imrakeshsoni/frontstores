@@ -72,13 +72,21 @@ export async function createProduct(tenantId: string, data: Omit<Product, 'id' |
   return mapProduct(rows[0]);
 }
 
+const PRODUCT_UPDATE_FIELDS = new Set([
+  'name','sku','barcode','category','brand','description','unit',
+  'mrp','selling_price','cost_price','gst_rate','hsn_code',
+  'dosage_form','salt_composition','manufacturer','requires_prescription',
+  'total_units','ml_volume','min_stock_qty','is_active','updated_at',
+]);
+
 export async function updateProduct(tenantId: string, id: string, data: Partial<Product>): Promise<void> {
   const db = await getDb();
-  const safe = { ...data };
-  delete (safe as any).id; delete (safe as any).tenant_id; delete (safe as any).created_at;
-  (safe as any).updated_at = now();
-  if ('requires_prescription' in safe) (safe as any).requires_prescription = safe.requires_prescription ? 1 : 0;
-  if ('is_active' in safe) (safe as any).is_active = safe.is_active ? 1 : 0;
+  const safe: Record<string, unknown> = { updated_at: now() };
+  for (const [k, v] of Object.entries(data)) {
+    if (PRODUCT_UPDATE_FIELDS.has(k)) safe[k] = v;
+  }
+  if ('requires_prescription' in safe) safe.requires_prescription = safe.requires_prescription ? 1 : 0;
+  if ('is_active' in safe) safe.is_active = safe.is_active ? 1 : 0;
   const fields = Object.keys(safe).map(k => `${k} = ?`).join(', ');
   await db.execute(`UPDATE products SET ${fields} WHERE id = ? AND tenant_id = ?`, [...Object.values(safe), id, tenantId]);
 }

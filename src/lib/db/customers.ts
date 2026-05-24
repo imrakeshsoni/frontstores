@@ -53,11 +53,17 @@ export async function createCustomer(tenantId: string, data: Pick<Customer, 'nam
   return mapCustomer(rows[0]);
 }
 
+const CUSTOMER_UPDATE_FIELDS = new Set([
+  'name','phone','email','address','city','tags','credit_limit','notes','updated_at',
+]);
+
 export async function updateCustomer(tenantId: string, id: string, data: Partial<Customer>): Promise<void> {
   const db = await getDb();
-  const safe: any = { ...data, updated_at: now() };
-  delete safe.id; delete safe.tenant_id; delete safe.created_at;
-  if ('tags' in safe) safe.tags = JSON.stringify(safe.tags);
+  const safe: Record<string, unknown> = { updated_at: now() };
+  for (const [k, v] of Object.entries(data)) {
+    if (CUSTOMER_UPDATE_FIELDS.has(k)) safe[k] = v;
+  }
+  if ('tags' in safe) safe.tags = JSON.stringify(safe.tags as string[]);
   const fields = Object.keys(safe).map(k => `${k} = ?`).join(', ');
   await db.execute(`UPDATE customers SET ${fields} WHERE id = ? AND tenant_id = ?`, [...Object.values(safe), id, tenantId]);
 }

@@ -6,6 +6,7 @@ let _db: Database | null = null;
 export async function getDb(): Promise<Database> {
   if (_db) return _db;
   _db = await Database.load('sqlite:frontstores.db');
+  await _db.execute('PRAGMA foreign_keys = ON');
   await runMigrations(_db);
   return _db;
 }

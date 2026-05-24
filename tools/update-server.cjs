@@ -23,8 +23,14 @@ if (!ADMIN_PASSWORD) {
   process.exit(1);
 }
 
+// HMAC with admin password as key — defeats rainbow table attacks on 6-digit PINs
 function hashCode(code) {
-  return crypto.createHash('sha256').update(String(code)).digest('hex');
+  return crypto.createHmac('sha256', ADMIN_PASSWORD).update(String(code)).digest('hex');
+}
+
+// Input sanitizer — truncates and trims string inputs from untrusted sources
+function sanitize(s, max = 200) {
+  return typeof s === 'string' ? s.trim().substring(0, max) : '';
 }
 
 // ── Rate limiting ────────────────────────────────────────────────────────────
@@ -107,13 +113,20 @@ const publicServer = http.createServer(async (req, res) => {
     const body = await readBody(req);
     try {
       const { tenant_id, shop_name, owner_name, shop_type, phone, email, city, gstin } = JSON.parse(body);
-      if (!tenant_id) { res.writeHead(400); res.end('Missing tenant_id'); return; }
+      if (!tenant_id || typeof tenant_id !== 'string' || tenant_id.length > 36 || !/^[a-f0-9\-]{32,36}$/i.test(tenant_id)) {
+        res.writeHead(400); res.end('Invalid tenant_id'); return;
+      }
       const subs = loadSubs();
       if (!subs[tenant_id]) {
         subs[tenant_id] = {
-          tenant_id, shop_name: shop_name||'Unknown', owner_name: owner_name||'',
-          shop_type: shop_type||'', phone: phone||'', email: email||'',
-          city: city||'', gstin: gstin||'',
+          tenant_id,
+          shop_name:  sanitize(shop_name,  100) || 'Unknown',
+          owner_name: sanitize(owner_name, 100),
+          shop_type:  sanitize(shop_type,   50),
+          phone:      sanitize(phone,        20),
+          email:      sanitize(email,       200),
+          city:       sanitize(city,        100),
+          gstin:      sanitize(gstin,        15),
           expires_at: addDays(new Date().toISOString(), 30),
           registered_at: new Date().toISOString(),
           account_status: 'active',

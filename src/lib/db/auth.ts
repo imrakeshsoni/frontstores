@@ -70,6 +70,7 @@ export async function getAuthUsername(tenantId: string): Promise<string | null> 
 }
 
 export async function createAuth(tenantId: string, username: string, password: string): Promise<void> {
+  if (password.length < 4) throw new Error('Password must be at least 4 characters');
   const db = await getDb();
   const salt = randomSalt();
   const hash = await hashPassword(password, salt);
@@ -177,6 +178,7 @@ export async function changeUsername(tenantId: string, newUsername: string): Pro
 export async function resetPasswordWithCode(
   tenantId: string, code: string, newPassword: string
 ): Promise<{ ok: boolean; error?: string }> {
+  if (newPassword.length < 4) return { ok: false, error: 'Password must be at least 4 characters' };
   const SERVER = 'https://update.frontstores.com';
   try {
     const res = await fetch(`${SERVER}/verify-reset-code`, {

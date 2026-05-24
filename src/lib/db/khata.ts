@@ -62,6 +62,8 @@ export async function addKhataEntry(tenantId: string, data: {
   notes?: string;
   order_id?: string;
 }) {
+  if (!data.amount || data.amount <= 0) throw new Error('Khata entry amount must be greater than zero');
+  if (data.type !== 'debit' && data.type !== 'credit') throw new Error('Invalid entry type');
   const db = await getDb();
   const id = uuid();
   await db.execute(
