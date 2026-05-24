@@ -124,22 +124,39 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
-      # ── macOS: upload DMG + update tar, capture sig ────────────────────────
+      # ── macOS: create updater tar, sign it, upload DMG + tar, capture sig ──
       - name: Upload macOS artifacts
         if: matrix.platform == 'macos-latest'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           TAG: ${{ github.ref_name }}
           TARGET: ${{ matrix.target }}
           ARCH: ${{ matrix.arch }}
         run: |
           BUNDLE_DIR="src-tauri/target/${TARGET}/release/bundle"
+          APP_DIR="${BUNDLE_DIR}/macos"
           DMG=$(find "${BUNDLE_DIR}/dmg" -name "*.dmg" | head -1)
-          TAR="${BUNDLE_DIR}/macos/FrontStores.app.tar.gz"
-          SIG="${BUNDLE_DIR}/macos/FrontStores.app.tar.gz.sig"
 
           echo "=== Files in bundle/macos ==="
-          ls -la "${BUNDLE_DIR}/macos/"
+          ls -la "${APP_DIR}/"
+
+          # tauri build creates the .app but not the .tar.gz updater bundle.
+          # Create it ourselves (same as what tauri-action does internally).
+          (cd "${APP_DIR}" && tar -czf FrontStores.app.tar.gz FrontStores.app)
+          echo "Created tar: $(du -h ${APP_DIR}/FrontStores.app.tar.gz | cut -f1)"
+
+          # Sign using the Tauri CLI signer (requires TAURI_SIGNING_PRIVATE_KEY)
+          npx tauri signer sign \
+            --private-key "$TAURI_SIGNING_PRIVATE_KEY" \
+            "${APP_DIR}/FrontStores.app.tar.gz" || true
+
+          TAR="${APP_DIR}/FrontStores.app.tar.gz"
+          SIG="${APP_DIR}/FrontStores.app.tar.gz.sig"
+
+          echo "=== After signing ==="
+          ls -la "${APP_DIR}/"
 
           # Upload to release with arch-tagged names
           gh release upload "$TAG" \
@@ -147,13 +164,12 @@ jobs:
             "${TAR}#FrontStores_${ARCH}.app.tar.gz" \
             --clobber
 
-          # Capture the sig before anything can touch it
+          # Capture the sig
           if [ -f "$SIG" ]; then
             cp "$SIG" update.sig
             echo "Sig captured: $(wc -c < update.sig) bytes"
           else
-            echo "WARNING: sig not found at $SIG"
-            find "src-tauri/target/${TARGET}" -name "*.sig" 2>/dev/null || true
+            echo "WARNING: sig not found — signing may have failed"
             touch update.sig
           fi
 
