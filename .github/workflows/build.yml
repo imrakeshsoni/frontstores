@@ -7,7 +7,59 @@ on:
   workflow_dispatch:
 
 jobs:
+  # ── Create the GitHub Release once, before platform builds start ────────────
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      release_id: ${{ steps.create.outputs.id }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version
+        id: ver
+        run: echo "version=$(node -p "require('./src-tauri/tauri.conf.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        id: create
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          gh release create "$TAG" \
+            --title "FrontStores $TAG" \
+            --notes "## FrontStores $TAG
+
+Complete business management software for Indian shops. 30-day free trial · ₹999/month.
+
+---
+
+### 🪟 Windows
+1. Download the \`.msi\` file below
+2. Double-click to install
+3. If SmartScreen shows a warning → click **More info** → **Run anyway**
+
+### 🍎 Mac (Apple Silicon — M1/M2/M3/M4)
+Download \`aarch64.dmg\`
+
+### 🍎 Mac (Intel)
+Download \`x86_64.dmg\`
+
+**Mac installation note:** macOS may show "App is damaged" — this is a security warning for apps not on the App Store. To fix:
+1. Copy FrontStores.app to your Applications folder
+2. Open Terminal and run:
+\`\`\`
+xattr -cr /Applications/FrontStores.app
+\`\`\`
+3. Double-click the app — done. You only need to do this once." \
+            --draft=false \
+            --prerelease=false
+
+  # ── Platform builds ─────────────────────────────────────────────────────────
   build:
+    needs: create-release
     permissions:
       contents: write
 
@@ -17,28 +69,27 @@ jobs:
         include:
           - platform: macos-latest
             args: '--target aarch64-apple-darwin'
+            target: aarch64-apple-darwin
+            arch: aarch64
             sig-artifact: sig-mac-aarch64
-            sig-path: src-tauri/target/aarch64-apple-darwin/release/bundle/macos/FrontStores.app.tar.gz.sig
-            update-url-suffix: FrontStores_aarch64.app.tar.gz
-            update-platform: darwin-aarch64
+
           - platform: macos-latest
             args: '--target x86_64-apple-darwin'
+            target: x86_64-apple-darwin
+            arch: x64
             sig-artifact: sig-mac-x86_64
-            sig-path: src-tauri/target/x86_64-apple-darwin/release/bundle/macos/FrontStores.app.tar.gz.sig
-            update-url-suffix: FrontStores_x64.app.tar.gz
-            update-platform: darwin-x86_64
+
           - platform: windows-latest
             args: ''
+            target: ''
+            arch: x64-win
             sig-artifact: sig-win-x86_64
-            sig-path: ''
-            update-url-suffix: ''
-            update-platform: windows-x86_64
+
           - platform: ubuntu-22.04
             args: ''
+            target: ''
+            arch: amd64-linux
             sig-artifact: ''
-            sig-path: ''
-            update-url-suffix: ''
-            update-platform: ''
 
     runs-on: ${{ matrix.platform }}
 
@@ -75,57 +126,45 @@ jobs:
         run: npm ci
 
       - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
+        run: npm run tauri build -- ${{ matrix.args }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'FrontStores ${{ github.ref_name }}'
-          releaseBody: |
-            ## FrontStores ${{ github.ref_name }}
 
-            Complete business management software for Indian shops. 30-day free trial · ₹999/month.
-
-            ---
-
-            ### 🪟 Windows
-            1. Download the `.msi` file below
-            2. Double-click to install
-            3. If SmartScreen shows a warning → click **More info** → **Run anyway**
-
-            ### 🍎 Mac (Apple Silicon — M1/M2/M3/M4)
-            Download `aarch64.dmg`
-
-            ### 🍎 Mac (Intel)
-            Download `x86_64.dmg`
-
-            **Mac installation note:** macOS may show "App is damaged" — this is a security warning for apps not on the App Store. To fix:
-            1. Copy FrontStores.app to your Applications folder
-            2. Open Terminal and run:
-            ```
-            xattr -cr /Applications/FrontStores.app
-            ```
-            3. Double-click the app — done. You only need to do this once.
-          releaseDraft: false
-          prerelease: false
-          args: ${{ matrix.args }}
-
-      # Find and copy the .sig file to a known location, then upload as artifact
-      - name: Collect macOS signature
+      # ── macOS: upload DMG + update tar, capture sig ────────────────────────
+      - name: Upload macOS artifacts
         if: matrix.platform == 'macos-latest'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          TARGET: ${{ matrix.target }}
+          ARCH: ${{ matrix.arch }}
         run: |
-          SIG=$(find src-tauri/target -name "*.app.tar.gz.sig" 2>/dev/null | head -1)
-          if [ -n "$SIG" ]; then
-            echo "Found sig: $SIG"
+          BUNDLE_DIR="src-tauri/target/${TARGET}/release/bundle"
+          DMG=$(find "${BUNDLE_DIR}/dmg" -name "*.dmg" | head -1)
+          TAR="${BUNDLE_DIR}/macos/FrontStores.app.tar.gz"
+          SIG="${BUNDLE_DIR}/macos/FrontStores.app.tar.gz.sig"
+
+          echo "=== Files in bundle/macos ==="
+          ls -la "${BUNDLE_DIR}/macos/"
+
+          # Upload to release with arch-tagged names
+          gh release upload "$TAG" \
+            "${DMG}#FrontStores_${ARCH}.dmg" \
+            "${TAR}#FrontStores_${ARCH}.app.tar.gz" \
+            --clobber
+
+          # Capture the sig before anything can touch it
+          if [ -f "$SIG" ]; then
             cp "$SIG" update.sig
+            echo "Sig captured: $(wc -c < update.sig) bytes"
           else
-            echo "No .sig file found"
+            echo "WARNING: sig not found at $SIG"
+            find "src-tauri/target/${TARGET}" -name "*.sig" 2>/dev/null || true
             touch update.sig
           fi
 
-      - name: Upload signature artifact (macOS)
+      - name: Upload macOS sig artifact
         if: matrix.platform == 'macos-latest'
         uses: actions/upload-artifact@v4
         with:
@@ -133,17 +172,30 @@ jobs:
           path: update.sig
           if-no-files-found: warn
 
-      - name: Find and upload Windows signature artifact
+      # ── Windows: upload MSI + NSIS, capture sig ───────────────────────────
+      - name: Upload Windows artifacts
         if: matrix.platform == 'windows-latest'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
         shell: pwsh
         run: |
-          $sigFile = Get-ChildItem -Path "src-tauri/target" -Filter "*.sig" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-          if ($sigFile) {
-            Write-Host "Found sig: $($sigFile.FullName)"
-            Copy-Item $sigFile.FullName -Destination "win-update.sig"
+          $msi = Get-ChildItem -Path "src-tauri/target/release/bundle/msi" -Filter "*.msi" | Select-Object -First 1
+          $nsis = Get-ChildItem -Path "src-tauri/target/release/bundle/nsis" -Filter "*.exe" | Select-Object -First 1
+
+          if ($msi) { gh release upload $env:TAG "$($msi.FullName)#FrontStores_x64_en-US.msi" --clobber }
+          if ($nsis) { gh release upload $env:TAG "$($nsis.FullName)#FrontStores_x64-setup.exe" --clobber }
+
+          # Capture the NSIS sig for auto-update (Windows uses NSIS)
+          $sig = Get-ChildItem -Path "src-tauri/target/release/bundle/nsis" -Filter "*.sig" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $sig) {
+            $sig = Get-ChildItem -Path "src-tauri/target/release/bundle/msi" -Filter "*.sig" -ErrorAction SilentlyContinue | Select-Object -First 1
+          }
+          if ($sig) {
+            Copy-Item $sig.FullName -Destination "update.sig"
+            Write-Host "Win sig captured"
           } else {
-            Write-Host "No .sig file found"
-            New-Item -Path "win-update.sig" -ItemType File | Out-Null
+            New-Item -Path "update.sig" -ItemType File -Force | Out-Null
           }
 
       - name: Upload Windows sig artifact
@@ -151,38 +203,48 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: sig-win-x86_64
-          path: win-update.sig
+          path: update.sig
           if-no-files-found: warn
 
-  # Runs after all platform builds — creates and uploads latest.json for auto-update
+      # ── Linux: upload AppImage + deb + rpm ────────────────────────────────
+      - name: Upload Linux artifacts
+        if: matrix.platform == 'ubuntu-22.04'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          find src-tauri/target/release/bundle -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" | \
+            xargs -I{} gh release upload "$TAG" {} --clobber
+
+  # ── Consolidation: generate latest.json from captured sigs ─────────────────
   create-update-manifest:
     needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Download Mac aarch64 signature
+      - name: Download Mac aarch64 sig
         uses: actions/download-artifact@v4
         with:
           name: sig-mac-aarch64
           path: sigs/aarch64
         continue-on-error: true
 
-      - name: Download Mac x86_64 signature
+      - name: Download Mac x86_64 sig
         uses: actions/download-artifact@v4
         with:
           name: sig-mac-x86_64
           path: sigs/x86_64
         continue-on-error: true
 
-      - name: Download Windows signature
+      - name: Download Windows sig
         uses: actions/download-artifact@v4
         with:
           name: sig-win-x86_64
           path: sigs/win
         continue-on-error: true
 
-      - name: Generate latest.json
+      - name: Generate and upload latest.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
@@ -191,23 +253,32 @@ jobs:
           BASE="https://github.com/imrakeshsoni/frontstores/releases/download/${TAG}"
           PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-          AARCH64_SIG=$(cat sigs/aarch64/*.sig 2>/dev/null || cat sigs/aarch64/FrontStores.app.tar.gz.sig 2>/dev/null || echo "")
-          X86_64_SIG=$(cat sigs/x86_64/*.sig 2>/dev/null || cat sigs/x86_64/FrontStores.app.tar.gz.sig 2>/dev/null || echo "")
+          echo "=== Sig file contents ==="
+          find sigs -type f | xargs -I{} sh -c 'echo "--- {} ---"; wc -c {}'
+
+          AARCH64_SIG=$(cat sigs/aarch64/update.sig 2>/dev/null || echo "")
+          X86_64_SIG=$(cat sigs/x86_64/update.sig 2>/dev/null || echo "")
 
           PLATFORMS="{}"
 
-          if [ -n "$AARCH64_SIG" ]; then
+          if [ -n "$AARCH64_SIG" ] && [ $(echo -n "$AARCH64_SIG" | wc -c) -gt 10 ]; then
             PLATFORMS=$(echo "$PLATFORMS" | jq \
               --arg sig "$AARCH64_SIG" \
               --arg url "${BASE}/FrontStores_aarch64.app.tar.gz" \
               '. + {"darwin-aarch64": {"signature": $sig, "url": $url}}')
+            echo "Added darwin-aarch64"
+          else
+            echo "WARNING: aarch64 sig empty or missing"
           fi
 
-          if [ -n "$X86_64_SIG" ]; then
+          if [ -n "$X86_64_SIG" ] && [ $(echo -n "$X86_64_SIG" | wc -c) -gt 10 ]; then
             PLATFORMS=$(echo "$PLATFORMS" | jq \
               --arg sig "$X86_64_SIG" \
               --arg url "${BASE}/FrontStores_x64.app.tar.gz" \
               '. + {"darwin-x86_64": {"signature": $sig, "url": $url}}')
+            echo "Added darwin-x86_64"
+          else
+            echo "WARNING: x86_64 sig empty or missing"
           fi
 
           echo "$PLATFORMS" | jq \
@@ -217,6 +288,7 @@ jobs:
             '{"version": $version, "notes": $notes, "pub_date": $pub_date, "platforms": .}' \
             > latest.json
 
+          echo "=== latest.json ==="
           cat latest.json
 
           gh release upload "${TAG}" latest.json \
