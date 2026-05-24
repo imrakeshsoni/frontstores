@@ -1,6 +1,6 @@
 -- Failed login tracking on app_auth
-ALTER TABLE app_auth ADD COLUMN IF NOT EXISTS failed_attempts INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE app_auth ADD COLUMN IF NOT EXISTS locked_until TEXT;
+ALTER TABLE app_auth ADD COLUMN failed_attempts INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE app_auth ADD COLUMN locked_until TEXT;
 
 -- Export / backup audit log
 CREATE TABLE IF NOT EXISTS export_logs (

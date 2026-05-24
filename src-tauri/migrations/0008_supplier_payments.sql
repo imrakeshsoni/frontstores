@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS supplier_payments (
   updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS total_payable REAL NOT NULL DEFAULT 0;
-ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS total_paid    REAL NOT NULL DEFAULT 0;
+ALTER TABLE suppliers ADD COLUMN total_payable REAL NOT NULL DEFAULT 0;
+ALTER TABLE suppliers ADD COLUMN total_paid    REAL NOT NULL DEFAULT 0;
 
 CREATE INDEX IF NOT EXISTS idx_supplier_payments ON supplier_payments(tenant_id, supplier_id) WHERE deleted_at IS NULL;
