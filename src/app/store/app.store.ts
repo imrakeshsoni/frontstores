@@ -10,6 +10,8 @@ interface AppState {
   isAuthenticated: boolean;
 
   loadConfig: () => Promise<void>;
+  // [core] [all tenants] — refreshes config without flashing the full-screen loader
+  refreshConfig: () => Promise<void>;
   setConfig: (config: AppConfig) => void;
   setAuthenticated: (v: boolean) => void;
 }
@@ -28,14 +30,18 @@ export const useAppStore = create<AppState>((set) => ({
         setReporterTenantId(config.tenant_id);
         if (config.is_setup_complete) runStartupChecks(config.tenant_id).catch(() => {});
       }
-      set({
-        config,
-        isSetupComplete: config?.is_setup_complete ?? false,
-        isLoading: false,
-      });
+      set({ config, isSetupComplete: config?.is_setup_complete ?? false, isLoading: false });
     } catch {
       set({ isLoading: false });
     }
+  },
+
+  refreshConfig: async () => {
+    try {
+      const config = await getAppConfig();
+      if (config?.tenant_id) setReporterTenantId(config.tenant_id);
+      set({ config, isSetupComplete: config?.is_setup_complete ?? false });
+    } catch { /* silent */ }
   },
 
   setConfig: (config) => { setReporterTenantId(config.tenant_id); set({ config, isSetupComplete: config.is_setup_complete }); },

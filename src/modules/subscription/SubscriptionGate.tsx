@@ -12,7 +12,8 @@ type Status = 'loading' | 'active' | 'warning' | 'locked' | 'pending';
 
 export function SubscriptionGate({ children }: { children: React.ReactNode }) {
   const config = useAppStore((s) => s.config);
-  const loadConfig = useAppStore((s) => s.loadConfig);
+  const loadConfig    = useAppStore((s) => s.loadConfig);
+  const refreshConfig = useAppStore((s) => s.refreshConfig);
   const [status, setStatus] = useState<Status>('loading');
   const [graceDaysLeft, setGraceDaysLeft] = useState(0);
   const [checking, setChecking] = useState(false);
@@ -153,7 +154,7 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
           `UPDATE app_config SET subscription_expires_at = ?, subscription_status = 'active', updated_at = ? WHERE tenant_id = ?`,
           [data.expires_at, now(), config.tenant_id]
         );
-        await loadConfig();
+        await refreshConfig();
         setStatus('active');
         return 'extended';
       }
