@@ -18,7 +18,7 @@ export interface AppConfig {
   app_version: string;
   trial_started_at: string | null;
   subscription_expires_at: string | null;
-  subscription_status: 'trial' | 'active' | 'expired' | 'grace';
+  subscription_status: 'pending' | 'trial' | 'active' | 'expired' | 'grace';
   tc_agreed_at: string | null;
   last_verified_at: string | null;
   last_server_time: string | null;
@@ -70,6 +70,32 @@ export async function createAppConfig(data: {
      VALUES (?, ?, 'invoice', 'INV', 0)`,
     [uuid(), tenant_id]
   );
+  return (await getAppConfig())!;
+}
+
+// [core] [all tenants] — used when DB was deleted but tenant already exists on server
+export async function recreateConfigWithTenantId(
+  tenant_id: string,
+  data: { shop_type: string; shop_name: string; owner_name: string; phone?: string; email?: string; city?: string }
+): Promise<AppConfig> {
+  const db = await getDb();
+  const trialStart = now();
+  await db.execute(
+    `INSERT OR REPLACE INTO app_config (id, tenant_id, shop_type, shop_name, owner_name, phone, email,
+      is_setup_complete, trial_started_at, subscription_expires_at, subscription_status, tc_agreed_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, NULL, 'pending', ?)`,
+    [uuid(), tenant_id, data.shop_type, data.shop_name, data.owner_name,
+     data.phone ?? null, data.email ?? null, trialStart, trialStart]
+  );
+  const existing = await db.select<any[]>(
+    `SELECT id FROM bill_sequences WHERE tenant_id = ? LIMIT 1`, [tenant_id]
+  );
+  if (existing.length === 0) {
+    await db.execute(
+      `INSERT INTO bill_sequences (id, tenant_id, sequence_type, prefix, current_number) VALUES (?, ?, 'invoice', 'INV', 0)`,
+      [uuid(), tenant_id]
+    );
+  }
   return (await getAppConfig())!;
 }
 

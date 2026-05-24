@@ -7,7 +7,8 @@
     "build": "tsc && vite build",
     "tauri": "tauri",
     "preview": "vite preview",
-    "lint": "eslint src --ext .ts,.tsx"
+    "lint": "eslint src --ext .ts,.tsx",
+    "heart": "node voice-assistant/server.cjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.4.2",

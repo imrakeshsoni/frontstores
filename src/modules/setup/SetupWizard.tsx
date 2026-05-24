@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useAppStore } from '@/app/store/app.store';
-import { createAppConfig } from '@/lib/db/config';
+import { createAppConfig, recreateConfigWithTenantId } from '@/lib/db/config';
 import { createAuth } from '@/lib/db/auth';
 import { importBackup } from '@/lib/db/backup';
 import { enqueue, flushQueue } from '@/lib/syncQueue';
@@ -50,6 +50,12 @@ export function SetupWizard() {
   const [restorePass, setRestorePass] = useState('');
   const [restoring, setRestoring] = useState(false);
 
+  // [core] [all tenants] — Reinstall flow: DB deleted but account exists on server
+  const [reinstallEmail, setReinstallEmail] = useState('');
+  const [reinstallLooking, setReinstallLooking] = useState(false);
+  const [reinstallError, setReinstallError] = useState('');
+  const [showReinstall, setShowReinstall] = useState(false);
+
   const update = (key: keyof FormData, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -75,6 +81,42 @@ export function SetupWizard() {
     username.trim().length >= 3 &&
     password.length >= 4 &&
     password === confirmPassword;
+
+  // [core] [all tenants] — Look up existing account by email, re-create local DB
+  async function handleReinstall() {
+    const email = reinstallEmail.trim().toLowerCase();
+    if (!email) return;
+    setReinstallLooking(true);
+    setReinstallError('');
+    try {
+      const res = await fetch(`${SERVER}/lookup-tenant?email=${encodeURIComponent(email)}`, {
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) throw new Error('Server unreachable');
+      const data = await res.json();
+      if (!data.found) {
+        setReinstallError('No account found with that email. Please sign up as new.');
+        return;
+      }
+      // Re-create local DB with the existing tenant_id
+      const config = await recreateConfigWithTenantId(data.tenant_id, {
+        shop_type: data.shop_type,
+        shop_name: data.shop_name,
+        owner_name: data.owner_name,
+        phone: data.phone,
+        email: data.email,
+        city: data.city,
+      });
+      // Pre-fill password step with this config so createAuth uses the right tenant_id
+      await createAuth(config.tenant_id, username.trim() || data.owner_name.toLowerCase().replace(/\s+/g, ''), password);
+      toast.success(`Welcome back, ${data.shop_name}! Please set a new password.`);
+      await loadConfig();
+    } catch (e) {
+      setReinstallError('Could not reach server. Make sure you are online and try again.');
+    } finally {
+      setReinstallLooking(false);
+    }
+  }
 
   const handleFinish = async () => {
     setSaving(true);
@@ -177,6 +219,14 @@ export function SetupWizard() {
                   <div className="font-medium text-slate-800 text-sm">Restore from Backup</div>
                   <div className="text-slate-500 text-xs mt-0.5">Moving from another computer — I have a .fsbak file</div>
                 </button>
+                <button
+                  onClick={() => setShowReinstall(r => !r)}
+                  className="text-left p-4 rounded-2xl border-2 border-slate-200 hover:border-purple-400 hover:bg-purple-50 transition-all"
+                >
+                  <div className="text-2xl mb-1">🔑</div>
+                  <div className="font-medium text-slate-800 text-sm">I already have an account</div>
+                  <div className="text-slate-500 text-xs mt-0.5">App was deleted or reinstalled — recover your account</div>
+                </button>
               </div>
 
               {/* Hidden file input */}
@@ -190,6 +240,43 @@ export function SetupWizard() {
                   if (f) setRestoreFile(f);
                 }}
               />
+
+              {/* Reinstall form — shown when "I already have an account" is clicked */}
+              {showReinstall && (
+                <div className="border-t border-slate-100 pt-5 mt-2">
+                  <p className="text-sm font-medium text-slate-700 mb-1">Enter the email you registered with</p>
+                  <p className="text-xs text-slate-400 mb-3">We'll find your account and restore it. Your old data is gone, but your account and approval remain active.</p>
+                  <input
+                    type="email"
+                    value={reinstallEmail}
+                    onChange={e => { setReinstallEmail(e.target.value); setReinstallError(''); }}
+                    placeholder="yourname@email.com"
+                    className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-400 mb-2"
+                  />
+                  {reinstallError && <p className="text-xs text-red-500 mb-2">{reinstallError}</p>}
+                  <div className="space-y-3 mb-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Set a new password *</label>
+                      <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+                        placeholder="New password (min 4 chars)"
+                        className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Confirm password *</label>
+                      <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+                        placeholder="Confirm password"
+                        className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleReinstall}
+                    disabled={!reinstallEmail || password.length < 4 || password !== confirmPassword || reinstallLooking}
+                    className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl text-sm transition-colors"
+                  >
+                    {reinstallLooking ? '🔍 Looking up your account…' : '🔑 Recover My Account'}
+                  </button>
+                </div>
+              )}
 
               {/* Restore form — shown once file is picked */}
               {restoreFile && (

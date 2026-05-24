@@ -110,6 +110,27 @@ const publicServer = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
+  // GET /lookup-tenant?email=xxx — used by reinstall flow to find existing tenant by email
+  if (req.method === 'GET' && pathname === '/lookup-tenant') {
+    const email = url.searchParams.get('email')?.toLowerCase().trim();
+    if (!email) { json(res, { found: false }); return; }
+    const subs = loadSubs();
+    const match = Object.values(subs).find(s => s.email?.toLowerCase().trim() === email);
+    if (!match) { json(res, { found: false }); return; }
+    json(res, {
+      found: true,
+      tenant_id: match.tenant_id,
+      shop_name: match.shop_name,
+      owner_name: match.owner_name,
+      shop_type: match.shop_type,
+      phone: match.phone || '',
+      email: match.email || '',
+      city: match.city || '',
+      account_status: match.account_status,
+    });
+    return;
+  }
+
   // POST /register — max 10 per IP per hour
   if (req.method === 'POST' && pathname === '/register') {
     if (rateLimit(req, res, 'register', 10, 60 * 60 * 1000)) return;

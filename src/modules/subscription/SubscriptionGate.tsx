@@ -170,7 +170,15 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
     setChecking(false);
   }
 
-  if (status === 'loading' || status === 'active') return <>{children}</>;
+  // [core] [all tenants] — never show the app during the initial server check
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-slate-400 text-sm">Verifying access…</div>
+      </div>
+    );
+  }
+  if (status === 'active') return <>{children}</>;
 
   if (status === 'pending') {
     return (
