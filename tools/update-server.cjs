@@ -8,13 +8,24 @@
  * Env:    PORT=3001  ADMIN_PORT=3002  ADMIN_PASSWORD=xxx  DATA_DIR=/path/to/data
  */
 
-const http = require('http');
-const fs   = require('fs');
-const path = require('path');
+const http   = require('http');
+const fs     = require('fs');
+const path   = require('path');
+const crypto = require('crypto');
 
-const PUBLIC_PORT   = parseInt(process.env.PORT        || '3001');
-const ADMIN_PORT    = parseInt(process.env.ADMIN_PORT  || '3002');
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD      || 'frontstores2025';
+const PUBLIC_PORT = parseInt(process.env.PORT       || '3001');
+const ADMIN_PORT  = parseInt(process.env.ADMIN_PORT || '3002');
+
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+if (!ADMIN_PASSWORD) {
+  console.error('❌  ADMIN_PASSWORD env var is not set. Set it before starting the server.');
+  console.error('    Example: ADMIN_PASSWORD=your-strong-password node tools/update-server.cjs');
+  process.exit(1);
+}
+
+function hashCode(code) {
+  return crypto.createHash('sha256').update(String(code)).digest('hex');
+}
 
 // DATA_DIR — all tenant + error data lives here. Change this env var on Mac Mini if needed.
 const DATA_DIR   = process.env.DATA_DIR || path.join(__dirname, 'data');
@@ -72,9 +83,9 @@ const publicServer = http.createServer(async (req, res) => {
           account_status: 'active',
         };
         console.log(`🆕 New: ${shop_name} (${tenant_id.substring(0,8)})`);
-      } else {
-        Object.assign(subs[tenant_id], { shop_name, owner_name, shop_type, phone, email, city, gstin });
       }
+      // Existing tenant: never overwrite their data from a re-register payload.
+      // Contact info updates must go through the admin panel.
       saveSubs(subs);
       const sub = subs[tenant_id];
       json(res, { ok: true, expires_at: sub.expires_at, account_status: sub.account_status||'active' });
@@ -167,7 +178,7 @@ const publicServer = http.createServer(async (req, res) => {
       const subs = loadSubs();
       const sub = subs[tenant_id];
       if (!sub || !sub.unlock_token) { json(res, { ok: false, error: 'No unlock code found' }); return; }
-      if (sub.unlock_token !== String(code)) { json(res, { ok: false, error: 'Invalid code' }); return; }
+      if (sub.unlock_token !== hashCode(code)) { json(res, { ok: false, error: 'Invalid code' }); return; }
       if (sub.unlock_token_expires && new Date(sub.unlock_token_expires) < new Date()) {
         json(res, { ok: false, error: 'Code has expired' }); return;
       }
@@ -190,7 +201,7 @@ const publicServer = http.createServer(async (req, res) => {
       const subs = loadSubs();
       const sub = subs[tenant_id];
       if (!sub || !sub.reset_token) { json(res, { ok: false, error: 'No reset code found' }); return; }
-      if (sub.reset_token !== String(code)) { json(res, { ok: false, error: 'Invalid code' }); return; }
+      if (sub.reset_token !== hashCode(code)) { json(res, { ok: false, error: 'Invalid code' }); return; }
       if (sub.reset_token_expires && new Date(sub.reset_token_expires) < new Date()) {
         json(res, { ok: false, error: 'Code has expired' }); return;
       }
@@ -282,11 +293,11 @@ const adminServer = http.createServer(async (req, res) => {
     const { code, expires } = JSON.parse(body);
     const subs = loadSubs();
     if (!subs[tenantId]) { json(res, {ok:false,error:'Not found'}, 404); return; }
-    subs[tenantId].unlock_token = code || null;
+    subs[tenantId].unlock_token = code ? hashCode(code) : null;
     subs[tenantId].unlock_token_expires = expires || null;
     if (!code) subs[tenantId].unlock_requested_at = null;
     saveSubs(subs);
-    if (code) console.log(`🔓 Unlock code set for ${subs[tenantId].shop_name}: ${code}`);
+    if (code) console.log(`🔓 Unlock code set for ${subs[tenantId].shop_name}`);
     json(res, { ok: true }); return;
   }
 
@@ -298,10 +309,10 @@ const adminServer = http.createServer(async (req, res) => {
     const { code, expires } = JSON.parse(body);
     const subs = loadSubs();
     if (!subs[tenantId]) { json(res, {ok:false,error:'Not found'}, 404); return; }
-    subs[tenantId].reset_token = code || null;
+    subs[tenantId].reset_token = code ? hashCode(code) : null;
     subs[tenantId].reset_token_expires = expires || null;
     saveSubs(subs);
-    if (code) console.log(`🔑 Reset code set for ${subs[tenantId].shop_name}: ${code}`);
+    if (code) console.log(`🔑 Reset code set for ${subs[tenantId].shop_name}`);
     json(res, { ok: true }); return;
   }
 
@@ -337,5 +348,4 @@ publicServer.listen(PUBLIC_PORT, '0.0.0.0', () => {
 adminServer.listen(ADMIN_PORT, '127.0.0.1', () => {
   console.log(`🔒 Admin   server: http://localhost:${ADMIN_PORT}   (localhost only — never internet-accessible)`);
   console.log(`   Open admin panel: http://localhost:${ADMIN_PORT}`);
-  console.log(`   Password: ${ADMIN_PASSWORD}`);
 });

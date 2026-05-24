@@ -1,5 +1,26 @@
 import { getDb, uuid, now } from './index';
 
+// In-memory lockout tracking — survives DB edits within a session.
+// A user editing SQLite to clear locked_until or reset failed_attempts
+// cannot bypass this because it lives in process memory, not on disk.
+const _memLock = new Map<string, { count: number; lockedUntil: number }>();
+
+function _checkMem(tenantId: string): { locked: boolean; lockedUntil?: string } {
+  const m = _memLock.get(tenantId);
+  if (!m || Date.now() >= m.lockedUntil) return { locked: false };
+  return { locked: true, lockedUntil: new Date(m.lockedUntil).toISOString() };
+}
+
+function _recordMemAttempt(tenantId: string, max: number): { locked: boolean; lockedUntil?: string } {
+  const m = _memLock.get(tenantId) || { count: 0, lockedUntil: 0 };
+  m.count += 1;
+  if (m.count >= max) m.lockedUntil = Date.now() + 30 * 60 * 1000;
+  _memLock.set(tenantId, m);
+  return m.lockedUntil > Date.now() ? { locked: true, lockedUntil: new Date(m.lockedUntil).toISOString() } : { locked: false };
+}
+
+function _clearMem(tenantId: string) { _memLock.delete(tenantId); }
+
 export interface AppAuth {
   id: string;
   tenant_id: string;
@@ -72,21 +93,30 @@ export async function verifyAuth(
   const auth = rows[0];
   if (!auth) return { ok: false };
 
-  // Check if currently locked
+  // In-memory check first — cannot be bypassed by editing SQLite
+  const memState = _checkMem(tenantId);
+  if (memState.locked) return { ok: false, locked: true, lockedUntil: memState.lockedUntil };
+
+  // DB check (catches lockouts from previous sessions)
   if (auth.locked_until && new Date(auth.locked_until) > new Date()) {
+    // Mirror into memory so current session is also blocked
+    const ts = new Date(auth.locked_until).getTime();
+    _memLock.set(tenantId, { count: maxAttempts, lockedUntil: ts });
     return { ok: false, locked: true, lockedUntil: auth.locked_until };
   }
 
   // Username must match
   if (auth.username !== username.trim().toLowerCase()) {
+    _recordMemAttempt(tenantId, maxAttempts);
     return { ok: false, attemptsLeft: maxAttempts - (auth.failed_attempts + 1) };
   }
 
   const hash = await hashPassword(password, auth.salt);
   if (hash !== auth.password_hash) {
     const newAttempts = (auth.failed_attempts ?? 0) + 1;
-    if (newAttempts >= maxAttempts) {
-      const lockUntil = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+    const memResult = _recordMemAttempt(tenantId, maxAttempts);
+    if (newAttempts >= maxAttempts || memResult.locked) {
+      const lockUntil = memResult.lockedUntil || new Date(Date.now() + 30 * 60 * 1000).toISOString();
       await db.execute(
         'UPDATE app_auth SET failed_attempts = ?, locked_until = ?, updated_at = ? WHERE tenant_id = ?',
         [newAttempts, lockUntil, now(), tenantId]
@@ -100,7 +130,8 @@ export async function verifyAuth(
     return { ok: false, attemptsLeft: maxAttempts - newAttempts };
   }
 
-  // Correct password — reset counters
+  // Correct password — reset both in-memory and DB counters
+  _clearMem(tenantId);
   await db.execute(
     'UPDATE app_auth SET failed_attempts = 0, locked_until = NULL, updated_at = ? WHERE tenant_id = ?',
     [now(), tenantId]
@@ -109,6 +140,7 @@ export async function verifyAuth(
 }
 
 export async function clearLockout(tenantId: string): Promise<void> {
+  _clearMem(tenantId);
   const db = await getDb();
   await db.execute(
     'UPDATE app_auth SET failed_attempts = 0, locked_until = NULL, updated_at = ? WHERE tenant_id = ?',

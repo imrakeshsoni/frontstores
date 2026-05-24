@@ -8,6 +8,36 @@ PLIST_DIR="$HOME/Library/LaunchAgents"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 mkdir -p "$PLIST_DIR"
 
+# ── Require a strong admin password ─────────────────────────────────────────
+EXISTING_PLIST="$PLIST_DIR/com.frontstores.server.plist"
+if [ -f "$EXISTING_PLIST" ]; then
+  # Re-install: extract existing password so the user isn't forced to re-enter it
+  EXISTING_PW=$(grep -A1 'ADMIN_PASSWORD' "$EXISTING_PLIST" | grep '<string>' | sed 's/.*<string>\(.*\)<\/string>.*/\1/' | xargs)
+else
+  EXISTING_PW=""
+fi
+
+if [ -n "$EXISTING_PW" ]; then
+  echo "Found existing admin password — reusing it."
+  ADMIN_PASSWORD="$EXISTING_PW"
+else
+  echo ""
+  echo "Set a strong admin password for the admin panel."
+  echo "This password is stored in the launchd plist and used to access localhost:3002."
+  read -r -s -p "Admin password: " ADMIN_PASSWORD
+  echo ""
+  if [ -z "$ADMIN_PASSWORD" ]; then
+    echo "❌ Password cannot be empty. Aborting."
+    exit 1
+  fi
+  read -r -s -p "Confirm password: " ADMIN_PASSWORD2
+  echo ""
+  if [ "$ADMIN_PASSWORD" != "$ADMIN_PASSWORD2" ]; then
+    echo "❌ Passwords do not match. Aborting."
+    exit 1
+  fi
+fi
+
 # ── 1. Admin server (node tools/update-server.cjs) ──────────────────────────
 cat > "$PLIST_DIR/com.frontstores.server.plist" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -24,7 +54,7 @@ cat > "$PLIST_DIR/com.frontstores.server.plist" << EOF
   <dict>
     <key>PORT</key>             <string>3001</string>
     <key>ADMIN_PORT</key>       <string>3002</string>
-    <key>ADMIN_PASSWORD</key>   <string>frontstores2025</string>
+    <key>ADMIN_PASSWORD</key>   <string>${ADMIN_PASSWORD}</string>
   </dict>
   <key>WorkingDirectory</key>   <string>${PROJECT_DIR}/tools</string>
   <key>RunAtLoad</key>          <true/>

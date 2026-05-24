@@ -6,8 +6,8 @@ const WHATSAPP = '919340419566';
 const EMAIL = 'imrakeshsoni@gmail.com';
 const SERVER = 'https://update.frontstores.com';
 const OFFLINE_GRACE_DAYS = 7;
-// If local clock is more than 1 hour behind last known server time, treat as rollback
-const ROLLBACK_TOLERANCE_MS = 60 * 60 * 1000;
+const ROLLBACK_TOLERANCE_MS = 60 * 60 * 1000;     // 1 hour
+const VERIFY_INTERVAL_MS   = 24 * 60 * 60 * 1000; // re-verify with server every 24h
 
 type Status = 'loading' | 'active' | 'warning' | 'locked';
 
@@ -37,20 +37,27 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
       ? new Date(config.subscription_expires_at)
       : null;
 
-    if (!expires) { setStatus('active'); return; }
-
-    // Detect clock rollback: local time is behind the last server timestamp we stored
-    const lastServerTime = config.last_server_time ? new Date(config.last_server_time).getTime() : null;
-    const clockRolledBack = lastServerTime !== null && (Date.now() < lastServerTime - ROLLBACK_TOLERANCE_MS);
-
-    if (clockRolledBack) {
-      // Clock has been wound back — must verify with server, cannot trust local expiry
+    // NULL expiry: never grant free pass — always require server confirmation
+    if (!expires) {
       const serverResult = await tryServerCheck();
       if (serverResult === 'extended') return;
-      if (serverResult === 'frozen') { setLockReason('frozen'); setStatus('locked'); return; }
+      if (serverResult === 'frozen')  { setLockReason('frozen');  setStatus('locked'); return; }
+      if (serverResult === 'revoked') { setLockReason('revoked'); setStatus('locked'); return; }
+      // confirmed_expired OR unreachable with no local expiry → lock
+      setLockReason('expired');
+      setStatus('locked');
+      return;
+    }
+
+    // Clock rollback detection: local clock is behind last known server timestamp
+    const lastServerTime = config.last_server_time ? new Date(config.last_server_time).getTime() : null;
+    if (lastServerTime !== null && Date.now() < lastServerTime - ROLLBACK_TOLERANCE_MS) {
+      const serverResult = await tryServerCheck();
+      if (serverResult === 'extended') return;
+      if (serverResult === 'frozen')  { setLockReason('frozen');  setStatus('locked'); return; }
       if (serverResult === 'revoked') { setLockReason('revoked'); setStatus('locked'); return; }
       if (serverResult === 'confirmed_expired') { setLockReason('expired'); setStatus('locked'); return; }
-      // Server unreachable and clock is suspicious — lock immediately, no grace
+      // Suspicious clock + unreachable server → lock with no grace
       setLockReason('expired');
       setStatus('locked');
       return;
@@ -60,26 +67,39 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
 
     if (daysUntilExpiry > 0) {
       setStatus('active');
-      // Background check — applies freeze/revoke immediately if server says so
+
+      // 24h freshness: if we haven't verified with server in 24h, do a blocking check now
+      const lastVerified = config.last_verified_at ? new Date(config.last_verified_at).getTime() : 0;
+      const stale = Date.now() - lastVerified > VERIFY_INTERVAL_MS;
+
+      if (stale && navigator.onLine) {
+        const serverResult = await tryServerCheck();
+        if (serverResult === 'frozen')           { setLockReason('frozen');  setStatus('locked'); return; }
+        if (serverResult === 'revoked')          { setLockReason('revoked'); setStatus('locked'); return; }
+        if (serverResult === 'confirmed_expired'){ setLockReason('expired'); setStatus('locked'); return; }
+        // extended or unreachable — stay active
+        return;
+      }
+
+      // Background check for freeze/revoke even when not stale
       tryServerCheck().then((result) => {
-        if (result === 'frozen') { setLockReason('frozen'); setStatus('locked'); }
-        if (result === 'revoked') { setLockReason('revoked'); setStatus('locked'); }
+        if (result === 'frozen')            { setLockReason('frozen');  setStatus('locked'); }
+        if (result === 'revoked')           { setLockReason('revoked'); setStatus('locked'); }
+        if (result === 'confirmed_expired') { setLockReason('expired'); setStatus('locked'); }
       });
       return;
     }
 
     // Expired locally — must verify with server
     const serverResult = await tryServerCheck();
-
     if (serverResult === 'extended') return;
-    if (serverResult === 'frozen') { setLockReason('frozen'); setStatus('locked'); return; }
+    if (serverResult === 'frozen')  { setLockReason('frozen');  setStatus('locked'); return; }
     if (serverResult === 'revoked') { setLockReason('revoked'); setStatus('locked'); return; }
     if (serverResult === 'confirmed_expired') { setLockReason('expired'); setStatus('locked'); return; }
 
     // Server unreachable — apply grace period
     const daysSinceExpiry = Math.ceil((Date.now() - expires.getTime()) / 864e5);
     const graceLeft = OFFLINE_GRACE_DAYS - daysSinceExpiry;
-
     if (graceLeft > 0) {
       setGraceDaysLeft(graceLeft);
       setStatus('warning');
@@ -99,23 +119,20 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
 
       const data = await res.json();
 
-      // Always persist the server's authoritative timestamp for rollback detection
-      if (data.server_time) {
-        const db = await getDb();
-        await db.execute(
-          `UPDATE app_config SET last_server_time = ?, updated_at = ? WHERE tenant_id = ?`,
-          [data.server_time, now(), config.tenant_id]
-        );
-      }
+      // Persist server timestamp + verification time on every response
+      const db = await getDb();
+      await db.execute(
+        `UPDATE app_config SET last_server_time = ?, last_verified_at = ?, updated_at = ? WHERE tenant_id = ?`,
+        [data.server_time || new Date().toISOString(), now(), now(), config.tenant_id]
+      );
 
       if (data.reason === 'frozen') return 'frozen';
       if (data.reason === 'revoked') return 'revoked';
 
       if (data.active && data.expires_at) {
-        const db = await getDb();
         await db.execute(
-          `UPDATE app_config SET subscription_expires_at = ?, subscription_status = 'active', last_verified_at = ?, updated_at = ? WHERE tenant_id = ?`,
-          [data.expires_at, now(), now(), config.tenant_id]
+          `UPDATE app_config SET subscription_expires_at = ?, subscription_status = 'active', updated_at = ? WHERE tenant_id = ?`,
+          [data.expires_at, now(), config.tenant_id]
         );
         await loadConfig();
         setStatus('active');
