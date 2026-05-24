@@ -8,7 +8,7 @@ const OFFLINE_GRACE_DAYS = 7;
 const ROLLBACK_TOLERANCE_MS = 60 * 60 * 1000;     // 1 hour
 const VERIFY_INTERVAL_MS   = 24 * 60 * 60 * 1000; // re-verify with server every 24h
 
-type Status = 'loading' | 'active' | 'warning' | 'locked';
+type Status = 'loading' | 'active' | 'warning' | 'locked' | 'pending';
 
 export function SubscriptionGate({ children }: { children: React.ReactNode }) {
   const config = useAppStore((s) => s.config);
@@ -40,6 +40,12 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
     if (!expires) {
       const serverResult = await tryServerCheck();
       if (serverResult === 'extended') return;
+      if (serverResult === 'pending') {
+        const db = await getDb();
+        await db.execute(`UPDATE app_config SET subscription_status = 'pending', updated_at = ? WHERE tenant_id = ?`, [now(), config.tenant_id]);
+        setStatus('pending');
+        return;
+      }
       if (serverResult === 'frozen')  { setLockReason('frozen');  setStatus('locked'); return; }
       if (serverResult === 'revoked') { setLockReason('revoked'); setStatus('locked'); return; }
       // confirmed_expired OR unreachable with no local expiry → lock
@@ -92,6 +98,12 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
     // Expired locally — must verify with server
     const serverResult = await tryServerCheck();
     if (serverResult === 'extended') return;
+    if (serverResult === 'pending') {
+      const db = await getDb();
+      await db.execute(`UPDATE app_config SET subscription_status = 'pending', updated_at = ? WHERE tenant_id = ?`, [now(), config.tenant_id]);
+      setStatus('pending');
+      return;
+    }
     if (serverResult === 'frozen')  { setLockReason('frozen');  setStatus('locked'); return; }
     if (serverResult === 'revoked') { setLockReason('revoked'); setStatus('locked'); return; }
     if (serverResult === 'confirmed_expired') { setLockReason('expired'); setStatus('locked'); return; }
@@ -108,7 +120,7 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
     }
   }
 
-  async function tryServerCheck(): Promise<'extended' | 'confirmed_expired' | 'frozen' | 'revoked' | 'unreachable'> {
+  async function tryServerCheck(): Promise<'extended' | 'confirmed_expired' | 'frozen' | 'revoked' | 'pending' | 'unreachable'> {
     if (!config) return 'unreachable';
     try {
       const res = await fetch(`${SERVER}/license/${config.tenant_id}`, {
@@ -125,6 +137,7 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
         [data.server_time || new Date().toISOString(), now(), now(), config.tenant_id]
       );
 
+      if (data.reason === 'pending') return 'pending';
       if (data.reason === 'frozen') return 'frozen';
       if (data.reason === 'revoked') return 'revoked';
 
@@ -151,6 +164,56 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
   }
 
   if (status === 'loading' || status === 'active') return <>{children}</>;
+
+  if (status === 'pending') {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="text-5xl mb-4">⏳</div>
+            <h1 className="text-2xl font-bold text-white">Awaiting Approval</h1>
+            <p className="text-slate-400 mt-2 text-sm">
+              Your account is pending review. You'll be able to use FrontStores once approved.
+            </p>
+          </div>
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
+            <div className="bg-indigo-950 border border-indigo-800 rounded-2xl p-4 mb-6">
+              <p className="text-indigo-300 text-sm font-semibold mb-1">What happens next?</p>
+              <ul className="text-indigo-400 text-xs space-y-1 mt-2">
+                <li>• We review your registration details</li>
+                <li>• You get 30 days free trial upon approval</li>
+                <li>• Usually approved within a few hours</li>
+              </ul>
+            </div>
+            <p className="text-slate-300 text-sm font-medium mb-3">Need help? Contact us:</p>
+            <a
+              href={CONTACT_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-3 bg-indigo-900 border border-indigo-700 rounded-2xl p-4 hover:bg-indigo-800 transition-colors"
+            >
+              <span className="text-2xl">📩</span>
+              <div>
+                <p className="text-white font-semibold text-sm">Get in touch</p>
+                <p className="text-indigo-300 text-xs">frontstores.com · Usually within a few hours</p>
+              </div>
+            </a>
+            <div className="mt-4 p-3 bg-slate-800 rounded-xl text-center">
+              <p className="text-slate-500 text-xs">Your Shop ID</p>
+              <p className="text-slate-300 font-mono text-sm mt-1">{config?.tenant_id?.substring(0, 16)}…</p>
+            </div>
+            <button
+              onClick={handleRecheck}
+              disabled={checking}
+              className="mt-4 w-full py-3 rounded-2xl border border-slate-700 text-slate-300 text-sm font-medium hover:bg-slate-800 transition-colors disabled:opacity-50"
+            >
+              {checking ? 'Checking…' : '🔄 Check approval status'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (status === 'warning') {
     return (
