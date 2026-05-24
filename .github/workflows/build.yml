@@ -112,25 +112,38 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
 
-      # Upload the .sig file as an artifact so the consolidation job can read it
+      # Find and copy the .sig file to a known location, then upload as artifact
+      - name: Collect macOS signature
+        if: matrix.platform == 'macos-latest'
+        run: |
+          SIG=$(find src-tauri/target -name "*.app.tar.gz.sig" 2>/dev/null | head -1)
+          if [ -n "$SIG" ]; then
+            echo "Found sig: $SIG"
+            cp "$SIG" update.sig
+          else
+            echo "No .sig file found"
+            touch update.sig
+          fi
+
       - name: Upload signature artifact (macOS)
         if: matrix.platform == 'macos-latest'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.sig-artifact }}
-          path: ${{ matrix.sig-path }}
+          path: update.sig
           if-no-files-found: warn
 
       - name: Find and upload Windows signature artifact
         if: matrix.platform == 'windows-latest'
         shell: pwsh
         run: |
-          $sigFile = Get-ChildItem -Path "src-tauri/target/release/bundle/nsis" -Filter "*.sig" -ErrorAction SilentlyContinue | Select-Object -First 1
+          $sigFile = Get-ChildItem -Path "src-tauri/target" -Filter "*.sig" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
           if ($sigFile) {
+            Write-Host "Found sig: $($sigFile.FullName)"
             Copy-Item $sigFile.FullName -Destination "win-update.sig"
           } else {
-            $msiSig = Get-ChildItem -Path "src-tauri/target/release/bundle/msi" -Filter "*.sig" -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($msiSig) { Copy-Item $msiSig.FullName -Destination "win-update.sig" }
+            Write-Host "No .sig file found"
+            New-Item -Path "win-update.sig" -ItemType File | Out-Null
           }
 
       - name: Upload Windows sig artifact
