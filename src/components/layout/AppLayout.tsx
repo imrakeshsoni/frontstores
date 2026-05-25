@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { getShopTypeLabel } from '@/lib/shop/shopType';
+import { VoiceAssistant } from '@/components/voice/VoiceAssistant';
 
 export const NAV_ITEMS = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -174,6 +175,9 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* AI Voice Assistant — floating button, available on all pages */}
+      <VoiceAssistant />
     </div>
   );
 }
