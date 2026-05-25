@@ -7,22 +7,21 @@ import './index.css';
 import { reportError } from './lib/errorReporter';
 import { flushQueue } from './lib/syncQueue';
 
-// Check for app updates on startup (Tauri v2 requires manual check)
+// Check for updates silently on startup — never auto-install, just notify
 async function checkForUpdate() {
   try {
     const { check } = await import('@tauri-apps/plugin-updater');
     const update = await check();
     if (!update) return;
-    toast.info(`Update v${update.version} available — installing…`, { duration: 6000 });
-    await update.downloadAndInstall();
-    const { relaunch } = await import('@tauri-apps/plugin-process');
-    await relaunch();
+    toast.info(`Update v${update.version} available — go to Settings to install.`, {
+      duration: 10000,
+      action: { label: 'Settings', onClick: () => { window.location.hash = '/settings'; } },
+    });
   } catch {
     // Updater failure is non-fatal — ignore silently
   }
 }
-// Delay slightly so the UI renders first
-setTimeout(checkForUpdate, 3000);
+setTimeout(checkForUpdate, 4000);
 
 // Flush queued sync items on start and whenever internet comes back
 flushQueue();
