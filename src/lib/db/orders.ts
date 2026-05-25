@@ -115,50 +115,44 @@ export async function createOrder(tenantId: string, data: {
     }
   }
 
-  // Everything valid — run atomically
-  await db.execute('BEGIN');
-  try {
-    const orderId    = uuid();
-    const billNumber = await getNextBillNumber(tenantId);
-    const orderDate  = data.order_date ?? now();
+  // Insert order and items — tauri-plugin-sql uses a connection pool so
+  // BEGIN/COMMIT span different connections and deadlock. Each execute auto-commits.
+  const orderId    = uuid();
+  const billNumber = await getNextBillNumber(tenantId);
+  const orderDate  = data.order_date ?? now();
 
+  await db.execute(
+    `INSERT INTO orders (id, tenant_id, bill_number, customer_id, customer_name, customer_phone,
+      patient_name, doctor_name, subtotal, discount, tax_total, total, payment_method,
+      payment_status, amount_paid, notes, order_date)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [orderId, tenantId, billNumber, data.customer_id ?? null, data.customer_name ?? null,
+     data.customer_phone ?? null, data.patient_name ?? null, data.doctor_name ?? null,
+     calcSubtotal, calcDiscount, calcTaxTotal, calcTotal, data.payment_method,
+     data.payment_status, data.amount_paid, data.notes ?? null, orderDate]
+  );
+
+  for (const item of lineItems) {
     await db.execute(
-      `INSERT INTO orders (id, tenant_id, bill_number, customer_id, customer_name, customer_phone,
-        patient_name, doctor_name, subtotal, discount, tax_total, total, payment_method,
-        payment_status, amount_paid, notes, order_date)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [orderId, tenantId, billNumber, data.customer_id ?? null, data.customer_name ?? null,
-       data.customer_phone ?? null, data.patient_name ?? null, data.doctor_name ?? null,
-       calcSubtotal, calcDiscount, calcTaxTotal, calcTotal, data.payment_method,
-       data.payment_status, data.amount_paid, data.notes ?? null, orderDate]
+      `INSERT INTO order_items (id, tenant_id, order_id, product_id, product_name, quantity,
+        unit_price, mrp, discount, gst_rate, total, batch_no, expiry_date)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [uuid(), tenantId, orderId, item.product_id ?? null, item.product_name, item.quantity,
+       item.unit_price, item.mrp ?? null, item.discount, item.gst_rate, item.total,
+       item.batch_no ?? null, item.expiry_date ?? null]
     );
-
-    for (const item of lineItems) {
+    if (item.product_id) {
+      await updateStock(tenantId, item.product_id, -item.quantity);
       await db.execute(
-        `INSERT INTO order_items (id, tenant_id, order_id, product_id, product_name, quantity,
-          unit_price, mrp, discount, gst_rate, total, batch_no, expiry_date)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        [uuid(), tenantId, orderId, item.product_id ?? null, item.product_name, item.quantity,
-         item.unit_price, item.mrp ?? null, item.discount, item.gst_rate, item.total,
-         item.batch_no ?? null, item.expiry_date ?? null]
+        `INSERT INTO inventory_adjustments (id, tenant_id, product_id, quantity, type, reference_id)
+         VALUES (?,?,?,?,?,?)`,
+        [uuid(), tenantId, item.product_id, -item.quantity, 'sale', orderId]
       );
-      if (item.product_id) {
-        await updateStock(tenantId, item.product_id, -item.quantity);
-        await db.execute(
-          `INSERT INTO inventory_adjustments (id, tenant_id, product_id, quantity, type, reference_id)
-           VALUES (?,?,?,?,?,?)`,
-          [uuid(), tenantId, item.product_id, -item.quantity, 'sale', orderId]
-        );
-      }
     }
-
-    await db.execute('COMMIT');
-    const rows = await db.select<any[]>(`SELECT * FROM orders WHERE id = ?`, [orderId]);
-    return rows[0] as Order;
-  } catch (err) {
-    await db.execute('ROLLBACK');
-    throw err;
   }
+
+  const rows = await db.select<any[]>(`SELECT * FROM orders WHERE id = ?`, [orderId]);
+  return rows[0] as Order;
 }
 
 export async function listOrders(tenantId: string, opts: {
@@ -194,26 +188,19 @@ export async function voidOrder(tenantId: string, orderId: string): Promise<void
   const order = await getOrderWithItems(tenantId, orderId);
   if (!order) throw new Error('Order not found');
 
-  await db.execute('BEGIN');
-  try {
-    await db.execute(
-      `UPDATE orders SET payment_status = 'cancelled', deleted_at = ?, updated_at = ? WHERE id = ? AND tenant_id = ?`,
-      [now(), now(), orderId, tenantId]
-    );
-    for (const item of order.items ?? []) {
-      if (item.product_id) {
-        await updateStock(tenantId, item.product_id, item.quantity);
-        await db.execute(
-          `INSERT INTO inventory_adjustments (id, tenant_id, product_id, quantity, type, reference_id, notes)
-           VALUES (?,?,?,?,?,?,?)`,
-          [uuid(), tenantId, item.product_id, item.quantity, 'return', orderId, 'Order voided']
-        );
-      }
+  await db.execute(
+    `UPDATE orders SET payment_status = 'cancelled', deleted_at = ?, updated_at = ? WHERE id = ? AND tenant_id = ?`,
+    [now(), now(), orderId, tenantId]
+  );
+  for (const item of order.items ?? []) {
+    if (item.product_id) {
+      await updateStock(tenantId, item.product_id, item.quantity);
+      await db.execute(
+        `INSERT INTO inventory_adjustments (id, tenant_id, product_id, quantity, type, reference_id, notes)
+         VALUES (?,?,?,?,?,?,?)`,
+        [uuid(), tenantId, item.product_id, item.quantity, 'return', orderId, 'Order voided']
+      );
     }
-    await db.execute('COMMIT');
-  } catch (err) {
-    await db.execute('ROLLBACK');
-    throw err;
   }
 }
 
