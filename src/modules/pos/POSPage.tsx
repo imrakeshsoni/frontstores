@@ -7,7 +7,7 @@ import { useAppStore } from '@/app/store/app.store';
 import { useCartStore } from '@/app/store/cart.store';
 import type { CartItem } from '@/app/store/cart.store';
 import { isMedicalShopType, useActiveShopType } from '@/lib/shop/shopType';
-import { listProducts, createProduct, getProductByBarcode } from '@/lib/db/products';
+import { listProducts, createProduct, getProductByBarcode, searchProductsForPOS } from '@/lib/db/products';
 import { listCustomers, createCustomer } from '@/lib/db/customers';
 import { createOrder } from '@/lib/db/orders';
 
@@ -189,7 +189,7 @@ export function POSPage() {
 
   const { data: searchResultsRaw, isFetching } = useQuery({
     queryKey: ['product-search', trimmedSearch, tenantId],
-    queryFn: () => listProducts(tenantId, { search: trimmedSearch, perPage: 50 }).then((r) => r.items),
+    queryFn: () => searchProductsForPOS(tenantId, trimmedSearch),
     enabled: trimmedSearch.length > 0 && !!tenantId,
   });
   const searchResults = searchResultsRaw ?? [];

@@ -48,6 +48,45 @@ export async function listProducts(tenantId: string, opts: {
   return { items: items.map(mapProduct), total };
 }
 
+export async function searchProductsForPOS(tenantId: string, search: string): Promise<(Product & { batchDetails: any[] })[]> {
+  const db = await getDb();
+  const params: any[] = [tenantId];
+  const searchCondition = search
+    ? `AND (p.name LIKE ? OR p.barcode = ? OR p.sku LIKE ? OR p.salt_composition LIKE ? OR p.manufacturer LIKE ?)`
+    : '';
+  if (search) params.push(`%${search}%`, search, `%${search}%`, `%${search}%`, `%${search}%`);
+
+  const products = await db.select<any[]>(
+    `SELECT * FROM products p
+     WHERE p.tenant_id = ? AND p.deleted_at IS NULL AND p.is_active = 1
+     ${searchCondition}
+     ORDER BY p.name LIMIT 50`,
+    params
+  );
+
+  if (products.length === 0) return [];
+
+  const productIds = products.map(p => p.id);
+  const placeholders = productIds.map(() => '?').join(',');
+  const batches = await db.select<any[]>(
+    `SELECT id, product_id, batch_no as batchNo, expiry_date as expiry,
+            quantity, cost_price, purchase_date as manufactureDate
+     FROM inventory_batches
+     WHERE tenant_id = ? AND product_id IN (${placeholders})
+       AND deleted_at IS NULL AND quantity > 0
+     ORDER BY expiry_date ASC NULLS LAST`,
+    [tenantId, ...productIds]
+  );
+
+  const batchMap: Record<string, any[]> = {};
+  for (const b of batches) {
+    if (!batchMap[b.product_id]) batchMap[b.product_id] = [];
+    batchMap[b.product_id].push(b);
+  }
+
+  return products.map(p => ({ ...mapProduct(p), batchDetails: batchMap[p.id] ?? [] }));
+}
+
 export async function getProductByBarcode(tenantId: string, barcode: string): Promise<Product | null> {
   const db = await getDb();
   const rows = await db.select<any[]>(`SELECT * FROM products WHERE tenant_id = ? AND barcode = ? AND deleted_at IS NULL LIMIT 1`, [tenantId, barcode]);
