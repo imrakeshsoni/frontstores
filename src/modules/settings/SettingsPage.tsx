@@ -230,34 +230,6 @@ export function SettingsPage() {
         </div>
       </div>
 
-      {/* Admin Panel */}
-      <div className="card p-6">
-        <p className="section-label mb-1">Admin Panel</p>
-        <p className="text-xs text-slate-400 mb-4">Manage customers, approve signups, extend subscriptions, and view error reports.</p>
-        <button
-          className="btn-secondary"
-          onClick={async () => {
-            try {
-              const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
-              const existing = await WebviewWindow.getByLabel('admin');
-              if (existing) { await existing.setFocus(); return; }
-              new WebviewWindow('admin', {
-                url: 'http://localhost:3002',
-                title: 'FrontStores Admin',
-                width: 1200,
-                height: 800,
-                center: true,
-                resizable: true,
-              });
-            } catch (e: any) {
-              toast.error('Could not open admin panel: ' + (e?.message ?? e));
-            }
-          }}
-        >
-          🔒 Open Admin Panel
-        </button>
-      </div>
-
       {/* App Updates */}
       <div className="card p-6">
         <p className="section-label mb-1">App Updates</p>
