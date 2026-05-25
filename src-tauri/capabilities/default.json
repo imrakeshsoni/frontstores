@@ -18,6 +18,9 @@
     "dialog:default",
     "fs:default",
     "shell:default",
-    "process:default"
+    "process:default",
+    "webview-window:allow-create",
+    "webview-window:allow-get-by-label",
+    "webview-window:allow-set-focus"
   ]
 }
