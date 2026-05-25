@@ -546,13 +546,12 @@ const adminServer = http.createServer(async (req, res) => {
     }))); return;
   }
 
-  // POST /admin/api/errors/:id/resolve
+  // POST /admin/api/errors/:id/resolve — deletes the record entirely
   const errAction = pathname.match(/^\/admin\/api\/errors\/([^/]+)\/resolve$/);
   if (req.method === 'POST' && errAction) {
     const errors = loadErrors();
-    const idx = errors.findIndex(e => e.id === errAction[1]);
-    if (idx !== -1) errors[idx].resolved = true;
-    saveErrors(errors);
+    const filtered = errors.filter(e => e.id !== errAction[1]);
+    saveErrors(filtered);
     json(res, { ok: true }); return;
   }
 

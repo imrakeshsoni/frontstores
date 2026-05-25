@@ -1,6 +1,7 @@
 // [core] [all tenants] — Native admin panel calling local server at localhost:3002
 import { useState, useEffect, useCallback } from 'react';
-import { Users, AlertCircle, CheckCircle, XCircle, RefreshCw, Lock, Unlock, Ban, Calendar } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Users, AlertCircle, CheckCircle, XCircle, RefreshCw, Lock, Unlock, Ban, Calendar, Copy, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 const ADMIN_PORT = 3002;
@@ -22,6 +23,7 @@ type AppError = {
   id: string;
   tenant_id: string;
   shop_name: string;
+  shop_type: string;
   message: string;
   context: string;
   app_version: string;
@@ -38,6 +40,11 @@ function fmtDate(s?: string | null) {
   return new Date(s).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+function fmtDateTime(s?: string | null) {
+  if (!s) return '—';
+  return new Date(s).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
     active:  'bg-emerald-100 text-emerald-700',
@@ -52,6 +59,80 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+function ErrorDetailModal({ error, onClose, onResolve }: { error: AppError; onClose: () => void; onResolve: () => void }) {
+  const claudeText = `FrontStores Error Report
+========================
+Shop: ${error.shop_name} (${error.shop_type})
+Tenant ID: ${error.tenant_id}
+App Version: v${error.app_version}
+Received: ${fmtDateTime(error.received_at)}
+
+Error Message:
+${error.message}
+
+Context:
+${error.context || '(none)'}
+========================
+Please find this bug in the codebase and fix it.`;
+
+  const copy = () => {
+    navigator.clipboard.writeText(claudeText);
+    toast.success('Copied — paste it to Claude Code to fix');
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b border-slate-100">
+          <div>
+            <p className="font-semibold text-slate-900">{error.shop_name}</p>
+            <p className="text-xs text-slate-400 mt-0.5">v{error.app_version} · {fmtDateTime(error.received_at)}</p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Error detail */}
+        <div className="p-5 space-y-3">
+          <div>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Error Message</p>
+            <p className="text-sm text-red-700 font-medium bg-red-50 rounded-lg p-3">{error.message}</p>
+          </div>
+          {error.context && (
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Context</p>
+              <p className="text-sm text-slate-600 bg-slate-50 rounded-lg p-3 font-mono break-all">{error.context}</p>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3 text-xs text-slate-500">
+            <div><span className="font-semibold">Shop type:</span> {error.shop_type || '—'}</div>
+            <div><span className="font-semibold">Tenant ID:</span> {error.tenant_id.substring(0, 8)}…</div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-2 p-5 pt-0">
+          <button onClick={copy} className="btn-secondary flex-1 flex items-center justify-center gap-2 text-sm">
+            <Copy className="h-4 w-4" />
+            Copy for Claude
+          </button>
+          <button
+            onClick={onResolve}
+            className="btn-primary flex-1 flex items-center justify-center gap-2 text-sm"
+          >
+            <CheckCircle className="h-4 w-4" />
+            Mark Fixed & Delete
+          </button>
+        </div>
+        <p className="text-center text-xs text-slate-400 pb-4">Clicking "Mark Fixed" removes this error permanently</p>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 export function AdminPage() {
   const [password, setPassword] = useState('');
   const [authed, setAuthed] = useState(false);
@@ -60,15 +141,14 @@ export function AdminPage() {
   const [errors, setErrors] = useState<AppError[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [selectedError, setSelectedError] = useState<AppError | null>(null);
 
   const api = useCallback(async (path: string, method = 'GET', body?: object) => {
-    const csrfToken = (window as any).__CSRF_TOKEN__ ?? '';
     const res = await fetch(`http://localhost:${ADMIN_PORT}${path}`, {
       method,
       headers: {
         'Authorization': makeAuth(password),
         'Content-Type': 'application/json',
-        'X-CSRF-Token': csrfToken,
       },
       body: body ? JSON.stringify(body) : undefined,
     });
@@ -120,7 +200,9 @@ export function AdminPage() {
   const resolveError = async (id: string) => {
     try {
       await api(`/admin/api/errors/${id}/resolve`, 'POST');
-      loadData();
+      setSelectedError(null);
+      setErrors(prev => prev.filter(e => e.id !== id));
+      toast.success('Error deleted — paste it to Claude Code to fix');
     } catch (e: any) {
       toast.error(e.message);
     }
@@ -133,7 +215,6 @@ export function AdminPage() {
   );
 
   const pending = tenants.filter(t => t.account_status === 'pending').length;
-  const unresolvedErrors = errors.filter(e => !e.resolved).length;
 
   if (!authed) {
     return (
@@ -195,7 +276,7 @@ export function AdminPage() {
         >
           <AlertCircle className="h-4 w-4" />
           Errors
-          {unresolvedErrors > 0 && <span className="bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">{unresolvedErrors}</span>}
+          {errors.length > 0 && <span className="bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">{errors.length}</span>}
         </button>
       </div>
 
@@ -268,39 +349,46 @@ export function AdminPage() {
       {tab === 'errors' && (
         <div className="card overflow-hidden">
           <div className="p-4 border-b border-slate-100">
-            <p className="font-semibold text-slate-900">{unresolvedErrors} unresolved errors</p>
+            <p className="font-semibold text-slate-900">{errors.length} error{errors.length !== 1 ? 's' : ''}</p>
+            {errors.length > 0 && <p className="text-xs text-slate-400 mt-0.5">Click an error to copy it for Claude and mark it fixed</p>}
           </div>
 
           {loading && <div className="p-8 text-center text-slate-400 text-sm">Loading…</div>}
-          {!loading && errors.length === 0 && <div className="p-8 text-center text-slate-400 text-sm">No errors reported.</div>}
+          {!loading && errors.length === 0 && <div className="p-8 text-center text-slate-400 text-sm">No errors — all clear.</div>}
 
           <div className="divide-y divide-slate-100">
             {errors.map(e => (
-              <div key={e.id} className={`p-4 ${e.resolved ? 'opacity-50' : ''}`}>
+              <div
+                key={e.id}
+                className="p-4 hover:bg-slate-50 transition-colors cursor-pointer"
+                onClick={() => setSelectedError(e)}
+              >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold text-slate-900 text-sm">{e.shop_name}</p>
-                      {e.resolved
-                        ? <span className="text-xs text-emerald-600 flex items-center gap-1"><CheckCircle className="h-3 w-3" />Resolved</span>
-                        : <span className="text-xs text-red-600 flex items-center gap-1"><XCircle className="h-3 w-3" />Unresolved</span>
-                      }
+                      <span className="text-xs text-red-600 flex items-center gap-1"><XCircle className="h-3 w-3" />Unresolved</span>
                       {e.app_version && <span className="text-xs text-slate-400">v{e.app_version}</span>}
                     </div>
-                    <p className="text-sm text-red-700 mt-1 font-medium">{e.message}</p>
-                    {e.context && <p className="text-xs text-slate-400 mt-0.5">Context: {e.context}</p>}
-                    <p className="text-xs text-slate-400 mt-1">{fmtDate(e.received_at)}</p>
+                    <p className="text-sm text-red-700 mt-1 font-medium truncate">{e.message}</p>
+                    {e.context && <p className="text-xs text-slate-400 mt-0.5 truncate">Context: {e.context}</p>}
+                    <p className="text-xs text-slate-400 mt-1">{fmtDateTime(e.received_at)}</p>
                   </div>
-                  {!e.resolved && (
-                    <button onClick={() => resolveError(e.id)} className="btn-secondary text-xs px-3 py-1.5 flex-shrink-0">
-                      <CheckCircle className="h-3.5 w-3.5" /> Resolve
-                    </button>
-                  )}
+                  <div className="flex-shrink-0 text-slate-300 text-xs">tap to view →</div>
                 </div>
               </div>
             ))}
           </div>
         </div>
+      )}
+
+      {/* Error detail modal */}
+      {selectedError && (
+        <ErrorDetailModal
+          error={selectedError}
+          onClose={() => setSelectedError(null)}
+          onResolve={() => resolveError(selectedError.id)}
+        />
       )}
     </div>
   );
