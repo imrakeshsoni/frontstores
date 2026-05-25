@@ -8,7 +8,10 @@ export async function getDb(): Promise<Database> {
   if (_db) return _db;
   try {
     _db = await Database.load('sqlite:frontstores.db');
+    await _db.execute('PRAGMA journal_mode = WAL');
+    await _db.execute('PRAGMA busy_timeout = 10000');
     await _db.execute('PRAGMA foreign_keys = ON');
+    await _db.execute('PRAGMA synchronous = NORMAL');
     await runMigrations(_db);
   } catch (e: any) {
     reportError(String(e?.message || e), e?.stack, 'db.getDb');
