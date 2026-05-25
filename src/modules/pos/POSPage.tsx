@@ -985,17 +985,6 @@ ${invoiceSnapshot.gstAmount > 0 ? `<div class="row"><span>GST</span><span>₹${i
     if (direction === 1) {
       if (cartEditField === 'quantity') {
         if (canSellLoose) {
-          if ((selectedCartItem.looseQty ?? 0) <= 0) {
-            if (!canApplyCartQuantityChange(selectedCartItem, {
-              nextQuantity: selectedCartItem.quantity,
-              nextLooseQty: 1,
-            })) {
-              toast.error('Not enough stock available');
-              return;
-            }
-            cart.toggleLoose(selectedCartItem.itemKey, true);
-            cart.updateLooseQty(selectedCartItem.itemKey, 1);
-          }
           setCartEditField('loose');
           return;
         }
