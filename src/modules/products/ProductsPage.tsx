@@ -76,7 +76,7 @@ export function ProductsPage() {
         cost_price: editing.cost_price ? String(editing.cost_price) : '',
         gst_rate: editing.gst_rate ? String(editing.gst_rate) : '12',
         total_units: editing.total_units ? String(editing.total_units) : '',
-        loose_selling_price: '',
+        loose_selling_price: editing.loose_selling_price ? String(editing.loose_selling_price) : '',
         min_stock_qty: editing.min_stock_qty ? String(editing.min_stock_qty) : '',
         requires_prescription: !!editing.requires_prescription,
         location_section: '',
@@ -329,6 +329,18 @@ export function ProductsPage() {
                   <label className="mb-2 block text-sm font-medium text-slate-700">{form.unit === 'strip' ? 'Strip MRP' : 'MRP'}</label>
                   <input type="number" className="input" value={form.mrp} onChange={(e) => setForm((c) => ({ ...c, mrp: e.target.value }))} />
                 </div>
+                {isMedicalStore && form.unit === 'strip' && Number(form.loose_selling_price) > 0 && (
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">Per Unit (Loose) Price</label>
+                    <input
+                      type="number"
+                      className="input bg-emerald-50 border-emerald-200"
+                      value={form.loose_selling_price}
+                      onChange={(e) => setForm((c) => ({ ...c, loose_selling_price: e.target.value }))}
+                    />
+                    <p className="mt-1 text-xs text-slate-400">Auto-calculated from Strip MRP ÷ Units. You can override.</p>
+                  </div>
+                )}
                 {!isMedicalStore && (
                   <>
                     <div>
