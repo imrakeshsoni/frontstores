@@ -95,6 +95,21 @@ export async function getExpiryAlerts(tenantId: string, daysAhead = 90): Promise
   );
 }
 
+export async function getBatchesWithChallan(tenantId: string, productId: string): Promise<any[]> {
+  const db = await getDb();
+  return db.select<any[]>(
+    `SELECT ib.id, ib.batch_no, ib.expiry_date, ib.quantity, ib.cost_price, ib.purchase_date,
+            ia.invoice_number, ia.created_at as received_at, ia.type,
+            s.name as supplier_name
+     FROM inventory_batches ib
+     LEFT JOIN inventory_adjustments ia ON ia.batch_id = ib.id AND ia.type = 'purchase'
+     LEFT JOIN suppliers s ON s.id = ia.supplier_id
+     WHERE ib.tenant_id = ? AND ib.product_id = ? AND ib.deleted_at IS NULL AND ib.quantity > 0
+     ORDER BY ib.expiry_date ASC NULLS LAST`,
+    [tenantId, productId]
+  );
+}
+
 export async function getLowStockAlerts(tenantId: string): Promise<any[]> {
   const db = await getDb();
   return db.select<any[]>(

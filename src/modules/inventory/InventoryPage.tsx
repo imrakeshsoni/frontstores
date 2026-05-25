@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Boxes, Clock, Plus, RotateCcw, Upload } from 'lucide-react';
+import { AlertTriangle, Boxes, Clock, Plus, RotateCcw, Upload, List, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAppStore } from '@/app/store/app.store';
 import { listProducts } from '@/lib/db/products';
 import { listSuppliers } from '@/lib/db/suppliers';
-import { adjustStock, addStock, getExpiryAlerts } from '@/lib/db/inventory';
+import { adjustStock, addStock, getExpiryAlerts, getBatchesWithChallan } from '@/lib/db/inventory';
 import { getDb } from '@/lib/db/index';
 import { PageIntro } from '@/components/ui/PageIntro';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -160,6 +160,13 @@ export function InventoryPage() {
   const inventoryItems = productsData?.items ?? [];
   const selectedProduct = allProducts?.items.find((p) => p.id === adjustment.productId);
 
+  const [batchDetailProduct, setBatchDetailProduct] = useState<{ id: string; name: string } | null>(null);
+  const { data: batchDetails = [] } = useQuery({
+    queryKey: ['batch-challan', tenantId, batchDetailProduct?.id],
+    queryFn: () => getBatchesWithChallan(tenantId, batchDetailProduct!.id),
+    enabled: !!batchDetailProduct && !!tenantId,
+  });
+
   const formatCurrency = (n: number) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
 
@@ -205,6 +212,7 @@ export function InventoryPage() {
                 <th className="text-right">Min Stock</th>
                 <th className="text-right">MRP</th>
                 <th className="text-right">Status</th>
+                <th className="text-right">Batches</th>
                 <th className="text-right">Actions</th>
               </tr>
             </thead>
@@ -237,6 +245,15 @@ export function InventoryPage() {
                         ? <span className="badge badge-red flex items-center gap-1 justify-end"><AlertTriangle className="h-3 w-3" /> Low</span>
                         : <span className="badge badge-green">OK</span>
                       }
+                    </td>
+                    <td className="text-right">
+                      <button
+                        className="rounded-full bg-slate-50 p-2 text-slate-600 hover:bg-slate-100"
+                        title="View batches & challan numbers"
+                        onClick={() => setBatchDetailProduct({ id: p.id, name: p.name })}
+                      >
+                        <List className="h-4 w-4" />
+                      </button>
                     </td>
                     <td className="text-right">
                       <button
@@ -401,6 +418,57 @@ export function InventoryPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Batch & Challan Detail Modal */}
+      {batchDetailProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+          <div className="card-strong flex max-h-[85vh] w-full max-w-2xl flex-col rounded-[2rem] p-6">
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <p className="section-label">Batch Details</p>
+                <h2 className="mt-1 text-lg font-bold text-slate-900">{batchDetailProduct.name}</h2>
+              </div>
+              <button className="btn-secondary p-2" onClick={() => setBatchDetailProduct(null)}>
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {batchDetails.length === 0 && (
+                <p className="py-8 text-center text-sm text-slate-400">No stock batches found.</p>
+              )}
+              {batchDetails.length > 0 && (
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Batch No</th>
+                      <th>Expiry</th>
+                      <th>Challan / Invoice</th>
+                      <th>Supplier</th>
+                      <th className="text-right">Qty</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {batchDetails.map((b: any) => (
+                      <tr key={b.id}>
+                        <td className="font-medium">{b.batch_no ?? '—'}</td>
+                        <td className={b.expiry_date && b.expiry_date < today ? 'text-red-600 font-semibold' : ''}>
+                          {b.expiry_date ?? '—'}
+                        </td>
+                        <td>
+                          {b.invoice_number
+                            ? <span className="font-medium text-indigo-700">{b.invoice_number}</span>
+                            : <span className="text-slate-400">—</span>}
+                        </td>
+                        <td className="text-slate-500">{b.supplier_name ?? '—'}</td>
+                        <td className="text-right font-semibold">{b.quantity}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         </div>
