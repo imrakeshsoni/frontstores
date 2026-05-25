@@ -15,7 +15,6 @@ import {
   Wallet,
   LogOut,
   ClipboardList,
-  Shield,
 } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { getShopTypeLabel } from '@/lib/shop/shopType';
@@ -34,7 +33,6 @@ export const NAV_ITEMS = [
   { to: '/purchase-orders', icon: ClipboardList, label: 'Purchase Orders' },
   { to: '/reports', icon: BarChart3, label: 'Reports' },
   { to: '/settings', icon: Settings, label: 'Settings' },
-  { to: '/admin', icon: Shield, label: 'Admin Panel' },
 ];
 
 export function AppLayout() {
