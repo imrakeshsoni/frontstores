@@ -19,8 +19,9 @@
     "fs:default",
     "shell:default",
     "process:default",
-    "webview-window:allow-create",
-    "webview-window:allow-get-by-label",
-    "webview-window:allow-set-focus"
+    "core:webview:allow-create-webview-window",
+    "core:window:allow-create",
+    "core:window:allow-get-all-windows",
+    "core:window:allow-set-focus"
   ]
 }
