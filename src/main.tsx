@@ -7,18 +7,15 @@ import './index.css';
 import { reportError } from './lib/errorReporter';
 import { flushQueue } from './lib/syncQueue';
 
-// Check for updates silently on startup — never auto-install, just notify
+// Check for updates silently on startup — store result for Settings page, no notification
 async function checkForUpdate() {
   try {
     const { check } = await import('@tauri-apps/plugin-updater');
     const update = await check();
     if (!update) return;
-    toast.info(`Update v${update.version} available — go to Settings to install.`, {
-      duration: 10000,
-      action: { label: 'Settings', onClick: () => { window.location.hash = '/settings'; } },
-    });
+    (window as any).__pendingUpdate = update;
   } catch {
-    // Updater failure is non-fatal — ignore silently
+    // Non-fatal — ignore silently
   }
 }
 setTimeout(checkForUpdate, 4000);

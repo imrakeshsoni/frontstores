@@ -42,6 +42,16 @@ export function SettingsPage() {
   const [updateVersion, setUpdateVersion] = useState('');
   const [pendingUpdate, setPendingUpdate] = useState<any>(null);
 
+  // On mount, pick up any update found silently at startup
+  useEffect(() => {
+    const stored = (window as any).__pendingUpdate;
+    if (stored) {
+      setUpdateVersion(stored.version);
+      setPendingUpdate(stored);
+      setUpdateStatus('found');
+    }
+  }, []);
+
   const handleCheckUpdate = useCallback(async () => {
     setUpdateStatus('checking');
     try {
@@ -50,6 +60,7 @@ export function SettingsPage() {
       if (!update) { setUpdateStatus('up-to-date'); return; }
       setUpdateVersion(update.version);
       setPendingUpdate(update);
+      (window as any).__pendingUpdate = update;
       setUpdateStatus('found');
     } catch (err) {
       setUpdateStatus('idle');
@@ -65,6 +76,10 @@ export function SettingsPage() {
 
   const handleInstallUpdate = useCallback(async () => {
     if (!pendingUpdate) return;
+    const confirmed = confirm(
+      `Install update v${updateVersion}?\n\nThe app will close and relaunch automatically.\n\nDo this when you are not billing a customer.`
+    );
+    if (!confirmed) return;
     setUpdateStatus('installing');
     try {
       await pendingUpdate.downloadAndInstall();
@@ -76,7 +91,7 @@ export function SettingsPage() {
       toast.error(`Install failed: ${msg}`);
       reportError(msg, undefined, 'update-install');
     }
-  }, [pendingUpdate]);
+  }, [pendingUpdate, updateVersion]);
 
   // Password change state
   const [currentUsername, setCurrentUsername] = useState('');
@@ -252,8 +267,8 @@ export function SettingsPage() {
         {updateStatus === 'found' && (
           <div className="mb-4 bg-indigo-950 border border-indigo-700 rounded-2xl p-4 flex items-center justify-between gap-4">
             <div>
-              <p className="text-indigo-200 font-semibold text-sm">🎉 New update available — v{updateVersion}</p>
-              <p className="text-indigo-400 text-xs mt-0.5">Click "Update & Relaunch" to install. The app will restart automatically.</p>
+              <p className="text-indigo-200 font-semibold text-sm">🎉 New version v{updateVersion} is available</p>
+              <p className="text-indigo-400 text-xs mt-0.5">⚠️ App will close and relaunch to install. Do this when not billing a customer.</p>
             </div>
             <button
               onClick={handleInstallUpdate}
