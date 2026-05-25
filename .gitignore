@@ -24,3 +24,7 @@ tools/subscriptions.json
 tools/errors.json
 tools/server.log
 tools/tunnel.log
+
+# AI model files — too large for git (copy with the project folder manually)
+tools/ollama/models/
+tools/kokoro/models/

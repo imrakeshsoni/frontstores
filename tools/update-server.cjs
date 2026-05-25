@@ -230,6 +230,111 @@ const publicServer = http.createServer(async (req, res) => {
 
   if (req.method === 'GET' && pathname === '/update') { res.writeHead(204); res.end(); return; }
 
+  // POST /ai/chat — voice AI assistant, proxies to local Ollama (dolphin3, unrestricted)
+  // Rate limit: 60 requests per minute per IP
+  if (req.method === 'POST' && pathname === '/ai/chat') {
+    if (rateLimit(req, res, 'ai-chat', 60, 60 * 1000)) return;
+    const body = await readBody(req);
+    try {
+      const { tenant_id, messages } = JSON.parse(body);
+      if (!tenant_id || !Array.isArray(messages) || messages.length === 0) {
+        res.writeHead(400); res.end('Missing tenant_id or messages'); return;
+      }
+
+      const ollamaRes = await fetch('http://localhost:11434/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'dolphin3',
+          messages: messages.map(m => ({
+            role: sanitize(m.role, 20),
+            content: sanitize(m.content, 4000),
+          })),
+          stream: false,
+          options: { temperature: 0.7, num_predict: 512 },
+        }),
+      });
+
+      if (!ollamaRes.ok) {
+        const errText = await ollamaRes.text();
+        console.error(`AI error: ${errText.substring(0, 200)}`);
+        res.writeHead(503); res.end(JSON.stringify({ error: 'AI service unavailable' })); return;
+      }
+
+      const data = await ollamaRes.json();
+      json(res, { ok: true, content: data.message?.content || '' });
+    } catch (e) {
+      console.error(`AI chat error: ${e.message}`);
+      res.writeHead(503); res.end(JSON.stringify({ error: 'AI not available' }));
+    }
+    return;
+  }
+
+  // GET /ai/status — check if Ollama + dolphin3 are ready
+  if (req.method === 'GET' && pathname === '/ai/status') {
+    try {
+      const r = await fetch('http://localhost:11434/api/tags');
+      if (!r.ok) { json(res, { available: false }); return; }
+      const data = await r.json();
+      const hasModel = (data.models || []).some(m => m.name.startsWith('dolphin3'));
+      json(res, { available: hasModel });
+    } catch {
+      json(res, { available: false });
+    }
+    return;
+  }
+
+  // POST /ai/tts — Kokoro TTS proxy (proxies to local Kokoro server on port 8880)
+  // Rate limit: 60 per minute per IP
+  if (req.method === 'POST' && pathname === '/ai/tts') {
+    if (rateLimit(req, res, 'ai-tts', 60, 60 * 1000)) return;
+    const body = await readBody(req);
+    try {
+      const { text, voice, speed } = JSON.parse(body);
+      if (!text) { res.writeHead(400); res.end('Missing text'); return; }
+
+      const kokoroRes = await fetch('http://127.0.0.1:8880/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: String(text).substring(0, 500),
+          voice: voice || 'heart',
+          speed: Number(speed) || 1.0,
+        }),
+      });
+
+      if (!kokoroRes.ok) {
+        const err = await kokoroRes.text();
+        console.error(`TTS error: ${err.substring(0, 100)}`);
+        res.writeHead(503); res.end(JSON.stringify({ error: 'TTS unavailable' })); return;
+      }
+
+      const audioBuffer = await kokoroRes.arrayBuffer();
+      res.writeHead(200, {
+        'Content-Type': 'audio/wav',
+        'Content-Length': audioBuffer.byteLength,
+        'Cache-Control': 'no-store',
+      });
+      res.end(Buffer.from(audioBuffer));
+    } catch (e) {
+      console.error(`TTS proxy error: ${e.message}`);
+      res.writeHead(503); res.end(JSON.stringify({ error: 'TTS not available' }));
+    }
+    return;
+  }
+
+  // GET /ai/tts/status — check if Kokoro TTS is ready
+  if (req.method === 'GET' && pathname === '/ai/tts/status') {
+    try {
+      const r = await fetch('http://127.0.0.1:8880/health', { signal: AbortSignal.timeout(2000) });
+      const data = await r.json();
+      json(res, { available: data.ok && data.kokoro });
+    } catch {
+      json(res, { available: false });
+    }
+    return;
+  }
+
   // POST /reset-request — max 5 per IP per 15 minutes
   if (req.method === 'POST' && pathname === '/reset-request') {
     if (rateLimit(req, res, 'reset-request', 5, 15 * 60 * 1000)) return;
