@@ -8,6 +8,7 @@ import { changePassword, changeUsername, getAuthUsername, getExportLogs, logExpo
 import { exportBackup } from '@/lib/db/backup';
 import { PageIntro } from '@/components/ui/PageIntro';
 import { useTheme } from '@/lib/theme/useTheme';
+import { reportError } from '@/lib/errorReporter';
 
 type SettingsForm = {
   shop_name: string;
@@ -53,12 +54,11 @@ export function SettingsPage() {
     } catch (err) {
       setUpdateStatus('idle');
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('network') || msg.includes('fetch') || msg.includes('connect')) {
-        toast.error('No internet connection. Please check your network and try again.');
-      } else if (msg.includes('up to date') || msg.includes('UpToDate')) {
+      if (msg.includes('up to date') || msg.includes('UpToDate') || msg.includes('204')) {
         setUpdateStatus('up-to-date');
       } else {
         toast.error(`Update check failed: ${msg}`);
+        reportError(msg, undefined, 'update-check');
       }
     }
   }, []);
@@ -74,6 +74,7 @@ export function SettingsPage() {
       setUpdateStatus('found');
       const msg = err instanceof Error ? err.message : String(err);
       toast.error(`Install failed: ${msg}`);
+      reportError(msg, undefined, 'update-install');
     }
   }, [pendingUpdate]);
 
