@@ -23,6 +23,7 @@ const SettingsPage  = lazy(() => import('@/modules/settings/SettingsPage').then(
 const KhataPage           = lazy(() => import('@/modules/khata/KhataPage').then(m => ({ default: m.KhataPage })));
 const ExpensesPage        = lazy(() => import('@/modules/expenses/ExpensesPage').then(m => ({ default: m.ExpensesPage })));
 const PurchaseOrdersPage  = lazy(() => import('@/modules/purchase-orders/PurchaseOrdersPage').then(m => ({ default: m.PurchaseOrdersPage })));
+const AdminPage           = lazy(() => import('@/modules/admin/AdminPage').then(m => ({ default: m.AdminPage })));
 
 function Loading() {
   return (
@@ -74,6 +75,7 @@ export default function App() {
             <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
             <Route path="reports"    element={<ReportsPage />} />
             <Route path="settings"   element={<SettingsPage />} />
+            <Route path="admin"      element={<AdminPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
