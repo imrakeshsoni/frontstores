@@ -49,7 +49,9 @@
     "category": "Business",
     "shortDescription": "Offline-first shop management for Indian businesses",
     "macOS": {
-      "signingIdentity": null
+      "signingIdentity": null,
+      "entitlements": "./entitlements.plist",
+      "infoPlist": "./Info.plist"
     }
   }
 }
