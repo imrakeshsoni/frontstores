@@ -283,6 +283,7 @@ jobs:
 
           AARCH64_SIG=$(cat sigs/aarch64/update.sig 2>/dev/null || echo "")
           X86_64_SIG=$(cat sigs/x86_64/update.sig 2>/dev/null || echo "")
+          WIN_SIG=$(cat sigs/win/update.sig 2>/dev/null || echo "")
 
           PLATFORMS="{}"
 
@@ -304,6 +305,16 @@ jobs:
             echo "Added darwin-x86_64"
           else
             echo "WARNING: x86_64 sig empty or missing"
+          fi
+
+          if [ -n "$WIN_SIG" ] && [ $(echo -n "$WIN_SIG" | wc -c) -gt 10 ]; then
+            PLATFORMS=$(echo "$PLATFORMS" | jq \
+              --arg sig "$WIN_SIG" \
+              --arg url "${BASE}/FrontStores_x64-setup.exe" \
+              '. + {"windows-x86_64": {"signature": $sig, "url": $url}}')
+            echo "Added windows-x86_64"
+          else
+            echo "WARNING: windows sig empty or missing"
           fi
 
           echo "$PLATFORMS" | jq \
