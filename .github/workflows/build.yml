@@ -211,15 +211,18 @@ jobs:
           if ($msi) { gh release upload $env:TAG "$($msi.FullName)#FrontStores_x64_en-US.msi" --clobber }
           if ($nsis) { gh release upload $env:TAG "$($nsis.FullName)#FrontStores_x64-setup.exe" --clobber }
 
-          # Capture the NSIS sig for auto-update (Windows uses NSIS)
-          $sig = Get-ChildItem -Path "src-tauri/target/release/bundle/nsis" -Filter "*.sig" -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $sig) {
-            $sig = Get-ChildItem -Path "src-tauri/target/release/bundle/msi" -Filter "*.sig" -ErrorAction SilentlyContinue | Select-Object -First 1
-          }
+          # Show all bundle files for diagnostics
+          Write-Host "=== Bundle directory contents ==="
+          Get-ChildItem -Path "src-tauri/target/release/bundle" -Recurse | Select-Object FullName, Length | Format-Table -AutoSize
+
+          # Tauri v2 Windows: sig is a .nsis.zip.sig or .exe.sig alongside the installer
+          # Search entire bundle dir for any .sig file
+          $sig = Get-ChildItem -Path "src-tauri/target/release/bundle" -Filter "*.sig" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
           if ($sig) {
             Copy-Item $sig.FullName -Destination "update.sig"
-            Write-Host "Win sig captured"
+            Write-Host "Win sig captured: $($sig.FullName) ($($sig.Length) bytes)"
           } else {
+            Write-Host "WARNING: No .sig file found anywhere in bundle dir — creating empty placeholder"
             New-Item -Path "update.sig" -ItemType File -Force | Out-Null
           }
 
