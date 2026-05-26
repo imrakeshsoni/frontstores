@@ -197,11 +197,13 @@ jobs:
           path: update.sig
           if-no-files-found: warn
 
-      # ── Windows: upload MSI + NSIS, capture sig ───────────────────────────
+      # ── Windows: sign NSIS manually (Tauri v2 doesn't auto-sign on Windows)
       - name: Upload Windows artifacts
         if: matrix.platform == 'windows-latest'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           TAG: ${{ github.ref_name }}
         shell: pwsh
         run: |
@@ -211,18 +213,20 @@ jobs:
           if ($msi) { gh release upload $env:TAG "$($msi.FullName)#FrontStores_x64_en-US.msi" --clobber }
           if ($nsis) { gh release upload $env:TAG "$($nsis.FullName)#FrontStores_x64-setup.exe" --clobber }
 
-          # Show all bundle files for diagnostics
-          Write-Host "=== Bundle directory contents ==="
-          Get-ChildItem -Path "src-tauri/target/release/bundle" -Recurse | Select-Object FullName, Length | Format-Table -AutoSize
-
-          # Tauri v2 Windows: sig is a .nsis.zip.sig or .exe.sig alongside the installer
-          # Search entire bundle dir for any .sig file
-          $sig = Get-ChildItem -Path "src-tauri/target/release/bundle" -Filter "*.sig" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-          if ($sig) {
-            Copy-Item $sig.FullName -Destination "update.sig"
-            Write-Host "Win sig captured: $($sig.FullName) ($($sig.Length) bytes)"
+          # Tauri v2 doesn't auto-sign on Windows — manually sign the NSIS exe
+          if ($nsis) {
+            Write-Host "Signing NSIS installer: $($nsis.FullName)"
+            npx tauri signer sign --private-key $env:TAURI_SIGNING_PRIVATE_KEY $nsis.FullName
+            $sigFile = "$($nsis.FullName).sig"
+            if (Test-Path $sigFile) {
+              Copy-Item $sigFile -Destination "update.sig"
+              Write-Host "Win sig captured: $((Get-Item update.sig).Length) bytes"
+            } else {
+              Write-Host "WARNING: signing produced no .sig file"
+              New-Item -Path "update.sig" -ItemType File -Force | Out-Null
+            }
           } else {
-            Write-Host "WARNING: No .sig file found anywhere in bundle dir — creating empty placeholder"
+            Write-Host "WARNING: No NSIS exe found to sign"
             New-Item -Path "update.sig" -ItemType File -Force | Out-Null
           }
 
