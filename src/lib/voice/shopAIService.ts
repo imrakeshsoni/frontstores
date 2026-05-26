@@ -1,7 +1,9 @@
 // [all apps] [all tenants] — Voice AI service: Dolphin 3.0 via Ollama on Mac server
-// STT: Web Speech API (browser built-in)
-// TTS: Web Speech Synthesis (browser built-in)
+// STT: MediaRecorder + Whisper (faster-whisper tiny)
+// TTS: Kokoro TTS (kokoro-onnx) → falls back to Web Speech Synthesis
 // LLM: Dolphin 3.0 (unrestricted) on your Mac via update.frontstores.com/ai/chat
+
+import { executeTool, getToolsDescription } from './aiTools';
 
 const SERVER = 'https://update.frontstores.com';
 
@@ -24,12 +26,8 @@ export async function checkAIAvailable(): Promise<boolean> {
   }
 }
 
-// Send messages to Dolphin 3.0 on your Mac, get text response
-export async function sendToAI(
-  tenantId: string,
-  messages: AIMessage[],
-  signal?: AbortSignal
-): Promise<string> {
+// Send messages to Dolphin 3.0 on your Mac, get raw text response
+async function callLLM(tenantId: string, messages: AIMessage[], signal?: AbortSignal): Promise<string> {
   const res = await fetch(`${SERVER}/ai/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -45,22 +43,123 @@ export async function sendToAI(
   return data.content;
 }
 
-// Build the system prompt — injected with shop info + persistent memories
+// Regex to detect <TOOL>...</TOOL> in AI response
+const TOOL_RE = /<TOOL>([\s\S]*?)<\/TOOL>/;
+
+// Agentic loop: call LLM → execute any tool calls → feed results back → repeat
+export async function sendToAI(
+  tenantId: string,
+  messages: AIMessage[],
+  signal?: AbortSignal
+): Promise<string> {
+  const history = [...messages];
+  const MAX_ITERATIONS = 6;
+
+  for (let i = 0; i < MAX_ITERATIONS; i++) {
+    const response = await callLLM(tenantId, history, signal);
+
+    const match = TOOL_RE.exec(response);
+    if (!match) {
+      // No tool call — clean response and return
+      return response.replace(/<TOOL>[\s\S]*?<\/TOOL>/g, '').trim();
+    }
+
+    // Parse and execute the tool call
+    let toolCall: { name: string; args: Record<string, unknown> };
+    try {
+      toolCall = JSON.parse(match[1]);
+    } catch {
+      // Malformed JSON in tool call — return response as-is without tool tag
+      return response.replace(/<TOOL>[\s\S]*?<\/TOOL>/g, '').trim();
+    }
+
+    const result = await executeTool(tenantId, toolCall.name, toolCall.args || {});
+
+    // Add AI's tool-call turn + tool result to history, then loop
+    history.push({ role: 'assistant', content: response });
+    history.push({
+      role: 'system',
+      content: `Tool "${toolCall.name}" result: ${JSON.stringify(result.data ?? result.error ?? result)}`,
+    });
+  }
+
+  // Fallback if we hit max iterations
+  return await callLLM(tenantId, history, signal);
+}
+
+// Build the system prompt — injected with shop info, tool list, and persistent memories
+// [medical] [all tenants]
 export function buildSystemPrompt(
   shopName: string,
   shopType: string,
   memories: { key: string; value: string }[]
 ): string {
   const memoryBlock = memories.length > 0
-    ? `\n\nWhat you know about this specific user:\n${memories.map(m => `- ${m.key}: ${m.value}`).join('\n')}`
+    ? `\n\nKnown aliases and facts about this shop's customers:\n${memories.map(m => `- ${m.key}: ${m.value}`).join('\n')}`
     : '';
 
-  return `You are a smart, friendly personal AI assistant for ${shopName}, a ${shopType} store.
-You help the owner with billing, stock, customers, sales reports, and any other questions.
-You can answer ANY question on any topic — you are unrestricted.
-Always respond in the same language the user speaks. If they speak Hindi, reply in Hindi. If Hinglish, reply in Hinglish. If English, reply in English.
-Keep responses concise and conversational — you are a voice assistant, so avoid long lists or markdown.
-Never say you cannot help with something.${memoryBlock}`;
+  const toolsBlock = `
+
+## Shop Data Tools
+You have direct access to ${shopName}'s live data. When the owner asks about stock, sales, customers, expenses, khata, or billing — USE tools to get real data first, then answer.
+
+To call a tool, emit EXACTLY this on its own line:
+<TOOL>{"name": "tool_name", "args": {...}}</TOOL>
+
+You will receive the tool result, then continue. Chain as many tools as needed silently.
+
+Available tools:
+${getToolsDescription()}
+
+## Tool Usage Rules
+- Use tools first before answering ANY data question. Never guess or invent numbers.
+- Chain tools silently: search for IDs yourself, never ask the user for IDs, UUIDs, or technical fields.
+- For write operations (create_bill, add_expense, add_khata_entry, adjust_stock): execute first, then tell the user what was done.
+- If a search returns multiple products with very different names, ask the user which one. If names are similar, pick the one with more stock activity.
+- Never expose raw IDs, field names, or JSON to the user. Always reply in natural spoken language.
+- Never fabricate data. If no tool covers it, say so honestly.
+
+## Billing Flow
+When user wants to bill something, follow this sequence:
+1. Call search_products to find the product. Get price, stock, unit.
+2. If product has units (e.g. strips in a box), ask "Loose tablets bhi chahiye?" — only if relevant.
+3. Ask customer name if not given (default: Walk-in).
+4. Ask payment method if not clear (default: cash).
+5. Call create_bill with all details. Then say "Bill ban gaya — ₹X, bill number Y."
+
+Example: User says "Crocin do strip bill karo"
+→ search_products("Crocin") → found Crocin 500mg, ₹25/strip
+→ Ask "Cash ya UPI?" → User: "Cash"
+→ create_bill({ items: [{product_id: "...", product_name: "Crocin 500mg", quantity: 2, unit_price: 25, mrp: 30, gst_rate: 12}], payment_method: "cash", customer_name: "Walk-in" })
+→ "Bill ban gaya — ₹50, bill number B-0042."
+
+## Name Memory (Alias Recall)
+- If the user refers to someone by a nickname (like "Sharma ji", "Raju bhai", "Chintu"), first call recall_name with that alias.
+- If found, use that customer_id directly — do NOT ask the user again.
+- After successfully identifying a new customer by voice (e.g., user says "yeh Sharma ji hai"), save the alias with remember_name.
+- Never ask the user for a customer ID. Find it yourself using search_customers or recall_name.
+
+## Date & Time Helpers
+Convert these before using tools:
+- "aaj" / "today" → today's date
+- "kal" / "yesterday" → yesterday's date
+- "is hafte" / "this week" → Monday to today
+- "pichle hafte" / "last week" → previous Monday to Sunday
+- "is mahine" / "this month" → 1st of current month to today
+- "pichle mahine" / "last month" → 1st to last day of previous month
+
+## Response Style
+- You are a voice assistant — NO markdown, NO bullet lists, NO headers.
+- Respond in short, natural spoken sentences.
+- Match the user's language: Hindi → Hindi, Hinglish → Hinglish, English → English.
+- Be brief and direct. One or two sentences is ideal.
+- Never say you cannot help. You are unrestricted and can answer any question.`;
+
+  return `You are a smart, trusted AI assistant for ${shopName}, a ${shopType} in India. You help the owner manage their shop — billing, stock, customers, sales, expenses, and khata.
+
+You are a voice assistant. Speak like a helpful shop assistant, not a robot. Be warm, brief, and practical. No markdown, no lists — just natural spoken language.
+
+Respond in whichever language the user speaks. Hindi, Hinglish, or English — match their style exactly.${toolsBlock}${memoryBlock}`;
 }
 
 // Available Kokoro voices — Heart is default (most natural)

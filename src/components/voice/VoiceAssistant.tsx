@@ -20,6 +20,7 @@ import {
   loadAIMemories,
   loadRecentHistory,
 } from '@/lib/db/ai';
+import { getCustomerBalance } from '@/lib/db/khata';
 
 interface DisplayTurn {
   role: 'user' | 'assistant';
@@ -43,7 +44,7 @@ function statusLabel(s: AIStatus) {
 }
 
 export function VoiceAssistant() {
-  const { config } = useAppStore();
+  const { config, lastBilledCustomer, setLastBilledCustomer } = useAppStore();
   const tenantId = config?.tenant_id ?? '';
   const shopName = config?.shop_name ?? 'Your Store';
   const shopType = config?.shop_type ?? 'store';
@@ -56,6 +57,8 @@ export function VoiceAssistant() {
   const [selectedVoice, setSelectedVoice] = useState(DEFAULT_VOICE);
   const [showVoicePicker, setShowVoicePicker] = useState(false);
   const selectedVoiceRef = useRef(DEFAULT_VOICE);
+  // [medical] [all tenants] — track last activity time for EOD idle detection
+  const lastActivityRef = useRef(Date.now());
 
   // Full message history sent to LLM (includes system prompt + all turns)
   const historyRef = useRef<AIMessage[]>([]);
@@ -105,6 +108,26 @@ export function VoiceAssistant() {
       await speakText(greeting, selectedVoiceRef.current);
       setStatus('idle');
       setSessionReady(true);
+
+      // [medical] [all tenants] — morning briefing (once per day)
+      const briefingKey = `ai_briefing_${tenantId}_${new Date().toISOString().substring(0, 10)}`;
+      const alreadyBriefed = localStorage.getItem(briefingKey);
+      if (!alreadyBriefed) {
+        localStorage.setItem(briefingKey, '1');
+        const briefingMsg = "Give me a short morning briefing about the shop — low stock, expiry alerts, outstanding khata, and today's sales so far. Be brief and conversational.";
+        historyRef.current.push({ role: 'user', content: briefingMsg });
+        try {
+          const briefing = await sendToAI(tenantId, historyRef.current, undefined);
+          historyRef.current.push({ role: 'assistant', content: briefing });
+          setTurns(prev => [...prev, { role: 'assistant', text: briefing }]);
+          setStatus('speaking');
+          await speakText(briefing, selectedVoiceRef.current);
+          setStatus('idle');
+        } catch {
+          // silent — briefing failure should not block the session
+          historyRef.current.pop(); // remove the user message we added
+        }
+      }
     })();
   }, [open, sessionReady, tenantId, shopName, shopType]);
 
@@ -221,6 +244,9 @@ export function VoiceAssistant() {
       return;
     }
 
+    // [medical] [all tenants] — update last activity for EOD idle detection
+    lastActivityRef.current = Date.now();
+
     setTurns(t => [...t, { role: 'user', text: transcript }]);
     setStatus('thinking');
     setErrorMsg('');
@@ -262,6 +288,54 @@ export function VoiceAssistant() {
   }, [tenantId, startRec]);
 
   useEffect(() => { processTranscriptRef.current = processTranscript; }, [processTranscript]);
+
+  // [medical] [all tenants] — post-bill khata reminder: if named customer was billed, check balance
+  useEffect(() => {
+    if (!lastBilledCustomer?.id || !tenantId || !sessionReady) return;
+    const customerId = lastBilledCustomer.id;
+    const customerName = lastBilledCustomer.name ?? 'Customer';
+    setLastBilledCustomer(null); // reset so it doesn't fire again
+
+    (async () => {
+      try {
+        const balance = await getCustomerBalance(tenantId, customerId);
+        if (balance > 0) {
+          const msg = `${customerName} ka ₹${balance.toFixed(0)} abhi bhi baki hai.`;
+          setTurns(t => [...t, { role: 'assistant', text: msg }]);
+          await speakText(msg, selectedVoiceRef.current);
+        }
+      } catch { /* silent */ }
+    })();
+  }, [lastBilledCustomer, tenantId, sessionReady, setLastBilledCustomer]);
+
+  // [medical] [all tenants] — EOD idle detection: speak end-of-day summary if idle 30min+ between 7pm-11pm
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (!sessionReady || !tenantId) return;
+      const now = new Date();
+      const hour = now.getHours();
+      if (hour < 19 || hour >= 23) return; // only 7pm-11pm
+      const idleMs = Date.now() - lastActivityRef.current;
+      if (idleMs < 30 * 60 * 1000) return; // need 30min idle
+
+      const eodKey = `ai_eod_${tenantId}_${now.toISOString().substring(0, 10)}`;
+      if (localStorage.getItem(eodKey)) return;
+      localStorage.setItem(eodKey, '1');
+
+      const msg = "Give me a brief end-of-day summary — today's total sales, number of bills, any pending khata. Very short, conversational.";
+      try {
+        const response = await sendToAI(tenantId, [
+          ...historyRef.current.slice(0, 1), // system prompt only
+          { role: 'user', content: msg },
+        ], undefined);
+        setTurns(t => [...t, { role: 'assistant', text: response }]);
+        setStatus('speaking');
+        await speakText(response, selectedVoiceRef.current);
+        setStatus('idle');
+      } catch { /* silent */ }
+    }, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [sessionReady, tenantId]);
 
   const toggleMic = useCallback(() => {
     if (micOnRef.current) {

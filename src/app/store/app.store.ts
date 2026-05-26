@@ -8,12 +8,15 @@ interface AppState {
   isLoading: boolean;
   isSetupComplete: boolean;
   isAuthenticated: boolean;
+  // [medical] [all tenants] — last billed customer for AI khata reminder
+  lastBilledCustomer: { id: string | null; name: string | null } | null;
 
   loadConfig: () => Promise<void>;
   // [core] [all tenants] — refreshes config without flashing the full-screen loader
   refreshConfig: () => Promise<void>;
   setConfig: (config: AppConfig) => void;
   setAuthenticated: (v: boolean) => void;
+  setLastBilledCustomer: (c: { id: string | null; name: string | null } | null) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -21,6 +24,7 @@ export const useAppStore = create<AppState>((set) => ({
   isLoading: true,
   isSetupComplete: false,
   isAuthenticated: false,
+  lastBilledCustomer: null,
 
   loadConfig: async () => {
     set({ isLoading: true });
@@ -46,4 +50,5 @@ export const useAppStore = create<AppState>((set) => ({
 
   setConfig: (config) => { setReporterTenantId(config.tenant_id); set({ config, isSetupComplete: config.is_setup_complete }); },
   setAuthenticated: (v) => set({ isAuthenticated: v }),
+  setLastBilledCustomer: (c) => set({ lastBilledCustomer: c }),
 }));

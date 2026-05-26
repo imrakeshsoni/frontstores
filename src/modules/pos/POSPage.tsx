@@ -480,6 +480,11 @@ export function POSPage() {
     },
     onSuccess: (order) => {
       toast.success(`Bill ${order.bill_number} created`);
+      // [medical] [all tenants] — notify AI assistant about billed customer for khata reminder
+      useAppStore.getState().setLastBilledCustomer({
+        id: order.customer_id ?? null,
+        name: order.customer_name ?? null,
+      });
       const snapshotItems = cart.items.map((item) => ({
         name: item.name,
         batchNo: item.batchNo,
