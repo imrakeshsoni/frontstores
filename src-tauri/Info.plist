@@ -4,5 +4,7 @@
 <dict>
   <key>NSMicrophoneUsageDescription</key>
   <string>FrontStores AI assistant needs microphone access for voice commands.</string>
+  <key>NSSpeechRecognitionUsageDescription</key>
+  <string>FrontStores AI assistant uses speech recognition to understand your voice commands.</string>
 </dict>
 </plist>
