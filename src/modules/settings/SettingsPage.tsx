@@ -41,8 +41,9 @@ export function SettingsPage() {
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'found' | 'installing' | 'up-to-date'>('idle');
   const [updateVersion, setUpdateVersion] = useState('');
   const [pendingUpdate, setPendingUpdate] = useState<any>(null);
+  const [currentVersion, setCurrentVersion] = useState('');
 
-  // On mount, pick up any update found silently at startup
+  // On mount, pick up any update found silently at startup + load current version
   useEffect(() => {
     const stored = (window as any).__pendingUpdate;
     if (stored) {
@@ -50,6 +51,7 @@ export function SettingsPage() {
       setPendingUpdate(stored);
       setUpdateStatus('found');
     }
+    import('@tauri-apps/api/app').then(({ getVersion }) => getVersion().then(setCurrentVersion).catch(() => {}));
   }, []);
 
   const handleCheckUpdate = useCallback(async () => {
@@ -232,7 +234,12 @@ export function SettingsPage() {
 
       {/* App Updates */}
       <div className="card p-6">
-        <p className="section-label mb-1">App Updates</p>
+        <div className="flex items-center justify-between mb-1">
+          <p className="section-label">App Updates</p>
+          {currentVersion && (
+            <span className="text-xs text-slate-500 font-mono">v{currentVersion}</span>
+          )}
+        </div>
         <p className="text-xs text-slate-400 mb-4">Updates only replace the app — your data, bills, and products are never touched.</p>
 
         {/* [core] [all tenants] — show update-available banner with explicit install step */}

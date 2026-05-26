@@ -209,7 +209,7 @@ export function VoiceAssistant() {
 
   useEffect(() => { processTranscriptRef.current = processTranscript; }, [processTranscript]);
 
-  const toggleMic = useCallback(() => {
+  const toggleMic = useCallback(async () => {
     if (micOnRef.current) {
       micOnRef.current = false;
       stopRec();
@@ -218,6 +218,16 @@ export function VoiceAssistant() {
       setStatus('idle');
     } else {
       if (!sessionReady) return;
+      // getUserMedia triggers macOS OS-level mic permission dialog in WKWebView.
+      // Web Speech API alone does not prompt — this must come first.
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(t => t.stop());
+      } catch {
+        setErrorMsg('Microphone access denied. Allow FrontStores microphone access in System Settings → Privacy → Microphone.');
+        setStatus('error');
+        return;
+      }
       micOnRef.current = true;
       setErrorMsg('');
       startRec();
