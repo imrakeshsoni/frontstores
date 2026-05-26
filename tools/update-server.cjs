@@ -13,6 +13,17 @@ const fs     = require('fs');
 const path   = require('path');
 const crypto = require('crypto');
 
+process.on('uncaughtException', (err) => {
+  console.error('uncaughtException:', err.stack || err);
+  process.exit(1);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('unhandledRejection:', reason);
+  process.exit(1);
+});
+process.on('SIGTERM', () => { process.exit(0); });
+process.on('SIGINT',  () => { process.exit(0); });
+
 const PUBLIC_PORT = parseInt(process.env.PORT       || '3001');
 const ADMIN_PORT  = parseInt(process.env.ADMIN_PORT || '3002');
 
