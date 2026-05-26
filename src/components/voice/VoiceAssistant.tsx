@@ -55,6 +55,7 @@ export function VoiceAssistant() {
   const [sessionReady, setSessionReady] = useState(false);
   const [selectedVoice, setSelectedVoice] = useState(DEFAULT_VOICE);
   const [showVoicePicker, setShowVoicePicker] = useState(false);
+  const selectedVoiceRef = useRef(DEFAULT_VOICE);
 
   // Full message history sent to LLM (includes system prompt + all turns)
   const historyRef = useRef<AIMessage[]>([]);
@@ -101,7 +102,7 @@ export function VoiceAssistant() {
       const greeting = `Hi! I'm your personal AI assistant for ${shopName}. How can I help you today?`;
       setTurns([{ role: 'assistant', text: greeting }]);
       setStatus('speaking');
-      await speakText(greeting, selectedVoice);
+      await speakText(greeting, selectedVoiceRef.current);
       setStatus('idle');
       setSessionReady(true);
     })();
@@ -187,7 +188,7 @@ export function VoiceAssistant() {
       setStatus('speaking');
 
       // Mic off while speaking — re-enable after
-      await speakText(response, selectedVoice);
+      await speakText(response, selectedVoiceRef.current);
 
       if (micOnRef.current) {
         startRec();
@@ -366,7 +367,7 @@ export function VoiceAssistant() {
                 {KOKORO_VOICES.map(v => (
                   <button
                     key={v.id}
-                    onClick={() => { setSelectedVoice(v.id); setShowVoicePicker(false); }}
+                    onClick={() => { setSelectedVoice(v.id); selectedVoiceRef.current = v.id; setShowVoicePicker(false); }}
                     style={{
                       width: '100%',
                       display: 'flex',

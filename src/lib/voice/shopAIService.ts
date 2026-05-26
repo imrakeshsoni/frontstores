@@ -80,9 +80,12 @@ export const KOKORO_VOICES = [
 export const DEFAULT_VOICE = 'heart';
 
 let _kokoroAvailable: boolean | null = null;
+let _kokoroCheckedAt = 0;
 
 async function isKokoroAvailable(): Promise<boolean> {
-  if (_kokoroAvailable !== null) return _kokoroAvailable;
+  const now = Date.now();
+  // Re-check every 60 seconds so a restarted Kokoro is picked up quickly
+  if (_kokoroAvailable !== null && now - _kokoroCheckedAt < 60_000) return _kokoroAvailable;
   try {
     const res = await fetch(`${SERVER}/ai/tts/status`, { signal: AbortSignal.timeout(3000) });
     const data = await res.json() as { available: boolean };
@@ -90,6 +93,7 @@ async function isKokoroAvailable(): Promise<boolean> {
   } catch {
     _kokoroAvailable = false;
   }
+  _kokoroCheckedAt = Date.now();
   return _kokoroAvailable;
 }
 
