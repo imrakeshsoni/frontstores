@@ -207,19 +207,22 @@ jobs:
           TAG: ${{ github.ref_name }}
         shell: pwsh
         run: |
-          $msi = Get-ChildItem -Path "src-tauri/target/release/bundle/msi" -Filter "*.msi" | Select-Object -First 1
+          $msi  = Get-ChildItem -Path "src-tauri/target/release/bundle/msi"  -Filter "*.msi" | Select-Object -First 1
           $nsis = Get-ChildItem -Path "src-tauri/target/release/bundle/nsis" -Filter "*.exe" | Select-Object -First 1
 
-          if ($msi) { gh release upload $env:TAG "$($msi.FullName)#FrontStores_x64_en-US.msi" --clobber }
-          if ($nsis) { gh release upload $env:TAG "$($nsis.FullName)#FrontStores_x64-setup.exe" --clobber }
+          # Copy to fixed names (# rename unreliable in PowerShell with gh CLI)
+          if ($msi)  { Copy-Item $msi.FullName  -Destination "FrontStores_x64_en-US.msi" }
+          if ($nsis) { Copy-Item $nsis.FullName -Destination "FrontStores_x64-setup.exe" }
 
-          # Tauri v2 doesn't auto-sign on Windows — manually sign the NSIS exe
-          if ($nsis) {
-            Write-Host "Signing NSIS installer: $($nsis.FullName)"
-            npx tauri signer sign --private-key $env:TAURI_SIGNING_PRIVATE_KEY $nsis.FullName
-            $sigFile = "$($nsis.FullName).sig"
-            if (Test-Path $sigFile) {
-              Copy-Item $sigFile -Destination "update.sig"
+          if (Test-Path "FrontStores_x64_en-US.msi") { gh release upload $env:TAG "FrontStores_x64_en-US.msi" --clobber }
+          if (Test-Path "FrontStores_x64-setup.exe")  { gh release upload $env:TAG "FrontStores_x64-setup.exe"  --clobber }
+
+          # Tauri v2 doesn't auto-sign on Windows — manually sign the fixed-name NSIS exe
+          if (Test-Path "FrontStores_x64-setup.exe") {
+            Write-Host "Signing NSIS installer..."
+            npx tauri signer sign --private-key $env:TAURI_SIGNING_PRIVATE_KEY "FrontStores_x64-setup.exe"
+            if (Test-Path "FrontStores_x64-setup.exe.sig") {
+              Copy-Item "FrontStores_x64-setup.exe.sig" -Destination "update.sig"
               Write-Host "Win sig captured: $((Get-Item update.sig).Length) bytes"
             } else {
               Write-Host "WARNING: signing produced no .sig file"
