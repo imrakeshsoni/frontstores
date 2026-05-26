@@ -334,6 +334,31 @@ const publicServer = http.createServer(async (req, res) => {
     return;
   }
 
+  // POST /ai/stt — Whisper STT proxy (proxies to local Kokoro server on port 8880)
+  if (req.method === 'POST' && pathname === '/ai/stt') {
+    if (rateLimit(req, res, 'ai-stt', 30, 60 * 1000)) return;
+    try {
+      const chunks = [];
+      for await (const chunk of req) chunks.push(chunk);
+      const audioBuffer = Buffer.concat(chunks);
+      const contentType = req.headers['content-type'] || 'audio/webm';
+
+      const sttRes = await fetch('http://127.0.0.1:8880/stt', {
+        method: 'POST',
+        headers: { 'Content-Type': contentType, 'Content-Length': String(audioBuffer.length) },
+        body: audioBuffer,
+        signal: AbortSignal.timeout(30000),
+      });
+
+      const data = await sttRes.json();
+      json(res, data);
+    } catch (e) {
+      console.error(`STT proxy error: ${e.message}`);
+      json(res, { ok: false, error: 'STT not available' });
+    }
+    return;
+  }
+
   // GET /ai/tts/status — check if Kokoro TTS is ready
   if (req.method === 'GET' && pathname === '/ai/tts/status') {
     try {

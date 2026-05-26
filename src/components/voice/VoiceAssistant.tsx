@@ -1,4 +1,4 @@
-// [all apps] [all tenants] — Voice AI assistant (Dolphin 3.0, unrestricted)
+// [all apps] [all tenants] — Voice AI assistant
 // STT: Web Speech API | TTS: Web Speech Synthesis | Memory: SQLite per tenant
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
@@ -108,57 +108,111 @@ export function VoiceAssistant() {
     })();
   }, [open, sessionReady, tenantId, shopName, shopType]);
 
+  const streamRef = useRef<MediaStream | null>(null);
+
   const stopRec = useCallback(() => {
     recRef.current?.stop();
     recRef.current = null;
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current = null;
   }, []);
 
   // processTranscript needs to be in a ref so startRec closure always gets the latest version
   const processTranscriptRef = useRef<(t: string) => void>(() => {});
 
-  const startRec = useCallback(() => {
+  // MediaRecorder + silence detection → Whisper STT
+  // Replaces unreliable Web Speech API which doesn't work in Tauri WKWebView
+  const startRec = useCallback(async () => {
     if (!micOnRef.current) return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const w = window as any;
-    const SR = w.SpeechRecognition ?? w.webkitSpeechRecognition;
-    if (!SR) {
-      setErrorMsg('Voice recognition not supported in this browser.');
+    setStatus('listening');
+
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+    } catch {
+      setErrorMsg('Microphone access denied.');
       micOnRef.current = false;
       setStatus('error');
       return;
     }
 
-    const rec = new SR();
-    rec.lang = 'hi-IN'; // Hindi + English (auto-detects Hinglish well)
-    rec.interimResults = false;
-    rec.maxAlternatives = 1;
-    recRef.current = rec;
-    setStatus('listening');
+    // Silence detection via AudioContext analyser
+    const audioCtx = new AudioContext();
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 512;
+    audioCtx.createMediaStreamSource(stream).connect(analyser);
+    const dataArr = new Uint8Array(analyser.frequencyBinCount);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    rec.onresult = (e: any) => {
-      const transcript: string = e.results[0][0].transcript;
-      rec.stop();
-      processTranscriptRef.current(transcript);
-    };
+    const chunks: Blob[] = [];
+    const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      ? 'audio/webm;codecs=opus' : 'audio/webm';
+    const recorder = new MediaRecorder(stream, { mimeType: mime });
+    recRef.current = recorder as any;
+    recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    rec.onerror = (e: any) => {
-      if (e.error === 'no-speech') {
-        // Silence — keep listening
-        if (micOnRef.current) setTimeout(() => startRec(), 300);
-      } else if (e.error !== 'aborted') {
-        setErrorMsg(`Mic error: ${e.error}`);
-        micOnRef.current = false;
-        setStatus('error');
+    recorder.onstop = async () => {
+      audioCtx.close();
+      stream.getTracks().forEach(t => t.stop());
+      if (!micOnRef.current) return;
+      if (chunks.length === 0) { if (micOnRef.current) startRec(); return; }
+
+      const blob = new Blob(chunks, { type: mime });
+      // Minimum 0.3s of audio to bother sending
+      if (blob.size < 3000) { if (micOnRef.current) startRec(); return; }
+
+      try {
+        const res = await fetch('https://update.frontstores.com/ai/stt', {
+          method: 'POST',
+          headers: { 'Content-Type': mime },
+          body: blob,
+        });
+        const data = await res.json() as { ok: boolean; transcript?: string };
+        const transcript = (data.transcript || '').trim();
+        if (transcript) {
+          processTranscriptRef.current(transcript);
+        } else {
+          if (micOnRef.current) startRec();
+        }
+      } catch {
+        if (micOnRef.current) startRec();
       }
     };
 
-    rec.onend = () => {
-      if (micOnRef.current && recRef.current === rec) setTimeout(() => startRec(), 300);
-    };
+    recorder.start();
 
-    rec.start();
+    // Poll audio level — stop when user pauses for 1.5s after speaking
+    let spokenOnce = false;
+    let silenceStart = 0;
+    const SILENCE_THRESHOLD = 10;
+    const SILENCE_DURATION = 1500;
+    const MAX_DURATION = 12000;
+    const startTime = Date.now();
+
+    const poll = setInterval(() => {
+      if (!micOnRef.current || recRef.current !== recorder) {
+        clearInterval(poll);
+        if (recorder.state === 'recording') recorder.stop();
+        return;
+      }
+      analyser.getByteFrequencyData(dataArr);
+      const level = dataArr.reduce((a, b) => a + b, 0) / dataArr.length;
+      const now = Date.now();
+
+      if (level > SILENCE_THRESHOLD) {
+        spokenOnce = true;
+        silenceStart = now;
+      } else if (spokenOnce && silenceStart && now - silenceStart > SILENCE_DURATION) {
+        clearInterval(poll);
+        if (recorder.state === 'recording') recorder.stop();
+        return;
+      }
+
+      if (now - startTime > MAX_DURATION) {
+        clearInterval(poll);
+        if (recorder.state === 'recording') recorder.stop();
+      }
+    }, 100);
   }, []);
 
   const processTranscript = useCallback(async (transcript: string) => {
@@ -209,7 +263,7 @@ export function VoiceAssistant() {
 
   useEffect(() => { processTranscriptRef.current = processTranscript; }, [processTranscript]);
 
-  const toggleMic = useCallback(async () => {
+  const toggleMic = useCallback(() => {
     if (micOnRef.current) {
       micOnRef.current = false;
       stopRec();
@@ -218,16 +272,6 @@ export function VoiceAssistant() {
       setStatus('idle');
     } else {
       if (!sessionReady) return;
-      // getUserMedia triggers macOS OS-level mic permission dialog in WKWebView.
-      // Web Speech API alone does not prompt — this must come first.
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach(t => t.stop());
-      } catch {
-        setErrorMsg('Microphone access denied. Allow FrontStores microphone access in System Settings → Privacy → Microphone.');
-        setStatus('error');
-        return;
-      }
       micOnRef.current = true;
       setErrorMsg('');
       startRec();
@@ -326,7 +370,7 @@ export function VoiceAssistant() {
                 AI Assistant
               </p>
               <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-tertiary)' }}>
-                {shopName} · Private · Dolphin 3.0
+                {shopName} · AI Assistant
               </p>
             </div>
             <button

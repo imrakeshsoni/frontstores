@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# FrontStores Kokoro TTS Server — runs on your Mac, serves audio to all customer apps
-# Port 8880 — localhost only, proxied via update-server.cjs at /ai/tts
+# FrontStores Kokoro TTS + Whisper STT Server
+# Port 8880 — localhost only, proxied via update-server.cjs at /ai/tts and /ai/stt
 # Usage: python3 tools/kokoro-server.py
 
 import http.server
@@ -8,6 +8,7 @@ import json
 import io
 import os
 import sys
+import tempfile
 
 PORT = int(os.environ.get("KOKORO_PORT", "8880"))
 
@@ -33,7 +34,18 @@ VOICES = {
     "lewis":   "bm_lewis",
 }
 
-# Load model once at startup
+# Whisper STT — loaded lazily on first /stt request (tiny model, fast)
+_whisper_model = None
+def get_whisper():
+    global _whisper_model
+    if _whisper_model is None:
+        from faster_whisper import WhisperModel
+        print("🎤 Loading Whisper STT model (tiny)...")
+        _whisper_model = WhisperModel("tiny", device="cpu", compute_type="int8")
+        print("✅ Whisper STT ready")
+    return _whisper_model
+
+# Load Kokoro TTS model once at startup
 kokoro = None
 if KOKORO_AVAILABLE:
     try:
@@ -61,6 +73,9 @@ class TTSHandler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
 
     def do_POST(self):
+        if self.path == "/stt":
+            self._handle_stt()
+            return
         if self.path != "/tts":
             self.send_response(404)
             self.end_headers()
@@ -102,6 +117,39 @@ class TTSHandler(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps({"error": str(e)}).encode())
+
+    def _handle_stt(self):
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            if length == 0:
+                self.send_response(400)
+                self.end_headers()
+                return
+            audio_data = self.rfile.read(length)
+            content_type = self.headers.get("Content-Type", "audio/webm")
+            ext = ".webm" if "webm" in content_type else ".wav"
+
+            with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as f:
+                f.write(audio_data)
+                tmp_path = f.name
+
+            try:
+                model = get_whisper()
+                segments, info = model.transcribe(tmp_path, language=None, task="transcribe")
+                transcript = " ".join(s.text for s in segments).strip()
+            finally:
+                os.unlink(tmp_path)
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(json.dumps({"ok": True, "transcript": transcript}).encode())
+        except Exception as e:
+            self.send_response(500)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"ok": False, "error": str(e)}).encode())
 
     def do_OPTIONS(self):
         self.send_response(204)
