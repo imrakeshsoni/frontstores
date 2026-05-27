@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Sun, Moon } from 'lucide-react';
+import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { useAppStore } from '@/app/store/app.store';
 import { updateAppConfig } from '@/lib/db/config';
 import { changePassword, changeUsername, getAuthUsername, getExportLogs, logExport } from '@/lib/db/auth';
@@ -391,6 +392,46 @@ export function SettingsPage() {
             }}
           >
             ↓ Export Orders (CSV)
+          </button>
+          {/* [platform] [all tenants] — WhatsApp and email share */}
+          <button
+            className="btn-secondary"
+            onClick={async () => {
+              try {
+                const { getDb } = await import('@/lib/db/index');
+                const db = await getDb();
+                const today = new Date().toISOString().slice(0, 10);
+                const orders = await db.select<any[]>(
+                  `SELECT COUNT(*) as count, COALESCE(SUM(total),0) as revenue FROM orders WHERE tenant_id = ? AND date(order_date,'localtime') = ? AND deleted_at IS NULL`,
+                  [tenantId, today]
+                );
+                const o = orders[0];
+                const msg = `📊 *Daily Report - ${config?.shop_name}*\n📅 ${new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}\n💰 Sales: ₹${Number(o?.revenue??0).toFixed(0)}\n🧾 Orders: ${o?.count??0}\n\n_Sent from FrontStores_`;
+                await shellOpen(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`);
+              } catch (e: any) { toast.error('Could not open WhatsApp: ' + e?.message); }
+            }}
+          >
+            📱 Share Report on WhatsApp
+          </button>
+          <button
+            className="btn-secondary"
+            onClick={async () => {
+              try {
+                const { getDb } = await import('@/lib/db/index');
+                const db = await getDb();
+                const today = new Date().toISOString().slice(0, 10);
+                const orders = await db.select<any[]>(
+                  `SELECT COUNT(*) as count, COALESCE(SUM(total),0) as revenue FROM orders WHERE tenant_id = ? AND date(order_date,'localtime') = ? AND deleted_at IS NULL`,
+                  [tenantId, today]
+                );
+                const o = orders[0];
+                const subject = encodeURIComponent(`Daily Report - ${config?.shop_name} - ${today}`);
+                const body = encodeURIComponent(`Daily Report for ${config?.shop_name}\nDate: ${today}\nSales: ₹${Number(o?.revenue??0).toFixed(0)}\nOrders: ${o?.count??0}\n\nSent from FrontStores`);
+                await shellOpen(`mailto:?subject=${subject}&body=${body}`);
+              } catch (e: any) { toast.error('Could not open email: ' + e?.message); }
+            }}
+          >
+            📧 Send Report via Email
           </button>
         </div>
         <p className="text-xs text-slate-500 mt-3">💡 Tip: Take a backup weekly and store it somewhere safe. Your data is only on this computer.</p>

@@ -657,6 +657,108 @@ export async function getRestaurantSummary(
   };
 }
 
+// ─── Analytics ────────────────────────────────────────────────────────────────
+
+export async function getTopMenuItems(
+  tenantId: string, from: string, to: string, limit = 10
+): Promise<Array<{ item_name: string; total_qty: number; total_revenue: number }>> {
+  const db = await getDb();
+  return db.select(
+    `SELECT item_name,
+       SUM(quantity) AS total_qty,
+       COALESCE(SUM(total), 0) AS total_revenue
+     FROM restaurant_order_items oi
+     JOIN restaurant_orders o ON o.id = oi.order_id
+     WHERE oi.tenant_id = ? AND o.status = 'settled'
+       AND oi.deleted_at IS NULL AND o.deleted_at IS NULL
+       AND o.created_at >= ? AND o.created_at <= ?
+     GROUP BY item_name ORDER BY total_qty DESC LIMIT ?`,
+    [tenantId, from, to, limit]
+  );
+}
+
+export async function getDailyRevenue(
+  tenantId: string, from: string, to: string
+): Promise<Array<{ date: string; revenue: number; orders: number }>> {
+  const db = await getDb();
+  return db.select(
+    `SELECT date(created_at, 'localtime') AS date,
+       COALESCE(SUM(total), 0) AS revenue,
+       COUNT(*) AS orders
+     FROM restaurant_orders
+     WHERE tenant_id = ? AND status = 'settled' AND deleted_at IS NULL
+       AND created_at >= ? AND created_at <= ?
+     GROUP BY date(created_at, 'localtime') ORDER BY date ASC`,
+    [tenantId, from, to]
+  );
+}
+
+// ─── Staff ────────────────────────────────────────────────────────────────────
+
+export interface Staff {
+  id: string;
+  tenant_id: string;
+  name: string;
+  role: string;
+  phone: string | null;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export async function listStaff(tenantId: string): Promise<Staff[]> {
+  const db = await getDb();
+  return db.select(
+    `SELECT * FROM restaurant_staff WHERE tenant_id = ? AND deleted_at IS NULL ORDER BY name ASC`,
+    [tenantId]
+  );
+}
+
+export async function createStaff(
+  tenantId: string, data: { name: string; role: string; phone?: string }
+): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `INSERT INTO restaurant_staff (id, tenant_id, name, role, phone) VALUES (?,?,?,?,?)`,
+    [uuid(), tenantId, data.name, data.role, data.phone ?? null]
+  );
+}
+
+export async function updateStaff(
+  tenantId: string, id: string, data: { name?: string; role?: string; phone?: string; is_active?: number }
+): Promise<void> {
+  const db = await getDb();
+  const fields: string[] = [];
+  const vals: unknown[] = [];
+  if (data.name !== undefined) { fields.push('name = ?'); vals.push(data.name); }
+  if (data.role !== undefined) { fields.push('role = ?'); vals.push(data.role); }
+  if (data.phone !== undefined) { fields.push('phone = ?'); vals.push(data.phone); }
+  if (data.is_active !== undefined) { fields.push('is_active = ?'); vals.push(data.is_active); }
+  if (!fields.length) return;
+  fields.push('updated_at = ?'); vals.push(now());
+  vals.push(tenantId); vals.push(id);
+  await db.execute(`UPDATE restaurant_staff SET ${fields.join(', ')} WHERE tenant_id = ? AND id = ?`, vals);
+}
+
+export async function deleteStaff(tenantId: string, id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `UPDATE restaurant_staff SET deleted_at = ?, updated_at = ? WHERE tenant_id = ? AND id = ?`,
+    [now(), now(), tenantId, id]
+  );
+}
+
+export async function assignStaffToTable(
+  tenantId: string, tableId: string, staffId: string | null, staffName: string | null
+): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `UPDATE restaurant_tables SET assigned_staff_id = ?, assigned_staff_name = ?, updated_at = ? WHERE tenant_id = ? AND id = ?`,
+    [staffId, staffName, now(), tenantId, tableId]
+  );
+}
+
 // ─── Kitchen ──────────────────────────────────────────────────────────────────
 
 export async function getKitchenItems(tenantId: string): Promise<KitchenItem[]> {

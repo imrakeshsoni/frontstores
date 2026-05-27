@@ -28,6 +28,9 @@ const TablesPage              = lazy(() => import('@/modules/restaurant/TablesPa
 const MenuPage                = lazy(() => import('@/modules/restaurant/MenuPage').then(m => ({ default: m.MenuPage })));
 const KitchenPage             = lazy(() => import('@/modules/restaurant/KitchenPage').then(m => ({ default: m.KitchenPage })));
 const RestaurantOrdersPage    = lazy(() => import('@/modules/restaurant/RestaurantOrdersPage').then(m => ({ default: m.RestaurantOrdersPage })));
+const RestaurantDashboard     = lazy(() => import('@/modules/restaurant/RestaurantDashboard').then(m => ({ default: m.RestaurantDashboard })));
+const RestaurantReportsPage   = lazy(() => import('@/modules/restaurant/RestaurantReportsPage').then(m => ({ default: m.RestaurantReportsPage })));
+const StaffPage               = lazy(() => import('@/modules/restaurant/StaffPage').then(m => ({ default: m.StaffPage })));
 
 function Loading() {
   return (
@@ -66,7 +69,7 @@ export default function App() {
       <Suspense fallback={<Loading />}>
         <Routes>
           <Route path="/" element={<AppLayout />}>
-            <Route index element={<Navigate to="/dashboard" replace />} />
+            <Route index element={<Navigate to={config?.shop_type === 'restaurant' ? '/restaurant/dashboard' : '/dashboard'} replace />} />
             <Route path="dashboard"  element={<Dashboard />} />
             <Route path="pos"        element={<POSPage />} />
             <Route path="products"   element={<ProductsPage />} />
@@ -80,10 +83,13 @@ export default function App() {
             <Route path="reports"    element={<ReportsPage />} />
             <Route path="settings"   element={<SettingsPage />} />
             {/* [restaurant] [all tenants] */}
-            <Route path="restaurant/tables"  element={<TablesPage />} />
-            <Route path="restaurant/menu"    element={<MenuPage />} />
-            <Route path="restaurant/kitchen" element={<KitchenPage />} />
-            <Route path="restaurant/orders"  element={<RestaurantOrdersPage />} />
+            <Route path="restaurant/dashboard" element={<RestaurantDashboard />} />
+            <Route path="restaurant/tables"    element={<TablesPage />} />
+            <Route path="restaurant/menu"      element={<MenuPage />} />
+            <Route path="restaurant/kitchen"   element={<KitchenPage />} />
+            <Route path="restaurant/orders"    element={<RestaurantOrdersPage />} />
+            <Route path="restaurant/staff"     element={<StaffPage />} />
+            <Route path="restaurant/reports"   element={<RestaurantReportsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

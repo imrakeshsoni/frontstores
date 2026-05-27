@@ -2,8 +2,11 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Plus, Users, X, ChefHat, CreditCard, Trash2, Minus } from 'lucide-react';
+import { Plus, Users, X, ChefHat, CreditCard, Trash2, Minus, Printer } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
+import { open as shellOpen } from '@tauri-apps/plugin-shell';
+import { appCacheDir } from '@tauri-apps/api/path';
+import { writeTextFile } from '@tauri-apps/plugin-fs';
 import {
   listTables,
   createTable,
@@ -134,9 +137,8 @@ export function TablesPage() {
   });
 
   const settleMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ withPrint }: { withPrint: boolean }) => {
       if (!currentOrder) throw new Error('No open order');
-      // Send any pending cart items first
       if (cart.length > 0) {
         await addItemsToOrder(tenantId, currentOrder.id, cart.map((ci) => ({
           menu_item_id: ci.menu_item_id,
@@ -147,12 +149,31 @@ export function TablesPage() {
           gst_rate: ci.gst_rate,
         })));
       }
-      return settleOrder(tenantId, currentOrder.id, {
+      await settleOrder(tenantId, currentOrder.id, {
         payment_method: settleForm.payment_method,
         discount: settleForm.discount ? Number(settleForm.discount) : 0,
         customer_name: settleForm.customer_name.trim() || null,
         customer_phone: settleForm.customer_phone.trim() || null,
       });
+      if (withPrint) {
+        const allItems = [
+          ...existingItems.map(i => ({ item_name: i.item_name, variant: i.variant, quantity: i.quantity, unit_price: i.unit_price, gst_rate: i.gst_rate, total: i.total })),
+          ...cart.map(c => ({ item_name: c.item_name, variant: c.variant === 'half' ? 'Half' : 'Full', quantity: c.quantity, unit_price: c.unit_price, gst_rate: c.gst_rate, total: c.quantity * c.unit_price })),
+        ];
+        const disc = settleForm.discount ? Number(settleForm.discount) : 0;
+        await printBill({
+          orderNumber: currentOrder.order_number,
+          orderType: ORDER_TYPE_LABELS[orderType],
+          tableName: selectedTable?.name ?? '',
+          allItems,
+          subtotal: existingSubtotal + cartSubtotal,
+          tax: existingTax + cartTax,
+          discount: disc,
+          total: Math.max(0, grandTotal - disc),
+          paymentMethod: settleForm.payment_method,
+          customerName: settleForm.customer_name.trim() || undefined,
+        });
+      }
     },
     onSuccess: () => {
       toast.success('Order settled!');
@@ -242,6 +263,79 @@ export function TablesPage() {
   const finalTotal = Math.max(0, grandTotal - discount);
 
   const fmt = (n: number) => `₹${n.toFixed(2)}`;
+
+  // [restaurant] [all tenants] — Bill print
+  async function printBill(opts: {
+    orderNumber: string; orderType: string; tableName: string;
+    allItems: Array<{ item_name: string; variant?: string | null; quantity: number; unit_price: number; gst_rate: number; total: number }>;
+    subtotal: number; tax: number; discount: number; total: number;
+    paymentMethod: string; customerName?: string;
+  }) {
+    const config = useAppStore.getState().config;
+    const s = (config?.settings ?? {}) as any;
+    const storeName = s.invoiceStoreDisplayName || config?.shop_name || 'Restaurant';
+    const address = config?.address_line1 || '';
+    const gstin = config?.gstin || '';
+    const footerNote = s.invoiceFooterNote || 'Thank you! Visit again!';
+    const dateStr = new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    const itemRows = opts.allItems.map(i => `
+      <div class="row">
+        <span class="item-name">${i.item_name}${i.variant && i.variant !== 'Full' ? ` (${i.variant})` : ''}</span>
+        <span class="item-qty">${i.quantity}</span>
+        <span class="item-price">₹${i.total.toFixed(2)}</span>
+      </div>`).join('');
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+  @page { size: 80mm auto; margin: 4mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Courier New', monospace; font-size: 11px; color: #000; width: 72mm; }
+  .center { text-align: center; }
+  .store-name { font-size: 15px; font-weight: 900; text-align: center; margin: 3px 0; }
+  .divider { border-top: 1px dashed #000; margin: 4px 0; }
+  .solid { border-top: 2px solid #000; margin: 4px 0; }
+  .row { display: flex; justify-content: space-between; margin: 1px 0; }
+  .item-name { flex: 1; margin-right: 4px; word-break: break-word; }
+  .item-qty { width: 22px; text-align: right; margin-right: 4px; }
+  .item-price { width: 55px; text-align: right; }
+  .bold { font-weight: bold; }
+  .total-row { font-weight: 900; font-size: 13px; }
+  @media print { body { -webkit-print-color-adjust: exact; } }
+</style></head><body>
+<div class="store-name">${storeName}</div>
+${address ? `<p class="center">${address}</p>` : ''}
+${gstin ? `<p class="center">GSTIN: ${gstin}</p>` : ''}
+<div class="divider"></div>
+<div class="row"><span>${opts.tableName}</span><span>${dateStr}</span></div>
+<div class="row"><span>Order#: ${opts.orderNumber}</span><span>${opts.orderType}</span></div>
+${opts.customerName ? `<div class="row"><span>Customer: ${opts.customerName}</span></div>` : ''}
+<div class="divider"></div>
+<div class="row bold"><span class="item-name">Item</span><span class="item-qty">Qty</span><span class="item-price">Amt</span></div>
+<div class="divider"></div>
+${itemRows}
+<div class="solid"></div>
+<div class="row"><span>Subtotal</span><span>₹${opts.subtotal.toFixed(2)}</span></div>
+<div class="row"><span>Tax</span><span>₹${opts.tax.toFixed(2)}</span></div>
+${opts.discount > 0 ? `<div class="row"><span>Discount</span><span>-₹${opts.discount.toFixed(2)}</span></div>` : ''}
+<div class="row total-row"><span>TOTAL</span><span>₹${opts.total.toFixed(2)}</span></div>
+<div class="divider"></div>
+<div class="row"><span>Payment</span><span>${opts.paymentMethod.toUpperCase()}</span></div>
+<div class="divider"></div>
+<p class="center">${footerNote}</p>
+<script>window.addEventListener('load',function(){setTimeout(function(){window.print();},400);});<\/script>
+</body></html>`;
+
+    try {
+      const cacheDir = await appCacheDir();
+      const sep = cacheDir.endsWith('/') ? '' : '/';
+      const filePath = `${cacheDir}${sep}restaurant-bill-${Date.now()}.html`;
+      await writeTextFile(filePath, html);
+      await shellOpen(filePath);
+    } catch (err: any) {
+      toast.error('Could not open print: ' + (err?.message ?? err));
+    }
+  }
 
   const statusColor: Record<string, string> = {
     empty: '#16a34a',
@@ -716,15 +810,25 @@ export function TablesPage() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 mt-6">
-              <button className="btn-secondary" onClick={() => setShowSettle(false)}>Cancel</button>
+            <div className="flex flex-col gap-2 mt-6">
               <button
-                className="btn-primary"
-                onClick={() => settleMutation.mutate()}
+                className="btn-primary flex items-center justify-center gap-2"
+                onClick={() => settleMutation.mutate({ withPrint: true })}
                 disabled={settleMutation.isPending}
               >
-                {settleMutation.isPending ? 'Processing…' : 'Collect Payment'}
+                <Printer size={15} />
+                {settleMutation.isPending ? 'Processing…' : 'Print & Collect'}
               </button>
+              <div className="flex gap-2">
+                <button className="btn-secondary flex-1" onClick={() => setShowSettle(false)}>Cancel</button>
+                <button
+                  className="btn-secondary flex-1"
+                  onClick={() => settleMutation.mutate({ withPrint: false })}
+                  disabled={settleMutation.isPending}
+                >
+                  Collect (No Print)
+                </button>
+              </div>
             </div>
           </div>
         </div>

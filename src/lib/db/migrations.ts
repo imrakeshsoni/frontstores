@@ -12,6 +12,7 @@ import migration0011 from '../../../src-tauri/migrations/0011_fix_app_auth_colum
 import migration0012 from '../../../src-tauri/migrations/0012_ai_memory.sql?raw';
 import migration0013 from '../../../src-tauri/migrations/0013_restaurant.sql?raw';
 import migration0014 from '../../../src-tauri/migrations/0014_challan_number.sql?raw';
+import migration0015 from '../../../src-tauri/migrations/0015_restaurant_staff.sql?raw';
 
 export interface Migration {
   name: string;
@@ -34,5 +35,6 @@ export async function readMigrations(): Promise<Migration[]> {
     { name: '0012_ai_memory', sql: migration0012 },
     { name: '0013_restaurant', sql: migration0013 },
     { name: '0014_challan_number', sql: migration0014 },
+    { name: '0015_restaurant_staff', sql: migration0015 },
   ];
 }

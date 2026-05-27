@@ -9,6 +9,7 @@ import { listProducts } from '@/lib/db/products';
 import { PageIntro } from '@/components/ui/PageIntro';
 
 type Tab = 'sales' | 'gst' | 'stock' | 'expiry';
+type ExpiryWindow = 30 | 60 | 90 | 365;
 
 export function ReportsPage() {
   const tenantId = useAppStore((s) => s.config?.tenant_id ?? '');
@@ -17,6 +18,7 @@ export function ReportsPage() {
   const [tab, setTab] = useState<Tab>('sales');
   const [from, setFrom] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
   const [to, setTo] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [expiryWindow, setExpiryWindow] = useState<ExpiryWindow>(90);
 
   const { data: salesData } = useQuery({
     queryKey: ['report-sales', tenantId, from, to],
@@ -155,7 +157,32 @@ export function ReportsPage() {
 
       {tab === 'gst' && (
         <div className="card p-6">
-          <p className="section-label mb-4">GST Summary</p>
+          <div className="flex items-center justify-between mb-4">
+            <p className="section-label">GST Summary (GSTR-1)</p>
+            <button
+              className="btn-secondary text-xs"
+              onClick={() => {
+                const items = ordersData?.items ?? [];
+                const taxable = items.reduce((s, o) => s + o.subtotal, 0);
+                const cgst = items.reduce((s, o) => s + o.tax_total / 2, 0);
+                const sgst = cgst;
+                const rows = [
+                  ['Period', 'Orders', 'Taxable Value', 'CGST', 'SGST', 'Total GST'],
+                  [`${from} to ${to}`, String(items.length), taxable.toFixed(2), cgst.toFixed(2), sgst.toFixed(2), (cgst + sgst).toFixed(2)],
+                  [],
+                  ['Bill No', 'Date', 'Customer', 'Subtotal', 'Tax', 'Total'],
+                  ...items.map(o => [o.bill_number, o.order_date?.slice(0,10), o.customer_name||'', o.subtotal.toFixed(2), o.tax_total.toFixed(2), o.total.toFixed(2)]),
+                ];
+                const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+                a.download = `GSTR1_${from}_${to}.csv`;
+                a.click();
+              }}
+            >
+              ↓ Export GSTR-1 CSV
+            </button>
+          </div>
           <table className="data-table">
             <thead>
               <tr>
@@ -208,22 +235,64 @@ export function ReportsPage() {
 
       {tab === 'expiry' && (
         <div className="card p-6">
-          <p className="section-label mb-4">Expiry Watch (next 12 months)</p>
-          <div className="space-y-2">
-            {(expiryData ?? []).length === 0 && <p className="text-sm text-emerald-600">No batches expiring in the next year</p>}
-            {(expiryData ?? []).map((a: any) => (
-              <div key={a.id} className="card-strong flex items-center justify-between p-4">
-                <div>
-                  <p className="font-semibold">{a.product_name}</p>
-                  <p className="text-xs text-slate-400">Batch: {a.batch_no ?? '—'}</p>
-                </div>
-                <div className="text-right">
-                  <span className="badge badge-red">{a.expiry_date}</span>
-                  <p className="text-xs text-slate-400 mt-1">{a.quantity} units</p>
-                </div>
-              </div>
-            ))}
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+            <p className="section-label">Expiry Watch</p>
+            <div className="flex gap-1">
+              {([30, 60, 90, 365] as ExpiryWindow[]).map((w) => (
+                <button
+                  key={w}
+                  onClick={() => setExpiryWindow(w)}
+                  className="px-3 py-1 rounded-lg text-xs font-medium transition-all"
+                  style={{
+                    background: expiryWindow === w ? '#7c3aed' : '#f1f5f9',
+                    color: expiryWindow === w ? 'white' : '#64748b',
+                  }}
+                >
+                  {w === 365 ? '1 Year' : `${w} Days`}
+                </button>
+              ))}
+            </div>
           </div>
+          {(() => {
+            const cutoff = format(new Date(Date.now() + expiryWindow * 86400000), 'yyyy-MM-dd');
+            const today = format(new Date(), 'yyyy-MM-dd');
+            const filtered = (expiryData ?? []).filter((a: any) => a.expiry_date >= today && a.expiry_date <= cutoff);
+            const expired = (expiryData ?? []).filter((a: any) => a.expiry_date < today);
+            const daysUntil = (d: string) => Math.ceil((new Date(d).getTime() - Date.now()) / 86400000);
+            return (
+              <div className="space-y-3">
+                {expired.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-red-500 mb-2">EXPIRED ({expired.length})</p>
+                    {expired.map((a: any) => (
+                      <div key={a.id} className="card-strong flex items-center justify-between p-3 mb-2 border border-red-200">
+                        <div><p className="font-semibold text-sm">{a.product_name}</p><p className="text-xs text-slate-400">Batch: {a.batch_no ?? '—'} · {a.quantity} units</p></div>
+                        <span className="badge badge-red">{a.expiry_date}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {filtered.length === 0 && expired.length === 0 && <p className="text-sm text-emerald-600">No batches expiring in the next {expiryWindow} days</p>}
+                {filtered.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-amber-600 mb-2">EXPIRING IN {expiryWindow} DAYS ({filtered.length})</p>
+                    {filtered.sort((a: any, b: any) => a.expiry_date.localeCompare(b.expiry_date)).map((a: any) => {
+                      const days = daysUntil(a.expiry_date);
+                      return (
+                        <div key={a.id} className="card-strong flex items-center justify-between p-3 mb-2">
+                          <div><p className="font-semibold text-sm">{a.product_name}</p><p className="text-xs text-slate-400">Batch: {a.batch_no ?? '—'} · {a.quantity} units</p></div>
+                          <div className="text-right">
+                            <span className={`badge ${days <= 30 ? 'badge-red' : 'badge-yellow'}`}>{a.expiry_date}</span>
+                            <p className="text-xs text-slate-400 mt-1">{days} days left</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>
