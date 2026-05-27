@@ -1,0 +1,123 @@
+// [carwash] [all tenants]
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Car } from 'lucide-react';
+import { useAppStore } from '@/app/store/app.store';
+import { listJobs, type JobStatus } from '@/lib/db/carwash';
+
+const STATUS_LABELS: Record<string, string> = {
+  waiting: 'Waiting', in_progress: 'In Progress', ready: 'Ready', delivered: 'Delivered',
+};
+const STATUS_COLORS: Record<string, { color: string; bg: string }> = {
+  waiting:     { color: '#d97706', bg: '#fef3c7' },
+  in_progress: { color: '#2563eb', bg: '#eff6ff' },
+  ready:       { color: '#16a34a', bg: '#d1fae5' },
+  delivered:   { color: '#6b7280', bg: '#f3f4f6' },
+};
+
+function todayISO() { return new Date().toISOString().slice(0, 10); }
+function fmt(n: number) { return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`; }
+
+export function JobsListPage() {
+  const tenantId = useAppStore((s) => s.config?.tenant_id ?? '');
+  const navigate  = useNavigate();
+  const [date, setDate]     = useState(todayISO());
+  const [filter, setFilter] = useState<string>('all');
+
+  const { data: jobs = [], isLoading } = useQuery({
+    queryKey: ['carwash-jobs-list', tenantId, date],
+    queryFn: () => listJobs(tenantId, { date }),
+    enabled: !!tenantId,
+    refetchInterval: 15000,
+  });
+
+  const filtered = filter === 'all' ? jobs : jobs.filter(j => j.status === filter);
+
+  const counts = jobs.reduce<Record<string, number>>((acc, j) => {
+    acc[j.status] = (acc[j.status] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  return (
+    <div className="flex-1 overflow-y-auto p-6 space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-tertiary)' }}>Car Wash</p>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Job Cards</h1>
+        </div>
+        <button onClick={() => navigate('/carwash/jobs/new')}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm text-white"
+          style={{ background: 'var(--accent)' }}>
+          <Plus className="h-4 w-4" /> New Job
+        </button>
+      </div>
+
+      {/* Date picker + filters */}
+      <div className="flex flex-wrap items-center gap-3">
+        <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+          className="rounded-xl border px-3 py-2 text-sm outline-none"
+          style={{ borderColor: 'var(--surface-border)', background: 'var(--surface)', color: 'var(--text-primary)' }} />
+        {(['all', 'waiting', 'in_progress', 'ready', 'delivered'] as const).map(s => {
+          const cnt = s === 'all' ? jobs.length : (counts[s] ?? 0);
+          const sc = STATUS_COLORS[s] ?? { color: '#6b7280', bg: '#f3f4f6' };
+          return (
+            <button key={s} onClick={() => setFilter(s)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold capitalize transition-all ${filter === s ? 'text-white' : ''}`}
+              style={filter === s ? { background: sc.color } : { background: sc.bg, color: sc.color }}>
+              {s === 'all' ? 'All' : STATUS_LABELS[s]} {cnt > 0 && `(${cnt})`}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Jobs */}
+      <div className="space-y-2">
+        {isLoading && Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-20 rounded-2xl animate-pulse" style={{ background: 'var(--surface-2)' }} />
+        ))}
+        {!isLoading && filtered.length === 0 && (
+          <div className="rounded-2xl p-10 flex flex-col items-center gap-3" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
+            <Car className="h-10 w-10 opacity-30" />
+            <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No jobs for this filter</p>
+          </div>
+        )}
+        {filtered.map(j => {
+          const sc = STATUS_COLORS[j.status] ?? STATUS_COLORS.delivered;
+          return (
+            <div key={j.id} onClick={() => navigate(`/carwash/jobs/${j.id}`)}
+              className="rounded-2xl p-4 cursor-pointer hover:shadow-md transition-shadow flex items-center justify-between gap-4"
+              style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 text-lg"
+                  style={{ background: sc.bg }}>
+                  {j.vehicle_type === 'hatchback' ? '🚗' : j.vehicle_type === 'suv' ? '🚐' : j.vehicle_type === 'luxury' ? '🏎️' : '🚙'}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>{j.reg_number}
+                    <span className="ml-2 text-xs font-normal" style={{ color: 'var(--text-tertiary)' }}>{j.job_number}</span>
+                  </p>
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    {[j.make, j.model].filter(Boolean).join(' ') || j.vehicle_type} · {j.customer_name || 'Walk-in'}
+                    {j.staff_name ? ` · 👤 ${j.staff_name}` : ''}
+                  </p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+                    {(j.items ?? []).slice(0, 2).map(i => i.service_name).join(', ')}
+                    {(j.items ?? []).length > 2 ? ` +${(j.items ?? []).length - 2}` : ''}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <p className="font-bold text-sm" style={{ color: 'var(--accent)' }}>{fmt(j.total)}</p>
+                <span className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full mt-1"
+                  style={{ background: sc.bg, color: sc.color }}>
+                  {STATUS_LABELS[j.status]}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

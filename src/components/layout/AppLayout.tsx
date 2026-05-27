@@ -19,6 +19,10 @@ import {
   UtensilsCrossed,
   ChefHat,
   PackagePlus,
+  Droplets,
+  ClipboardCheck,
+  Wrench,
+  CreditCard,
   UserCheck,
   ShoppingBasket,
 } from 'lucide-react';
@@ -71,6 +75,19 @@ const RESTAURANT_NAV_ITEMS = [
   { to: '/settings',             icon: Settings,        label: 'Settings',       iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
 
+// [carwash] [all tenants]
+const CARWASH_NAV_ITEMS = [
+  { to: '/carwash/dashboard', icon: LayoutDashboard, label: 'Dashboard',      iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/carwash/jobs',      icon: ClipboardCheck,  label: 'Job Cards',      iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/carwash/services',  icon: Droplets,        label: 'Services',       iconBg: '#cffafe', iconColor: '#0891b2' },
+  { to: '/carwash/membership',icon: CreditCard,      label: 'Memberships',    iconBg: '#f3e8ff', iconColor: '#9333ea' },
+  { to: '/customers',         icon: Users,           label: 'Customers',      iconBg: '#fce7f3', iconColor: '#db2777' },
+  { to: '/expenses',          icon: Wallet,          label: 'Expenses',       iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/carwash/staff',     icon: Wrench,          label: 'Staff',          iconBg: '#d1fae5', iconColor: '#059669' },
+  { to: '/carwash/reports',   icon: BarChart3,       label: 'Reports',        iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',          icon: Settings,        label: 'Settings',       iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
 export function AppLayout() {
   const { config, setAuthenticated } = useAppStore();
   const navigate = useNavigate();
@@ -78,6 +95,7 @@ export function AppLayout() {
   const activeNavItems =
     config?.shop_type === 'restaurant' ? RESTAURANT_NAV_ITEMS :
     config?.shop_type === 'grocery'    ? GROCERY_NAV_ITEMS :
+    config?.shop_type === 'carwash'    ? CARWASH_NAV_ITEMS :
     NAV_ITEMS;
 
   useEffect(() => {

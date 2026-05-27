@@ -28,6 +28,15 @@ const GroceryDashboard        = lazy(() => import('@/modules/grocery/GroceryDash
 const CashDrawerPage          = lazy(() => import('@/modules/grocery/CashDrawerPage').then(m => ({ default: m.CashDrawerPage })));
 const PurchasePage            = lazy(() => import('@/modules/grocery/PurchasePage').then(m => ({ default: m.PurchasePage })));
 
+// [carwash] [all tenants]
+const CarwashDashboard        = lazy(() => import('@/modules/carwash/CarwashDashboard').then(m => ({ default: m.CarwashDashboard })));
+const JobsListPage            = lazy(() => import('@/modules/carwash/JobsListPage').then(m => ({ default: m.JobsListPage })));
+const JobCardPage             = lazy(() => import('@/modules/carwash/JobCardPage').then(m => ({ default: m.JobCardPage })));
+const CarwashServicesPage     = lazy(() => import('@/modules/carwash/CarwashServicesPage').then(m => ({ default: m.CarwashServicesPage })));
+const MembershipPage          = lazy(() => import('@/modules/carwash/MembershipPage').then(m => ({ default: m.MembershipPage })));
+const CarwashStaffPage        = lazy(() => import('@/modules/carwash/CarwashStaffPage').then(m => ({ default: m.CarwashStaffPage })));
+const CarwashReportsPage      = lazy(() => import('@/modules/carwash/CarwashReportsPage').then(m => ({ default: m.CarwashReportsPage })));
+
 // [restaurant] [all tenants]
 const TablesPage              = lazy(() => import('@/modules/restaurant/TablesPage').then(m => ({ default: m.TablesPage })));
 const MenuPage                = lazy(() => import('@/modules/restaurant/MenuPage').then(m => ({ default: m.MenuPage })));
@@ -77,6 +86,7 @@ export default function App() {
             <Route index element={<Navigate to={
               config?.shop_type === 'restaurant' ? '/restaurant/dashboard' :
               config?.shop_type === 'grocery'    ? '/grocery/dashboard' :
+              config?.shop_type === 'carwash'    ? '/carwash/dashboard' :
               '/dashboard'
             } replace />} />
             <Route path="dashboard"  element={<Dashboard />} />
@@ -95,6 +105,15 @@ export default function App() {
             <Route path="grocery/dashboard" element={<GroceryDashboard />} />
             <Route path="grocery/cash"      element={<CashDrawerPage />} />
             <Route path="grocery/purchase"  element={<PurchasePage />} />
+
+            {/* [carwash] [all tenants] */}
+            <Route path="carwash/dashboard"  element={<CarwashDashboard />} />
+            <Route path="carwash/jobs"       element={<JobsListPage />} />
+            <Route path="carwash/jobs/:id"   element={<JobCardPage />} />
+            <Route path="carwash/services"   element={<CarwashServicesPage />} />
+            <Route path="carwash/membership" element={<MembershipPage />} />
+            <Route path="carwash/staff"      element={<CarwashStaffPage />} />
+            <Route path="carwash/reports"    element={<CarwashReportsPage />} />
 
             {/* [restaurant] [all tenants] */}
             <Route path="restaurant/dashboard" element={<RestaurantDashboard />} />
