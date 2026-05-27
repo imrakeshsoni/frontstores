@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "print-window",
+  "description": "Capabilities for dynamically created print preview windows",
+  "windows": ["print_*"],
+  "permissions": [
+    "core:window:allow-close",
+    "core:window:allow-destroy"
+  ]
+}

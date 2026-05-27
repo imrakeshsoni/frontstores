@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { appCacheDir } from '@tauri-apps/api/path';
+import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -56,38 +59,134 @@ export function OrdersPage() {
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / 30));
 
-  const handlePrintOrder = (order: any) => {
+  // [medical] [all tenants] — A5 invoice print, same format as POS invoice
+  const handlePrintOrder = async (order: any) => {
     if (!order?.items) return;
-    const settings = (config?.settings ?? {}) as any;
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
-    if (!printWindow) { toast.error('Unable to open print window'); return; }
+    const s = (config?.settings ?? {}) as any;
+    const storeName   = s.invoiceStoreDisplayName || config?.shop_name || 'Store';
+    const address     = config?.address_line1 || '';
+    const headerLeft  = s.invoiceHeaderLeft  || 'Chemist & Druggist';
+    const headerRight = s.invoiceHeaderRight  || 'Cash/Credit Memo';
+    const whatsapp    = s.invoiceWhatsappNumber || '';
+    const footerNote  = s.invoiceFooterNote   || 'Thanks for your purchase';
+    const sigLabel    = s.invoiceSignatureLabel || 'Authorised Signature';
+    const dlNumbers   = config?.drug_license_no || '';
+    const dateStr     = new Date(order.order_date).toLocaleString('en-IN', {
+      day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
 
-    const itemRows = order.items.map((item: any, idx: number) => `
-      <tr>
-        <td>${idx + 1}</td>
-        <td>${item.product_name}</td>
-        <td style="text-align:center">${item.quantity}</td>
-        <td style="text-align:right">${item.unit_price.toFixed(2)}</td>
-        <td style="text-align:right">${item.total.toFixed(2)}</td>
-      </tr>`).join('');
+    const itemRows = order.items.map((item: any, idx: number) => {
+      const mrp      = Number(item.mrp  || item.unit_price);
+      const qty      = Number(item.quantity);
+      const value    = mrp * qty;
+      const disc     = Number(item.discount || 0);
+      const gst      = Number(item.gst_rate || 0);
+      const total    = Number(item.total);
+      return `<tr>
+        <td class="td-center">${idx + 1}</td>
+        <td class="td-name">${item.product_name}${item.batch_no ? `<br><span style="font-size:9px;color:#64748b">Batch: ${item.batch_no}</span>` : ''}</td>
+        <td class="td-center">${qty}</td>
+        <td class="td-amount">${mrp.toFixed(2)}</td>
+        <td class="td-amount">${value.toFixed(2)}</td>
+        <td class="td-center">${gst > 0 ? `${gst}%` : '-'}</td>
+        <td class="td-amount">${disc > 0 ? disc.toFixed(2) : '-'}</td>
+        <td class="td-amount">${total.toFixed(2)}</td>
+      </tr>`;
+    }).join('');
 
-    printWindow.document.write(`<!DOCTYPE html><html><head>
-      <style>
-        body { font-family: Arial; font-size: 12px; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 5px 8px; border-bottom: 1px solid #ddd; }
-        .total { font-weight: bold; font-size: 14px; text-align: right; margin-top: 10px; }
-      </style></head><body>
-      <h2>${settings.invoiceStoreDisplayName || config?.shop_name || 'Store'}</h2>
-      <p>Bill No: <strong>${order.bill_number}</strong></p>
-      <p>Date: ${format(new Date(order.order_date), 'dd MMM yyyy HH:mm')}</p>
-      ${order.customer_name ? `<p>Customer: ${order.customer_name}</p>` : ''}
-      <table><thead><tr><th>#</th><th>Product</th><th>Qty</th><th>Price</th><th>Amount</th></tr></thead>
-      <tbody>${itemRows}</tbody></table>
-      <div class="total">Total: ₹${order.total.toFixed(2)}</div>
-      <p>Payment: ${order.payment_method}</p>
-      <script>window.onload=()=>window.print()<\/script></body></html>`);
-    printWindow.document.close();
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>${order.bill_number}</title>
+<style>
+  @page { size: A5 portrait; margin: 8mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 11px; color: #1e3a8a; background: white; }
+  .invoice { border: 2px solid #1e3a8a; width: 100%; }
+  .hdr { display: flex; justify-content: space-between; align-items: flex-start; padding: 8px 14px; border-bottom: 2px solid #1e3a8a; font-weight: 600; font-size: 11px; }
+  .hdr-right { text-align: right; }
+  .banner { text-align: center; padding: 8px 14px; border-bottom: 2px solid #1e3a8a; }
+  .store-name { font-size: 20px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
+  .store-addr { font-size: 10px; font-weight: 600; margin-top: 2px; }
+  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; padding: 7px 14px; border-bottom: 2px solid #1e3a8a; font-size: 10px; }
+  .meta span { font-weight: 700; }
+  table { width: 100%; border-collapse: collapse; font-size: 10px; }
+  th { padding: 6px 8px; border-bottom: 2px solid #1e3a8a; font-weight: 700; text-align: left; background: white; }
+  th.th-amount { text-align: right; }
+  td { padding: 5px 8px; border-bottom: 1px solid #bfdbfe; vertical-align: top; }
+  td.td-center { text-align: center; border-left: 1px solid #bfdbfe; }
+  td.td-amount { text-align: right; font-weight: 700; white-space: nowrap; border-left: 1px solid #bfdbfe; }
+  td.td-name { border-right: none; }
+  .total-row td { border-top: 2px solid #1e3a8a; border-bottom: none; font-weight: 700; padding: 6px 8px; }
+  .total-label { text-align: right; }
+  .total-value { text-align: right; font-size: 13px; font-weight: 900; white-space: nowrap; }
+  .footer { display: flex; justify-content: space-between; align-items: flex-end; padding: 10px 14px 8px; }
+  .footer-note { font-size: 10px; font-weight: 600; max-width: 55%; }
+  .sig-block { text-align: right; font-size: 10px; font-weight: 600; min-width: 100px; }
+  .sig-line { border-top: 1px solid #1e3a8a; margin-top: 28px; padding-top: 3px; }
+</style>
+</head><body>
+<div id="__pbar" style="position:fixed;top:0;left:0;right:0;z-index:999;display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:#1e3a8a;color:white;font-family:Arial,sans-serif;font-size:13px;gap:12px"><span style="font-weight:600">Invoice Preview</span><div style="display:flex;gap:8px"><button onclick="window.print()" style="background:#fff;color:#1e3a8a;border:none;border-radius:6px;padding:7px 20px;font-size:13px;font-weight:700;cursor:pointer">🖨 Print</button><button onclick="window.__TAURI_INTERNALS__?.invoke('plugin:window|close')" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.4);border-radius:6px;padding:7px 14px;font-size:13px;cursor:pointer">Close</button></div></div>
+<div style="height:44px"></div>
+<style>@media print{#__pbar,div[style*="height:44px"]{display:none!important}}</style>
+<div class="invoice">
+  <div class="hdr">
+    <div>${headerLeft.replace(/\n/g, '<br>')}</div>
+    <div class="hdr-right"><div>${headerRight}</div>${whatsapp ? `<div>${whatsapp}</div>` : ''}</div>
+  </div>
+  <div class="banner">
+    <div class="store-name">${storeName}</div>
+    ${address ? `<div class="store-addr">${address}</div>` : ''}
+  </div>
+  <div class="meta">
+    <div><span>DL No.</span> ${dlNumbers || '-'}</div>
+    <div><span>Date.</span> ${dateStr}</div>
+    <div><span>Patient.</span> ${order.patient_name || order.customer_name || '-'}</div>
+    <div><span>Doctor.</span> ${order.doctor_name || '-'}</div>
+    <div><span>Bill No.</span> ${order.bill_number}</div>
+    <div><span>Payment.</span> ${order.payment_method === 'credit' ? 'Credit' : (order.payment_method || 'Cash').toUpperCase()}</div>
+  </div>
+  <table>
+    <thead><tr>
+      <th style="width:5%;text-align:center">Sr.</th>
+      <th style="width:27%">Product</th>
+      <th style="width:10%;text-align:center;border-left:1px solid #bfdbfe">Qty</th>
+      <th class="th-amount" style="width:12%;border-left:1px solid #bfdbfe">MRP</th>
+      <th class="th-amount" style="width:12%;border-left:1px solid #bfdbfe">Value</th>
+      <th style="width:8%;text-align:center;border-left:1px solid #bfdbfe">GST%</th>
+      <th class="th-amount" style="width:10%;border-left:1px solid #bfdbfe">Disc</th>
+      <th class="th-amount" style="width:12%;border-left:1px solid #bfdbfe">Amount</th>
+    </tr></thead>
+    <tbody>
+      ${itemRows}
+      <tr class="total-row">
+        <td colspan="6">${footerNote}</td>
+        <td class="total-label">Total ₹</td>
+        <td class="total-value">${Number(order.total).toFixed(2)}</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="footer">
+    <div class="footer-note">* Goods once sold will not be taken back</div>
+    <div class="sig-block"><div class="sig-line">${sigLabel}</div></div>
+  </div>
+</div>
+</body></html>`;
+
+    try {
+      const cacheDir = await appCacheDir();
+      const sep = cacheDir.endsWith('/') ? '' : '/';
+      const filePath = `${cacheDir}${sep}frontstores-print-${Date.now()}.html`;
+      await writeTextFile(filePath, html);
+      new WebviewWindow(`print_${Date.now()}`, {
+        url: `file://${filePath}`,
+        title: 'Print',
+        width: 800,
+        height: 600,
+        visible: true,
+        focus: true,
+      });
+    } catch (err: any) {
+      toast.error('Could not open print window: ' + (err?.message ?? err));
+    }
   };
 
   return (

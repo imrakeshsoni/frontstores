@@ -1,4 +1,9 @@
 import { useState, useRef, useCallback, ReactNode, useEffect } from 'react';
+// [medical] [all tenants] — Tauri plugins for invoice download + print
+import { save } from '@tauri-apps/plugin-dialog';
+import { writeFile, writeTextFile } from '@tauri-apps/plugin-fs';
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { appCacheDir } from '@tauri-apps/api/path';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Search, Trash2, Plus, Minus, IndianRupee, UserPlus, X, CheckCircle, Download } from 'lucide-react';
@@ -636,14 +641,17 @@ export function POSPage() {
 
   const handleDownloadInvoice = async () => {
     if (!invoiceSnapshot) return;
-
     try {
       const imageDataUrl = await generateInvoiceImage();
-      const link = document.createElement('a');
-      link.href = imageDataUrl;
-      link.download = `${invoiceSnapshot.billNumber}.jpeg`;
-      link.click();
-      toast.success('Invoice image downloaded');
+      const base64 = imageDataUrl.split(',')[1];
+      const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+      const filePath = await save({
+        defaultPath: `${invoiceSnapshot.billNumber}.jpg`,
+        filters: [{ name: 'Image', extensions: ['jpg'] }],
+      });
+      if (!filePath) return;
+      await writeFile(filePath, bytes);
+      toast.success('Invoice saved');
     } catch (error: any) {
       toast.error(error?.message ?? 'Unable to download invoice image');
     }
@@ -659,14 +667,33 @@ export function POSPage() {
     window.open(url, '_blank');
   };
 
+  // [medical] [all tenants] — write HTML to temp file, open in WebviewWindow for printing
+  const printViaIframe = async (html: string) => {
+    const printBar = `<div id="__pbar" style="position:fixed;top:0;left:0;right:0;z-index:999;display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:#1e3a8a;color:white;font-family:Arial,sans-serif;font-size:13px;gap:12px"><span style="font-weight:600">Invoice Preview</span><div style="display:flex;gap:8px"><button onclick="window.print()" style="background:#fff;color:#1e3a8a;border:none;border-radius:6px;padding:7px 20px;font-size:13px;font-weight:700;cursor:pointer">🖨 Print</button><button onclick="window.__TAURI_INTERNALS__?.invoke('plugin:window|close')" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.4);border-radius:6px;padding:7px 14px;font-size:13px;cursor:pointer">Close</button></div></div><div style="height:44px"></div>`;
+    const printHtml = html
+      .replace('<body>', `<body>${printBar}`)
+      .replace('</body>', `<style>@media print{#__pbar{display:none!important}div[style*="height:44px"]{display:none!important}}<\/style></body>`);
+    try {
+      const cacheDir = await appCacheDir();
+      const sep = cacheDir.endsWith('/') ? '' : '/';
+      const filePath = `${cacheDir}${sep}frontstores-print-${Date.now()}.html`;
+      await writeTextFile(filePath, printHtml);
+      const win = new WebviewWindow(`print_${Date.now()}`, {
+        url: `file://${filePath}`,
+        title: 'Print',
+        width: 800,
+        height: 600,
+        visible: true,
+        focus: true,
+      });
+      win.once('tauri://error', () => toast.error('Unable to open print window'));
+    } catch (err: any) {
+      toast.error('Could not open print window: ' + (err?.message ?? err));
+    }
+  };
+
   const handlePrintInvoiceA5 = () => {
     if (!invoiceSnapshot) return;
-
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
-    if (!printWindow) {
-      toast.error('Unable to open print window');
-      return;
-    }
 
     const storeName = invoiceSnapshot.storeName || 'Medical Store';
     const address = invoiceSnapshot.storeAddress || '';
@@ -699,7 +726,7 @@ export function POSPage() {
       hour: '2-digit', minute: '2-digit',
     });
 
-    printWindow.document.write(`<!DOCTYPE html>
+    printViaIframe(`<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -711,23 +738,19 @@ export function POSPage() {
 
     .invoice { border: 2px solid #1e3a8a; width: 100%; }
 
-    /* header strip */
     .hdr { display: flex; justify-content: space-between; align-items: flex-start;
            padding: 8px 14px; border-bottom: 2px solid #1e3a8a; font-weight: 600; font-size: 11px; }
     .hdr-right { text-align: right; }
     .hdr-phone { font-size: 12px; margin-top: 3px; }
 
-    /* store name banner */
     .banner { text-align: center; padding: 8px 14px; border-bottom: 2px solid #1e3a8a; }
     .store-name { font-size: 20px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
     .store-addr { font-size: 10px; font-weight: 600; margin-top: 2px; }
 
-    /* meta row */
     .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px;
             padding: 7px 14px; border-bottom: 2px solid #1e3a8a; font-size: 10px; }
     .meta span { font-weight: 700; }
 
-    /* items table */
     table { width: 100%; border-collapse: collapse; font-size: 10px; }
     th { padding: 6px 8px; border-bottom: 2px solid #1e3a8a; font-weight: 700;
          text-align: left; background: white; }
@@ -736,14 +759,11 @@ export function POSPage() {
     td.td-center { text-align: center; border-left: 1px solid #bfdbfe; }
     td.td-amount { text-align: right; font-weight: 700; white-space: nowrap; border-left: 1px solid #bfdbfe; }
     td.td-name { border-right: none; }
-    .qty-label { color: #3b82f6; font-size: 9px; }
 
-    /* total row */
     .total-row td { border-top: 2px solid #1e3a8a; border-bottom: none; font-weight: 700; padding: 6px 8px; }
     .total-label { text-align: right; }
     .total-value { text-align: right; font-size: 13px; font-weight: 900; white-space: nowrap; }
 
-    /* footer */
     .footer { display: flex; justify-content: space-between; align-items: flex-end;
                padding: 10px 14px 8px; }
     .footer-note { font-size: 10px; font-weight: 600; max-width: 55%; }
@@ -760,12 +780,10 @@ export function POSPage() {
       ${whatsapp ? `<div class="hdr-phone">${whatsapp}</div>` : ''}
     </div>
   </div>
-
   <div class="banner">
     <div class="store-name">${storeName}</div>
     ${address ? `<div class="store-addr">${address}</div>` : ''}
   </div>
-
   <div class="meta">
     <div><span>DL No.</span> ${dlNumbers || '-'}</div>
     <div><span>Date.</span> ${dateStr}</div>
@@ -774,7 +792,6 @@ export function POSPage() {
     <div><span>Bill No.</span> ${invoiceSnapshot.billNumber}</div>
     <div><span>Payment.</span> ${invoiceSnapshot.paymentMethod === 'credit' ? 'Credit' : invoiceSnapshot.paymentMethod.toUpperCase()}</div>
   </div>
-
   <table>
     <thead>
       <tr>
@@ -797,22 +814,17 @@ export function POSPage() {
       </tr>
     </tbody>
   </table>
-
   <div class="footer">
     <div class="footer-note">* Goods once sold will not be taken back</div>
     <div class="sig-block"><div class="sig-line">${signatureLabel}</div></div>
   </div>
 </div>
-<script>window.onload = () => { window.print(); }<\/script>
 </body>
 </html>`);
-    printWindow.document.close();
   };
 
   const handlePrintThermal = () => {
     if (!invoiceSnapshot) return;
-    const printWindow = window.open('', '_blank', 'width=400,height=600');
-    if (!printWindow) { toast.error('Unable to open print window'); return; }
     const storeName = invoiceSnapshot.storeName || 'Store';
     const invoiceDate = getInvoiceDisplayDate(invoiceSnapshot, invoiceDateTime, canEditInvoiceDateTime);
     const dateStr = invoiceDate.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -820,13 +832,12 @@ export function POSPage() {
       `<div class="item"><span class="item-name">${idx + 1}. ${item.name}</span><span class="item-amt">₹${getInvoiceItemTotalAmount(item).toFixed(2)}</span></div>
        <div class="item-sub">${item.quantityLabel} × ₹${item.unitPrice.toFixed(2)}${item.discountAmount > 0 ? ` | Disc ₹${item.discountAmount.toFixed(2)}` : ''}</div>`
     ).join('');
-    printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${invoiceSnapshot.billNumber}</title>
+    printViaIframe(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${invoiceSnapshot.billNumber}</title>
 <style>
   @page { size: 58mm auto; margin: 2mm 3mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Courier New', monospace; font-size: 10px; color: #000; width: 52mm; }
   .center { text-align: center; }
-  .bold { font-weight: bold; }
   .store { font-size: 13px; font-weight: 900; text-transform: uppercase; text-align: center; margin-bottom: 2px; }
   .divider { border-top: 1px dashed #000; margin: 3px 0; }
   .row { display: flex; justify-content: space-between; margin: 1px 0; }
@@ -852,9 +863,7 @@ ${invoiceSnapshot.gstAmount > 0 ? `<div class="row"><span>GST</span><span>₹${i
 <div class="row"><span>Payment</span><span>${invoiceSnapshot.paymentMethod === 'credit' ? 'Credit' : invoiceSnapshot.paymentMethod.toUpperCase()}</span></div>
 <div class="divider"></div>
 <div class="footer">Thank you! Visit again.</div>
-<script>window.onload = () => { window.print(); }<\/script>
 </body></html>`);
-    printWindow.document.close();
   };
 
   const resultList = showingSearchResults ? (searchResults ?? []) : [];

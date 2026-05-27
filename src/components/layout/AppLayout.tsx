@@ -24,29 +24,29 @@ import { getShopTypeLabel } from '@/lib/shop/shopType';
 import { VoiceAssistant } from '@/components/voice/VoiceAssistant';
 
 export const NAV_ITEMS = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/pos', icon: ShoppingCart, label: 'POS / Billing' },
-  { to: '/products', icon: Package, label: 'Products' },
-  { to: '/inventory', icon: Boxes, label: 'Inventory' },
-  { to: '/orders', icon: Receipt, label: 'Orders' },
-  { to: '/customers', icon: Users, label: 'Customers' },
-  { to: '/khata', icon: BookOpen, label: 'Khata' },
-  { to: '/expenses', icon: Wallet, label: 'Expenses' },
-  { to: '/suppliers', icon: Truck, label: 'Suppliers' },
-  { to: '/purchase-orders', icon: ClipboardList, label: 'Purchase Orders' },
-  { to: '/reports', icon: BarChart3, label: 'Reports' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
+  { to: '/dashboard',       icon: LayoutDashboard, label: 'Dashboard',       iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/pos',             icon: ShoppingCart,    label: 'POS / Billing',   iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/products',        icon: Package,         label: 'Products',        iconBg: '#ffedd5', iconColor: '#ea580c' },
+  { to: '/inventory',       icon: Boxes,           label: 'Inventory',       iconBg: '#cffafe', iconColor: '#0891b2' },
+  { to: '/orders',          icon: Receipt,         label: 'Orders',          iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/customers',       icon: Users,           label: 'Customers',       iconBg: '#fce7f3', iconColor: '#db2777' },
+  { to: '/khata',           icon: BookOpen,        label: 'Khata',           iconBg: '#f3e8ff', iconColor: '#9333ea' },
+  { to: '/expenses',        icon: Wallet,          label: 'Expenses',        iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/suppliers',       icon: Truck,           label: 'Suppliers',       iconBg: '#fef9c3', iconColor: '#ca8a04' },
+  { to: '/purchase-orders', icon: ClipboardList,   label: 'Purchase Orders', iconBg: '#d1fae5', iconColor: '#059669' },
+  { to: '/reports',         icon: BarChart3,       label: 'Reports',         iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',        icon: Settings,        label: 'Settings',        iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
 
 // [restaurant] [all tenants]
 const RESTAURANT_NAV_ITEMS = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/restaurant/tables', icon: UtensilsCrossed, label: 'Tables & Orders' },
-  { to: '/restaurant/menu', icon: BookOpen, label: 'Menu' },
-  { to: '/restaurant/kitchen', icon: ChefHat, label: 'Kitchen' },
-  { to: '/restaurant/orders', icon: Receipt, label: 'Order History' },
-  { to: '/reports', icon: BarChart3, label: 'Reports' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
+  { to: '/dashboard',          icon: LayoutDashboard, label: 'Dashboard',      iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/restaurant/tables',  icon: UtensilsCrossed, label: 'Tables & Orders',iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/restaurant/menu',    icon: BookOpen,        label: 'Menu',           iconBg: '#ffedd5', iconColor: '#ea580c' },
+  { to: '/restaurant/kitchen', icon: ChefHat,         label: 'Kitchen',        iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/restaurant/orders',  icon: Receipt,         label: 'Order History',  iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/reports',            icon: BarChart3,       label: 'Reports',        iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',           icon: Settings,        label: 'Settings',       iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
 
 export function AppLayout() {
@@ -105,15 +105,29 @@ export function AppLayout() {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
-          {activeNavItems.map(({ to, icon: Icon, label }) => (
+        <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
+          {activeNavItems.map(({ to, icon: Icon, label, iconBg, iconColor }) => (
             <NavLink
               key={to}
               to={to}
-              className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+              className={({ isActive }) =>
+                `flex items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all ${
+                  isActive ? 'text-slate-900' : 'text-slate-500 hover:bg-slate-900 hover:text-white'
+                }`
+              }
+              style={({ isActive }) => isActive ? { background: iconBg } : {}}
             >
-              <Icon className="h-4 w-4 flex-shrink-0" />
-              {label}
+              {({ isActive }) => (
+                <>
+                  <span
+                    className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg"
+                    style={{ background: iconBg }}
+                  >
+                    <Icon className="h-3.5 w-3.5" style={{ color: iconColor }} />
+                  </span>
+                  <span style={isActive ? { color: iconColor, fontWeight: 600 } : {}}>{label}</span>
+                </>
+              )}
             </NavLink>
           ))}
         </nav>

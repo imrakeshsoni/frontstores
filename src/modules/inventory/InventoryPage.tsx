@@ -373,7 +373,7 @@ export function InventoryPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">Challan Number</label>
-                  <input className="input" placeholder="e.g. CH-2024-001" value={adjustment.challanNumber} onChange={(e) => setAdjustment((c) => ({ ...c, challanNumber: e.target.value }))} />
+                  <input className="input" value={adjustment.challanNumber} onChange={(e) => setAdjustment((c) => ({ ...c, challanNumber: e.target.value }))} />
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">Invoice Number</label>
