@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { appCacheDir } from '@tauri-apps/api/path';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -124,9 +124,6 @@ export function OrdersPage() {
   .sig-line { border-top: 1px solid #1e3a8a; margin-top: 28px; padding-top: 3px; }
 </style>
 </head><body>
-<div id="__pbar" style="position:fixed;top:0;left:0;right:0;z-index:999;display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:#1e3a8a;color:white;font-family:Arial,sans-serif;font-size:13px;gap:12px"><span style="font-weight:600">Invoice Preview</span><div style="display:flex;gap:8px"><button onclick="window.print()" style="background:#fff;color:#1e3a8a;border:none;border-radius:6px;padding:7px 20px;font-size:13px;font-weight:700;cursor:pointer">🖨 Print</button><button onclick="window.__TAURI_INTERNALS__?.invoke('plugin:window|close')" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.4);border-radius:6px;padding:7px 14px;font-size:13px;cursor:pointer">Close</button></div></div>
-<div style="height:44px"></div>
-<style>@media print{#__pbar,div[style*="height:44px"]{display:none!important}}</style>
 <div class="invoice">
   <div class="hdr">
     <div>${headerLeft.replace(/\n/g, '<br>')}</div>
@@ -169,6 +166,7 @@ export function OrdersPage() {
     <div class="sig-block"><div class="sig-line">${sigLabel}</div></div>
   </div>
 </div>
+<script>window.addEventListener('load',function(){setTimeout(function(){window.print();},400);});<\/script>
 </body></html>`;
 
     try {
@@ -176,16 +174,9 @@ export function OrdersPage() {
       const sep = cacheDir.endsWith('/') ? '' : '/';
       const filePath = `${cacheDir}${sep}frontstores-print-${Date.now()}.html`;
       await writeTextFile(filePath, html);
-      new WebviewWindow(`print_${Date.now()}`, {
-        url: `file://${filePath}`,
-        title: 'Print',
-        width: 800,
-        height: 600,
-        visible: true,
-        focus: true,
-      });
+      await shellOpen(filePath);
     } catch (err: any) {
-      toast.error('Could not open print window: ' + (err?.message ?? err));
+      toast.error('Could not open print: ' + (err?.message ?? err));
     }
   };
 

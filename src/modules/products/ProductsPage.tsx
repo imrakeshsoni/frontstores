@@ -20,6 +20,7 @@ type ProductForm = {
   ml_volume: string;
   mrp: string;
   selling_price: string;
+  wholesale_price: string;
   cost_price: string;
   gst_rate: string;
   total_units: string;
@@ -36,7 +37,7 @@ const DOSAGE_FORM_OPTIONS = ['Tablet', 'Syrup', 'Powder', 'Drop', 'Injection', '
 
 const emptyForm: ProductForm = {
   name: '', sku: '', barcode: '', unit: 'piece', dosage_form: '', ml_volume: '',
-  mrp: '', selling_price: '', cost_price: '', gst_rate: '12', total_units: '',
+  mrp: '', selling_price: '', wholesale_price: '', cost_price: '', gst_rate: '12', total_units: '',
   loose_selling_price: '', min_stock_qty: '', requires_prescription: false,
   location_section: '', location_rack: '', location_shelf: '',
 };
@@ -75,6 +76,7 @@ export function ProductsPage() {
         ml_volume: editing.ml_volume ? String(editing.ml_volume) : '',
         mrp: editing.mrp ? String(editing.mrp) : '',
         selling_price: editing.selling_price ? String(editing.selling_price) : '',
+        wholesale_price: editing.wholesale_price ? String(editing.wholesale_price) : '',
         cost_price: editing.cost_price ? String(editing.cost_price) : '',
         gst_rate: editing.gst_rate ? String(editing.gst_rate) : defaultGstRate,
         total_units: editing.total_units ? String(editing.total_units) : '',
@@ -113,6 +115,7 @@ export function ProductsPage() {
         selling_price: isMedicalStore
           ? (form.mrp ? Number(form.mrp) : 0)
           : (form.selling_price ? Number(form.selling_price) : 0),
+        wholesale_price: form.wholesale_price ? Number(form.wholesale_price) : null,
         cost_price: form.cost_price ? Number(form.cost_price) : null,
         gst_rate: Number(form.gst_rate || 0),
         dosage_form: isMedicalStore && form.dosage_form ? form.dosage_form : null,
@@ -206,6 +209,7 @@ export function ProductsPage() {
                 <th>Unit</th>
                 <th className="text-right">MRP</th>
                 {!isMedicalStore && <th className="text-right">Selling Price</th>}
+                {isGrocery && <th className="text-right">Margin</th>}
                 <th className="text-right">GST</th>
                 <th className="text-right">Stock</th>
                 <th className="text-right">Actions</th>
@@ -213,12 +217,12 @@ export function ProductsPage() {
             </thead>
             <tbody>
               {isLoading && Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i}>{Array.from({ length: isMedicalStore ? 7 : 8 }).map((_, j) => (
+                <tr key={i}>{Array.from({ length: isMedicalStore ? 7 : isGrocery ? 9 : 8 }).map((_, j) => (
                   <td key={j}><div className="h-4 rounded bg-slate-200 animate-pulse" /></td>
                 ))}</tr>
               ))}
               {!isLoading && items.length === 0 && (
-                <tr><td colSpan={isMedicalStore ? 7 : 8} className="p-0">
+                <tr><td colSpan={isMedicalStore ? 7 : isGrocery ? 9 : 8} className="p-0">
                   <EmptyState icon={<Package className="h-8 w-8" />} title="No products yet"
                     description="Start your catalog with a few products, then expand it into a richer library." />
                 </td></tr>
@@ -233,6 +237,14 @@ export function ProductsPage() {
                   <td className="text-slate-500">{p.unit}</td>
                   <td className="text-right">{formatCurrency(p.mrp)}</td>
                   {!isMedicalStore && <td className="text-right font-semibold text-blue-700">{formatCurrency(p.selling_price)}</td>}
+                  {isGrocery && (() => {
+                    const cost = p.cost_price;
+                    const sell = p.selling_price;
+                    if (!cost || cost <= 0 || !sell) return <td className="text-right text-slate-400">—</td>;
+                    const margin = ((sell - cost) / cost) * 100;
+                    const color = margin >= 20 ? '#16a34a' : margin >= 10 ? '#ca8a04' : '#dc2626';
+                    return <td className="text-right text-xs font-semibold" style={{ color }}>{margin.toFixed(1)}%</td>;
+                  })()}
                   <td className="text-right font-semibold text-blue-700">{p.gst_rate}%</td>
                   <td className="text-right">
                     <span className={`badge ${p.stock_qty <= p.min_stock_qty ? 'badge-red' : 'badge-green'}`}>
@@ -346,11 +358,17 @@ export function ProductsPage() {
                 {!isMedicalStore && (
                   <>
                     <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700">Selling Price</label>
+                      <label className="mb-2 block text-sm font-medium text-slate-700">Selling Price (Retail)</label>
                       <input type="number" className="input" value={form.selling_price} onChange={(e) => setForm((c) => ({ ...c, selling_price: e.target.value }))} />
                     </div>
+                    {isGrocery && (
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-slate-700">Wholesale Price</label>
+                        <input type="number" className="input" value={form.wholesale_price} onChange={(e) => setForm((c) => ({ ...c, wholesale_price: e.target.value }))} placeholder="Optional" />
+                      </div>
+                    )}
                     <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700">Purchase Price</label>
+                      <label className="mb-2 block text-sm font-medium text-slate-700">Purchase / Cost Price</label>
                       <input type="number" className="input" value={form.cost_price} onChange={(e) => setForm((c) => ({ ...c, cost_price: e.target.value }))} />
                     </div>
                   </>

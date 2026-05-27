@@ -268,7 +268,7 @@ async function addProductStep(ctx: FlowContext, answer: string, tenantId: string
         description: null, unit: 'strip', mrp, selling_price: sp,
         cost_price: null, gst_rate: 12, hsn_code: null, dosage_form: null,
         salt_composition: null, manufacturer: null, requires_prescription: false,
-        total_units: null, ml_volume: null, min_stock_qty: 10, is_active: true,
+        total_units: null, ml_volume: null, wholesale_price: null, min_stock_qty: 10, is_active: true,
         deleted_at: null,
       } as Parameters<typeof createProduct>[1]);
       if (stock > 0) {

@@ -23,6 +23,7 @@ export interface Product {
   ml_volume: string | null;
   stock_qty: number;
   min_stock_qty: number;
+  wholesale_price?: number | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -113,7 +114,7 @@ export async function createProduct(tenantId: string, data: Omit<Product, 'id' |
 
 const PRODUCT_UPDATE_FIELDS = new Set([
   'name','sku','barcode','category','brand','description','unit',
-  'mrp','selling_price','cost_price','gst_rate','hsn_code',
+  'mrp','selling_price','wholesale_price','cost_price','gst_rate','hsn_code',
   'dosage_form','salt_composition','manufacturer','requires_prescription',
   'total_units','ml_volume','min_stock_qty','is_active','updated_at',
 ]);

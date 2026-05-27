@@ -18,6 +18,7 @@ import {
   ClipboardList,
   UtensilsCrossed,
   ChefHat,
+  PackagePlus,
   UserCheck,
   ShoppingBasket,
 } from 'lucide-react';
@@ -50,9 +51,11 @@ const GROCERY_NAV_ITEMS = [
   { to: '/customers',         icon: Users,           label: 'Customers',      iconBg: '#fce7f3', iconColor: '#db2777' },
   { to: '/khata',             icon: BookOpen,        label: 'Khata',          iconBg: '#f3e8ff', iconColor: '#9333ea' },
   { to: '/expenses',          icon: Wallet,          label: 'Expenses',       iconBg: '#fee2e2', iconColor: '#dc2626' },
-  { to: '/suppliers',         icon: Truck,           label: 'Suppliers',      iconBg: '#fef9c3', iconColor: '#ca8a04' },
-  { to: '/reports',           icon: BarChart3,       label: 'Reports',        iconBg: '#e0f2fe', iconColor: '#0284c7' },
-  { to: '/settings',          icon: Settings,        label: 'Settings',       iconBg: '#f1f5f9', iconColor: '#64748b' },
+  { to: '/suppliers',          icon: Truck,        label: 'Suppliers',      iconBg: '#fef9c3', iconColor: '#ca8a04' },
+  { to: '/grocery/purchase',   icon: PackagePlus,  label: 'Purchase Entry', iconBg: '#d1fae5', iconColor: '#059669' },
+  { to: '/grocery/cash',       icon: Wallet,       label: 'Cash Drawer',    iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/reports',            icon: BarChart3,    label: 'Reports',        iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',           icon: Settings,     label: 'Settings',       iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
 
 // [restaurant] [all tenants]

@@ -387,6 +387,7 @@ const TOOLS: Record<string, { description: string; executor: ToolExecutor }> = {
         total_units: args.total_units ? Number(args.total_units) : null,
         ml_volume: null,
         min_stock_qty: Number(args.min_stock_qty || 10),
+        wholesale_price: null,
         is_active: true,
         deleted_at: null,
       } as Parameters<typeof createProduct>[1]);

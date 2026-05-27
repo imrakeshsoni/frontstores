@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, ReactNode, useEffect } from 'react';
 // [medical] [all tenants] — Tauri plugins for invoice download + print
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeFile, writeTextFile } from '@tauri-apps/plugin-fs';
-import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { appCacheDir } from '@tauri-apps/api/path';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -141,6 +141,7 @@ export function POSPage() {
   const [invoiceSnapshot, setInvoiceSnapshot] = useState<InvoiceSnapshot | null>(null);
   const [invoiceDateTime, setInvoiceDateTime] = useState('');
   const [heldCarts, setHeldCarts] = useState<HeldCart[]>(() => readHeldCarts());
+  const [wholesaleMode, setWholesaleMode] = useState(false);
   const [predefinedCustomerId, setPredefinedCustomerId] = useState<string | null>(null);
   const [productForm, setProductForm] = useState<ProductForm>(emptyProductForm);
   const [selectedResultIndex, setSelectedResultIndex] = useState(0);
@@ -170,6 +171,7 @@ export function POSPage() {
   const config = useAppStore((s) => s.config);
   const activeShopType = useActiveShopType();
   const isMedicalStore = isMedicalShopType(activeShopType);
+  const isGrocery = activeShopType === 'grocery';
   const queryClient = useQueryClient();
   const cart = useCartStore();
   const navigate = useNavigate();
@@ -386,7 +388,9 @@ export function POSPage() {
     const batchAvailableQuantity = Number(selectedBatch?.quantity ?? 0) || undefined;
     const unitPrice = isMedicalStore
       ? Number(product.mrp ?? product.selling_price ?? 0)
-      : Number(product.selling_price ?? product.mrp ?? 0);
+      : (isGrocery && wholesaleMode && product.wholesale_price)
+        ? Number(product.wholesale_price)
+        : Number(product.selling_price ?? product.mrp ?? 0);
     const currentItem = cart.items.find(
       (item) =>
         item.productId === resolvedProductId &&
@@ -431,7 +435,7 @@ export function POSPage() {
     });
     setSearch('');
     searchRef.current?.focus();
-  }, [cart, isMedicalStore]);
+  }, [cart, isMedicalStore, isGrocery, wholesaleMode]);
 
   const placeMutation = useMutation({
     mutationFn: async (_paymentRef?: string) => {
@@ -566,7 +570,7 @@ export function POSPage() {
         min_stock_qty: productForm.lowStockQuantity ? Number(productForm.lowStockQuantity) : 0,
         requires_prescription: productForm.nrx,
         sku: null, barcode: null, category: null, brand: null, description: null,
-        hsn_code: null, salt_composition: null, manufacturer: null, is_active: true,
+        hsn_code: null, salt_composition: null, manufacturer: null, wholesale_price: null, is_active: true,
       });
     },
     onSuccess: (product) => {
@@ -667,28 +671,17 @@ export function POSPage() {
     window.open(url, '_blank');
   };
 
-  // [medical] [all tenants] — write HTML to temp file, open in WebviewWindow for printing
+  // [medical] [all tenants] — write HTML to cache dir, open in system browser for printing
   const printViaIframe = async (html: string) => {
-    const printBar = `<div id="__pbar" style="position:fixed;top:0;left:0;right:0;z-index:999;display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:#1e3a8a;color:white;font-family:Arial,sans-serif;font-size:13px;gap:12px"><span style="font-weight:600">Invoice Preview</span><div style="display:flex;gap:8px"><button onclick="window.print()" style="background:#fff;color:#1e3a8a;border:none;border-radius:6px;padding:7px 20px;font-size:13px;font-weight:700;cursor:pointer">🖨 Print</button><button onclick="window.__TAURI_INTERNALS__?.invoke('plugin:window|close')" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.4);border-radius:6px;padding:7px 14px;font-size:13px;cursor:pointer">Close</button></div></div><div style="height:44px"></div>`;
-    const printHtml = html
-      .replace('<body>', `<body>${printBar}`)
-      .replace('</body>', `<style>@media print{#__pbar{display:none!important}div[style*="height:44px"]{display:none!important}}<\/style></body>`);
+    const finalHtml = html.replace('</body>', `<script>window.addEventListener('load',function(){setTimeout(function(){window.print();},400);});<\/script></body>`);
     try {
       const cacheDir = await appCacheDir();
       const sep = cacheDir.endsWith('/') ? '' : '/';
       const filePath = `${cacheDir}${sep}frontstores-print-${Date.now()}.html`;
-      await writeTextFile(filePath, printHtml);
-      const win = new WebviewWindow(`print_${Date.now()}`, {
-        url: `file://${filePath}`,
-        title: 'Print',
-        width: 800,
-        height: 600,
-        visible: true,
-        focus: true,
-      });
-      win.once('tauri://error', () => toast.error('Unable to open print window'));
+      await writeTextFile(filePath, finalHtml);
+      await shellOpen(filePath);
     } catch (err: any) {
-      toast.error('Could not open print window: ' + (err?.message ?? err));
+      toast.error('Could not open print: ' + (err?.message ?? err));
     }
   };
 
@@ -1758,6 +1751,15 @@ ${invoiceSnapshot.gstAmount > 0 ? `<div class="row"><span>GST</span><span>₹${i
                   className="input py-3 pl-11 text-base"
                 />
               </div>
+              {isGrocery && (
+                <button
+                  className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${wholesaleMode ? 'bg-blue-600 text-white' : 'btn-secondary'}`}
+                  onClick={() => setWholesaleMode((w) => !w)}
+                  title="Toggle wholesale pricing"
+                >
+                  {wholesaleMode ? '⚡ Wholesale' : 'Wholesale'}
+                </button>
+              )}
               <button className="btn-secondary shrink-0" onClick={handleOpenAddProduct}>
                 <Plus className="h-4 w-4" />
                 New Product

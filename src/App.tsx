@@ -25,6 +25,8 @@ const ExpensesPage        = lazy(() => import('@/modules/expenses/ExpensesPage')
 const PurchaseOrdersPage  = lazy(() => import('@/modules/purchase-orders/PurchaseOrdersPage').then(m => ({ default: m.PurchaseOrdersPage })));
 // [grocery] [all tenants]
 const GroceryDashboard        = lazy(() => import('@/modules/grocery/GroceryDashboard').then(m => ({ default: m.GroceryDashboard })));
+const CashDrawerPage          = lazy(() => import('@/modules/grocery/CashDrawerPage').then(m => ({ default: m.CashDrawerPage })));
+const PurchasePage            = lazy(() => import('@/modules/grocery/PurchasePage').then(m => ({ default: m.PurchasePage })));
 
 // [restaurant] [all tenants]
 const TablesPage              = lazy(() => import('@/modules/restaurant/TablesPage').then(m => ({ default: m.TablesPage })));
@@ -91,6 +93,8 @@ export default function App() {
             <Route path="settings"   element={<SettingsPage />} />
             {/* [grocery] [all tenants] */}
             <Route path="grocery/dashboard" element={<GroceryDashboard />} />
+            <Route path="grocery/cash"      element={<CashDrawerPage />} />
+            <Route path="grocery/purchase"  element={<PurchasePage />} />
 
             {/* [restaurant] [all tenants] */}
             <Route path="restaurant/dashboard" element={<RestaurantDashboard />} />
