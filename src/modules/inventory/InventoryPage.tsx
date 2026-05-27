@@ -336,6 +336,18 @@ export function InventoryPage() {
                 </div>
               </div>
 
+              {/* [medical] [all tenants] — Challan + Invoice always visible */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">Challan Number</label>
+                  <input className="input" value={adjustment.challanNumber} onChange={(e) => setAdjustment((c) => ({ ...c, challanNumber: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">Invoice Number</label>
+                  <input className="input" value={adjustment.invoiceNumber} onChange={(e) => setAdjustment((c) => ({ ...c, invoiceNumber: e.target.value }))} />
+                </div>
+              </div>
+
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">Quantity *</label>
                 <input type="number" min="0.01" step="any" className="input" value={adjustment.quantity}
@@ -368,18 +380,6 @@ export function InventoryPage() {
                   )}
                 </>
               )}
-
-              {/* [medical] [all tenants] — Challan number field */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">Challan Number</label>
-                  <input className="input" value={adjustment.challanNumber} onChange={(e) => setAdjustment((c) => ({ ...c, challanNumber: e.target.value }))} />
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">Invoice Number</label>
-                  <input className="input" value={adjustment.invoiceNumber} onChange={(e) => setAdjustment((c) => ({ ...c, invoiceNumber: e.target.value }))} />
-                </div>
-              </div>
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">Notes</label>
                 <input className="input" value={adjustment.notes} onChange={(e) => setAdjustment((c) => ({ ...c, notes: e.target.value }))} />
