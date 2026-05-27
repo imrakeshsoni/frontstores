@@ -25,6 +25,12 @@ import {
   CreditCard,
   UserCheck,
   ShoppingBasket,
+  Stethoscope,
+  CalendarDays,
+  FlaskConical,
+  Pill,
+  BedDouble,
+  FileText,
 } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { getShopTypeLabel } from '@/lib/shop/shopType';
@@ -75,6 +81,22 @@ const RESTAURANT_NAV_ITEMS = [
   { to: '/settings',             icon: Settings,        label: 'Settings',       iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
 
+// [clinic] [all tenants]
+const CLINIC_NAV_ITEMS = [
+  { to: '/clinic/dashboard',    icon: LayoutDashboard, label: 'OPD Dashboard',   iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/clinic/patients',     icon: Users,           label: 'Patients',        iconBg: '#fce7f3', iconColor: '#db2777' },
+  { to: '/clinic/visits/new',   icon: Stethoscope,     label: 'New Visit',       iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/clinic/appointments', icon: CalendarDays,    label: 'Appointments',    iconBg: '#ffedd5', iconColor: '#ea580c' },
+  { to: '/clinic/doctors',      icon: UserCheck,       label: 'Doctors',         iconBg: '#cffafe', iconColor: '#0891b2' },
+  { to: '/clinic/pharmacy',     icon: Pill,            label: 'Pharmacy',        iconBg: '#f0fdf4', iconColor: '#15803d' },
+  { to: '/clinic/lab',          icon: FlaskConical,    label: 'Lab',             iconBg: '#fef9c3', iconColor: '#ca8a04' },
+  { to: '/clinic/ipd',          icon: BedDouble,       label: 'IPD / Beds',      iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/clinic/billing',      icon: FileText,        label: 'Billing',         iconBg: '#d1fae5', iconColor: '#059669' },
+  { to: '/expenses',            icon: Wallet,          label: 'Expenses',        iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/clinic/reports',      icon: BarChart3,       label: 'Reports',         iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',            icon: Settings,        label: 'Settings',        iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
 // [carwash] [all tenants]
 const CARWASH_NAV_ITEMS = [
   { to: '/carwash/dashboard', icon: LayoutDashboard, label: 'Dashboard',      iconBg: '#dbeafe', iconColor: '#2563eb' },
@@ -96,6 +118,7 @@ export function AppLayout() {
     config?.shop_type === 'restaurant' ? RESTAURANT_NAV_ITEMS :
     config?.shop_type === 'grocery'    ? GROCERY_NAV_ITEMS :
     config?.shop_type === 'carwash'    ? CARWASH_NAV_ITEMS :
+    config?.shop_type === 'clinic'     ? CLINIC_NAV_ITEMS :
     NAV_ITEMS;
 
   useEffect(() => {

@@ -37,6 +37,18 @@ const MembershipPage          = lazy(() => import('@/modules/carwash/MembershipP
 const CarwashStaffPage        = lazy(() => import('@/modules/carwash/CarwashStaffPage').then(m => ({ default: m.CarwashStaffPage })));
 const CarwashReportsPage      = lazy(() => import('@/modules/carwash/CarwashReportsPage').then(m => ({ default: m.CarwashReportsPage })));
 
+// [clinic] [all tenants]
+const ClinicDashboard         = lazy(() => import('@/modules/clinic/ClinicDashboard').then(m => ({ default: m.ClinicDashboard })));
+const PatientsPage            = lazy(() => import('@/modules/clinic/PatientsPage').then(m => ({ default: m.PatientsPage })));
+const VisitPage               = lazy(() => import('@/modules/clinic/VisitPage').then(m => ({ default: m.VisitPage })));
+const AppointmentsPage        = lazy(() => import('@/modules/clinic/AppointmentsPage').then(m => ({ default: m.AppointmentsPage })));
+const DoctorsPage             = lazy(() => import('@/modules/clinic/DoctorsPage').then(m => ({ default: m.DoctorsPage })));
+const PharmacyPage            = lazy(() => import('@/modules/clinic/PharmacyPage').then(m => ({ default: m.PharmacyPage })));
+const LabPage                 = lazy(() => import('@/modules/clinic/LabPage').then(m => ({ default: m.LabPage })));
+const IPDPage                 = lazy(() => import('@/modules/clinic/IPDPage').then(m => ({ default: m.IPDPage })));
+const BillingPage             = lazy(() => import('@/modules/clinic/BillingPage').then(m => ({ default: m.BillingPage })));
+const ClinicReportsPage       = lazy(() => import('@/modules/clinic/ClinicReportsPage').then(m => ({ default: m.ClinicReportsPage })));
+
 // [restaurant] [all tenants]
 const TablesPage              = lazy(() => import('@/modules/restaurant/TablesPage').then(m => ({ default: m.TablesPage })));
 const MenuPage                = lazy(() => import('@/modules/restaurant/MenuPage').then(m => ({ default: m.MenuPage })));
@@ -87,6 +99,7 @@ export default function App() {
               config?.shop_type === 'restaurant' ? '/restaurant/dashboard' :
               config?.shop_type === 'grocery'    ? '/grocery/dashboard' :
               config?.shop_type === 'carwash'    ? '/carwash/dashboard' :
+              config?.shop_type === 'clinic'     ? '/clinic/dashboard' :
               '/dashboard'
             } replace />} />
             <Route path="dashboard"  element={<Dashboard />} />
@@ -114,6 +127,18 @@ export default function App() {
             <Route path="carwash/membership" element={<MembershipPage />} />
             <Route path="carwash/staff"      element={<CarwashStaffPage />} />
             <Route path="carwash/reports"    element={<CarwashReportsPage />} />
+
+            {/* [clinic] [all tenants] */}
+            <Route path="clinic/dashboard"    element={<ClinicDashboard />} />
+            <Route path="clinic/patients"     element={<PatientsPage />} />
+            <Route path="clinic/visits/new"   element={<VisitPage />} />
+            <Route path="clinic/appointments" element={<AppointmentsPage />} />
+            <Route path="clinic/doctors"      element={<DoctorsPage />} />
+            <Route path="clinic/pharmacy"     element={<PharmacyPage />} />
+            <Route path="clinic/lab"          element={<LabPage />} />
+            <Route path="clinic/ipd"          element={<IPDPage />} />
+            <Route path="clinic/billing"      element={<BillingPage />} />
+            <Route path="clinic/reports"      element={<ClinicReportsPage />} />
 
             {/* [restaurant] [all tenants] */}
             <Route path="restaurant/dashboard" element={<RestaurantDashboard />} />
