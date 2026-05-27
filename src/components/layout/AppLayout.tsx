@@ -19,6 +19,7 @@ import {
   UtensilsCrossed,
   ChefHat,
   UserCheck,
+  ShoppingBasket,
 } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { getShopTypeLabel } from '@/lib/shop/shopType';
@@ -39,6 +40,21 @@ export const NAV_ITEMS = [
   { to: '/settings',        icon: Settings,        label: 'Settings',        iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
 
+// [grocery] [all tenants]
+const GROCERY_NAV_ITEMS = [
+  { to: '/grocery/dashboard', icon: LayoutDashboard, label: 'Dashboard',      iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/pos',               icon: ShoppingBasket,  label: 'POS / Billing',  iconBg: '#ffedd5', iconColor: '#ea580c' },
+  { to: '/products',          icon: Package,         label: 'Products',       iconBg: '#cffafe', iconColor: '#0891b2' },
+  { to: '/inventory',         icon: Boxes,           label: 'Inventory',      iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/orders',            icon: Receipt,         label: 'Orders',         iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/customers',         icon: Users,           label: 'Customers',      iconBg: '#fce7f3', iconColor: '#db2777' },
+  { to: '/khata',             icon: BookOpen,        label: 'Khata',          iconBg: '#f3e8ff', iconColor: '#9333ea' },
+  { to: '/expenses',          icon: Wallet,          label: 'Expenses',       iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/suppliers',         icon: Truck,           label: 'Suppliers',      iconBg: '#fef9c3', iconColor: '#ca8a04' },
+  { to: '/reports',           icon: BarChart3,       label: 'Reports',        iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',          icon: Settings,        label: 'Settings',       iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
 // [restaurant] [all tenants]
 const RESTAURANT_NAV_ITEMS = [
   { to: '/restaurant/dashboard', icon: LayoutDashboard, label: 'Dashboard',      iconBg: '#ede9fe', iconColor: '#7c3aed' },
@@ -55,8 +71,11 @@ const RESTAURANT_NAV_ITEMS = [
 export function AppLayout() {
   const { config, setAuthenticated } = useAppStore();
   const navigate = useNavigate();
-  // [restaurant] [all tenants] — pick correct nav based on shop type
-  const activeNavItems = config?.shop_type === 'restaurant' ? RESTAURANT_NAV_ITEMS : NAV_ITEMS;
+  // pick correct nav based on shop type
+  const activeNavItems =
+    config?.shop_type === 'restaurant' ? RESTAURANT_NAV_ITEMS :
+    config?.shop_type === 'grocery'    ? GROCERY_NAV_ITEMS :
+    NAV_ITEMS;
 
   useEffect(() => {
     setAINavigator((path) => navigate(path));

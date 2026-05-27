@@ -9,7 +9,9 @@ import { toast } from 'sonner';
 const SERVER = 'https://update.frontstores.com';
 
 const SHOP_TYPES = [
-  { value: 'medical', label: 'Medical / Pharmacy', icon: '💊', desc: 'Medicines, prescriptions, drug inventory' },
+  { value: 'medical',     label: 'Medical / Pharmacy', icon: '💊', desc: 'Medicines, prescriptions, drug inventory' },
+  { value: 'grocery',    label: 'Grocery Store',       icon: '🛒', desc: 'Kirana, supermarket, weight-based billing, khata' },
+  { value: 'restaurant', label: 'Restaurant / Café',   icon: '🍽️', desc: 'Table orders, KOT, menu, kitchen display' },
 ];
 
 interface FormData {

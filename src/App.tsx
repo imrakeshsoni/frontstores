@@ -23,6 +23,9 @@ const SettingsPage  = lazy(() => import('@/modules/settings/SettingsPage').then(
 const KhataPage           = lazy(() => import('@/modules/khata/KhataPage').then(m => ({ default: m.KhataPage })));
 const ExpensesPage        = lazy(() => import('@/modules/expenses/ExpensesPage').then(m => ({ default: m.ExpensesPage })));
 const PurchaseOrdersPage  = lazy(() => import('@/modules/purchase-orders/PurchaseOrdersPage').then(m => ({ default: m.PurchaseOrdersPage })));
+// [grocery] [all tenants]
+const GroceryDashboard        = lazy(() => import('@/modules/grocery/GroceryDashboard').then(m => ({ default: m.GroceryDashboard })));
+
 // [restaurant] [all tenants]
 const TablesPage              = lazy(() => import('@/modules/restaurant/TablesPage').then(m => ({ default: m.TablesPage })));
 const MenuPage                = lazy(() => import('@/modules/restaurant/MenuPage').then(m => ({ default: m.MenuPage })));
@@ -69,7 +72,11 @@ export default function App() {
       <Suspense fallback={<Loading />}>
         <Routes>
           <Route path="/" element={<AppLayout />}>
-            <Route index element={<Navigate to={config?.shop_type === 'restaurant' ? '/restaurant/dashboard' : '/dashboard'} replace />} />
+            <Route index element={<Navigate to={
+              config?.shop_type === 'restaurant' ? '/restaurant/dashboard' :
+              config?.shop_type === 'grocery'    ? '/grocery/dashboard' :
+              '/dashboard'
+            } replace />} />
             <Route path="dashboard"  element={<Dashboard />} />
             <Route path="pos"        element={<POSPage />} />
             <Route path="products"   element={<ProductsPage />} />
@@ -82,6 +89,9 @@ export default function App() {
             <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
             <Route path="reports"    element={<ReportsPage />} />
             <Route path="settings"   element={<SettingsPage />} />
+            {/* [grocery] [all tenants] */}
+            <Route path="grocery/dashboard" element={<GroceryDashboard />} />
+
             {/* [restaurant] [all tenants] */}
             <Route path="restaurant/dashboard" element={<RestaurantDashboard />} />
             <Route path="restaurant/tables"    element={<TablesPage />} />

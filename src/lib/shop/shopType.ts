@@ -1,14 +1,23 @@
 import { useAppStore } from '@/app/store/app.store';
 
-export type ShopType = 'medical' | 'restaurant';
+export type ShopType = 'medical' | 'restaurant' | 'grocery';
 
 const SHOP_TYPE_LABELS: Record<string, string> = {
   medical: 'Medical Store',
   restaurant: 'Restaurant',
+  grocery: 'Grocery Store',
 };
 
 export function isMedicalShopType(shopType?: string | null): boolean {
   return shopType === 'medical';
+}
+
+export function isGroceryShopType(shopType?: string | null): boolean {
+  return shopType === 'grocery';
+}
+
+export function isRestaurantShopType(shopType?: string | null): boolean {
+  return shopType === 'restaurant';
 }
 
 export function getShopTypeLabel(shopType?: string | null): string {

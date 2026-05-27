@@ -7,7 +7,7 @@ import { useAppStore } from '@/app/store/app.store';
 import { listProducts, createProduct, updateProduct, deleteProduct } from '@/lib/db/products';
 import { PageIntro } from '@/components/ui/PageIntro';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { isMedicalShopType, useActiveShopType } from '@/lib/shop/shopType';
+import { isMedicalShopType, isGroceryShopType, useActiveShopType } from '@/lib/shop/shopType';
 
 type ProductSaveMode = 'close' | 'inventory' | 'new';
 
@@ -50,6 +50,8 @@ export function ProductsPage() {
   const tenantId = useAppStore((s) => s.config?.tenant_id ?? '');
   const activeShopType = useActiveShopType();
   const isMedicalStore = isMedicalShopType(activeShopType);
+  const isGrocery = isGroceryShopType(activeShopType);
+  const defaultGstRate = isGrocery ? '0' : '12';
   const unitOptions = isMedicalStore
     ? ['ml', 'piece', 'strip', 'dozen', 'unit']
     : ['kg', 'gram', 'litre', 'ml', 'piece', 'strip', 'box', 'pack', 'dozen', 'unit'];
@@ -74,7 +76,7 @@ export function ProductsPage() {
         mrp: editing.mrp ? String(editing.mrp) : '',
         selling_price: editing.selling_price ? String(editing.selling_price) : '',
         cost_price: editing.cost_price ? String(editing.cost_price) : '',
-        gst_rate: editing.gst_rate ? String(editing.gst_rate) : '12',
+        gst_rate: editing.gst_rate ? String(editing.gst_rate) : defaultGstRate,
         total_units: editing.total_units ? String(editing.total_units) : '',
         loose_selling_price: editing.loose_selling_price ? String(editing.loose_selling_price) : '',
         min_stock_qty: editing.min_stock_qty ? String(editing.min_stock_qty) : '',
@@ -84,7 +86,7 @@ export function ProductsPage() {
         location_shelf: '',
       });
     } else {
-      setForm(emptyForm);
+      setForm({ ...emptyForm, gst_rate: defaultGstRate });
     }
   }, [editing]);
 
@@ -137,14 +139,14 @@ export function ProductsPage() {
       queryClient.invalidateQueries({ queryKey: ['pos-top-products'] });
 
       if (!editing && saveMode === 'inventory' && id) {
-        setShowForm(false); setEditing(null); setForm(emptyForm);
+        setShowForm(false); setEditing(null); setForm({ ...emptyForm, gst_rate: defaultGstRate });
         navigate('/inventory', { state: { openAdjustStock: true, productId: id, productName: name, direction: 'add', type: 'purchase' } });
         return;
       }
       if (!editing && saveMode === 'new') {
-        setEditing(null); setForm(emptyForm);
+        setEditing(null); setForm({ ...emptyForm, gst_rate: defaultGstRate });
       } else {
-        setShowForm(false); setEditing(null); setForm(emptyForm);
+        setShowForm(false); setEditing(null); setForm({ ...emptyForm, gst_rate: defaultGstRate });
       }
     },
     onError: (err: any) => toast.error(err.message ?? 'Unable to save product'),

@@ -24,10 +24,11 @@ Which app are you working on?
 
 1) Medical Store (medical)
 2) Restaurant / Café (restaurant)
-3) Core / Shared (affects all apps)
-4) Website — frontstores.com
-5) Admin Panel (tools/update-server, admin-app)
-6) ➕ Create new app
+3) Grocery Store (grocery)
+4) Core / Shared (affects all apps)
+5) Website — frontstores.com
+6) Admin Panel (tools/update-server, admin-app)
+7) ➕ Create new app
 ```
 
 ---
@@ -73,6 +74,7 @@ frontstores.com hosts multiple separate apps. Each app is a different downloadab
 |-----|---------------|---------------|--------|
 | Medical Store | frontstores.com/medical | `medical` | ✅ Active |
 | Restaurant | frontstores.com/restaurant | `restaurant` | ✅ Active |
+| Grocery Store | frontstores.com/grocery | `grocery` | ✅ Active |
 
 All apps are built from this single codebase. The `shopType` field in `app_config` controls which features are visible.
 
