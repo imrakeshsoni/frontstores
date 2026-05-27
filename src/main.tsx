@@ -6,6 +6,7 @@ import App from './App';
 import './index.css';
 import { reportError } from './lib/errorReporter';
 import { flushQueue } from './lib/syncQueue';
+import { setAIQueryClient } from './lib/voice/aiQueryInvalidator';
 
 // Check for updates silently on startup — store result for Settings page, no notification
 async function checkForUpdate() {
@@ -41,11 +42,17 @@ if (savedTheme === 'dark') document.documentElement.classList.add('dark');
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5,  // 5 minutes
+      staleTime: 0,              // data is always considered stale
+      gcTime: 1000 * 60 * 5,    // keep cache 5 min so navigating back is instant
+      refetchOnMount: true,      // refetch every time a page mounts / user navigates to it
+      refetchOnWindowFocus: true, // refetch when user clicks back into the app
+      refetchOnReconnect: true,  // refetch when internet comes back
+      refetchInterval: 30_000,   // background auto-refresh every 30 seconds on any open page
       retry: 1,
     },
   },
 });
+setAIQueryClient(queryClient);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

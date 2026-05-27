@@ -1,5 +1,6 @@
-import { Outlet, NavLink } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
+import { setAINavigator } from '@/lib/voice/aiNavigator';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -15,6 +16,8 @@ import {
   Wallet,
   LogOut,
   ClipboardList,
+  UtensilsCrossed,
+  ChefHat,
 } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { getShopTypeLabel } from '@/lib/shop/shopType';
@@ -35,8 +38,26 @@ export const NAV_ITEMS = [
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
+// [restaurant] [all tenants]
+const RESTAURANT_NAV_ITEMS = [
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/restaurant/tables', icon: UtensilsCrossed, label: 'Tables & Orders' },
+  { to: '/restaurant/menu', icon: BookOpen, label: 'Menu' },
+  { to: '/restaurant/kitchen', icon: ChefHat, label: 'Kitchen' },
+  { to: '/restaurant/orders', icon: Receipt, label: 'Order History' },
+  { to: '/reports', icon: BarChart3, label: 'Reports' },
+  { to: '/settings', icon: Settings, label: 'Settings' },
+];
+
 export function AppLayout() {
   const { config, setAuthenticated } = useAppStore();
+  const navigate = useNavigate();
+  // [restaurant] [all tenants] — pick correct nav based on shop type
+  const activeNavItems = config?.shop_type === 'restaurant' ? RESTAURANT_NAV_ITEMS : NAV_ITEMS;
+
+  useEffect(() => {
+    setAINavigator((path) => navigate(path));
+  }, [navigate]);
 
   useEffect(() => {
     if (config?.shop_type === 'medical') {
@@ -85,7 +106,7 @@ export function AppLayout() {
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
-          {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
+          {activeNavItems.map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
               to={to}
@@ -155,7 +176,7 @@ export function AppLayout() {
             borderBottom: '1px solid var(--surface-border)',
           }}
         >
-          {NAV_ITEMS.map(({ to, label }) => (
+          {activeNavItems.map(({ to, label }) => (
             <NavLink
               key={to}
               to={to}

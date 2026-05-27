@@ -35,6 +35,7 @@ export async function addStock(tenantId: string, data: {
   cost_price?: number;
   supplier_id?: string;
   invoice_number?: string;
+  challan_number?: string;
   notes?: string;
   type?: string;
 }): Promise<void> {
@@ -53,10 +54,10 @@ export async function addStock(tenantId: string, data: {
   );
   await updateStock(tenantId, data.product_id, data.quantity);
   await db.execute(
-    `INSERT INTO inventory_adjustments (id, tenant_id, product_id, batch_id, quantity, type, invoice_number, notes)
-     VALUES (?,?,?,?,?,?,?,?)`,
+    `INSERT INTO inventory_adjustments (id, tenant_id, product_id, batch_id, quantity, type, invoice_number, challan_number, notes)
+     VALUES (?,?,?,?,?,?,?,?,?)`,
     [uuid(), tenantId, data.product_id, batchId, data.quantity, data.type ?? 'purchase',
-     data.invoice_number ?? null, data.notes ?? null]
+     data.invoice_number ?? null, data.challan_number ?? null, data.notes ?? null]
   );
 }
 
@@ -68,6 +69,7 @@ export async function adjustStock(tenantId: string, data: {
   batch_no?: string;
   expiry_date?: string;
   invoice_number?: string;
+  challan_number?: string;
   notes?: string;
 }): Promise<void> {
   if (!data.quantity || data.quantity <= 0) throw new Error('Adjustment quantity must be greater than zero');
@@ -75,9 +77,9 @@ export async function adjustStock(tenantId: string, data: {
   const delta = data.direction === 'add' ? Math.abs(data.quantity) : -Math.abs(data.quantity);
   await updateStock(tenantId, data.product_id, delta);
   await db.execute(
-    `INSERT INTO inventory_adjustments (id, tenant_id, product_id, quantity, type, invoice_number, notes)
-     VALUES (?,?,?,?,?,?,?)`,
-    [uuid(), tenantId, data.product_id, delta, data.type, data.invoice_number ?? null, data.notes ?? null]
+    `INSERT INTO inventory_adjustments (id, tenant_id, product_id, quantity, type, invoice_number, challan_number, notes)
+     VALUES (?,?,?,?,?,?,?,?)`,
+    [uuid(), tenantId, data.product_id, delta, data.type, data.invoice_number ?? null, data.challan_number ?? null, data.notes ?? null]
   );
 }
 

@@ -1,5 +1,7 @@
 // [medical] [all tenants] — AI tool calling: DB access for Dolphin 3.0
-import { searchProductsForPOS, listProducts } from '../db/products';
+import { aiNavigate } from './aiNavigator';
+import { useCartStore } from '@/app/store/cart.store';
+import { searchProductsForPOS, listProducts, createProduct } from '../db/products';
 import { listCustomers, getCustomerByPhone } from '../db/customers';
 import { listOrders, getSalesSummary, createOrder } from '../db/orders';
 import { getExpiryAlerts, getLowStockAlerts, adjustStock } from '../db/inventory';
@@ -352,6 +354,124 @@ const TOOLS: Record<string, { description: string; executor: ToolExecutor }> = {
       if (!alias || !customerId) return { ok: false, error: 'alias and customer_id are required.' };
       await upsertAIMemory(tid, `alias:${alias}`, `${customerId}|${customerName}`);
       return { ok: true, data: { message: `Remembered: "${alias}" → ${customerName}` } };
+    },
+  },
+
+  // [all apps] [all tenants] — add a new product to the catalogue
+  add_product: {
+    description: 'Add a new product. Args: { name: string, mrp: number, selling_price: number, unit?: string, cost_price?: number, gst_rate?: number, stock_qty?: number, min_stock_qty?: number, category?: string, brand?: string, hsn_code?: string, total_units?: number }. Navigate to /products first so user can see.',
+    executor: async (tid, args) => {
+      const name = String(args.name || '').trim();
+      if (!name) return { ok: false, error: 'Product name is required.' };
+      const mrp = Number(args.mrp || 0);
+      const selling_price = Number(args.selling_price || mrp);
+      if (mrp <= 0) return { ok: false, error: 'MRP must be provided.' };
+
+      const product = await createProduct(tid, {
+        name,
+        sku: null,
+        barcode: null,
+        category: args.category ? String(args.category) : null,
+        brand: args.brand ? String(args.brand) : null,
+        description: null,
+        unit: String(args.unit || 'strip'),
+        mrp,
+        selling_price,
+        cost_price: args.cost_price ? Number(args.cost_price) : null,
+        gst_rate: Number(args.gst_rate || 12),
+        hsn_code: args.hsn_code ? String(args.hsn_code) : null,
+        dosage_form: null,
+        salt_composition: null,
+        manufacturer: null,
+        requires_prescription: false,
+        total_units: args.total_units ? Number(args.total_units) : null,
+        ml_volume: null,
+        min_stock_qty: Number(args.min_stock_qty || 10),
+        is_active: true,
+        deleted_at: null,
+      } as Parameters<typeof createProduct>[1]);
+
+      // Add opening stock if provided
+      if (Number(args.stock_qty) > 0) {
+        const { adjustStock } = await import('../db/inventory');
+        await adjustStock(tid, {
+          product_id: product.id,
+          quantity: Number(args.stock_qty),
+          direction: 'add',
+          type: 'manual',
+          notes: 'Opening stock via AI',
+        });
+      }
+
+      return { ok: true, data: { id: product.id, name: product.name, mrp, selling_price, message: `${name} product add ho gaya.` } };
+    },
+  },
+
+  // [all apps] [all tenants] — navigate to any page in the app
+  navigate_to_page: {
+    description: 'Navigate to a page in the app. Args: { page: "dashboard"|"pos"|"products"|"inventory"|"orders"|"customers"|"khata"|"expenses"|"suppliers"|"reports"|"settings" }',
+    executor: async (_tid, args) => {
+      const pageMap: Record<string, string> = {
+        dashboard: '/dashboard', pos: '/pos', products: '/products',
+        inventory: '/inventory', orders: '/orders', customers: '/customers',
+        khata: '/khata', expenses: '/expenses', suppliers: '/suppliers',
+        'purchase-orders': '/purchase-orders', reports: '/reports', settings: '/settings',
+      };
+      const page = String(args.page || '').toLowerCase();
+      const path = pageMap[page];
+      if (!path) return { ok: false, error: `Unknown page: ${page}. Valid: ${Object.keys(pageMap).join(', ')}` };
+      aiNavigate(path);
+      return { ok: true, data: { message: `Navigated to ${page}` } };
+    },
+  },
+
+  // [all apps] [all tenants] — populate POS cart with products and navigate to billing page
+  prepare_bill_in_pos: {
+    description: 'Open the POS page and add products to cart so the owner can review and bill. Args: { items: [{product_name: string, quantity: number, loose_qty?: number}], customer_name?: string }. Search product names first if you do not have IDs.',
+    executor: async (tid, args) => {
+      const rawItems = (args.items as Record<string, unknown>[]) || [];
+      if (!rawItems.length) return { ok: false, error: 'No items provided.' };
+
+      aiNavigate('/pos');
+      await new Promise(r => setTimeout(r, 400)); // let page mount
+
+      const cart = useCartStore.getState();
+      cart.clearCart();
+
+      const added: string[] = [];
+      const notFound: string[] = [];
+
+      for (const raw of rawItems) {
+        const productName = String(raw.product_name || '');
+        const quantity = Math.max(1, Number(raw.quantity || 1));
+        const looseQty = Number(raw.loose_qty || 0);
+
+        const results = await searchProductsForPOS(tid, productName);
+        const product = results[0];
+        if (!product) { notFound.push(productName); continue; }
+
+        const itemKey = [product.id, 'no-batch', 'no-exp'].join(':');
+        cart.addItem({
+          itemKey,
+          productId: product.id,
+          name: product.name,
+          sku: product.sku ?? '',
+          unit: product.unit ?? 'pc',
+          unitPrice: Number(product.selling_price ?? 0),
+          looseUnitPrice: undefined,
+          gstRate: Number(product.gst_rate ?? 0),
+          discount: 0,
+          quantity,
+        });
+        if (quantity > 1) cart.updateQty(itemKey, quantity);
+        if (looseQty > 0) { cart.toggleLoose(itemKey, true); cart.updateLooseQty(itemKey, looseQty); }
+        added.push(`${product.name} ×${quantity}`);
+      }
+
+      const msg = added.length
+        ? `Cart ready: ${added.join(', ')}${notFound.length ? `. Not found: ${notFound.join(', ')}` : ''}. Please review and confirm.`
+        : `Could not find products: ${notFound.join(', ')}`;
+      return { ok: true, data: { message: msg, added, not_found: notFound } };
     },
   },
 

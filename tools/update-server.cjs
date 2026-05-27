@@ -259,10 +259,10 @@ const publicServer = http.createServer(async (req, res) => {
           model: 'dolphin3',
           messages: messages.map(m => ({
             role: sanitize(m.role, 20),
-            content: sanitize(m.content, 4000),
+            content: sanitize(m.content, 16000),
           })),
           stream: false,
-          options: { temperature: 0.7, num_predict: 512 },
+          options: { temperature: 0.3, num_predict: 2048 },
         }),
       });
 

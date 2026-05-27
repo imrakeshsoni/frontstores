@@ -36,7 +36,7 @@ export function InventoryPage() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [adjustment, setAdjustment] = useState({
     productId: '', quantity: '1', direction: 'add', type: 'adjustment',
-    supplierId: '', invoiceNumber: '', batchNo: '', expiryDate: '', notes: '',
+    supplierId: '', invoiceNumber: '', challanNumber: '', batchNo: '', expiryDate: '', notes: '',
   });
   const navigationState = (location.state ?? null) as InventoryNavigationState | null;
 
@@ -97,7 +97,7 @@ export function InventoryPage() {
   }, [allProducts, productSearchInput]);
 
   const resetAdjustment = () => {
-    setAdjustment({ productId: '', quantity: '1', direction: 'add', type: 'adjustment', supplierId: '', invoiceNumber: '', batchNo: '', expiryDate: '', notes: '' });
+    setAdjustment({ productId: '', quantity: '1', direction: 'add', type: 'adjustment', supplierId: '', invoiceNumber: '', challanNumber: '', batchNo: '', expiryDate: '', notes: '' });
     setProductSearchInput('');
   };
 
@@ -113,6 +113,7 @@ export function InventoryPage() {
           expiry_date: adjustment.expiryDate || undefined,
           supplier_id: adjustment.supplierId || undefined,
           invoice_number: adjustment.invoiceNumber || undefined,
+          challan_number: adjustment.challanNumber || undefined,
           notes: adjustment.notes || undefined,
           type: adjustment.type,
         });
@@ -123,6 +124,7 @@ export function InventoryPage() {
           direction: adjustment.direction as 'add' | 'remove',
           type: adjustment.type,
           invoice_number: adjustment.invoiceNumber || undefined,
+          challan_number: adjustment.challanNumber || undefined,
           notes: adjustment.notes || undefined,
         });
       }
@@ -367,9 +369,16 @@ export function InventoryPage() {
                 </>
               )}
 
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">Invoice Number</label>
-                <input className="input" value={adjustment.invoiceNumber} onChange={(e) => setAdjustment((c) => ({ ...c, invoiceNumber: e.target.value }))} />
+              {/* [medical] [all tenants] — Challan number field */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">Challan Number</label>
+                  <input className="input" placeholder="e.g. CH-2024-001" value={adjustment.challanNumber} onChange={(e) => setAdjustment((c) => ({ ...c, challanNumber: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">Invoice Number</label>
+                  <input className="input" value={adjustment.invoiceNumber} onChange={(e) => setAdjustment((c) => ({ ...c, invoiceNumber: e.target.value }))} />
+                </div>
               </div>
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">Notes</label>

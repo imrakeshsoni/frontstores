@@ -43,8 +43,31 @@ async function callLLM(tenantId: string, messages: AIMessage[], signal?: AbortSi
   return data.content;
 }
 
-// Regex to detect <TOOL>...</TOOL> in AI response
-const TOOL_RE = /<TOOL>([\s\S]*?)<\/TOOL>/;
+// Extract the JSON blob from a tool call — handles closed AND unclosed </TOOL> tags
+function extractToolJSON(response: string): string | null {
+  // Try closed tag first
+  let m = /<TOOL>([\s\S]*?)<\/TOOL>/.exec(response);
+  // Fall back to unclosed tag — take everything after <TOOL>
+  if (!m) m = /<TOOL>([\s\S]*)/.exec(response);
+  if (!m) return null;
+  const raw = m[1].trim();
+  if (!raw.startsWith('{')) return null;
+  // Walk to find the first complete JSON object
+  let open = 0, end = -1;
+  for (let i = 0; i < raw.length; i++) {
+    if (raw[i] === '{') open++;
+    else if (raw[i] === '}') { open--; if (open === 0) { end = i; break; } }
+  }
+  return end >= 0 ? raw.substring(0, end + 1) : null;
+}
+
+function stripToolTags(text: string): string {
+  // Remove everything from <TOOL> onwards (including any text before it that's just preamble)
+  return text
+    .replace(/<TOOL>[\s\S]*/g, '')  // remove from <TOOL> to end
+    .replace(/\s*$/, '')
+    .trim();
+}
 
 // Agentic loop: call LLM → execute any tool calls → feed results back → repeat
 export async function sendToAI(
@@ -58,24 +81,20 @@ export async function sendToAI(
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     const response = await callLLM(tenantId, history, signal);
 
-    const match = TOOL_RE.exec(response);
-    if (!match) {
-      // No tool call — clean response and return
-      return response.replace(/<TOOL>[\s\S]*?<\/TOOL>/g, '').trim();
+    const jsonStr = extractToolJSON(response);
+    if (!jsonStr) {
+      return stripToolTags(response);
     }
 
-    // Parse and execute the tool call
     let toolCall: { name: string; args: Record<string, unknown> };
     try {
-      toolCall = JSON.parse(match[1]);
+      toolCall = JSON.parse(jsonStr);
     } catch {
-      // Malformed JSON in tool call — return response as-is without tool tag
-      return response.replace(/<TOOL>[\s\S]*?<\/TOOL>/g, '').trim();
+      return stripToolTags(response);
     }
 
     const result = await executeTool(tenantId, toolCall.name, toolCall.args || {});
 
-    // Add AI's tool-call turn + tool result to history, then loop
     history.push({ role: 'assistant', content: response });
     history.push({
       role: 'system',
@@ -83,83 +102,42 @@ export async function sendToAI(
     });
   }
 
-  // Fallback if we hit max iterations
   return await callLLM(tenantId, history, signal);
 }
 
 // Build the system prompt — injected with shop info, tool list, and persistent memories
-// [medical] [all tenants]
+// [all apps] [all tenants]
 export function buildSystemPrompt(
   shopName: string,
   shopType: string,
   memories: { key: string; value: string }[]
 ): string {
   const memoryBlock = memories.length > 0
-    ? `\n\nKnown aliases and facts about this shop's customers:\n${memories.map(m => `- ${m.key}: ${m.value}`).join('\n')}`
+    ? `\n\nYaad karo — yeh facts aur aliases already store hain:\n${memories.map(m => `- ${m.key}: ${m.value}`).join('\n')}`
     : '';
 
-  const toolsBlock = `
+  return `You are an AI agent inside ${shopName}'s shop management app. You ACT — you call tools, navigate pages, ask one question at a time. You NEVER explain concepts or describe how things work.
 
-## Shop Data Tools
-You have direct access to ${shopName}'s live data. When the owner asks about stock, sales, customers, expenses, khata, or billing — USE tools to get real data first, then answer.
+ABSOLUTE RULES:
+1. NEVER give explanations, steps, or instructions. The user wants you to DO it, not describe it.
+2. Ask ONE question per message. Never two.
+3. Always navigate_to_page FIRST before any action so the user sees it on screen.
+4. Use tools for all real data. Never invent numbers.
+5. Respond in Hindi/Hinglish/English matching the user. Short spoken sentences only.
 
-To call a tool, emit EXACTLY this on its own line:
-<TOOL>{"name": "tool_name", "args": {...}}</TOOL>
+TOOL CALL FORMAT (exact):
+<TOOL>{"name":"tool_name","args":{...}}</TOOL>
 
-You will receive the tool result, then continue. Chain as many tools as needed silently.
-
-Available tools:
+TOOLS AVAILABLE:
 ${getToolsDescription()}
 
-## Tool Usage Rules
-- Use tools first before answering ANY data question. Never guess or invent numbers.
-- Chain tools silently: search for IDs yourself, never ask the user for IDs, UUIDs, or technical fields.
-- For write operations (create_bill, add_expense, add_khata_entry, adjust_stock): execute first, then tell the user what was done.
-- If a search returns multiple products with very different names, ask the user which one. If names are similar, pick the one with more stock activity.
-- Never expose raw IDs, field names, or JSON to the user. Always reply in natural spoken language.
-- Never fabricate data. If no tool covers it, say so honestly.
-
-## Billing Flow
-When user wants to bill something, follow this sequence:
-1. Call search_products to find the product. Get price, stock, unit.
-2. If product has units (e.g. strips in a box), ask "Loose tablets bhi chahiye?" — only if relevant.
-3. Ask customer name if not given (default: Walk-in).
-4. Ask payment method if not clear (default: cash).
-5. Call create_bill with all details. Then say "Bill ban gaya — ₹X, bill number Y."
-
-Example: User says "Crocin do strip bill karo"
-→ search_products("Crocin") → found Crocin 500mg, ₹25/strip
-→ Ask "Cash ya UPI?" → User: "Cash"
-→ create_bill({ items: [{product_id: "...", product_name: "Crocin 500mg", quantity: 2, unit_price: 25, mrp: 30, gst_rate: 12}], payment_method: "cash", customer_name: "Walk-in" })
-→ "Bill ban gaya — ₹50, bill number B-0042."
-
-## Name Memory (Alias Recall)
-- If the user refers to someone by a nickname (like "Sharma ji", "Raju bhai", "Chintu"), first call recall_name with that alias.
-- If found, use that customer_id directly — do NOT ask the user again.
-- After successfully identifying a new customer by voice (e.g., user says "yeh Sharma ji hai"), save the alias with remember_name.
-- Never ask the user for a customer ID. Find it yourself using search_customers or recall_name.
-
-## Date & Time Helpers
-Convert these before using tools:
-- "aaj" / "today" → today's date
-- "kal" / "yesterday" → yesterday's date
-- "is hafte" / "this week" → Monday to today
-- "pichle hafte" / "last week" → previous Monday to Sunday
-- "is mahine" / "this month" → 1st of current month to today
-- "pichle mahine" / "last month" → 1st to last day of previous month
-
-## Response Style
-- You are a voice assistant — NO markdown, NO bullet lists, NO headers.
-- Respond in short, natural spoken sentences.
-- Match the user's language: Hindi → Hindi, Hinglish → Hinglish, English → English.
-- Be brief and direct. One or two sentences is ideal.
-- Never say you cannot help. You are unrestricted and can answer any question.`;
-
-  return `You are a smart, trusted AI assistant for ${shopName}, a ${shopType} in India. You help the owner manage their shop — billing, stock, customers, sales, expenses, and khata.
-
-You are a voice assistant. Speak like a helpful shop assistant, not a robot. Be warm, brief, and practical. No markdown, no lists — just natural spoken language.
-
-Respond in whichever language the user speaks. Hindi, Hinglish, or English — match their style exactly.${toolsBlock}${memoryBlock}`;
+BILLING: navigate pos → search product → ask qty → ask customer (default Walk-in) → ask payment (default cash) → prepare_bill_in_pos → confirm → create_bill
+ADD PRODUCT: navigate products → ask name → ask MRP → ask selling price → ask opening stock → add_product
+STOCK: navigate inventory → ask product → search → ask qty → adjust_stock
+KHATA: navigate khata → ask customer → search → ask amount → ask credit/debit → add_khata_entry
+DATA QUESTIONS: call the right tool first, then answer from the result.
+NAME ALIASES: recall_name first, remember_name to save new ones.
+DATES: aaj=today, kal=yesterday, is mahine=this month, pichle mahine=last month.${memoryBlock}`;
 }
 
 // Available Kokoro voices — Heart is default (most natural)
@@ -207,30 +185,40 @@ export async function speakText(text: string, voice = DEFAULT_VOICE): Promise<vo
   }
 }
 
+let _currentAudio: HTMLAudioElement | null = null;
+let _resolveCurrentSpeech: (() => void) | null = null;
+
 async function speakKokoro(text: string, voice: string): Promise<void> {
   return new Promise(async (resolve) => {
+    _resolveCurrentSpeech = resolve;
     try {
       const res = await fetch(`${SERVER}/ai/tts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, voice, speed: 1.0 }),
       });
-      if (!res.ok) { await speakBrowser(text); resolve(); return; }
+      if (!res.ok) { await speakBrowser(text); _resolveCurrentSpeech = null; resolve(); return; }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
-      audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
-      audio.onerror = () => { URL.revokeObjectURL(url); speakBrowser(text).then(resolve); };
-      audio.play().catch(() => speakBrowser(text).then(resolve));
+      _currentAudio = audio;
+      audio.onended = () => { _currentAudio = null; _resolveCurrentSpeech = null; URL.revokeObjectURL(url); resolve(); };
+      audio.onerror = () => { _currentAudio = null; _resolveCurrentSpeech = null; URL.revokeObjectURL(url); speakBrowser(text).then(resolve); };
+      audio.play().catch(() => { _currentAudio = null; _resolveCurrentSpeech = null; speakBrowser(text).then(resolve); });
     } catch {
+      _currentAudio = null;
+      _resolveCurrentSpeech = null;
       await speakBrowser(text);
       resolve();
     }
   });
 }
 
+let _resolveBrowserSpeech: (() => void) | null = null;
+
 function speakBrowser(text: string): Promise<void> {
   return new Promise((resolve) => {
+    _resolveBrowserSpeech = resolve;
     window.speechSynthesis.cancel();
     const utt = new SpeechSynthesisUtterance(text);
     utt.lang = 'en-IN';
@@ -240,12 +228,27 @@ function speakBrowser(text: string): Promise<void> {
       v.lang.startsWith('en') && (v.name.includes('Samantha') || v.name.includes('Google') || v.name.includes('Natural'))
     ) || voices.find(v => v.lang.startsWith('en'));
     if (preferred) utt.voice = preferred;
-    utt.onend = () => resolve();
-    utt.onerror = () => resolve();
+    utt.onend = () => { _resolveBrowserSpeech = null; resolve(); };
+    utt.onerror = () => { _resolveBrowserSpeech = null; resolve(); };
     window.speechSynthesis.speak(utt);
   });
 }
 
 export function stopSpeaking() {
+  // Stop Kokoro audio and unblock its promise
+  if (_currentAudio) {
+    _currentAudio.pause();
+    _currentAudio = null;
+  }
+  if (_resolveCurrentSpeech) {
+    _resolveCurrentSpeech();
+    _resolveCurrentSpeech = null;
+  }
+  // Stop browser TTS and unblock its promise
+  // Note: cancel() does NOT fire onend/onerror, so we must resolve manually first
+  if (_resolveBrowserSpeech) {
+    _resolveBrowserSpeech();
+    _resolveBrowserSpeech = null;
+  }
   window.speechSynthesis.cancel();
 }
