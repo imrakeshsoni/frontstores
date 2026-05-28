@@ -23,6 +23,7 @@ import migration0022 from '../../../src-tauri/migrations/0022_study_ai_persona.s
 import migration0023 from '../../../src-tauri/migrations/0023_study_new_features.sql?raw';
 import migration0024 from '../../../src-tauri/migrations/0024_study_round2.sql?raw';
 import migration0025 from '../../../src-tauri/migrations/0025_study_round3.sql?raw';
+import migration0026 from '../../../src-tauri/migrations/0026_linked_accounts.sql?raw';
 
 export interface Migration {
   name: string;
@@ -56,5 +57,6 @@ export async function readMigrations(): Promise<Migration[]> {
     { name: '0023_study_new_features', sql: migration0023 },
     { name: '0024_study_round2', sql: migration0024 },
     { name: '0025_study_round3', sql: migration0025 },
+    { name: '0026_linked_accounts', sql: migration0026 },
   ];
 }

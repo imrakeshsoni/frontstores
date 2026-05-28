@@ -583,6 +583,85 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
     return;
   }
 
+  // POST /register-app-type — [core] [all tenants]
+  // Existing tenant requests access to a different app type
+  if (req.method === 'POST' && pathname === '/register-app-type') {
+    if (rateLimit(req, res, 'register-app-type', 5, 60 * 60 * 1000)) return;
+    const body = await readBody(req);
+    try {
+      const { existing_tenant_id, shop_type, shop_name, owner_name, phone, email, city } = JSON.parse(body);
+      if (!existing_tenant_id || !shop_type || !shop_name) { res.writeHead(400); res.end('Missing fields'); return; }
+      const subs = loadSubs();
+      // Verify existing tenant exists
+      if (!subs[existing_tenant_id]) { json(res, { ok: false, error: 'Your current account was not found. Please re-launch the app.' }); return; }
+      const existingSub = subs[existing_tenant_id];
+      // Check if this phone already has this app type registered
+      const alreadyRegistered = Object.values(subs).find((s) =>
+        (s.phone === sanitize(phone, 20) || s.email === sanitize(email, 200)) &&
+        s.shop_type === sanitize(shop_type, 50) &&
+        s.tenant_id !== existing_tenant_id
+      );
+      if (alreadyRegistered) {
+        json(res, { ok: true, new_tenant_id: alreadyRegistered.tenant_id, status: alreadyRegistered.account_status, already_exists: true });
+        return;
+      }
+      // Create new pending registration for this app type
+      const newTenantId = crypto.randomUUID();
+      subs[newTenantId] = {
+        tenant_id:     newTenantId,
+        shop_name:     sanitize(shop_name,  100),
+        owner_name:    sanitize(owner_name, 100) || existingSub.owner_name,
+        shop_type:     sanitize(shop_type,   50),
+        phone:         sanitize(phone,        20) || existingSub.phone || '',
+        email:         sanitize(email,       200) || existingSub.email || '',
+        city:          sanitize(city,        100) || existingSub.city  || '',
+        expires_at:    null,
+        registered_at: new Date().toISOString(),
+        account_status: 'pending',
+        switch_request: { from_tenant_id: existing_tenant_id, requested_at: new Date().toISOString() },
+      };
+      saveSubs(subs);
+      logActivity(newTenantId, sanitize(shop_name, 50), 'switch_request', `${existingSub.shop_type} → ${sanitize(shop_type, 50)}`);
+      console.log(`🔄 App switch request: ${existingSub.shop_name} wants ${sanitize(shop_type, 50)} (new: ${newTenantId.substring(0,8)})`);
+      json(res, { ok: true, new_tenant_id: newTenantId, status: 'pending' });
+    } catch { res.writeHead(400); res.end('Bad request'); }
+    return;
+  }
+
+  // GET /linked-apps?tenant_id=xxx — [core] [all tenants]
+  // Returns all app registrations linked to the same owner (by phone or email)
+  if (req.method === 'GET' && pathname === '/linked-apps') {
+    const tenantId = url.searchParams.get('tenant_id');
+    if (!tenantId) { res.writeHead(400); res.end('Missing tenant_id'); return; }
+    const subs = loadSubs();
+    const current = subs[tenantId];
+    if (!current) { json(res, { apps: [] }); return; }
+    // Find all subs with matching phone or email
+    const phone = current.phone;
+    const email = current.email;
+    const linked = Object.values(subs).filter(s =>
+      s.tenant_id !== tenantId &&
+      ((phone && s.phone === phone) || (email && s.email === email))
+    ).map(s => ({
+      tenant_id:      s.tenant_id,
+      shop_type:      s.shop_type,
+      shop_name:      s.shop_name,
+      account_status: s.account_status,
+      expires_at:     s.expires_at,
+      registered_at:  s.registered_at,
+    }));
+    // Include the current one too
+    linked.unshift({
+      tenant_id:      current.tenant_id,
+      shop_type:      current.shop_type,
+      shop_name:      current.shop_name,
+      account_status: current.account_status,
+      expires_at:     current.expires_at,
+      registered_at:  current.registered_at,
+    });
+    json(res, { apps: linked }); return;
+  }
+
   // Block any attempt to reach admin from public port
   if (pathname.startsWith('/admin')) { res.writeHead(403); res.end('Forbidden'); return; }
 
@@ -1075,11 +1154,10 @@ ${e.context ? `Context: ${JSON.stringify(e.context).substring(0, 300)}` : ''}
 ---`;
     }).join('\n');
 
-    // Get latest git tag for next version
+    // latestTag is read only for logging — Claude recomputes dynamically at runtime
     let latestTag = 'v1.0.0';
     try { latestTag = execSync('git -C "' + PROJECT_DIR + '" tag --sort=-v:refname | head -1', { encoding: 'utf8' }).trim() || 'v1.0.0'; } catch {}
-    const parts = latestTag.replace('v','').split('.').map(Number);
-    const nextTag = `v${parts[0]}.${parts[1]}.${(parts[2]||0)+1}`;
+    const nextTagHint = (() => { const p = latestTag.replace('v','').split('.').map(Number); return `v${p[0]}.${p[1]}.${(p[2]||0)+1}`; })();
 
     const prompt = `You are fixing production bugs reported by real customers of the FrontStores app (a Tauri + React desktop app for Indian shop owners).
 
@@ -1094,21 +1172,25 @@ Your tasks — do them IN ORDER, no skipping:
 2. Fix each bug. Tag every code change with // [apptype] [all tenants]
 3. Run: cd "${PROJECT_DIR}" && npx tsc --noEmit
 4. If TypeScript check passes, commit: git add -A && git commit -m "fix: auto-fix production errors [all apps] [all tenants] - Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
-5. Create and push tag: git tag ${nextTag} && git push origin main && git push origin ${nextTag}
-6. After everything is done, output this EXACT line at the very end (replace placeholders):
-AUTOFIX_RESULT:{"fixed":["brief description of fix 1","fix 2"],"version":"${nextTag}","count":N}
+5. IMPORTANT — compute the deploy version at THIS EXACT MOMENT to avoid conflicts:
+   Run: LATEST_TAG=$(git -C "${PROJECT_DIR}" tag --sort=-v:refname | head -1)
+   Increment the patch by 1 (e.g. v1.0.70→v1.0.71, v1.0.71→v1.0.72, v1.0.72→v1.0.73)
+   Then: git tag $NEXT_TAG && git push origin main && git push origin $NEXT_TAG
+   Only deploy if there are actual code changes (git diff HEAD~1 is non-empty)
+6. Output this EXACT line at the very end (use the ACTUAL tag you pushed):
+AUTOFIX_RESULT:{"fixed":["description of fix 1","fix 2"],"version":"REPLACE_WITH_ACTUAL_TAG","count":N}
 
 Rules:
-- Fix real bugs only — don't refactor or change things that aren't causing errors
-- If an error is a data/user issue (not a code bug), still note it but skip it
-- Run tsc check and fix any TypeScript errors before committing
-- If nothing to fix (all user-side issues), output: AUTOFIX_RESULT:{"fixed":[],"version":"${latestTag}","count":0,"note":"All errors are user/data issues, no code changes needed"}`;
+- Fix real bugs only — no refactoring or cleanup beyond what's needed
+- If a bug is a data/user issue (not code), note it but skip the fix
+- Run tsc check and fix TypeScript errors before committing
+- If nothing to fix: output AUTOFIX_RESULT:{"fixed":[],"version":"${latestTag}","count":0,"note":"All errors are user/data issues"}`;
 
     // Init status
     const status = {
       status: 'running',
       started_at: new Date().toISOString(),
-      log: [`🚀 Starting auto-fix for ${uniqueErrors.length} unique errors...`, `📦 Target deploy: ${nextTag}`],
+      log: [`🚀 Starting auto-fix for ${uniqueErrors.length} unique errors...`, `📦 Current latest tag: ${latestTag} → next will be ${nextTagHint} (computed dynamically at deploy time)`],
       result: null,
       pid: null,
     };
@@ -1194,7 +1276,7 @@ Rules:
       }
     });
 
-    json(res, { ok: true, started: true, target_version: nextTag }); return;
+    json(res, { ok: true, started: true, target_version: nextTagHint + ' (computed dynamically at deploy time)' }); return;
   }
 
   res.writeHead(404); res.end('Not found');

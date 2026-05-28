@@ -1,5 +1,6 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { SwitchAppModal } from '@/modules/switch/SwitchAppModal';
 import { setAINavigator } from '@/lib/voice/aiNavigator';
 import {
   LayoutDashboard,
@@ -203,6 +204,7 @@ const CARWASH_NAV_ITEMS = [
 export function AppLayout() {
   const { config, setAuthenticated } = useAppStore();
   const navigate = useNavigate();
+  const [showSwitchModal, setShowSwitchModal] = useState(false);
   // pick correct nav based on shop type
   const activeNavItems =
     config?.shop_type === 'restaurant' ? RESTAURANT_NAV_ITEMS :
@@ -326,6 +328,16 @@ export function AppLayout() {
               </p>
             </div>
             <button
+              onClick={() => setShowSwitchModal(true)}
+              title="Switch App"
+              className="flex-shrink-0 p-1.5 rounded-lg transition-colors text-xs font-bold"
+              style={{ color: 'var(--text-tertiary)', background: 'var(--surface-2)', borderRadius: 8, padding: '4px 7px' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--accent)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-tertiary)'; }}
+            >
+              ⊕
+            </button>
+            <button
               onClick={() => setAuthenticated(false)}
               title="Lock / Sign out"
               className="flex-shrink-0 p-1.5 rounded-lg transition-colors"
@@ -393,6 +405,8 @@ export function AppLayout() {
       {/* Voice assistants — shop apps get VoiceAssistant, StudyMate gets StudyVoiceAssistant */}
       {config?.shop_type !== 'study' && <VoiceAssistant />}
       {config?.shop_type === 'study'  && <StudyVoiceAssistant />}
+      {/* [core] [all tenants] — Switch App modal */}
+      {showSwitchModal && <SwitchAppModal onClose={() => setShowSwitchModal(false)} />}
     </div>
   );
 }

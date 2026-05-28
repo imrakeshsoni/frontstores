@@ -26,7 +26,8 @@ export interface AppConfig {
 
 export async function getAppConfig(): Promise<AppConfig | null> {
   const db = await getDb();
-  const rows = await db.select<any[]>('SELECT * FROM app_config LIMIT 1');
+  // is_active added in migration 0026 — fall back to LIMIT 1 for older DBs
+  const rows = await db.select<any[]>('SELECT * FROM app_config WHERE is_active=1 OR is_active IS NULL ORDER BY is_active DESC LIMIT 1');
   if (rows.length === 0) return null;
   const r = rows[0];
   return {

@@ -560,6 +560,7 @@
           <button class="filter-btn"        id="f-expiring" onclick="setFilter('expiring')">Expiring</button>
           <button class="filter-btn"        id="f-expired"  onclick="setFilter('expired')">Expired</button>
           <button class="filter-btn"        id="f-frozen"   onclick="setFilter('frozen')">Frozen</button>
+          <button class="filter-btn"        id="f-switch"   onclick="setFilter('switch')" style="border-color:rgba(167,139,250,.4);color:#a78bfa">🔄 Switch Requests</button>
           <button class="export-btn" onclick="exportCSV()">⬇ Export CSV</button>
         </div>
 
@@ -948,6 +949,7 @@ function renderCustomers() {
   const q = document.getElementById('search').value.toLowerCase();
   let list = allCustomers.filter(c => {
     const st = subStatus(c);
+    if (filter === 'switch') return !!c.switch_request && st === 'pending';
     if (filter !== 'all' && st !== filter) return false;
     if (typeFilter !== 'all' && c.shop_type !== typeFilter) return false;
     if (!q) return true;
@@ -961,7 +963,8 @@ function renderCustomers() {
     const icon = ICONS[c.shop_type]||'🏪';
     const reg = c.registered_at ? new Date(c.registered_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : '—';
     let badge, bar='';
-    if (st==='pending')  badge=`<span class="badge" style="background:rgba(167,139,250,.15);color:#a78bfa;border:1px solid rgba(167,139,250,.3)">⏳ Pending</span>`;
+    const isSwitchReq = st==='pending' && c.switch_request;
+    if (st==='pending')  badge=`<span class="badge" style="background:rgba(167,139,250,.15);color:#a78bfa;border:1px solid rgba(167,139,250,.3)">${isSwitchReq?'🔄 Switch Request':'⏳ Pending'}</span>`;
     else if (st==='active')   { badge=`<span class="badge badge-active">✓ ${d}d left</span>`; bar=`<div class="days-bar"><div class="days-fill" style="width:${Math.min(100,(d/30)*100)}%;background:var(--green)"></div></div>`; }
     else if (st==='expiring') { badge=`<span class="badge badge-expiring">⚠ ${d}d left</span>`; bar=`<div class="days-bar"><div class="days-fill" style="width:${Math.min(100,(d/30)*100)}%;background:var(--gold)"></div></div>`; }
     else if (st==='expired')  badge=`<span class="badge badge-expired">✕ Expired</span>`;
@@ -1062,6 +1065,14 @@ function renderPanel(c) {
       <div class="dp-label">Registered</div><div class="dp-value">${c.registered_at?new Date(c.registered_at).toLocaleString('en-IN'):'—'}</div>
       <div class="dp-label">Expires</div><div class="dp-value">${escHtml(c.expires_at||'—')}</div>
     </div>
+    ${c.switch_request ? `
+    <div class="dp-section" style="background:rgba(167,139,250,.08);border-radius:12px;padding:14px;margin-top:16px;border:1px solid rgba(167,139,250,.2)">
+      <div style="font-size:13px;font-weight:700;color:#a78bfa;margin-bottom:8px">🔄 App Switch Request</div>
+      <div class="dp-label">Wants to use</div><div class="dp-value">${escHtml(LABELS[c.shop_type]||c.shop_type)} ${ICONS[c.shop_type]||'🏪'}</div>
+      <div class="dp-label">From account</div><div class="dp-value" style="font-family:monospace;font-size:11px">${escHtml(c.switch_request.from_tenant_id||'—')}</div>
+      <div class="dp-label">Requested</div><div class="dp-value">${c.switch_request.requested_at?new Date(c.switch_request.requested_at).toLocaleString('en-IN'):'—'}</div>
+      <div style="margin-top:10px;font-size:12px;color:var(--muted)">Approving will activate this app for this owner. Their data will be separate from their existing app.</div>
+    </div>` : ''}
 
     <div class="dp-section">
       <div class="contact-row">
