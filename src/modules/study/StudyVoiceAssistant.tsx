@@ -1,10 +1,22 @@
-// [study] [all tenants] — StudyMate voice assistant
-// Heart voice (Kokoro TTS), persistent mic, concise AI answers
+// [study] [all tenants] — StudyMate voice assistant — draggable, heart voice, persistent mic
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Mic, MicOff, Volume2 } from 'lucide-react';
+import { Mic, Volume2 } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { speakText, stopSpeaking } from '@/lib/voice/shopAIService';
+
+const POS_KEY = 'studymate_voice_pos';
+const BTN_SIZE = 56;
+
+function getSavedPos(): { x: number; y: number } {
+  try {
+    const s = localStorage.getItem(POS_KEY);
+    if (s) return JSON.parse(s);
+  } catch {}
+  return { x: window.innerWidth - BTN_SIZE - 24, y: window.innerHeight - BTN_SIZE - 24 };
+}
+
+function clamp(val: number, min: number, max: number) { return Math.max(min, Math.min(max, val)); }
 
 const SERVER  = 'https://update.frontstores.com';
 const VOICE   = 'heart';
@@ -62,12 +74,57 @@ export function StudyVoiceAssistant() {
   const [showBubble, setShowBubble] = useState(false);
   const [error, setError]           = useState('');
 
-  const micOnRef   = useRef(false);
+  const micOnRef    = useRef(false);
   const speakingRef = useRef(false);
-  const recRef     = useRef<MediaRecorder | null>(null);
-  const streamRef  = useRef<MediaStream | null>(null);
-  const historyRef = useRef<{ role: 'user' | 'assistant'; content: string }[]>([]);
+  const recRef      = useRef<MediaRecorder | null>(null);
+  const streamRef   = useRef<MediaStream | null>(null);
+  const historyRef  = useRef<{ role: 'user' | 'assistant'; content: string }[]>([]);
   const bubbleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Drag state ───────────────────────────────────────────────────────────
+  const [pos, setPos]       = useState<{ x: number; y: number }>(getSavedPos);
+  const posRef              = useRef(pos);
+  const dragInfo            = useRef({ active: false, startMX: 0, startMY: 0, startX: 0, startY: 0, moved: false });
+
+  function onDragStart(clientX: number, clientY: number) {
+    dragInfo.current = { active: true, startMX: clientX, startMY: clientY, startX: posRef.current.x, startY: posRef.current.y, moved: false };
+  }
+
+  function onDragMove(clientX: number, clientY: number) {
+    if (!dragInfo.current.active) return;
+    const dx = clientX - dragInfo.current.startMX;
+    const dy = clientY - dragInfo.current.startMY;
+    if (!dragInfo.current.moved && Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+    dragInfo.current.moved = true;
+    const newX = clamp(dragInfo.current.startX + dx, 0, window.innerWidth  - BTN_SIZE);
+    const newY = clamp(dragInfo.current.startY + dy, 0, window.innerHeight - BTN_SIZE);
+    posRef.current = { x: newX, y: newY };
+    setPos({ x: newX, y: newY });
+  }
+
+  function onDragEnd() {
+    if (!dragInfo.current.active) return;
+    dragInfo.current.active = false;
+    localStorage.setItem(POS_KEY, JSON.stringify(posRef.current));
+  }
+
+  // Attach global mouse/touch listeners for drag
+  useEffect(() => {
+    function onMouseMove(e: MouseEvent) { onDragMove(e.clientX, e.clientY); }
+    function onMouseUp()  { onDragEnd(); }
+    function onTouchMove(e: TouchEvent) { if (e.touches[0]) onDragMove(e.touches[0].clientX, e.touches[0].clientY); }
+    function onTouchEnd() { onDragEnd(); }
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup',   onMouseUp);
+    window.addEventListener('touchmove', onTouchMove, { passive: true });
+    window.addEventListener('touchend',  onTouchEnd);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup',   onMouseUp);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend',  onTouchEnd);
+    };
+  }, []);
 
   // cleanup on unmount
   useEffect(() => () => {
@@ -217,14 +274,20 @@ export function StudyVoiceAssistant() {
 
   const isActive = micOnRef.current || status !== 'idle';
 
+  // Decide bubble position: above button if enough space, else below
+  const bubbleAbove = pos.y > 160;
+
   return createPortal(
-    <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999 }}>
+    <div style={{ position: 'fixed', left: pos.x, top: pos.y, zIndex: 9999, userSelect: 'none' }}>
       {/* Answer bubble */}
       {showBubble && (lastQ || lastA) && (
         <div
           style={{
-            position: 'absolute', bottom: '72px', right: 0,
-            width: '280px', borderRadius: '16px', padding: '14px',
+            position: 'absolute',
+            [bubbleAbove ? 'bottom' : 'top']: bubbleAbove ? (BTN_SIZE + 10) : (BTN_SIZE + 10),
+            right: pos.x > window.innerWidth / 2 ? 0 : 'auto',
+            left:  pos.x > window.innerWidth / 2 ? 'auto' : 0,
+            width: '270px', borderRadius: '16px', padding: '14px',
             background: 'var(--surface, #1a3352)',
             border: `1px solid ${btnColor}30`,
             boxShadow: `0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px ${btnColor}20`,
@@ -267,19 +330,22 @@ export function StudyVoiceAssistant() {
         </div>
       )}
 
-      {/* Main mic button */}
+      {/* Main mic button — drag to move, click to toggle mic */}
       <button
-        onClick={toggleMic}
-        title={isActive ? 'Click to stop voice' : 'Click to talk to AI'}
+        onMouseDown={e => { e.preventDefault(); onDragStart(e.clientX, e.clientY); }}
+        onTouchStart={e => { if (e.touches[0]) onDragStart(e.touches[0].clientX, e.touches[0].clientY); }}
+        onClick={() => { if (!dragInfo.current.moved) toggleMic(); }}
+        title={isActive ? 'Click to stop · Drag to move' : 'Click to talk · Drag to move'}
         style={{
-          width: '56px', height: '56px', borderRadius: '50%',
+          width: `${BTN_SIZE}px`, height: `${BTN_SIZE}px`, borderRadius: '50%',
           background: btnColor,
-          border: 'none', cursor: 'pointer',
+          border: 'none',
+          cursor: dragInfo.current.active ? 'grabbing' : 'grab',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: isActive
             ? `0 0 0 6px ${btnColor}30, 0 0 0 12px ${btnColor}15, 0 6px 20px rgba(0,0,0,0.4)`
             : `0 4px 16px rgba(0,0,0,0.3)`,
-          transition: 'all 0.2s ease',
+          transition: 'box-shadow 0.2s ease, background 0.2s ease',
           transform: status === 'listening' ? 'scale(1.08)' : 'scale(1)',
           position: 'relative',
         }}
