@@ -295,6 +295,53 @@ const publicServer = http.createServer(async (req, res) => {
     return;
   }
 
+  // POST /ai/study/test — [study] generate mock test MCQs via Ollama
+  if (req.method === 'POST' && pathname === '/ai/study/test') {
+    if (rateLimit(req, res, 'ai-study-test', 10, 60 * 1000)) return;
+    const body = await readBody(req);
+    try {
+      const { tenant_id, subject, chapter, count, class_grade } = JSON.parse(body);
+      if (!tenant_id || !subject || !chapter) { res.writeHead(400); res.end('Missing fields'); return; }
+      const prompt = `Generate exactly ${count || 10} multiple choice questions for a student${class_grade ? ` in class ${class_grade}` : ''} on the topic: "${sanitize(chapter, 200)}" in subject: "${sanitize(subject, 100)}".
+Return ONLY a valid JSON array with exactly ${count || 10} objects. Each object must have these exact keys:
+{"question_no":(number),"question":"...","option_a":"...","option_b":"...","option_c":"...","option_d":"...","correct_answer":"A" or "B" or "C" or "D","explanation":"..."}
+Mix easy, medium, and hard questions. Return ONLY the JSON array, no other text.`;
+      const ollamaRes = await fetch('http://localhost:11434/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'dolphin3', messages: [{ role: 'system', content: 'You are a test generator. Return only valid JSON arrays, no markdown, no code blocks.' }, { role: 'user', content: prompt }], stream: false, options: { temperature: 0.4, num_predict: 4096 } }),
+      });
+      if (!ollamaRes.ok) { res.writeHead(503); res.end(JSON.stringify({ error: 'AI unavailable' })); return; }
+      const data = await ollamaRes.json();
+      json(res, { ok: true, content: data.message?.content || '' });
+    } catch (e) { console.error('study/test error:', e); res.writeHead(503); res.end(JSON.stringify({ error: 'AI not available' })); }
+    return;
+  }
+
+  // POST /ai/study/flashcards — [study] generate flashcards from notes via Ollama
+  if (req.method === 'POST' && pathname === '/ai/study/flashcards') {
+    if (rateLimit(req, res, 'ai-study-fc', 10, 60 * 1000)) return;
+    const body = await readBody(req);
+    try {
+      const { tenant_id, notes, subject } = JSON.parse(body);
+      if (!tenant_id || !notes) { res.writeHead(400); res.end('Missing fields'); return; }
+      const prompt = `Read the following study notes and create flashcards from them.${subject ? `\nSubject: ${sanitize(subject, 100)}` : ''}
+Notes:\n${sanitize(notes, 4000)}
+Return ONLY a valid JSON array of flashcard objects. Each object must have:
+{"front":"question or key term","back":"answer or definition"}
+Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no other text.`;
+      const ollamaRes = await fetch('http://localhost:11434/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'dolphin3', messages: [{ role: 'system', content: 'You are a flashcard generator. Return only valid JSON arrays, no markdown, no code blocks.' }, { role: 'user', content: prompt }], stream: false, options: { temperature: 0.3, num_predict: 2048 } }),
+      });
+      if (!ollamaRes.ok) { res.writeHead(503); res.end(JSON.stringify({ error: 'AI unavailable' })); return; }
+      const data = await ollamaRes.json();
+      json(res, { ok: true, content: data.message?.content || '' });
+    } catch (e) { console.error('study/flashcards error:', e); res.writeHead(503); res.end(JSON.stringify({ error: 'AI not available' })); }
+    return;
+  }
+
   // POST /ai/tts — Kokoro TTS proxy (proxies to local Kokoro server on port 8880)
   // Rate limit: 60 per minute per IP
   if (req.method === 'POST' && pathname === '/ai/tts') {

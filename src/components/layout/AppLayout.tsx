@@ -34,6 +34,9 @@ import {
   Sparkles,
   HeartHandshake,
   Scissors,
+  Brain,
+  FlameIcon,
+  GraduationCap,
 } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { getShopTypeLabel } from '@/lib/shop/shopType';
@@ -100,6 +103,17 @@ const CLINIC_NAV_ITEMS = [
   { to: '/settings',            icon: Settings,        label: 'Settings',        iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
 
+// [study] [all tenants]
+const STUDY_NAV_ITEMS = [
+  { to: '/study/dashboard', icon: LayoutDashboard, label: 'Dashboard',     iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/study/ask',       icon: Brain,           label: 'Ask AI',        iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/study/mock-tests',icon: ClipboardList,   label: 'Mock Tests',    iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/study/flashcards',icon: BookOpen,        label: 'Flashcards',    iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/study/tracker',   icon: FlameIcon,       label: 'Study Tracker', iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/study/parents',   icon: GraduationCap,   label: 'Parent View',   iconBg: '#fce7f3', iconColor: '#db2777' },
+  { to: '/study/setup',     icon: Settings,        label: 'Profile',       iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
 // [beauty] [all tenants]
 const BEAUTY_NAV_ITEMS = [
   { to: '/beauty/dashboard',     icon: LayoutDashboard, label: 'Dashboard',      iconBg: '#fce7f3', iconColor: '#db2777' },
@@ -136,6 +150,7 @@ export function AppLayout() {
     config?.shop_type === 'carwash'    ? CARWASH_NAV_ITEMS :
     config?.shop_type === 'clinic'     ? CLINIC_NAV_ITEMS :
     config?.shop_type === 'beauty'     ? BEAUTY_NAV_ITEMS :
+    config?.shop_type === 'study'      ? STUDY_NAV_ITEMS :
     NAV_ITEMS;
 
   useEffect(() => {

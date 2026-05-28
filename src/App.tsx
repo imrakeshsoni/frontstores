@@ -49,6 +49,15 @@ const IPDPage                 = lazy(() => import('@/modules/clinic/IPDPage').th
 const BillingPage             = lazy(() => import('@/modules/clinic/BillingPage').then(m => ({ default: m.BillingPage })));
 const ClinicReportsPage       = lazy(() => import('@/modules/clinic/ClinicReportsPage').then(m => ({ default: m.ClinicReportsPage })));
 
+// [study] [all tenants]
+const StudyDashboard          = lazy(() => import('@/modules/study/StudyDashboard').then(m => ({ default: m.StudyDashboard })));
+const AskAIPage               = lazy(() => import('@/modules/study/AskAIPage').then(m => ({ default: m.AskAIPage })));
+const MockTestPage            = lazy(() => import('@/modules/study/MockTestPage').then(m => ({ default: m.MockTestPage })));
+const FlashcardsPage          = lazy(() => import('@/modules/study/FlashcardsPage').then(m => ({ default: m.FlashcardsPage })));
+const StudyTrackerPage        = lazy(() => import('@/modules/study/StudyTrackerPage').then(m => ({ default: m.StudyTrackerPage })));
+const ParentReportPage        = lazy(() => import('@/modules/study/ParentReportPage').then(m => ({ default: m.ParentReportPage })));
+const StudySetupPage          = lazy(() => import('@/modules/study/StudySetupPage').then(m => ({ default: m.StudySetupPage })));
+
 // [beauty] [all tenants]
 const BeautyDashboard         = lazy(() => import('@/modules/beauty/BeautyDashboard').then(m => ({ default: m.BeautyDashboard })));
 const BeautyServicesPage      = lazy(() => import('@/modules/beauty/BeautyServicesPage').then(m => ({ default: m.BeautyServicesPage })));
@@ -111,6 +120,7 @@ export default function App() {
               config?.shop_type === 'carwash'    ? '/carwash/dashboard' :
               config?.shop_type === 'clinic'     ? '/clinic/dashboard' :
               config?.shop_type === 'beauty'     ? '/beauty/dashboard' :
+              config?.shop_type === 'study'      ? '/study/dashboard' :
               '/dashboard'
             } replace />} />
             <Route path="dashboard"  element={<Dashboard />} />
@@ -150,6 +160,15 @@ export default function App() {
             <Route path="clinic/ipd"          element={<IPDPage />} />
             <Route path="clinic/billing"      element={<BillingPage />} />
             <Route path="clinic/reports"      element={<ClinicReportsPage />} />
+
+            {/* [study] [all tenants] */}
+            <Route path="study/dashboard"  element={<StudyDashboard />} />
+            <Route path="study/ask"        element={<AskAIPage />} />
+            <Route path="study/mock-tests" element={<MockTestPage />} />
+            <Route path="study/flashcards" element={<FlashcardsPage />} />
+            <Route path="study/tracker"    element={<StudyTrackerPage />} />
+            <Route path="study/parents"    element={<ParentReportPage />} />
+            <Route path="study/setup"      element={<StudySetupPage />} />
 
             {/* [beauty] [all tenants] */}
             <Route path="beauty/dashboard"              element={<BeautyDashboard />} />

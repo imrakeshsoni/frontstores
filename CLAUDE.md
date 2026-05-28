@@ -28,10 +28,11 @@ Which app are you working on?
 4) Car Wash / Detailing (carwash)
 5) Hospital / Clinic (clinic)
 6) Beauty Parlor / Salon (beauty)
-7) Core / Shared (affects all apps)
-8) Website — frontstores.com
-9) Admin Panel (tools/update-server, admin-app)
-10) ➕ Create new app
+7) StudyMate — Student App (study)
+8) Core / Shared (affects all apps)
+9) Website — frontstores.com
+10) Admin Panel (tools/update-server, admin-app)
+11) ➕ Create new app
 ```
 
 ---
@@ -81,6 +82,7 @@ frontstores.com hosts multiple separate apps. Each app is a different downloadab
 | Car Wash | frontstores.com/carwash | `carwash` | ✅ Active |
 | Hospital / Clinic | frontstores.com/clinic | `clinic` | ✅ Active |
 | Beauty Parlor / Salon | frontstores.com/beauty | `beauty` | ✅ Active |
+| StudyMate (Student App) | frontstores.com/study | `study` | ✅ Active |
 
 All apps are built from this single codebase. The `shopType` field in `app_config` controls which features are visible.
 

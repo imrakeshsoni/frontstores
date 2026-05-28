@@ -553,6 +553,31 @@
         </div>
       </div>
 
+      <!-- ✅ LIVE: StudyMate -->
+      <div class="store-card">
+        <div class="store-card-top">
+          <div class="store-icon">📚</div>
+          <span class="live-badge">Live</span>
+        </div>
+        <div class="store-name">StudyMate — Student App</div>
+        <div class="store-desc">AI-powered offline study companion for school and college students. Ask your AI tutor anything, generate mock tests, create flashcards from notes, track study habits, and give parents a weekly report. Works offline after first use.</div>
+        <div class="store-features">
+          <div class="sf">AI tutor — explains concepts step by step</div>
+          <div class="sf">Auto-generate mock tests for any chapter</div>
+          <div class="sf">Flashcards from your notes (AI-powered)</div>
+          <div class="sf">Study streak + daily time tracker</div>
+          <div class="sf">PIN-protected parent report</div>
+          <div class="sf">Offline — all Q&amp;A saved locally</div>
+        </div>
+        <div class="store-dl">
+          <a href="#download" class="dl-btn-win" id="study-win-btn">⬇️ Windows (.exe)</a>
+          <div class="dl-mac-links">
+            <a href="#" id="study-mac-arm-btn">🍎 Mac M1/M2/M3</a>
+            <a href="#" id="study-mac-intel-btn">🍎 Mac Intel</a>
+          </div>
+        </div>
+      </div>
+
       <!-- ✅ LIVE: Beauty Parlor -->
       <div class="store-card">
         <div class="store-card-top">
@@ -933,15 +958,15 @@
 
       if (winUrl) {
         document.getElementById('dl-win').href = winUrl;
-        ['medical-win-btn', 'beauty-win-btn'].forEach(id => { const b = document.getElementById(id); if (b) b.href = winUrl; });
+        ['medical-win-btn', 'beauty-win-btn', 'study-win-btn'].forEach(id => { const b = document.getElementById(id); if (b) b.href = winUrl; });
       }
       if (macArm) {
         document.getElementById('dl-mac-arm').href = macArm;
-        ['medical-mac-arm-btn', 'beauty-mac-arm-btn'].forEach(id => { const b = document.getElementById(id); if (b) b.href = macArm; });
+        ['medical-mac-arm-btn', 'beauty-mac-arm-btn', 'study-mac-arm-btn'].forEach(id => { const b = document.getElementById(id); if (b) b.href = macArm; });
       }
       if (macIntel) {
         document.getElementById('dl-mac-intel').href = macIntel;
-        ['medical-mac-intel-btn', 'beauty-mac-intel-btn'].forEach(id => { const b = document.getElementById(id); if (b) b.href = macIntel; });
+        ['medical-mac-intel-btn', 'beauty-mac-intel-btn', 'study-mac-intel-btn'].forEach(id => { const b = document.getElementById(id); if (b) b.href = macIntel; });
       }
       document.getElementById('dl-version').textContent = `Latest: ${data.tag_name} · Free 30-day trial`;
     } catch {

@@ -15,6 +15,7 @@ const SHOP_TYPES = [
   { value: 'carwash',    label: 'Car Wash / Detailing', icon: '🚗', desc: 'Job cards, live queue, memberships, WhatsApp alerts' },
   { value: 'clinic',     label: 'Hospital / Clinic',    icon: '🏥', desc: 'OPD tokens, Rx, lab, IPD beds, pharmacy, billing' },
   { value: 'beauty',     label: 'Beauty Parlor / Salon', icon: '💅', desc: 'Appointments, services, staff, memberships, billing' },
+  { value: 'study',      label: 'StudyMate — Student App', icon: '📚', desc: 'AI tutor, mock tests, flashcards, study tracker, parent report' },
 ];
 
 interface FormData {
