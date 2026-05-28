@@ -1,5 +1,5 @@
 // [study] [all tenants]
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAppStore } from '@/app/store/app.store';
@@ -20,7 +20,10 @@ export function StudySetupPage() {
   const [school, setSchool]   = useState('');
   const [subjects, setSubjects] = useState<string[]>([]);
   const [activeThemeId, setActiveThemeId] = useState(getSavedThemeId);
-  const [activeCategory, setActiveCategory] = useState('Ocean & Sky');
+  const [activeCategory, setActiveCategory] = useState('Night');
+  const [aiName, setAiName]   = useState('StudyMate');
+  const [aiAvatar, setAiAvatar] = useState<string | null>(null);
+  const avatarInputRef = React.useRef<HTMLInputElement>(null);
 
   const { data: config } = useQuery({
     queryKey: ['study-config', tenantId],
@@ -34,6 +37,8 @@ export function StudySetupPage() {
       setGrade(config.class_grade ?? '');
       setSchool(config.school ?? '');
       setSubjects(config.subjects ? config.subjects.split(',') : []);
+      setAiName(config.ai_name ?? 'StudyMate');
+      setAiAvatar(config.ai_avatar ?? null);
     }
   }, [config]);
 
@@ -43,6 +48,8 @@ export function StudySetupPage() {
       class_grade:  grade || null,
       school:       school.trim() || null,
       subjects:     subjects.length ? subjects.join(',') : null,
+      ai_name:      aiName.trim() || 'StudyMate',
+      ai_avatar:    aiAvatar,
     }),
     onSuccess: () => { toast.success('Profile saved!'); qc.invalidateQueries({ queryKey: ['study-config'] }); },
     onError: (e: any) => toast.error(e?.message ?? 'Save failed'),
@@ -133,6 +140,64 @@ export function StudySetupPage() {
           <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
             {STUDY_THEMES.find(t => t.id === activeThemeId)?.name ?? 'Sky Blue'} — applied
           </p>
+        </div>
+      </div>
+
+      {/* ── AI Persona ───────────────────────────────────────────────────── */}
+      <div>
+        <div className="mb-4">
+          <p className="text-xs font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-tertiary)' }}>Voice Assistant</p>
+          <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Your AI Tutor</h2>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>Give your AI a name and photo. It will remember and use both.</p>
+        </div>
+
+        <div className="flex items-start gap-5 max-w-md">
+          {/* Avatar picker */}
+          <div className="flex-shrink-0">
+            <button onClick={() => avatarInputRef.current?.click()}
+              className="relative group"
+              style={{ width: '80px', height: '80px', borderRadius: '50%', overflow: 'hidden',
+                border: `2px solid var(--accent)`, display: 'block', cursor: 'pointer' }}>
+              {aiAvatar ? (
+                <img src={aiAvatar} alt="AI avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <div style={{ width: '100%', height: '100%', background: 'var(--surface-2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }}>
+                  🤖
+                </div>
+              )}
+              {/* Overlay on hover */}
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                style={{ background: 'rgba(0,0,0,0.55)', fontSize: '11px', color: 'white', fontWeight: 600 }}>
+                Change
+              </div>
+            </button>
+            {aiAvatar && (
+              <button onClick={() => setAiAvatar(null)}
+                className="mt-1 w-full text-center text-xs"
+                style={{ color: 'var(--text-tertiary)' }}>Remove</button>
+            )}
+            <input ref={avatarInputRef} type="file" accept="image/*" className="hidden"
+              onChange={e => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                const reader = new FileReader();
+                reader.onload = () => setAiAvatar(reader.result as string);
+                reader.readAsDataURL(f);
+                e.target.value = '';
+              }} />
+          </div>
+
+          {/* AI name */}
+          <div className="flex-1">
+            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>AI Name</label>
+            <input value={aiName} onChange={e => setAiName(e.target.value)} placeholder="StudyMate"
+              className="w-full rounded-xl border px-3 py-2.5 text-sm outline-none"
+              style={{ borderColor: 'var(--surface-border)', background: 'var(--surface)', color: 'var(--text-primary)' }} />
+            <p className="text-xs mt-1.5" style={{ color: 'var(--text-tertiary)' }}>
+              The AI will call itself this name and remember it across every conversation.
+            </p>
+          </div>
         </div>
       </div>
 

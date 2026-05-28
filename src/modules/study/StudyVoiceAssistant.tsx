@@ -1,9 +1,48 @@
-// [study] [all tenants] — StudyMate voice assistant — draggable, heart voice, persistent mic
+// [study] [all tenants] — StudyMate voice assistant — draggable, custom AI avatar, heart voice
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Mic, Volume2 } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { speakText, stopSpeaking } from '@/lib/voice/shopAIService';
+import { useQuery } from '@tanstack/react-query';
+import { getStudyConfig } from '@/lib/db/study';
+
+// Default AI avatar SVG — shown when no custom image is set
+function DefaultAIFace({ size = 48, color = '#7dd3fc' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="face-bg" cx="50%" cy="40%" r="60%">
+          <stop offset="0%" stopColor={color} stopOpacity="0.9" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.4" />
+        </radialGradient>
+        <radialGradient id="face-glow" cx="40%" cy="35%" r="50%">
+          <stop offset="0%" stopColor="white" stopOpacity="0.6" />
+          <stop offset="100%" stopColor="white" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      {/* Outer ring */}
+      <circle cx="24" cy="24" r="23" stroke={color} strokeWidth="1" strokeOpacity="0.4" />
+      {/* Face */}
+      <circle cx="24" cy="24" r="19" fill="url(#face-bg)" />
+      <circle cx="24" cy="24" r="19" fill="url(#face-glow)" />
+      {/* Eyes */}
+      <ellipse cx="17" cy="22" rx="3.5" ry="2.5" fill="white" fillOpacity="0.95" />
+      <ellipse cx="17" cy="22" rx="1.8" ry="1.4" fill={color} />
+      <circle cx="16.2" cy="21.3" r="0.7" fill="white" />
+      <ellipse cx="31" cy="22" rx="3.5" ry="2.5" fill="white" fillOpacity="0.95" />
+      <ellipse cx="31" cy="22" rx="1.8" ry="1.4" fill={color} />
+      <circle cx="30.2" cy="21.3" r="0.7" fill="white" />
+      {/* Smile */}
+      <path d="M17 29 Q24 33 31 29" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round" strokeOpacity="0.9" />
+      {/* Antenna */}
+      <line x1="24" y1="5" x2="24" y2="10" stroke={color} strokeWidth="1.5" strokeOpacity="0.7" />
+      <circle cx="24" cy="4" r="1.8" fill={color} fillOpacity="0.8" />
+      {/* Sparkle */}
+      <path d="M38 7 L38.4 8.6 L40 9 L38.4 9.4 L38 11 L37.6 9.4 L36 9 L37.6 8.6Z" fill="white" fillOpacity="0.8" />
+    </svg>
+  );
+}
 
 const POS_KEY = 'studymate_voice_pos';
 const BTN_SIZE = 56;
@@ -26,20 +65,27 @@ const MAX_DURATION      = 12000; // ms max recording per chunk
 
 type Status = 'idle' | 'listening' | 'thinking' | 'speaking';
 
-const CONCISE_SYSTEM = `You are StudyMate, a friendly voice tutor. Rules:
+function buildSystem(aiName: string, studentName: string | null): string {
+  return `Your name is ${aiName}. You are a friendly voice tutor for ${studentName ? studentName : 'a student'}.
+Rules:
 - Keep every answer SHORT: 2 to 3 spoken sentences maximum.
-- Use simple everyday English, like a friend talking — not a textbook.
+- Use simple everyday English like a friend talking — not a textbook.
 - No lists, no asterisks, no bullet points — just plain spoken sentences.
-- If student asks for more explanation, give a tiny bit more, still brief.
-- Be warm and encouraging. Never make them feel bad for not knowing.`;
+- Address the student by name (${studentName ?? 'friend'}) occasionally to feel personal.
+- If student asks for more explanation, give a bit more but still brief.
+- Be warm and encouraging. Never make them feel bad for not knowing.
+- Always refer to yourself as ${aiName}.`;
+}
 
 async function sendToStudyAI(
   tenantId: string,
   question: string,
-  history: { role: 'user' | 'assistant'; content: string }[]
+  history: { role: 'user' | 'assistant'; content: string }[],
+  aiName: string,
+  studentName: string | null,
 ): Promise<string> {
   const messages = [
-    { role: 'system', content: CONCISE_SYSTEM },
+    { role: 'system', content: buildSystem(aiName, studentName) },
     ...history.slice(-6),
     { role: 'user', content: question },
   ];
@@ -67,6 +113,14 @@ async function transcribe(blob: Blob, mime: string): Promise<string> {
 
 export function StudyVoiceAssistant() {
   const tenantId = useAppStore((s) => s.config?.tenant_id ?? '');
+  const { data: studyConfig } = useQuery({
+    queryKey: ['study-config', tenantId],
+    queryFn:  () => getStudyConfig(tenantId),
+    enabled:  !!tenantId,
+  });
+  const aiName   = studyConfig?.ai_name   ?? 'StudyMate';
+  const aiAvatar = studyConfig?.ai_avatar ?? null;
+  const accent   = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#7dd3fc';
 
   const [status, setStatus]         = useState<Status>('idle');
   const [userText, setUserText]     = useState('');   // what user said (shown while thinking)
@@ -193,7 +247,7 @@ export function StudyVoiceAssistant() {
         openBubble();
         historyRef.current.push({ role: 'user', content: transcript });
 
-        const answer = await sendToStudyAI(tenantId, transcript, historyRef.current);
+        const answer = await sendToStudyAI(tenantId, transcript, historyRef.current, aiName, studyConfig?.student_name ?? null);
         if (!answer) { if (micOnRef.current) startRec(); return; }
 
         historyRef.current.push({ role: 'assistant', content: answer });
@@ -334,7 +388,7 @@ export function StudyVoiceAssistant() {
           {aiText ? (
             <div>
               <p style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em',
-                color: btnColor, marginBottom: '4px', opacity: 0.9 }}>StudyMate</p>
+                color: btnColor, marginBottom: '4px', opacity: 0.9 }}>{aiName}</p>
               <p style={{ fontSize: '13px', color: '#ffffff', lineHeight: 1.55, fontWeight: 500 }}>{aiText}</p>
             </div>
           ) : status === 'thinking' ? (
@@ -405,19 +459,25 @@ export function StudyVoiceAssistant() {
           </>
         )}
 
-        {status === 'idle'      && <Mic size={22} color="#fff" />}
-        {status === 'listening' && <Mic size={22} color="#fff" />}
-        {status === 'thinking'  && (
+        {/* Avatar / AI face */}
+        {status === 'idle' || status === 'speaking' ? (
+          aiAvatar ? (
+            <img src={aiAvatar} alt={aiName}
+              style={{ width: BTN_SIZE, height: BTN_SIZE, borderRadius: '50%', objectFit: 'cover' }} />
+          ) : (
+            <DefaultAIFace size={BTN_SIZE} color={accent} />
+          )
+        ) : status === 'listening' ? (
+          <Mic size={24} color="#fff" />
+        ) : (
+          /* thinking */
           <div style={{ display: 'flex', gap: '3px' }}>
             {[0,1,2].map(i => (
-              <div key={i} style={{
-                width: '5px', height: '5px', borderRadius: '50%', background: '#fff',
-                animation: `bounce 0.8s ease infinite ${i * 0.15}s`,
-              }} />
+              <div key={i} style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#fff',
+                animation: `bounce 0.8s ease infinite ${i*0.15}s` }} />
             ))}
           </div>
         )}
-        {status === 'speaking'  && <Volume2 size={22} color="#fff" />}
       </button>
 
       {/* Inline keyframes */}

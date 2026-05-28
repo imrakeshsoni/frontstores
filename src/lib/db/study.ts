@@ -9,6 +9,8 @@ export interface StudyConfig {
   school: string | null;
   subjects: string | null;
   parent_pin: string | null;
+  ai_name: string | null;
+  ai_avatar: string | null;
 }
 
 export interface StudyConversation {
@@ -98,16 +100,19 @@ export async function saveStudyConfig(tenantId: string, data: Partial<StudyConfi
   const existing = await getStudyConfig(tenantId);
   if (existing) {
     await db.execute(
-      `UPDATE study_config SET student_name=?, class_grade=?, school=?, subjects=?, parent_pin=?, updated_at=? WHERE tenant_id=?`,
+      `UPDATE study_config SET student_name=?, class_grade=?, school=?, subjects=?, parent_pin=?, ai_name=?, ai_avatar=?, updated_at=? WHERE tenant_id=?`,
       [data.student_name ?? existing.student_name, data.class_grade ?? existing.class_grade,
        data.school ?? existing.school, data.subjects ?? existing.subjects,
-       data.parent_pin !== undefined ? data.parent_pin : existing.parent_pin, now(), tenantId]
+       data.parent_pin !== undefined ? data.parent_pin : existing.parent_pin,
+       data.ai_name !== undefined ? data.ai_name : existing.ai_name,
+       data.ai_avatar !== undefined ? data.ai_avatar : existing.ai_avatar,
+       now(), tenantId]
     );
   } else {
     await db.execute(
-      `INSERT INTO study_config (id, tenant_id, student_name, class_grade, school, subjects, parent_pin, created_at, updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?)`,
-      [uuid(), tenantId, data.student_name, data.class_grade, data.school, data.subjects, data.parent_pin, now(), now()]
+      `INSERT INTO study_config (id, tenant_id, student_name, class_grade, school, subjects, parent_pin, ai_name, ai_avatar, created_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+      [uuid(), tenantId, data.student_name, data.class_grade, data.school, data.subjects, data.parent_pin, data.ai_name ?? null, data.ai_avatar ?? null, now(), now()]
     );
   }
 }
