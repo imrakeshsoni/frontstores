@@ -41,6 +41,7 @@ import {
 import { useAppStore } from '@/app/store/app.store';
 import { getShopTypeLabel } from '@/lib/shop/shopType';
 import { VoiceAssistant } from '@/components/voice/VoiceAssistant';
+import { StudyVoiceAssistant } from '@/modules/study/StudyVoiceAssistant';
 
 export const NAV_ITEMS = [
   { to: '/dashboard',       icon: LayoutDashboard, label: 'Dashboard',       iconBg: '#ede9fe', iconColor: '#7c3aed' },
@@ -322,8 +323,9 @@ export function AppLayout() {
         </main>
       </div>
 
-      {/* AI Voice Assistant — all apps except study (has its own Ask AI page) */}
+      {/* Voice assistants — shop apps get VoiceAssistant, StudyMate gets StudyVoiceAssistant */}
       {config?.shop_type !== 'study' && <VoiceAssistant />}
+      {config?.shop_type === 'study'  && <StudyVoiceAssistant />}
     </div>
   );
 }
