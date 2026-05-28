@@ -69,8 +69,8 @@ export function StudyVoiceAssistant() {
   const tenantId = useAppStore((s) => s.config?.tenant_id ?? '');
 
   const [status, setStatus]         = useState<Status>('idle');
-  const [lastQ, setLastQ]           = useState('');
-  const [lastA, setLastA]           = useState('');
+  const [userText, setUserText]     = useState('');   // what user said (shown while thinking)
+  const [aiText, setAiText]         = useState('');   // what AI said (shown while speaking)
   const [showBubble, setShowBubble] = useState(false);
   const [error, setError]           = useState('');
 
@@ -134,10 +134,14 @@ export function StudyVoiceAssistant() {
     streamRef.current?.getTracks().forEach(t => t.stop());
   }, []);
 
-  function showAnswer(q: string, a: string) {
-    setLastQ(q); setLastA(a); setShowBubble(true);
+  function openBubble() {
+    setShowBubble(true);
     if (bubbleTimer.current) clearTimeout(bubbleTimer.current);
-    bubbleTimer.current = setTimeout(() => setShowBubble(false), 18000);
+  }
+
+  function closeBubbleAfter(ms: number) {
+    if (bubbleTimer.current) clearTimeout(bubbleTimer.current);
+    bubbleTimer.current = setTimeout(() => setShowBubble(false), ms);
   }
 
   const startRec = useCallback(async () => {
@@ -183,21 +187,26 @@ export function StudyVoiceAssistant() {
         const transcript = await transcribe(blob, mime);
         if (!transcript) { if (micOnRef.current) startRec(); return; }
 
-        setLastQ(transcript);
+        // Show what user said immediately
+        setUserText(transcript);
+        setAiText('');
+        openBubble();
         historyRef.current.push({ role: 'user', content: transcript });
 
         const answer = await sendToStudyAI(tenantId, transcript, historyRef.current);
         if (!answer) { if (micOnRef.current) startRec(); return; }
 
         historyRef.current.push({ role: 'assistant', content: answer });
-        showAnswer(transcript, answer);
+
+        // Show AI answer in bubble
+        setAiText(answer);
+        closeBubbleAfter(20000);
 
         if (!micOnRef.current) { setStatus('idle'); return; }
         setStatus('speaking');
         speakingRef.current = true;
 
-        // Speak sentence by sentence
-        const sentences = answer.match(/[^.!?]+[.!?]+/g) ?? [answer];
+        const sentences = answer.match(/[^.!?।]+[.!?।]+/g) ?? [answer];
         for (const s of sentences) {
           if (!speakingRef.current || !micOnRef.current) break;
           await speakText(s.trim(), VOICE);
@@ -245,16 +254,20 @@ export function StudyVoiceAssistant() {
 
   function toggleMic() {
     if (micOnRef.current) {
-      // Turn off
       micOnRef.current = false;
       speakingRef.current = false;
       stopSpeaking();
       recRef.current?.stop();
       streamRef.current?.getTracks().forEach(t => t.stop());
       setStatus('idle');
+      setShowBubble(false);
+      setUserText('');
+      setAiText('');
     } else {
-      // Turn on
       micOnRef.current = true;
+      setUserText('');
+      setAiText('');
+      setShowBubble(true);
       startRec();
     }
   }
@@ -280,34 +293,60 @@ export function StudyVoiceAssistant() {
   return createPortal(
     <div style={{ position: 'fixed', left: pos.x, top: pos.y, zIndex: 9999, userSelect: 'none' }}>
       {/* Answer bubble */}
-      {showBubble && (lastQ || lastA) && (
+      {showBubble && (
         <div
           style={{
             position: 'absolute',
-            [bubbleAbove ? 'bottom' : 'top']: bubbleAbove ? (BTN_SIZE + 10) : (BTN_SIZE + 10),
+            [bubbleAbove ? 'bottom' : 'top']: BTN_SIZE + 10,
             right: pos.x > window.innerWidth / 2 ? 0 : 'auto',
             left:  pos.x > window.innerWidth / 2 ? 'auto' : 0,
-            width: '270px', borderRadius: '16px', padding: '14px',
-            background: 'var(--surface, #1a3352)',
-            border: `1px solid ${btnColor}30`,
-            boxShadow: `0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px ${btnColor}20`,
-            animation: 'fadeInUp 0.2s ease',
+            width: '280px', borderRadius: '18px', padding: '14px 16px',
+            background: 'var(--surface, #162a3d)',
+            border: `1px solid ${btnColor}40`,
+            boxShadow: `0 8px 32px rgba(0,0,0,0.45), 0 0 0 1px ${btnColor}25`,
+            animation: 'fadeInUp 0.18s ease',
           }}
         >
-          {lastQ && (
-            <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.55)', marginBottom: '6px', lineHeight: 1.4 }}>
-              💬 {lastQ}
-            </p>
-          )}
-          {lastA && (
-            <p style={{ fontSize: '13px', color: '#ffffff', lineHeight: 1.55, fontWeight: 500 }}>
-              {lastA}
-            </p>
-          )}
+          {/* Close button */}
           <button
             onClick={() => setShowBubble(false)}
-            style={{ position: 'absolute', top: '8px', right: '10px', fontSize: '16px', background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', lineHeight: 1 }}
+            style={{ position: 'absolute', top: '8px', right: '10px', width: '20px', height: '20px',
+              background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%',
+              color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: '13px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >×</button>
+
+          {/* What user said */}
+          {userText && (
+            <div style={{ marginBottom: aiText ? '10px' : 0 }}>
+              <p style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em',
+                color: 'rgba(255,255,255,0.45)', marginBottom: '4px' }}>You said</p>
+              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.85)', lineHeight: 1.45 }}>{userText}</p>
+            </div>
+          )}
+
+          {/* Divider */}
+          {userText && aiText && (
+            <div style={{ height: '1px', background: `${btnColor}25`, margin: '8px 0' }} />
+          )}
+
+          {/* What AI said */}
+          {aiText ? (
+            <div>
+              <p style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em',
+                color: btnColor, marginBottom: '4px', opacity: 0.9 }}>StudyMate</p>
+              <p style={{ fontSize: '13px', color: '#ffffff', lineHeight: 1.55, fontWeight: 500 }}>{aiText}</p>
+            </div>
+          ) : status === 'thinking' ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+              <p style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em',
+                color: btnColor, opacity: 0.9 }}>Thinking</p>
+              <div style={{ display: 'flex', gap: '3px' }}>
+                {[0,1,2].map(i => <div key={i} style={{ width: '4px', height: '4px', borderRadius: '50%',
+                  background: btnColor, animation: `bounce 0.7s ease infinite ${i*0.15}s` }} />)}
+              </div>
+            </div>
+          ) : null}
         </div>
       )}
 
