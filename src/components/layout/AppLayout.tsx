@@ -158,6 +158,14 @@ export function AppLayout() {
     setAINavigator((path) => navigate(path));
   }, [navigate]);
 
+  // [study] [all tenants] — apply midnight purple dark theme for StudyMate
+  useEffect(() => {
+    if (config?.shop_type === 'study') {
+      document.documentElement.classList.add('study-theme');
+      return () => document.documentElement.classList.remove('study-theme');
+    }
+  }, [config?.shop_type]);
+
   useEffect(() => {
     if (config?.shop_type === 'medical') {
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">

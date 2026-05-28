@@ -44,6 +44,45 @@
     --shadow-lg:       0 8px 32px rgba(0, 0, 0, 0.50), 0 2px 8px rgba(0, 0, 0, 0.30);
   }
 
+  /* [study] [all tenants] — Night-friendly midnight purple theme for StudyMate */
+  html.study-theme {
+    color-scheme: dark;
+    --bg:              #0d0c14;
+    --surface:         #161424;
+    --surface-2:       #1f1c30;
+    --surface-border:  rgba(139, 92, 246, 0.18);
+    --text-primary:    #f0eeff;
+    --text-secondary:  #9d97c0;
+    --text-tertiary:   #5d5a7c;
+    --accent:          #a78bfa;
+    --accent-hover:    #8b5cf6;
+    --accent-soft:     rgba(167, 139, 250, 0.15);
+    --accent-ring:     rgba(167, 139, 250, 0.35);
+    --shadow-sm:       0 1px 3px rgba(0, 0, 0, 0.50), 0 1px 2px rgba(0,0,0,0.40);
+    --shadow-md:       0 4px 16px rgba(0, 0, 0, 0.60), 0 1px 4px rgba(0,0,0,0.40);
+    --shadow-lg:       0 8px 32px rgba(0, 0, 0, 0.70), 0 2px 8px rgba(0,0,0,0.50);
+  }
+
+  /* Sidebar gets a subtle gradient glow in study theme */
+  html.study-theme aside {
+    background: linear-gradient(180deg, #1a1730 0%, #161424 100%) !important;
+    border-right-color: rgba(139, 92, 246, 0.2) !important;
+  }
+
+  /* Nav active items get a glowing violet tint */
+  html.study-theme .btn-primary {
+    background: linear-gradient(135deg, #a78bfa, #7c3aed) !important;
+    box-shadow: 0 4px 20px rgba(124, 58, 237, 0.4) !important;
+  }
+
+  /* Inputs get a subtle purple border glow on focus */
+  html.study-theme input:focus,
+  html.study-theme textarea:focus,
+  html.study-theme select:focus {
+    border-color: #a78bfa !important;
+    box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.20) !important;
+  }
+
   * { box-sizing: border-box; }
 
   html { scroll-behavior: smooth; }
