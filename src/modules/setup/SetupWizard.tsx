@@ -16,6 +16,19 @@ const SHOP_TYPES = [
   { value: 'clinic',     label: 'Hospital / Clinic',    icon: '🏥', desc: 'OPD tokens, Rx, lab, IPD beds, pharmacy, billing' },
   { value: 'beauty',     label: 'Beauty Parlor / Salon', icon: '💅', desc: 'Appointments, services, staff, memberships, billing' },
   { value: 'study',      label: 'StudyMate — Student App', icon: '📚', desc: 'AI tutor, mock tests, flashcards, study tracker, parent report' },
+  { value: 'coaching',   label: 'Coaching Institute',      icon: '🎓', desc: 'Students, batches, attendance, fee collection, exams, teachers' },
+  { value: 'gym',        label: 'Gym / Fitness Center',    icon: '💪', desc: 'Members, memberships, check-in, renewals, PT packages, staff' },
+  { value: 'jewellery',  label: 'Jewellery Shop',          icon: '💍', desc: 'Gold rate, inventory, billing, custom orders, repairs' },
+  { value: 'realestate', label: 'Real Estate / PropMate',  icon: '🏠', desc: 'Leads, deals, commissions, site visits, builder projects' },
+];
+
+const RE_ROLES = [
+  { value: 'resale',     label: 'Resale Broker',         icon: '🏘️', desc: 'Buy/sell secondary market properties, manage buyers & sellers' },
+  { value: 'channel',    label: 'Channel Partner',        icon: '🤝', desc: 'Tied to builder projects, earn commission on new flat bookings' },
+  { value: 'individual', label: 'Individual Agent',       icon: '👤', desc: 'Freelancer — take clients, work independently or under a broker' },
+  { value: 'rental',     label: 'Rental Agent',           icon: '🔑', desc: 'Rental leads, agreements, monthly commission tracking' },
+  { value: 'commercial', label: 'Commercial Broker',      icon: '🏢', desc: 'Office/shop/warehouse deals, commercial properties' },
+  { value: 'builder',    label: 'Builder / Developer',    icon: '🏗️', desc: 'List your own projects, track bookings and agent commissions' },
 ];
 
 interface FormData {
@@ -30,6 +43,7 @@ interface FormData {
   pincode: string;
   gstin: string;
   drug_license_no: string;
+  re_role: string;
 }
 
 export function SetupWizard() {
@@ -41,7 +55,7 @@ export function SetupWizard() {
   const [form, setForm] = useState<FormData>({
     shop_type: '', shop_name: '', owner_name: '', phone: '',
     email: '', address_line1: '', city: '', state: '',
-    pincode: '', gstin: '', drug_license_no: '',
+    pincode: '', gstin: '', drug_license_no: '', re_role: 'resale',
   });
 
   // Step 5 — password setup
@@ -82,7 +96,9 @@ export function SetupWizard() {
   }
 
   const isStudy = form.shop_type === 'study';
+  const isRealEstate = form.shop_type === 'realestate';
   const canProceedStep1 = form.shop_type !== '';
+  const canProceedStep1b = !isRealEstate || form.re_role !== '';
   const canProceedStep2 = isStudy
     ? form.owner_name.trim() !== ''
     : form.shop_name.trim() !== '' && form.owner_name.trim() !== '';
@@ -144,6 +160,12 @@ export function SetupWizard() {
         drug_license_no: form.drug_license_no || undefined,
       });
       await createAuth(config.tenant_id, username.trim(), password);
+
+      // [realestate] save role in settings
+      if (form.shop_type === 'realestate' && form.re_role) {
+        const { updateAppConfig } = await import('@/lib/db/config');
+        await updateAppConfig({ settings: { re_role: form.re_role } });
+      }
 
       // Queue registration then flush immediately so server knows about this tenant
       await enqueue('register', config.tenant_id, {
@@ -338,12 +360,32 @@ export function SetupWizard() {
                   </button>
                 ))}
               </div>
+              {/* [realestate] Role picker appears when realestate is selected */}
+              {isRealEstate && (
+                <div className="mt-5 border-t border-slate-100 pt-5">
+                  <p className="text-sm font-semibold text-slate-700 mb-3">What is your role? *</p>
+                  <div className="grid grid-cols-1 gap-2">
+                    {RE_ROLES.map(r => (
+                      <button key={r.value} onClick={() => update('re_role', r.value)} className={`text-left p-3 rounded-xl border-2 transition-all ${form.re_role === r.value ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{r.icon}</span>
+                          <div>
+                            <div className="font-medium text-slate-800 text-sm">{r.label}</div>
+                            <div className="text-slate-500 text-xs">{r.desc}</div>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <button
                 onClick={() => {
                   if (form.shop_type === 'study') update('shop_name', 'StudyMate');
+                  if (form.shop_type === 'realestate') update('shop_name', form.shop_name || 'PropMate');
                   setStep(2);
                 }}
-                disabled={!canProceedStep1}
+                disabled={!canProceedStep1 || !canProceedStep1b}
                 className="mt-6 w-full btn-primary py-3 text-base disabled:opacity-40 disabled:cursor-not-allowed">
                 Continue →
               </button>

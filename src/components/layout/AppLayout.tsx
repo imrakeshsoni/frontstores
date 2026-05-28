@@ -64,6 +64,11 @@ import {
   Edit3,
   Gamepad2,
   Sigma,
+  Dumbbell,
+  RefreshCw,
+  LogIn,
+  Gem,
+  Star,
 } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { getShopTypeLabel } from '@/lib/shop/shopType';
@@ -173,7 +178,78 @@ const STUDY_NAV_ITEMS = [
   { to: '/study/constants',    icon: Sigma,           label: 'Constants',     iconBg: '#ede9fe', iconColor: '#7c3aed' },
   { to: '/study/backup',       icon: HardDrive,       label: 'Backup',        iconBg: '#dbeafe', iconColor: '#2563eb' },
   { to: '/study/setup',        icon: Settings,        label: 'Profile',       iconBg: '#f1f5f9', iconColor: '#64748b' },
+  { to: '/settings',           icon: Settings,        label: 'Settings',      iconBg: '#f1f5f9', iconColor: '#64748b' }, // [study] [all tenants]
 ];
+
+// [coaching] [all tenants]
+const COACHING_NAV_ITEMS = [
+  { to: '/coaching/dashboard',  icon: LayoutDashboard, label: 'Dashboard',   iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/coaching/students',   icon: Users,           label: 'Students',    iconBg: '#fce7f3', iconColor: '#db2777' },
+  { to: '/coaching/batches',    icon: BookOpen,        label: 'Batches',     iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/coaching/attendance', icon: UserCheck,       label: 'Attendance',  iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/coaching/fees',       icon: Wallet,          label: 'Fees',        iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/coaching/exams',      icon: ClipboardList,   label: 'Exams',       iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/coaching/teachers',   icon: GraduationCap,   label: 'Teachers',    iconBg: '#f0fdf4', iconColor: '#15803d' },
+  { to: '/expenses',            icon: Wallet,          label: 'Expenses',    iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/coaching/reports',    icon: BarChart3,       label: 'Reports',     iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',            icon: Settings,        label: 'Settings',    iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [gym] [all tenants]
+const GYM_NAV_ITEMS = [
+  { to: '/gym/dashboard', icon: LayoutDashboard, label: 'Dashboard',    iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/gym/members',   icon: Users,           label: 'Members',      iconBg: '#fce7f3', iconColor: '#db2477' },
+  { to: '/gym/checkin',   icon: LogIn,           label: 'Check In',     iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/gym/plans',     icon: Star,            label: 'Plans',        iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/gym/renewals',  icon: RefreshCw,       label: 'Renewals',     iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/gym/staff',     icon: UserCheck,       label: 'Staff',        iconBg: '#d1fae5', iconColor: '#059669' },
+  { to: '/expenses',      icon: Wallet,          label: 'Expenses',     iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/gym/reports',   icon: BarChart3,       label: 'Reports',      iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',      icon: Settings,        label: 'Settings',     iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [jewellery] [all tenants]
+const JEWELLERY_NAV_ITEMS = [
+  { to: '/jewellery/dashboard',      icon: LayoutDashboard, label: 'Dashboard',      iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/jewellery/gold-rate',      icon: TrendingUp,      label: 'Gold Rate',      iconBg: '#fef9c3', iconColor: '#ca8a04' },
+  { to: '/jewellery/products',       icon: Gem,             label: 'Inventory',      iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/jewellery/billing',        icon: Receipt,         label: 'Billing',        iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/jewellery/custom-orders',  icon: Star,            label: 'Custom Orders',  iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/jewellery/repairs',        icon: Wrench,          label: 'Repairs',        iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/customers',                icon: Users,           label: 'Customers',      iconBg: '#fce7f3', iconColor: '#db2477' },
+  { to: '/khata',                    icon: BookOpen,        label: 'Khata',          iconBg: '#f3e8ff', iconColor: '#9333ea' },
+  { to: '/expenses',                 icon: Wallet,          label: 'Expenses',       iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/jewellery/reports',        icon: BarChart3,       label: 'Reports',        iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',                 icon: Settings,        label: 'Settings',       iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [realestate] [all tenants]
+const REALESTATE_BASE_NAV = [
+  { to: '/realestate/dashboard',   icon: LayoutDashboard, label: 'Dashboard',      iconBg: '#dcfce7', iconColor: '#15803d' },
+  { to: '/realestate/leads',       icon: Users,           label: 'Leads / CRM',    iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/realestate/properties',  icon: Receipt,         label: 'Properties',     iconBg: '#cffafe', iconColor: '#0891b2' },
+  { to: '/realestate/projects',    icon: BookOpen,        label: 'Projects',       iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/realestate/builders',    icon: Truck,           label: 'Builders',       iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/realestate/deals',       icon: ClipboardCheck,  label: 'Deals',          iconBg: '#dcfce7', iconColor: '#15803d' },
+  { to: '/realestate/site-visits', icon: CalendarDays,    label: 'Site Visits',    iconBg: '#f3e8ff', iconColor: '#9333ea' },
+  { to: '/realestate/commissions', icon: Wallet,          label: 'Commissions',    iconBg: '#fef9c3', iconColor: '#ca8a04' },
+  { to: '/realestate/documents',   icon: FileText,        label: 'Documents',      iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/expenses',               icon: Wallet,          label: 'Expenses',       iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/realestate/reports',     icon: BarChart3,       label: 'Reports',        iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',               icon: Settings,        label: 'Settings',       iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+function getRealEstateNavItems(role: string) {
+  // Individual and rental agents don't need builder directory prominently
+  if (role === 'individual' || role === 'rental' || role === 'commercial') {
+    return REALESTATE_BASE_NAV.filter(i => i.to !== '/realestate/builders');
+  }
+  // Builder role — replace properties with projects as first item
+  if (role === 'builder') {
+    return REALESTATE_BASE_NAV.filter(i => i.to !== '/realestate/properties');
+  }
+  return REALESTATE_BASE_NAV;
+}
 
 // [beauty] [all tenants]
 const BEAUTY_NAV_ITEMS = [
@@ -206,13 +282,18 @@ export function AppLayout() {
   const navigate = useNavigate();
   const [showSwitchModal, setShowSwitchModal] = useState(false);
   // pick correct nav based on shop type
+  const reRole = (config?.settings as any)?.re_role ?? 'resale';
   const activeNavItems =
-    config?.shop_type === 'restaurant' ? RESTAURANT_NAV_ITEMS :
-    config?.shop_type === 'grocery'    ? GROCERY_NAV_ITEMS :
-    config?.shop_type === 'carwash'    ? CARWASH_NAV_ITEMS :
-    config?.shop_type === 'clinic'     ? CLINIC_NAV_ITEMS :
-    config?.shop_type === 'beauty'     ? BEAUTY_NAV_ITEMS :
-    config?.shop_type === 'study'      ? STUDY_NAV_ITEMS :
+    config?.shop_type === 'restaurant'  ? RESTAURANT_NAV_ITEMS :
+    config?.shop_type === 'grocery'     ? GROCERY_NAV_ITEMS :
+    config?.shop_type === 'carwash'     ? CARWASH_NAV_ITEMS :
+    config?.shop_type === 'clinic'      ? CLINIC_NAV_ITEMS :
+    config?.shop_type === 'beauty'      ? BEAUTY_NAV_ITEMS :
+    config?.shop_type === 'study'       ? STUDY_NAV_ITEMS :
+    config?.shop_type === 'coaching'    ? COACHING_NAV_ITEMS :
+    config?.shop_type === 'gym'         ? GYM_NAV_ITEMS :
+    config?.shop_type === 'jewellery'   ? JEWELLERY_NAV_ITEMS :
+    config?.shop_type === 'realestate'  ? getRealEstateNavItems(reRole) :
     NAV_ITEMS;
 
   useEffect(() => {
@@ -369,6 +450,15 @@ export function AppLayout() {
             </div>
             <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{config?.shop_name || 'FrontStores'}</span>
           </div>
+          {/* [core] [all tenants] — App Switch button on mobile */}
+          <button
+            onClick={() => setShowSwitchModal(true)}
+            title="Switch App"
+            className="flex items-center justify-center h-8 w-8 rounded-xl text-sm font-bold transition-colors"
+            style={{ color: 'var(--text-tertiary)', background: 'var(--surface-2)' }}
+          >
+            ⊕
+          </button>
         </header>
 
         {/* Mobile horizontal nav */}

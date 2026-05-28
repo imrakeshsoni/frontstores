@@ -24,6 +24,10 @@ import migration0023 from '../../../src-tauri/migrations/0023_study_new_features
 import migration0024 from '../../../src-tauri/migrations/0024_study_round2.sql?raw';
 import migration0025 from '../../../src-tauri/migrations/0025_study_round3.sql?raw';
 import migration0026 from '../../../src-tauri/migrations/0026_linked_accounts.sql?raw';
+import migration0027 from '../../../src-tauri/migrations/0027_coaching.sql?raw';
+import migration0028 from '../../../src-tauri/migrations/0028_gym.sql?raw';
+import migration0029 from '../../../src-tauri/migrations/0029_jewellery.sql?raw';
+import migration0030 from '../../../src-tauri/migrations/0030_realestate.sql?raw';
 
 export interface Migration {
   name: string;
@@ -58,5 +62,9 @@ export async function readMigrations(): Promise<Migration[]> {
     { name: '0024_study_round2', sql: migration0024 },
     { name: '0025_study_round3', sql: migration0025 },
     { name: '0026_linked_accounts', sql: migration0026 },
+    { name: '0027_coaching', sql: migration0027 },
+    { name: '0028_gym', sql: migration0028 },
+    { name: '0029_jewellery', sql: migration0029 },
+    { name: '0030_realestate', sql: migration0030 },
   ];
 }

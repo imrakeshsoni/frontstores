@@ -1,6 +1,6 @@
 import { useAppStore } from '@/app/store/app.store';
 
-export type ShopType = 'medical' | 'restaurant' | 'grocery' | 'carwash' | 'clinic' | 'beauty' | 'study';
+export type ShopType = 'medical' | 'restaurant' | 'grocery' | 'carwash' | 'clinic' | 'beauty' | 'study' | 'coaching' | 'gym' | 'jewellery' | 'realestate';
 
 const SHOP_TYPE_LABELS: Record<string, string> = {
   medical: 'Medical Store',
@@ -10,6 +10,10 @@ const SHOP_TYPE_LABELS: Record<string, string> = {
   clinic: 'Hospital / Clinic',
   beauty: 'Beauty Parlor',
   study: 'StudyMate',
+  coaching: 'Coaching Institute',
+  gym: 'Gym / Fitness',
+  jewellery: 'Jewellery Shop',
+  realestate: 'Real Estate / PropMate',
 };
 
 // ── APP_REGISTRY ─────────────────────────────────────────────────────────────
@@ -89,6 +93,42 @@ export const APP_REGISTRY: AppRegistryEntry[] = [
     color: '#7c3aed',
     bgColor: '#ede9fe',
     dashboardRoute: '/study/dashboard',
+  },
+  {
+    type: 'coaching',
+    label: 'Coaching Institute',
+    icon: '🎓',
+    description: 'Students, batches, attendance, fees, exams',
+    color: '#2563eb',
+    bgColor: '#dbeafe',
+    dashboardRoute: '/coaching/dashboard',
+  },
+  {
+    type: 'gym',
+    label: 'Gym / Fitness Center',
+    icon: '💪',
+    description: 'Members, memberships, check-in, renewals, PT',
+    color: '#16a34a',
+    bgColor: '#dcfce7',
+    dashboardRoute: '/gym/dashboard',
+  },
+  {
+    type: 'jewellery',
+    label: 'Jewellery Shop',
+    icon: '💍',
+    description: 'Gold rates, inventory, billing, custom orders, repair',
+    color: '#d97706',
+    bgColor: '#fef3c7',
+    dashboardRoute: '/jewellery/dashboard',
+  },
+  {
+    type: 'realestate',
+    label: 'Real Estate / PropMate',
+    icon: '🏠',
+    description: 'Leads, deals, commissions, site visits, builder projects',
+    color: '#15803d',
+    bgColor: '#dcfce7',
+    dashboardRoute: '/realestate/dashboard',
   },
   // ➕ Add new apps here — they appear automatically in the Switch App modal
 ];

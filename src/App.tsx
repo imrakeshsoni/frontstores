@@ -23,6 +23,45 @@ const SettingsPage  = lazy(() => import('@/modules/settings/SettingsPage').then(
 const KhataPage           = lazy(() => import('@/modules/khata/KhataPage').then(m => ({ default: m.KhataPage })));
 const ExpensesPage        = lazy(() => import('@/modules/expenses/ExpensesPage').then(m => ({ default: m.ExpensesPage })));
 const PurchaseOrdersPage  = lazy(() => import('@/modules/purchase-orders/PurchaseOrdersPage').then(m => ({ default: m.PurchaseOrdersPage })));
+// [coaching] [all tenants]
+const CoachingDashboard  = lazy(() => import('@/modules/coaching/CoachingDashboard').then(m => ({ default: m.CoachingDashboard })));
+const CoachingStudents   = lazy(() => import('@/modules/coaching/StudentsPage').then(m => ({ default: m.StudentsPage })));
+const CoachingBatches    = lazy(() => import('@/modules/coaching/BatchesPage').then(m => ({ default: m.BatchesPage })));
+const CoachingAttendance = lazy(() => import('@/modules/coaching/AttendancePage').then(m => ({ default: m.AttendancePage })));
+const CoachingFees       = lazy(() => import('@/modules/coaching/FeesPage').then(m => ({ default: m.FeesPage })));
+const CoachingExams      = lazy(() => import('@/modules/coaching/ExamsPage').then(m => ({ default: m.ExamsPage })));
+const CoachingTeachers   = lazy(() => import('@/modules/coaching/TeachersPage').then(m => ({ default: m.TeachersPage })));
+const CoachingReports    = lazy(() => import('@/modules/coaching/CoachingReportsPage').then(m => ({ default: m.CoachingReportsPage })));
+
+// [gym] [all tenants]
+const GymDashboard   = lazy(() => import('@/modules/gym/GymDashboard').then(m => ({ default: m.GymDashboard })));
+const GymMembers     = lazy(() => import('@/modules/gym/MembersPage').then(m => ({ default: m.MembersPage })));
+const GymPlans       = lazy(() => import('@/modules/gym/PlansPage').then(m => ({ default: m.PlansPage })));
+const GymCheckIn     = lazy(() => import('@/modules/gym/CheckInPage').then(m => ({ default: m.CheckInPage })));
+const GymRenewals    = lazy(() => import('@/modules/gym/RenewalsPage').then(m => ({ default: m.RenewalsPage })));
+const GymStaff       = lazy(() => import('@/modules/gym/GymStaffPage').then(m => ({ default: m.GymStaffPage })));
+const GymReports     = lazy(() => import('@/modules/gym/GymReportsPage').then(m => ({ default: m.GymReportsPage })));
+
+// [realestate] [all tenants]
+const RealEstateDashboard = lazy(() => import('@/modules/realestate/RealEstateDashboard').then(m => ({ default: m.RealEstateDashboard })));
+const RELeadsPage         = lazy(() => import('@/modules/realestate/LeadsPage').then(m => ({ default: m.LeadsPage })));
+const REPropertiesPage    = lazy(() => import('@/modules/realestate/PropertiesPage').then(m => ({ default: m.PropertiesPage })));
+const REProjectsPage      = lazy(() => import('@/modules/realestate/ProjectsPage').then(m => ({ default: m.ProjectsPage })));
+const REDealsPage         = lazy(() => import('@/modules/realestate/DealsPage').then(m => ({ default: m.DealsPage })));
+const RESiteVisitsPage    = lazy(() => import('@/modules/realestate/SiteVisitsPage').then(m => ({ default: m.SiteVisitsPage })));
+const RECommissionsPage   = lazy(() => import('@/modules/realestate/CommissionsPage').then(m => ({ default: m.CommissionsPage })));
+const REDocumentsPage     = lazy(() => import('@/modules/realestate/DocumentsPage').then(m => ({ default: m.DocumentsPage })));
+const REBuildersPage      = lazy(() => import('@/modules/realestate/BuildersPage').then(m => ({ default: m.BuildersPage })));
+const REReportsPage       = lazy(() => import('@/modules/realestate/REReportsPage').then(m => ({ default: m.REReportsPage })));
+
+// [jewellery] [all tenants]
+const JewelleryDashboard    = lazy(() => import('@/modules/jewellery/JewelleryDashboard').then(m => ({ default: m.JewelleryDashboard })));
+const JewelleryGoldRate     = lazy(() => import('@/modules/jewellery/GoldRatePage').then(m => ({ default: m.GoldRatePage })));
+const JewelleryProducts     = lazy(() => import('@/modules/jewellery/JewelleryProductsPage').then(m => ({ default: m.JewelleryProductsPage })));
+const JewelleryCustomOrders = lazy(() => import('@/modules/jewellery/CustomOrdersPage').then(m => ({ default: m.CustomOrdersPage })));
+const JewelleryRepairs      = lazy(() => import('@/modules/jewellery/RepairsPage').then(m => ({ default: m.RepairsPage })));
+const JewelleryReports      = lazy(() => import('@/modules/jewellery/JewelleryReportsPage').then(m => ({ default: m.JewelleryReportsPage })));
+
 // [grocery] [all tenants]
 const GroceryDashboard        = lazy(() => import('@/modules/grocery/GroceryDashboard').then(m => ({ default: m.GroceryDashboard })));
 const CashDrawerPage          = lazy(() => import('@/modules/grocery/CashDrawerPage').then(m => ({ default: m.CashDrawerPage })));
@@ -154,6 +193,10 @@ export default function App() {
               config?.shop_type === 'clinic'     ? '/clinic/dashboard' :
               config?.shop_type === 'beauty'     ? '/beauty/dashboard' :
               config?.shop_type === 'study'      ? '/study/dashboard' :
+              config?.shop_type === 'coaching'   ? '/coaching/dashboard' :
+              config?.shop_type === 'gym'        ? '/gym/dashboard' :
+              config?.shop_type === 'jewellery'   ? '/jewellery/dashboard' :
+              config?.shop_type === 'realestate'  ? '/realestate/dashboard' :
               '/dashboard'
             } replace />} />
             <Route path="dashboard"  element={<Dashboard />} />
@@ -235,6 +278,46 @@ export default function App() {
             <Route path="study/writing"      element={<WritingPracticePage />} />
             <Route path="study/brain-break"  element={<BrainBreakPage />} />
             <Route path="study/constants"    element={<MathConstantsPage />} />
+
+            {/* [coaching] [all tenants] */}
+            <Route path="coaching/dashboard"  element={<CoachingDashboard />} />
+            <Route path="coaching/students"   element={<CoachingStudents />} />
+            <Route path="coaching/batches"    element={<CoachingBatches />} />
+            <Route path="coaching/attendance" element={<CoachingAttendance />} />
+            <Route path="coaching/fees"       element={<CoachingFees />} />
+            <Route path="coaching/exams"      element={<CoachingExams />} />
+            <Route path="coaching/teachers"   element={<CoachingTeachers />} />
+            <Route path="coaching/reports"    element={<CoachingReports />} />
+
+            {/* [gym] [all tenants] */}
+            <Route path="gym/dashboard" element={<GymDashboard />} />
+            <Route path="gym/members"   element={<GymMembers />} />
+            <Route path="gym/plans"     element={<GymPlans />} />
+            <Route path="gym/checkin"   element={<GymCheckIn />} />
+            <Route path="gym/renewals"  element={<GymRenewals />} />
+            <Route path="gym/staff"     element={<GymStaff />} />
+            <Route path="gym/reports"   element={<GymReports />} />
+
+            {/* [jewellery] [all tenants] */}
+            <Route path="jewellery/dashboard"     element={<JewelleryDashboard />} />
+            <Route path="jewellery/gold-rate"     element={<JewelleryGoldRate />} />
+            <Route path="jewellery/products"      element={<JewelleryProducts />} />
+            <Route path="jewellery/billing"       element={<JewelleryProducts />} />
+            <Route path="jewellery/custom-orders" element={<JewelleryCustomOrders />} />
+            <Route path="jewellery/repairs"       element={<JewelleryRepairs />} />
+            <Route path="jewellery/reports"       element={<JewelleryReports />} />
+
+            {/* [realestate] [all tenants] */}
+            <Route path="realestate/dashboard"   element={<RealEstateDashboard />} />
+            <Route path="realestate/leads"       element={<RELeadsPage />} />
+            <Route path="realestate/properties"  element={<REPropertiesPage />} />
+            <Route path="realestate/projects"    element={<REProjectsPage />} />
+            <Route path="realestate/deals"       element={<REDealsPage />} />
+            <Route path="realestate/site-visits" element={<RESiteVisitsPage />} />
+            <Route path="realestate/commissions" element={<RECommissionsPage />} />
+            <Route path="realestate/documents"   element={<REDocumentsPage />} />
+            <Route path="realestate/builders"    element={<REBuildersPage />} />
+            <Route path="realestate/reports"     element={<REReportsPage />} />
 
             {/* [beauty] [all tenants] */}
             <Route path="beauty/dashboard"              element={<BeautyDashboard />} />
