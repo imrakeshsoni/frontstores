@@ -1,7 +1,7 @@
 // [study] [all tenants]
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Lock, Unlock, BookOpen, Flame, ClipboardList, Brain } from 'lucide-react';
+import { Lock, Unlock, BookOpen, Flame, ClipboardList, Brain, Printer } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import {
   getStudyConfig, saveStudyConfig, getStreak, getTodayStudyTime,
@@ -95,11 +95,18 @@ export function ParentReportPage() {
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{studentName}'s Report</h1>
           {config?.class_grade && <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Class {config.class_grade} · {config.school || ''}</p>}
         </div>
-        <button onClick={() => { setUnlocked(false); setPin(''); }}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border"
-          style={{ borderColor: 'var(--surface-border)', color: 'var(--text-secondary)' }}>
-          <Lock className="h-4 w-4" /> Lock
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => window.print()}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border"
+            style={{ borderColor: 'var(--accent)', color: 'var(--accent)', background: 'var(--surface)' }}>
+            <Printer className="h-4 w-4" /> Export PDF
+          </button>
+          <button onClick={() => { setUnlocked(false); setPin(''); }}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border"
+            style={{ borderColor: 'var(--surface-border)', color: 'var(--text-secondary)' }}>
+            <Lock className="h-4 w-4" /> Lock
+          </button>
+        </div>
       </div>
 
       {/* Key stats */}

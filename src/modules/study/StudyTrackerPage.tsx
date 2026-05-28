@@ -4,7 +4,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Timer, Plus, Flame, BookOpen } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
-import { logSession, getSessionsByDate, getStreak, getTodayStudyTime, getWeeklySubjectBreakdown } from '@/lib/db/study';
+import {
+  logSession, getSessionsByDate, getStreak, getTodayStudyTime, getWeeklySubjectBreakdown,
+  getStreakFreeze, awardFreezeToken, useFreezeToken, addXP,
+} from '@/lib/db/study';
 
 const SUBJECTS = ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'History', 'Geography', 'English', 'Economics', 'Science', 'Hindi', 'Other'];
 const DURATIONS = [15, 30, 45, 60, 90, 120];
@@ -22,6 +25,7 @@ export function StudyTrackerPage() {
   const { data: streak }   = useQuery({ queryKey: ['study-streak', tenantId], queryFn: () => getStreak(tenantId), enabled: !!tenantId });
   const { data: todayMin } = useQuery({ queryKey: ['study-today', tenantId], queryFn: () => getTodayStudyTime(tenantId), enabled: !!tenantId });
   const { data: weekly }   = useQuery({ queryKey: ['study-subjects', tenantId], queryFn: () => getWeeklySubjectBreakdown(tenantId), enabled: !!tenantId });
+  const { data: freeze }   = useQuery({ queryKey: ['study-freeze', tenantId], queryFn: () => getStreakFreeze(tenantId), enabled: !!tenantId });
   const { data: sessions = [] } = useQuery({
     queryKey: ['study-sessions', tenantId, viewDate],
     queryFn: () => {
@@ -32,7 +36,14 @@ export function StudyTrackerPage() {
   });
 
   const logMutation = useMutation({
-    mutationFn: () => logSession(tenantId, subject, duration, notes || null),
+    mutationFn: async () => {
+      await logSession(tenantId, subject, duration, notes || null);
+      await addXP(tenantId, 'session_logged');
+      // Award freeze token every 7-day streak milestone
+      if (streak && streak.current > 0 && streak.current % 7 === 0) {
+        await awardFreezeToken(tenantId);
+      }
+    },
     onSuccess: () => {
       toast.success(`Logged ${minToHr(duration)} of ${subject}`);
       setShowForm(false); setNotes('');
@@ -40,8 +51,18 @@ export function StudyTrackerPage() {
       qc.invalidateQueries({ queryKey: ['study-today'] });
       qc.invalidateQueries({ queryKey: ['study-streak'] });
       qc.invalidateQueries({ queryKey: ['study-subjects'] });
+      qc.invalidateQueries({ queryKey: ['study-xp'] });
+      qc.invalidateQueries({ queryKey: ['study-freeze'] });
     },
     onError: (e: any) => toast.error(e?.message),
+  });
+
+  const freezeMutation = useMutation({
+    mutationFn: () => useFreezeToken(tenantId),
+    onSuccess: (used) => {
+      if (used) { toast.success('Streak freeze used! Your streak is protected.'); qc.invalidateQueries({ queryKey: ['study-freeze'] }); }
+      else toast.error('No freeze tokens available');
+    },
   });
 
   const grouped: Record<string, typeof sessions> = {};
@@ -84,6 +105,22 @@ export function StudyTrackerPage() {
           <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ background: '#dcfce7', color: '#16a34a' }}><BookOpen size={18} /></div>
           <div><p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Total Days</p><p className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{streak?.totalDays ?? 0}</p></div>
         </div>
+      </div>
+
+      {/* Streak Freeze */}
+      <div className="rounded-2xl p-4 flex items-center gap-4" style={{ background: '#dbeafe', border: '1px solid #93c5fd' }}>
+        <span className="text-2xl">🧊</span>
+        <div className="flex-1">
+          <p className="font-bold text-sm" style={{ color: '#1e40af' }}>Streak Freeze</p>
+          <p className="text-xs" style={{ color: '#2563eb' }}>
+            {freeze?.tokens ?? 0} token{(freeze?.tokens ?? 0) !== 1 ? 's' : ''} available · Earn 1 every 7-day streak · Protects 1 missed day
+          </p>
+        </div>
+        {(freeze?.tokens ?? 0) > 0 && (
+          <button onClick={() => freezeMutation.mutate()} disabled={freezeMutation.isPending}
+            className="px-4 py-2 rounded-xl text-sm font-bold text-white flex-shrink-0 disabled:opacity-60"
+            style={{ background: '#2563eb' }}>Use Freeze</button>
+        )}
       </div>
 
       {/* Weekly subject chart */}

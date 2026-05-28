@@ -58,23 +58,27 @@ export async function searchRelevantResources(tenantId: string, question: string
   return scored.filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 3).map(x => x.r);
 }
 
-// Extract text from PDF bytes (basic extraction for standard PDFs)
-export function extractPdfText(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  const raw = new TextDecoder('latin1').decode(bytes);
-  const parts: string[] = [];
-  const btBlocks = raw.match(/BT[\s\S]*?ET/g) ?? [];
-  for (const block of btBlocks) {
-    const tjs = block.match(/\(([^)\\]*(?:\\.[^)\\]*)*)\)\s*Tj/g) ?? [];
-    for (const tj of tjs) {
-      const m = tj.match(/\(([^)\\]*(?:\\.[^)\\]*)*)\)/);
-      if (m?.[1]) parts.push(m[1].replace(/\\n/g, '\n').replace(/\\t/g, ' '));
+// Extract text from PDF bytes using pdfjs-dist (handles compressed modern PDFs)
+export async function extractPdfText(buffer: ArrayBuffer): Promise<string> {
+  try {
+    const pdfjsLib = await import('pdfjs-dist');
+    // Use legacy build to avoid worker issues in Tauri WebView
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer), useWorkerFetch: false, isEvalSupported: false, useSystemFonts: true }).promise;
+    const pages: string[] = [];
+    for (let i = 1; i <= Math.min(pdf.numPages, 100); i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const pageText = content.items
+        .filter(item => 'str' in item)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .map((item: any) => (item.str as string) + (item.hasEOL ? '\n' : ' '))
+        .join('');
+      pages.push(pageText);
     }
-    const tjarr = block.match(/\[([^\]]*)\]\s*TJ/g) ?? [];
-    for (const tja of tjarr) {
-      const str = tja.match(/\(([^)]*)\)/g)?.map(s => s.slice(1, -1)).join('') ?? '';
-      if (str.trim()) parts.push(str);
-    }
+    return pages.join('\n\n').replace(/\s{3,}/g, '  ').trim().substring(0, 50000);
+  } catch (e) {
+    console.error('PDF extraction failed:', e);
+    return '';
   }
-  return parts.join(' ').replace(/\s+/g, ' ').trim().substring(0, 50000);
 }

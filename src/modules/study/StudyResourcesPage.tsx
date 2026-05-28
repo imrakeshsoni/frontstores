@@ -2,9 +2,11 @@
 import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Upload, Trash2, FileText, Image, BookOpen, Plus, Eye } from 'lucide-react';
+import { Upload, Trash2, FileText, Image, BookOpen, Plus, Eye, Sparkles, Bookmark, BookmarkCheck, Loader2 } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { listResources, saveResource, deleteResource, extractPdfText, type StudyResource } from '@/lib/db/studyResources';
+import { addBookmark, getBookmarks, deleteBookmark } from '@/lib/db/study';
+import { askTutor } from '@/lib/study/studyAI';
 
 const SUBJECTS = ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'History', 'Geography', 'English', 'Economics', 'Science', 'Hindi', 'Other'];
 
@@ -28,6 +30,138 @@ function fmtSize(bytes: number) {
   return `${(bytes / 1048576).toFixed(1)} MB`;
 }
 
+function ResourcePreviewModal({ resource, tenantId, summary, summarizing, selectedText, setSelectedText, onSummarize, onClose }: {
+  resource: StudyResource;
+  tenantId: string;
+  summary: string | null;
+  summarizing: boolean;
+  selectedText: string;
+  setSelectedText: (t: string) => void;
+  onSummarize: () => void;
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const [bookmarkNote, setBookmarkNote] = useState('');
+  const [showBookmarkInput, setShowBookmarkInput] = useState(false);
+
+  const { data: bookmarks = [] } = useQuery({
+    queryKey: ['study-bookmarks', tenantId, resource.id],
+    queryFn: () => getBookmarks(tenantId, resource.id),
+    enabled: !!tenantId,
+  });
+
+  const addBmMutation = useMutation({
+    mutationFn: () => addBookmark(tenantId, resource.id, selectedText, bookmarkNote || null),
+    onSuccess: () => { toast.success('Bookmark saved!'); setShowBookmarkInput(false); setBookmarkNote(''); qc.invalidateQueries({ queryKey: ['study-bookmarks'] }); },
+  });
+
+  const deleteBmMutation = useMutation({
+    mutationFn: (id: string) => deleteBookmark(tenantId, id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['study-bookmarks'] }),
+  });
+
+  const hasText = !!resource.content && resource.type !== 'image';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+      <div className="rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col" style={{ background: 'var(--surface)' }}>
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: 'var(--surface-border)' }}>
+          <h2 className="font-bold text-base truncate" style={{ color: 'var(--text-primary)' }}>{resource.name}</h2>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {hasText && (
+              <button onClick={onSummarize} disabled={summarizing}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white disabled:opacity-60"
+                style={{ background: '#7c3aed' }}>
+                {summarizing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                {summarizing ? 'Summarizing…' : 'AI Summary'}
+              </button>
+            )}
+            <button onClick={onClose} className="text-sm px-3 py-1.5 rounded-lg border" style={{ borderColor: 'var(--surface-border)', color: 'var(--text-secondary)' }}>Close</button>
+          </div>
+        </div>
+
+        <div className="flex flex-1 min-h-0">
+          {/* Main content */}
+          <div className="flex-1 overflow-y-auto p-5">
+            {/* AI summary */}
+            {summary && (
+              <div className="rounded-xl p-4 mb-4" style={{ background: '#ede9fe', border: '1px solid #c4b5fd' }}>
+                <p className="text-xs font-bold mb-2" style={{ color: '#5b21b6' }}>🤖 AI Summary</p>
+                <p className="text-sm whitespace-pre-wrap" style={{ color: '#4c1d95' }}>{summary}</p>
+              </div>
+            )}
+            {resource.image_data ? (
+              <img src={resource.image_data} alt={resource.name} className="max-w-full rounded-xl" />
+            ) : resource.content ? (
+              <div>
+                {hasText && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Select text then click Bookmark to save highlights</p>
+                    <button
+                      onClick={() => {
+                        const sel = window.getSelection()?.toString().trim();
+                        if (sel) { setSelectedText(sel); setShowBookmarkInput(true); }
+                        else toast.info('Select some text first');
+                      }}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold flex-shrink-0"
+                      style={{ background: '#fef3c7', color: '#d97706' }}>
+                      <Bookmark className="h-3 w-3" /> Bookmark Selection
+                    </button>
+                  </div>
+                )}
+                <pre className="text-sm whitespace-pre-wrap leading-relaxed select-text"
+                  style={{ color: 'var(--text-primary)', fontFamily: 'inherit' }}>
+                  {resource.content.substring(0, 8000)}{resource.content.length > 8000 ? '\n\n[truncated…]' : ''}
+                </pre>
+              </div>
+            ) : (
+              <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No preview available</p>
+            )}
+          </div>
+
+          {/* Bookmarks panel */}
+          {hasText && bookmarks.length > 0 && (
+            <div className="w-64 border-l overflow-y-auto p-4 space-y-3 flex-shrink-0" style={{ borderColor: 'var(--surface-border)' }}>
+              <div className="flex items-center gap-1.5">
+                <BookmarkCheck className="h-4 w-4" style={{ color: '#d97706' }} />
+                <p className="text-xs font-bold" style={{ color: 'var(--text-secondary)' }}>Bookmarks ({bookmarks.length})</p>
+              </div>
+              {bookmarks.map(bm => (
+                <div key={bm.id} className="rounded-xl p-3 relative" style={{ background: '#fef3c7' }}>
+                  <p className="text-xs font-medium pr-5" style={{ color: '#92400e' }}>"{bm.highlighted_text.substring(0, 100)}{bm.highlighted_text.length > 100 ? '…' : ''}"</p>
+                  {bm.note && <p className="text-xs mt-1" style={{ color: '#78350f' }}>{bm.note}</p>}
+                  <button onClick={() => deleteBmMutation.mutate(bm.id)}
+                    className="absolute top-2 right-2 h-5 w-5 rounded flex items-center justify-center hover:bg-red-100 text-red-400">
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Bookmark input */}
+        {showBookmarkInput && (
+          <div className="border-t p-4 space-y-2" style={{ borderColor: 'var(--surface-border)' }}>
+            <p className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>Bookmarking: "{selectedText.substring(0, 60)}…"</p>
+            <div className="flex gap-2">
+              <input value={bookmarkNote} onChange={e => setBookmarkNote(e.target.value)}
+                placeholder="Add a note (optional)"
+                className="flex-1 px-3 py-2 rounded-xl text-sm border outline-none"
+                style={{ background: 'var(--surface-2)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }} />
+              <button onClick={() => addBmMutation.mutate()}
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-white" style={{ background: '#d97706' }}>Save</button>
+              <button onClick={() => setShowBookmarkInput(false)}
+                className="px-3 py-2 rounded-xl text-sm border" style={{ borderColor: 'var(--surface-border)', color: 'var(--text-secondary)' }}>Cancel</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function StudyResourcesPage() {
   const tenantId = useAppStore((s) => s.config?.tenant_id ?? '');
   const qc = useQueryClient();
@@ -40,6 +174,9 @@ export function StudyResourcesPage() {
   const [noteSubject, setNoteSubject] = useState('');
   const [preview, setPreview]     = useState<StudyResource | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [summary, setSummary]     = useState<string | null>(null);
+  const [summarizing, setSummarizing] = useState(false);
+  const [selectedText, setSelectedText] = useState('');
 
   const { data: resources = [], isLoading } = useQuery({
     queryKey: ['study-resources', tenantId],
@@ -81,7 +218,9 @@ export function StudyResourcesPage() {
           toast.success(`${file.name} uploaded`);
         } else if (isPdf) {
           const buf = await file.arrayBuffer();
-          const text = extractPdfText(buf);
+          toast.loading(`Extracting text from ${file.name}…`, { id: 'pdf-extract' });
+          const text = await extractPdfText(buf);
+          toast.dismiss('pdf-extract');
           if (!text.trim()) { toast.warning(`${file.name}: could not extract text — try copy-pasting instead`); continue; }
           await saveResource(tenantId, { name: file.name, type: 'pdf', subject: subject || null, content: text, image_data: null, file_size: file.size });
           toast.success(`${file.name} — ${text.length} chars extracted`);
@@ -272,23 +411,24 @@ export function StudyResourcesPage() {
 
       {/* Preview modal */}
       {preview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-          <div className="rounded-2xl p-6 w-full max-w-2xl max-h-[85vh] flex flex-col" style={{ background: 'var(--surface)' }}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-base truncate" style={{ color: 'var(--text-primary)' }}>{preview.name}</h2>
-              <button onClick={() => setPreview(null)} className="text-sm px-3 py-1.5 rounded-lg border flex-shrink-0" style={{ borderColor: 'var(--surface-border)', color: 'var(--text-secondary)' }}>Close</button>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              {preview.image_data ? (
-                <img src={preview.image_data} alt={preview.name} className="max-w-full rounded-xl" />
-              ) : preview.content ? (
-                <pre className="text-xs whitespace-pre-wrap leading-relaxed" style={{ color: 'var(--text-primary)', fontFamily: 'inherit' }}>{preview.content.substring(0, 5000)}{preview.content.length > 5000 ? '\n\n[truncated…]' : ''}</pre>
-              ) : (
-                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No preview available</p>
-              )}
-            </div>
-          </div>
-        </div>
+        <ResourcePreviewModal
+          resource={preview}
+          tenantId={tenantId}
+          summary={summary}
+          summarizing={summarizing}
+          selectedText={selectedText}
+          setSelectedText={setSelectedText}
+          onSummarize={async () => {
+            if (!preview.content) return;
+            setSummarizing(true); setSummary(null);
+            try {
+              const result = await askTutor(tenantId, 'Summarize these notes in bullet points. Be concise.', preview.subject ?? null, [], { resourceContext: preview.content.substring(0, 4000) });
+              setSummary(result);
+            } catch { toast.error('AI summary failed'); }
+            finally { setSummarizing(false); }
+          }}
+          onClose={() => { setPreview(null); setSummary(null); setSelectedText(''); }}
+        />
       )}
     </div>
   );

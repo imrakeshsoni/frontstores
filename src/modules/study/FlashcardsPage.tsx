@@ -6,13 +6,33 @@ import { Plus, Trash2, ChevronLeft, ChevronRight, Loader2, Layers } from 'lucide
 import { useAppStore } from '@/app/store/app.store';
 import {
   listDecks, createDeck, deleteDeck, getCards, addCard, addCards, recordCardReview, deleteCard,
+  getDueCards, updateCardSM2,
   type StudyFlashcardDeck, type StudyFlashcard,
 } from '@/lib/db/study';
 import { generateFlashcards } from '@/lib/study/studyAI';
 
 const SUBJECTS = ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'History', 'Geography', 'English', 'Economics', 'Science', 'Hindi', 'Other'];
 
-type Screen = 'decks' | 'cards' | 'review';
+function DeckMasteryBadge({ tenantId, deckId, cardCount }: { tenantId: string; deckId: string; cardCount: number }) {
+  const { data: cards = [] } = useQuery({
+    queryKey: ['study-mastery', tenantId, deckId],
+    queryFn: () => getCards(tenantId, deckId),
+    enabled: !!tenantId && cardCount > 0,
+  });
+  if (!cards.length) return <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{cardCount} cards</p>;
+  const mastered = cards.filter(c => (c as any).interval_days >= 7).length;
+  const pct = Math.round((mastered / cards.length) * 100);
+  return (
+    <div className="mt-1">
+      <p className="text-xs mb-0.5" style={{ color: 'var(--text-tertiary)' }}>{cardCount} cards · {pct}% mastered</p>
+      <div className="h-1.5 w-24 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: pct === 100 ? '#16a34a' : 'var(--accent)' }} />
+      </div>
+    </div>
+  );
+}
+
+type Screen = 'decks' | 'cards' | 'review' | 'smart-review';
 
 export function FlashcardsPage() {
   const tenantId = useAppStore((s) => s.config?.tenant_id ?? '');
@@ -48,6 +68,12 @@ export function FlashcardsPage() {
   const { data: cards = [], isLoading: cardsLoading } = useQuery({
     queryKey: ['study-cards', tenantId, activeDeck?.id],
     queryFn:  () => activeDeck ? getCards(tenantId, activeDeck.id) : [],
+    enabled:  !!activeDeck,
+  });
+
+  const { data: dueCards = [] } = useQuery({
+    queryKey: ['study-due-cards', tenantId, activeDeck?.id],
+    queryFn:  () => activeDeck ? getDueCards(tenantId, activeDeck.id) : [],
     enabled:  !!activeDeck,
   });
 
@@ -96,8 +122,23 @@ export function FlashcardsPage() {
     else setScreen('cards');
   }
 
+  async function handleSM2Review(quality: number) {
+    // quality: 1=Hard(1), 2=Okay(3), 3=Easy(5)
+    const qMap = [0, 1, 3, 5];
+    const card = dueCards[reviewIdx];
+    await updateCardSM2(card.id, qMap[quality]);
+    setReviewDone(d => ({ correct: d.correct + (quality >= 2 ? 1 : 0), wrong: d.wrong + (quality < 2 ? 1 : 0) }));
+    setFlipped(false);
+    if (reviewIdx + 1 < dueCards.length) setReviewIdx(i => i + 1);
+    else { qc.invalidateQueries({ queryKey: ['study-due-cards'] }); qc.invalidateQueries({ queryKey: ['study-cards'] }); setScreen('cards'); }
+  }
+
   function startReview() {
     setReviewIdx(0); setFlipped(false); setReviewDone({ correct: 0, wrong: 0 }); setScreen('review');
+  }
+
+  function startSmartReview() {
+    setReviewIdx(0); setFlipped(false); setReviewDone({ correct: 0, wrong: 0 }); setScreen('smart-review');
   }
 
   // ── Review screen ──────────────────────────────────────────────────────────
@@ -150,6 +191,71 @@ export function FlashcardsPage() {
     );
   }
 
+  // ── Smart Review (Spaced Repetition) ──────────────────────────────────────
+  if (screen === 'smart-review') {
+    if (dueCards.length === 0) return (
+      <div className="flex-1 flex flex-col items-center justify-center p-6 gap-4 text-center">
+        <p className="text-5xl">🎉</p>
+        <p className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>All caught up!</p>
+        <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No cards due for review today. Come back tomorrow!</p>
+        <button onClick={() => setScreen('cards')} className="px-5 py-2.5 rounded-xl font-semibold text-sm text-white" style={{ background: 'var(--accent)' }}>Back to Deck</button>
+      </div>
+    );
+    if (reviewIdx >= dueCards.length) return (
+      <div className="flex-1 flex flex-col items-center justify-center p-6 gap-4 text-center">
+        <p className="text-5xl">🏆</p>
+        <p className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Review Complete!</p>
+        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>✅ {reviewDone.correct} got it · ❌ {reviewDone.wrong} need work</p>
+        <button onClick={() => setScreen('cards')} className="px-5 py-2.5 rounded-xl font-semibold text-sm text-white mt-2" style={{ background: 'var(--accent)' }}>Done</button>
+      </div>
+    );
+    const card = dueCards[reviewIdx];
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-6 gap-6">
+        <div className="w-full max-w-lg">
+          <div className="flex items-center justify-between mb-2">
+            <button onClick={() => setScreen('cards')} className="text-sm" style={{ color: 'var(--text-tertiary)' }}>← Exit</button>
+            <div className="flex items-center gap-2">
+              <span className="text-xs px-2.5 py-1 rounded-full font-semibold" style={{ background: '#ede9fe', color: '#7c3aed' }}>🧠 Smart Review</span>
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>{reviewIdx + 1}/{dueCards.length}</p>
+            </div>
+            <p className="text-sm">✅ {reviewDone.correct} · ❌ {reviewDone.wrong}</p>
+          </div>
+          <div className="h-2 rounded-full mb-6 overflow-hidden" style={{ background: 'var(--surface-2)' }}>
+            <div className="h-full rounded-full" style={{ width: `${(reviewIdx / dueCards.length) * 100}%`, background: '#7c3aed' }} />
+          </div>
+          <div onClick={() => setFlipped(f => !f)}
+            className="rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer hover:shadow-lg transition-shadow min-h-[220px]"
+            style={{ background: flipped ? '#7c3aed' : 'var(--surface)', border: '2px solid var(--surface-border)' }}>
+            <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: flipped ? 'rgba(255,255,255,0.7)' : 'var(--text-tertiary)' }}>
+              {flipped ? 'Answer' : 'Question — tap to reveal'}
+            </p>
+            <p className="text-lg font-semibold leading-relaxed" style={{ color: flipped ? 'white' : 'var(--text-primary)' }}>
+              {flipped ? card.back : card.front}
+            </p>
+          </div>
+          {flipped && (
+            <div className="flex gap-2 mt-5">
+              <button onClick={() => handleSM2Review(1)}
+                className="flex-1 py-3 rounded-xl font-bold text-sm" style={{ background: '#fef2f2', color: '#dc2626', border: '2px solid #fecaca' }}>
+                😓 Hard
+              </button>
+              <button onClick={() => handleSM2Review(2)}
+                className="flex-1 py-3 rounded-xl font-bold text-sm" style={{ background: '#fef3c7', color: '#d97706', border: '2px solid #fde68a' }}>
+                🤔 Okay
+              </button>
+              <button onClick={() => handleSM2Review(3)}
+                className="flex-1 py-3 rounded-xl font-bold text-sm" style={{ background: '#f0fdf4', color: '#16a34a', border: '2px solid #bbf7d0' }}>
+                ✅ Easy!
+              </button>
+            </div>
+          )}
+          {!flipped && <p className="text-xs text-center mt-4" style={{ color: 'var(--text-tertiary)' }}>Tap the card to see the answer</p>}
+        </div>
+      </div>
+    );
+  }
+
   // ── Cards screen ───────────────────────────────────────────────────────────
   if (screen === 'cards' && activeDeck) return (
     <div className="flex-1 overflow-y-auto p-6 space-y-5">
@@ -162,6 +268,14 @@ export function FlashcardsPage() {
           {activeDeck.subject && <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>{activeDeck.subject}</p>}
         </div>
         <div className="flex gap-2">
+          {dueCards.length > 0 && (
+            <button onClick={startSmartReview}
+              className="px-4 py-2.5 rounded-xl font-semibold text-sm text-white relative"
+              style={{ background: '#7c3aed' }}>
+              🧠 Smart Review
+              <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-xs font-bold" style={{ background: 'rgba(255,255,255,0.25)' }}>{dueCards.length}</span>
+            </button>
+          )}
           {cards.length > 0 && (
             <button onClick={startReview}
               className="px-4 py-2.5 rounded-xl font-semibold text-sm text-white"
@@ -201,6 +315,7 @@ export function FlashcardsPage() {
                 {card.times_reviewed > 0 && (
                   <p className="text-xs mt-1.5" style={{ color: 'var(--text-tertiary)' }}>
                     Reviewed {card.times_reviewed}× · {Math.round((card.times_correct / card.times_reviewed) * 100)}% correct
+                    {(card as any).next_review && <span className="ml-2">· Due {(card as any).next_review}</span>}
                   </p>
                 )}
               </div>
@@ -299,7 +414,7 @@ export function FlashcardsPage() {
             <div className="flex-1 min-w-0">
               <p className="font-bold" style={{ color: 'var(--text-primary)' }}>{deck.name}</p>
               {deck.subject && <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{deck.subject}</p>}
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{deck.card_count} cards</p>
+              <DeckMasteryBadge tenantId={tenantId} deckId={deck.id} cardCount={deck.card_count} />
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               <button onClick={e => { e.stopPropagation(); deleteDeckMutation.mutate(deck.id); }} className="p-1.5 rounded hover:bg-red-50 text-slate-400 hover:text-red-500">

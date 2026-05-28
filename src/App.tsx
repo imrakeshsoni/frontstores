@@ -58,6 +58,38 @@ const StudyTrackerPage        = lazy(() => import('@/modules/study/StudyTrackerP
 const ParentReportPage        = lazy(() => import('@/modules/study/ParentReportPage').then(m => ({ default: m.ParentReportPage })));
 const StudySetupPage          = lazy(() => import('@/modules/study/StudySetupPage').then(m => ({ default: m.StudySetupPage })));
 const StudyResourcesPage      = lazy(() => import('@/modules/study/StudyResourcesPage').then(m => ({ default: m.StudyResourcesPage })));
+const TimetablePage           = lazy(() => import('@/modules/study/TimetablePage').then(m => ({ default: m.TimetablePage })));
+const PomodoroPage            = lazy(() => import('@/modules/study/PomodoroPage').then(m => ({ default: m.PomodoroPage })));
+const ExamsPage               = lazy(() => import('@/modules/study/ExamsPage').then(m => ({ default: m.ExamsPage })));
+const AssignmentsPage         = lazy(() => import('@/modules/study/AssignmentsPage').then(m => ({ default: m.AssignmentsPage })));
+const GoalsPage               = lazy(() => import('@/modules/study/GoalsPage').then(m => ({ default: m.GoalsPage })));
+const BadgesPage              = lazy(() => import('@/modules/study/BadgesPage').then(m => ({ default: m.BadgesPage })));
+const FormulaBankPage         = lazy(() => import('@/modules/study/FormulaBankPage').then(m => ({ default: m.FormulaBankPage })));
+const MindmapPage             = lazy(() => import('@/modules/study/MindmapPage').then(m => ({ default: m.MindmapPage })));
+const PYQPage                 = lazy(() => import('@/modules/study/PYQPage').then(m => ({ default: m.PYQPage })));
+const ChapterChecklistPage    = lazy(() => import('@/modules/study/ChapterChecklistPage').then(m => ({ default: m.ChapterChecklistPage })));
+const RevisionPlannerPage     = lazy(() => import('@/modules/study/RevisionPlannerPage').then(m => ({ default: m.RevisionPlannerPage })));
+const StudyCalendarPage       = lazy(() => import('@/modules/study/StudyCalendarPage').then(m => ({ default: m.StudyCalendarPage })));
+const HeatmapPage             = lazy(() => import('@/modules/study/HeatmapPage').then(m => ({ default: m.HeatmapPage })));
+const UnitConverterPage       = lazy(() => import('@/modules/study/UnitConverterPage').then(m => ({ default: m.UnitConverterPage })));
+const CalculatorPage          = lazy(() => import('@/modules/study/CalculatorPage').then(m => ({ default: m.CalculatorPage })));
+const BackupPage              = lazy(() => import('@/modules/study/BackupPage').then(m => ({ default: m.BackupPage })));
+const RichNotesPage           = lazy(() => import('@/modules/study/RichNotesPage').then(m => ({ default: m.RichNotesPage })));
+const WhiteboardPage          = lazy(() => import('@/modules/study/WhiteboardPage').then(m => ({ default: m.WhiteboardPage })));
+const DoubtBankPage           = lazy(() => import('@/modules/study/DoubtBankPage').then(m => ({ default: m.DoubtBankPage })));
+const ExamResultsPage         = lazy(() => import('@/modules/study/ExamResultsPage').then(m => ({ default: m.ExamResultsPage })));
+const AttendancePage          = lazy(() => import('@/modules/study/AttendancePage').then(m => ({ default: m.AttendancePage })));
+const TodayFocusPage          = lazy(() => import('@/modules/study/TodayFocusPage').then(m => ({ default: m.TodayFocusPage })));
+const ExamRegistrationsPage   = lazy(() => import('@/modules/study/ExamRegistrationsPage').then(m => ({ default: m.ExamRegistrationsPage })));
+const VocabularyPage          = lazy(() => import('@/modules/study/VocabularyPage').then(m => ({ default: m.VocabularyPage })));
+const PeriodicTablePage       = lazy(() => import('@/modules/study/PeriodicTablePage').then(m => ({ default: m.PeriodicTablePage })));
+const VideoBookmarksPage      = lazy(() => import('@/modules/study/VideoBookmarksPage').then(m => ({ default: m.VideoBookmarksPage })));
+const ConceptCardsPage        = lazy(() => import('@/modules/study/ConceptCardsPage').then(m => ({ default: m.ConceptCardsPage })));
+const SleepTrackerPage        = lazy(() => import('@/modules/study/SleepTrackerPage').then(m => ({ default: m.SleepTrackerPage })));
+const StudyWrappedPage        = lazy(() => import('@/modules/study/StudyWrappedPage').then(m => ({ default: m.StudyWrappedPage })));
+const WritingPracticePage     = lazy(() => import('@/modules/study/WritingPracticePage').then(m => ({ default: m.WritingPracticePage })));
+const BrainBreakPage          = lazy(() => import('@/modules/study/BrainBreakPage').then(m => ({ default: m.BrainBreakPage })));
+const MathConstantsPage       = lazy(() => import('@/modules/study/MathConstantsPage').then(m => ({ default: m.MathConstantsPage })));
 
 // [beauty] [all tenants]
 const BeautyDashboard         = lazy(() => import('@/modules/beauty/BeautyDashboard').then(m => ({ default: m.BeautyDashboard })));
@@ -167,10 +199,42 @@ export default function App() {
             <Route path="study/ask"        element={<AskAIPage />} />
             <Route path="study/mock-tests" element={<MockTestPage />} />
             <Route path="study/flashcards" element={<FlashcardsPage />} />
-            <Route path="study/resources"  element={<StudyResourcesPage />} />
-            <Route path="study/tracker"    element={<StudyTrackerPage />} />
-            <Route path="study/parents"    element={<ParentReportPage />} />
-            <Route path="study/setup"      element={<StudySetupPage />} />
+            <Route path="study/resources"    element={<StudyResourcesPage />} />
+            <Route path="study/tracker"      element={<StudyTrackerPage />} />
+            <Route path="study/parents"      element={<ParentReportPage />} />
+            <Route path="study/setup"        element={<StudySetupPage />} />
+            <Route path="study/timetable"    element={<TimetablePage />} />
+            <Route path="study/pomodoro"     element={<PomodoroPage />} />
+            <Route path="study/exams"        element={<ExamsPage />} />
+            <Route path="study/assignments"  element={<AssignmentsPage />} />
+            <Route path="study/goals"        element={<GoalsPage />} />
+            <Route path="study/badges"       element={<BadgesPage />} />
+            <Route path="study/formulas"     element={<FormulaBankPage />} />
+            <Route path="study/mindmaps"     element={<MindmapPage />} />
+            <Route path="study/pyq"          element={<PYQPage />} />
+            <Route path="study/chapters"     element={<ChapterChecklistPage />} />
+            <Route path="study/revision"     element={<RevisionPlannerPage />} />
+            <Route path="study/calendar"     element={<StudyCalendarPage />} />
+            <Route path="study/analytics"    element={<HeatmapPage />} />
+            <Route path="study/converter"    element={<UnitConverterPage />} />
+            <Route path="study/calculator"   element={<CalculatorPage />} />
+            <Route path="study/backup"       element={<BackupPage />} />
+            <Route path="study/notes"        element={<RichNotesPage />} />
+            <Route path="study/whiteboard"   element={<WhiteboardPage />} />
+            <Route path="study/doubts"       element={<DoubtBankPage />} />
+            <Route path="study/results"      element={<ExamResultsPage />} />
+            <Route path="study/attendance"   element={<AttendancePage />} />
+            <Route path="study/focus"        element={<TodayFocusPage />} />
+            <Route path="study/registrations" element={<ExamRegistrationsPage />} />
+            <Route path="study/vocabulary"   element={<VocabularyPage />} />
+            <Route path="study/periodic"     element={<PeriodicTablePage />} />
+            <Route path="study/videos"       element={<VideoBookmarksPage />} />
+            <Route path="study/concepts"     element={<ConceptCardsPage />} />
+            <Route path="study/sleep"        element={<SleepTrackerPage />} />
+            <Route path="study/wrapped"      element={<StudyWrappedPage />} />
+            <Route path="study/writing"      element={<WritingPracticePage />} />
+            <Route path="study/brain-break"  element={<BrainBreakPage />} />
+            <Route path="study/constants"    element={<MathConstantsPage />} />
 
             {/* [beauty] [all tenants] */}
             <Route path="beauty/dashboard"              element={<BeautyDashboard />} />

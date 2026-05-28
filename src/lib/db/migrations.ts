@@ -20,6 +20,9 @@ import migration0019 from '../../../src-tauri/migrations/0019_beauty.sql?raw';
 import migration0020 from '../../../src-tauri/migrations/0020_study.sql?raw';
 import migration0021 from '../../../src-tauri/migrations/0021_study_resources.sql?raw';
 import migration0022 from '../../../src-tauri/migrations/0022_study_ai_persona.sql?raw';
+import migration0023 from '../../../src-tauri/migrations/0023_study_new_features.sql?raw';
+import migration0024 from '../../../src-tauri/migrations/0024_study_round2.sql?raw';
+import migration0025 from '../../../src-tauri/migrations/0025_study_round3.sql?raw';
 
 export interface Migration {
   name: string;
@@ -50,5 +53,8 @@ export async function readMigrations(): Promise<Migration[]> {
     { name: '0020_study', sql: migration0020 },
     { name: '0021_study_resources', sql: migration0021 },
     { name: '0022_study_ai_persona', sql: migration0022 },
+    { name: '0023_study_new_features', sql: migration0023 },
+    { name: '0024_study_round2', sql: migration0024 },
+    { name: '0025_study_round3', sql: migration0025 },
   ];
 }

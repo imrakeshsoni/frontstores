@@ -6,7 +6,7 @@ import { ClipboardList, Plus, ChevronRight, CheckCircle, XCircle, Loader2 } from
 import { useAppStore } from '@/app/store/app.store';
 import {
   listMockTests, createMockTest, getTestWithQuestions, submitTestAnswer, completeTest,
-  getStudyConfig, type StudyMockQuestion,
+  getStudyConfig, getWeakTopics, type StudyMockQuestion,
 } from '@/lib/db/study';
 import { generateMockTest } from '@/lib/study/studyAI';
 
@@ -240,6 +240,8 @@ export function MockTestPage() {
         </button>
       </div>
 
+      <WeakTopicsPanel tenantId={tenantId} onRetake={(subj, chap) => { setSubject(subj); setChapter(chap); setScreen('setup'); }} />
+
       {isLoading && Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-16 rounded-2xl animate-pulse" style={{ background: 'var(--surface)' }} />)}
 
       {!isLoading && tests.length === 0 && (
@@ -278,6 +280,47 @@ export function MockTestPage() {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function WeakTopicsPanel({ tenantId, onRetake }: { tenantId: string; onRetake: (subject: string, chapter: string) => void }) {
+  const { data: weakTopics = [] } = useQuery({
+    queryKey: ['study-weak-topics', tenantId],
+    queryFn: () => getWeakTopics(tenantId),
+    enabled: !!tenantId,
+  });
+
+  if (!weakTopics.length) return null;
+
+  const needsWork = weakTopics.filter(t => t.avg_score < 60);
+  if (!needsWork.length) return null;
+
+  return (
+    <div className="rounded-2xl p-5" style={{ background: '#fef2f2', border: '2px solid #fecaca' }}>
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-xl">🎯</span>
+        <p className="font-bold" style={{ color: '#dc2626' }}>Topics That Need Work</p>
+      </div>
+      <p className="text-xs mb-4" style={{ color: '#b91c1c' }}>Based on your test history — retake these to improve</p>
+      <div className="space-y-2">
+        {needsWork.map(t => (
+          <div key={`${t.subject}-${t.chapter}`}
+            className="flex items-center gap-3 rounded-xl p-3"
+            style={{ background: 'rgba(255,255,255,0.7)' }}>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm" style={{ color: '#7f1d1d' }}>{t.chapter}</p>
+              <p className="text-xs" style={{ color: '#b91c1c' }}>{t.subject} · {t.attempts} attempt{t.attempts > 1 ? 's' : ''} · Avg {Math.round(t.avg_score)}%</p>
+            </div>
+            <div className="h-2 w-16 rounded-full overflow-hidden" style={{ background: '#fee2e2' }}>
+              <div className="h-full rounded-full" style={{ width: `${t.avg_score}%`, background: t.avg_score < 40 ? '#dc2626' : '#f97316' }} />
+            </div>
+            <button onClick={() => onRetake(t.subject, t.chapter)}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold text-white flex-shrink-0"
+              style={{ background: '#dc2626' }}>Retake</button>
+          </div>
+        ))}
       </div>
     </div>
   );

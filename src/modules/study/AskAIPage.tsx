@@ -287,6 +287,22 @@ export function AskAIPage() {
             </div>
           )}
 
+          {/* Quick action buttons */}
+          <div className="flex gap-2 flex-wrap mb-2">
+            {[
+              { label: '📷 Solve from Image', action: () => { imgInputRef.current?.click(); } },
+              { label: '✏️ Check My Answer', action: () => setInput(prev => prev || 'Check my answer: ') },
+              { label: '🔍 Simplify This', action: () => setInput(prev => prev || 'Explain this in the simplest way possible: ') },
+              { label: '📝 Essay Help', action: () => setInput(prev => prev || 'Help me write an essay on: ') },
+            ].map(btn => (
+              <button key={btn.label} onClick={btn.action} disabled={!aiOnline}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold border disabled:opacity-40 transition-colors hover:bg-opacity-80"
+                style={{ background: 'var(--surface)', borderColor: 'var(--surface-border)', color: 'var(--text-secondary)' }}>
+                {btn.label}
+              </button>
+            ))}
+          </div>
+
           <div className="flex gap-2">
             {/* Attach image button */}
             <button onClick={() => imgInputRef.current?.click()}
