@@ -307,6 +307,53 @@ const publicServer = http.createServer(async (req, res) => {
     return;
   }
 
+  // POST /ai/study/websearch — [study] search the web via DuckDuckGo and return context snippets
+  if (req.method === 'POST' && pathname === '/ai/study/websearch') {
+    if (rateLimit(req, res, 'ai-study-search', 20, 60 * 1000)) return;
+    const body = await readBody(req);
+    try {
+      const { query } = JSON.parse(body);
+      if (!query) { res.writeHead(400); res.end('Missing query'); return; }
+      const q = encodeURIComponent(sanitize(query, 200));
+      const results = [];
+
+      // 1. DuckDuckGo Instant Answers (JSON, free, no key)
+      try {
+        const iaRes = await fetch(`https://api.duckduckgo.com/?q=${q}&format=json&no_html=1&skip_disambig=1`, {
+          headers: { 'User-Agent': 'StudyMate/1.0' }, signal: AbortSignal.timeout(6000),
+        });
+        const ia = await iaRes.json();
+        if (ia.AbstractText) results.push({ source: ia.AbstractSource || 'Web', text: ia.AbstractText });
+        if (ia.Answer)       results.push({ source: 'Direct Answer', text: ia.Answer });
+        for (const t of (ia.RelatedTopics || []).slice(0, 3)) {
+          if (t.Text && t.Text.length > 40) results.push({ source: t.FirstURL || '', text: t.Text });
+        }
+      } catch {}
+
+      // 2. DuckDuckGo HTML search for more results
+      if (results.length < 3) {
+        try {
+          const htmlRes = await fetch(`https://html.duckduckgo.com/html/?q=${q}`, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
+            signal: AbortSignal.timeout(8000),
+          });
+          const html = await htmlRes.text();
+          const snippets = [...html.matchAll(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g)].slice(0, 5);
+          for (const m of snippets) {
+            const text = m[1].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').trim();
+            if (text.length > 50) results.push({ source: 'Web', text });
+          }
+        } catch {}
+      }
+
+      json(res, { ok: true, results: results.slice(0, 5) });
+    } catch (e) {
+      console.error('websearch error:', e);
+      json(res, { ok: false, results: [] });
+    }
+    return;
+  }
+
   // POST /ai/study/test — [study] generate mock test MCQs via Ollama
   if (req.method === 'POST' && pathname === '/ai/study/test') {
     if (rateLimit(req, res, 'ai-study-test', 10, 60 * 1000)) return;

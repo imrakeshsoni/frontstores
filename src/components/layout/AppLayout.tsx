@@ -105,13 +105,14 @@ const CLINIC_NAV_ITEMS = [
 
 // [study] [all tenants]
 const STUDY_NAV_ITEMS = [
-  { to: '/study/dashboard', icon: LayoutDashboard, label: 'Dashboard',     iconBg: '#ede9fe', iconColor: '#7c3aed' },
-  { to: '/study/ask',       icon: Brain,           label: 'Ask AI',        iconBg: '#dbeafe', iconColor: '#2563eb' },
-  { to: '/study/mock-tests',icon: ClipboardList,   label: 'Mock Tests',    iconBg: '#dcfce7', iconColor: '#16a34a' },
-  { to: '/study/flashcards',icon: BookOpen,        label: 'Flashcards',    iconBg: '#fef3c7', iconColor: '#d97706' },
-  { to: '/study/tracker',   icon: FlameIcon,       label: 'Study Tracker', iconBg: '#fee2e2', iconColor: '#dc2626' },
-  { to: '/study/parents',   icon: GraduationCap,   label: 'Parent View',   iconBg: '#fce7f3', iconColor: '#db2777' },
-  { to: '/study/setup',     icon: Settings,        label: 'Profile',       iconBg: '#f1f5f9', iconColor: '#64748b' },
+  { to: '/study/dashboard',  icon: LayoutDashboard, label: 'Dashboard',     iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/study/ask',        icon: Brain,           label: 'Ask AI',        iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/study/mock-tests', icon: ClipboardList,   label: 'Mock Tests',    iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/study/flashcards', icon: BookOpen,        label: 'Flashcards',    iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/study/resources',  icon: Boxes,           label: 'My Resources',  iconBg: '#fce7f3', iconColor: '#db2777' },
+  { to: '/study/tracker',    icon: FlameIcon,       label: 'Study Tracker', iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/study/parents',    icon: GraduationCap,   label: 'Parent View',   iconBg: '#f0fdf4', iconColor: '#16a34a' },
+  { to: '/study/setup',      icon: Settings,        label: 'Profile',       iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
 
 // [beauty] [all tenants]
@@ -309,8 +310,8 @@ export function AppLayout() {
         </main>
       </div>
 
-      {/* AI Voice Assistant — floating button, available on all pages */}
-      <VoiceAssistant />
+      {/* AI Voice Assistant — all apps except study (has its own Ask AI page) */}
+      {config?.shop_type !== 'study' && <VoiceAssistant />}
     </div>
   );
 }

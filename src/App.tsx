@@ -57,6 +57,7 @@ const FlashcardsPage          = lazy(() => import('@/modules/study/FlashcardsPag
 const StudyTrackerPage        = lazy(() => import('@/modules/study/StudyTrackerPage').then(m => ({ default: m.StudyTrackerPage })));
 const ParentReportPage        = lazy(() => import('@/modules/study/ParentReportPage').then(m => ({ default: m.ParentReportPage })));
 const StudySetupPage          = lazy(() => import('@/modules/study/StudySetupPage').then(m => ({ default: m.StudySetupPage })));
+const StudyResourcesPage      = lazy(() => import('@/modules/study/StudyResourcesPage').then(m => ({ default: m.StudyResourcesPage })));
 
 // [beauty] [all tenants]
 const BeautyDashboard         = lazy(() => import('@/modules/beauty/BeautyDashboard').then(m => ({ default: m.BeautyDashboard })));
@@ -166,6 +167,7 @@ export default function App() {
             <Route path="study/ask"        element={<AskAIPage />} />
             <Route path="study/mock-tests" element={<MockTestPage />} />
             <Route path="study/flashcards" element={<FlashcardsPage />} />
+            <Route path="study/resources"  element={<StudyResourcesPage />} />
             <Route path="study/tracker"    element={<StudyTrackerPage />} />
             <Route path="study/parents"    element={<ParentReportPage />} />
             <Route path="study/setup"      element={<StudySetupPage />} />
