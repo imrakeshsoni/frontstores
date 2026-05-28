@@ -12,6 +12,7 @@ const http   = require('http');
 const fs     = require('fs');
 const path   = require('path');
 const crypto = require('crypto');
+const { spawn, execSync } = require('child_process');
 
 process.on('uncaughtException', (err) => {
   console.error('uncaughtException:', err.stack || err);
@@ -77,6 +78,9 @@ const DATA_DIR      = process.env.DATA_DIR || path.join(__dirname, 'data');
 const SUBS_FILE     = path.join(DATA_DIR, 'subscriptions.json');
 const ERRORS_FILE   = path.join(DATA_DIR, 'errors.json');
 const CONTACTS_FILE = path.join(DATA_DIR, 'contacts.json');
+const ACTIVITY_FILE  = path.join(DATA_DIR, 'activity.json');
+const BROADCAST_FILE = path.join(DATA_DIR, 'broadcast.json');
+const NOTES_FILE     = path.join(DATA_DIR, 'notes.json');
 
 // Ensure data dir exists
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -87,7 +91,20 @@ function saveSubs(d)        { fs.writeFileSync(SUBS_FILE,      JSON.stringify(d,
 function loadErrors()       { try { return JSON.parse(fs.readFileSync(ERRORS_FILE,    'utf8')); } catch { return []; } }
 function loadContacts()     { try { return JSON.parse(fs.readFileSync(CONTACTS_FILE,  'utf8')); } catch { return []; } }
 function saveContacts(d)    { fs.writeFileSync(CONTACTS_FILE,  JSON.stringify(d, null, 2)); }
-function saveErrors(d)   { fs.writeFileSync(ERRORS_FILE, JSON.stringify(d, null, 2)); }
+function saveErrors(d)      { fs.writeFileSync(ERRORS_FILE, JSON.stringify(d, null, 2)); }
+function loadActivity()     { try { return JSON.parse(fs.readFileSync(ACTIVITY_FILE,  'utf8')); } catch { return []; } }
+function saveActivity(d)    { fs.writeFileSync(ACTIVITY_FILE,  JSON.stringify(d, null, 2)); }
+function loadBroadcast()    { try { return JSON.parse(fs.readFileSync(BROADCAST_FILE, 'utf8')); } catch { return []; } }
+function saveBroadcast(d)   { fs.writeFileSync(BROADCAST_FILE, JSON.stringify(d, null, 2)); }
+function loadNotes()        { try { return JSON.parse(fs.readFileSync(NOTES_FILE,     'utf8')); } catch { return {}; } }
+function saveNotes(d)       { fs.writeFileSync(NOTES_FILE,     JSON.stringify(d, null, 2)); }
+
+function logActivity(tenantId, shopName, action, detail='') {
+  const log = loadActivity();
+  log.unshift({ id: crypto.randomUUID(), tenant_id: tenantId, shop_name: shopName, action, detail, at: new Date().toISOString() });
+  if (log.length > 500) log.length = 500; // keep last 500
+  saveActivity(log);
+}
 
 function addDays(from, days) {
   const d = new Date(from); d.setDate(d.getDate() + days);
@@ -644,6 +661,8 @@ const adminServer = http.createServer(async (req, res) => {
       console.log(`✅ Approved: ${subs[tenantId].shop_name} → 30-day trial starts now`);
     }
     saveSubs(subs);
+    const actionLabels = { extend: '+30 days', freeze: 'Frozen', unfreeze: 'Unfrozen', revoke: 'Revoked', approve: 'Approved — 30d trial' };
+    logActivity(tenantId, subs[tenantId].shop_name, action, actionLabels[action] || action);
     json(res, { ok: true, expires_at: subs[tenantId].expires_at }); return;
   }
 
@@ -710,6 +729,472 @@ const adminServer = http.createServer(async (req, res) => {
     if (idx !== -1) contacts[idx].resolved = true;
     saveContacts(contacts);
     json(res, { ok: true }); return;
+  }
+
+  // POST /admin/api/customers/:id/extend-custom
+  const extendCustomAction = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/extend-custom$/);
+  if (req.method === 'POST' && extendCustomAction) {
+    const tenantId = extendCustomAction[1];
+    const body = await readBody(req);
+    try {
+      const { days, expiry_date } = JSON.parse(body);
+      const subs = loadSubs();
+      if (!subs[tenantId]) { json(res, { ok: false, error: 'Not found' }, 404); return; }
+      let newExpiry;
+      if (expiry_date) {
+        newExpiry = new Date(expiry_date).toISOString().replace('T',' ').substring(0,19);
+        logActivity(tenantId, subs[tenantId].shop_name, 'extend-custom', `Set expiry to ${expiry_date}`);
+      } else if (days) {
+        const base = new Date(subs[tenantId].expires_at) > new Date() ? subs[tenantId].expires_at : new Date().toISOString();
+        newExpiry = addDays(base, parseInt(days));
+        logActivity(tenantId, subs[tenantId].shop_name, 'extend-custom', `Extended +${days}d`);
+      } else { json(res, { ok: false, error: 'Provide days or expiry_date' }, 400); return; }
+      subs[tenantId].expires_at = newExpiry;
+      subs[tenantId].account_status = 'active';
+      subs[tenantId].extended_at = new Date().toISOString();
+      saveSubs(subs);
+      json(res, { ok: true, expires_at: newExpiry });
+    } catch { res.writeHead(400); res.end('Bad request'); }
+    return;
+  }
+
+  // POST /admin/api/customers/:id/set-plan-type
+  const planTypeAction = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/set-plan-type$/);
+  if (req.method === 'POST' && planTypeAction) {
+    const tenantId = planTypeAction[1];
+    const body = await readBody(req);
+    try {
+      const { plan_type } = JSON.parse(body);
+      if (!['trial','monthly','yearly'].includes(plan_type)) { res.writeHead(400); res.end('Invalid plan_type'); return; }
+      const subs = loadSubs();
+      if (!subs[tenantId]) { json(res, { ok: false, error: 'Not found' }, 404); return; }
+      subs[tenantId].plan_type = plan_type;
+      saveSubs(subs);
+      logActivity(tenantId, subs[tenantId].shop_name, 'set-plan-type', plan_type);
+      json(res, { ok: true });
+    } catch { res.writeHead(400); res.end('Bad request'); }
+    return;
+  }
+
+  // GET /admin/api/customers/:id/notes
+  const notesGetAction = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/notes$/);
+  if (req.method === 'GET' && notesGetAction) {
+    const tenantId = notesGetAction[1];
+    const notes = loadNotes();
+    json(res, { notes: notes[tenantId] || '' }); return;
+  }
+
+  // POST /admin/api/customers/:id/notes
+  const notesPostAction = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/notes$/);
+  if (req.method === 'POST' && notesPostAction) {
+    const tenantId = notesPostAction[1];
+    const body = await readBody(req);
+    try {
+      const { notes } = JSON.parse(body);
+      const allNotes = loadNotes();
+      allNotes[tenantId] = String(notes || '').substring(0, 5000);
+      saveNotes(allNotes);
+      json(res, { ok: true });
+    } catch { res.writeHead(400); res.end('Bad request'); }
+    return;
+  }
+
+  // POST /admin/api/customers/:id/comm-log
+  const commLogAction = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/comm-log$/);
+  if (req.method === 'POST' && commLogAction) {
+    const tenantId = commLogAction[1];
+    const body = await readBody(req);
+    try {
+      const { channel, message } = JSON.parse(body);
+      if (!['whatsapp','email','call','other'].includes(channel)) { res.writeHead(400); res.end('Invalid channel'); return; }
+      const subs = loadSubs();
+      if (!subs[tenantId]) { json(res, { ok: false, error: 'Not found' }, 404); return; }
+      if (!Array.isArray(subs[tenantId].comm_log)) subs[tenantId].comm_log = [];
+      subs[tenantId].comm_log.push({ channel, message: sanitize(message, 1000), at: new Date().toISOString() });
+      saveSubs(subs);
+      logActivity(tenantId, subs[tenantId].shop_name, 'comm-log', `${channel}: ${sanitize(message, 60)}`);
+      json(res, { ok: true });
+    } catch { res.writeHead(400); res.end('Bad request'); }
+    return;
+  }
+
+  // POST /admin/api/bulk
+  if (req.method === 'POST' && pathname === '/admin/api/bulk') {
+    const body = await readBody(req);
+    try {
+      const { action, days = 30 } = JSON.parse(body);
+      const subs = loadSubs();
+      const now = new Date();
+      let count = 0;
+      if (action === 'approve-pending') {
+        for (const [id, s] of Object.entries(subs)) {
+          if (s.account_status === 'pending') {
+            subs[id].account_status = 'active';
+            subs[id].expires_at = addDays(now.toISOString(), 30);
+            subs[id].approved_at = now.toISOString();
+            logActivity(id, s.shop_name, 'bulk-approve', 'Bulk approved');
+            count++;
+          }
+        }
+      } else if (action === 'extend-expiring') {
+        for (const [id, s] of Object.entries(subs)) {
+          if (s.account_status === 'active' && s.expires_at) {
+            const d = Math.ceil((new Date(s.expires_at) - now) / 864e5);
+            if (d >= 0 && d <= 7) {
+              subs[id].expires_at = addDays(s.expires_at, parseInt(days));
+              logActivity(id, s.shop_name, 'bulk-extend', `+${days}d (was expiring in ${d}d)`);
+              count++;
+            }
+          }
+        }
+      } else if (action === 'extend-expired') {
+        for (const [id, s] of Object.entries(subs)) {
+          if (s.account_status !== 'frozen' && s.account_status !== 'revoked' && s.expires_at && new Date(s.expires_at) < now) {
+            subs[id].expires_at = addDays(now.toISOString(), parseInt(days));
+            subs[id].account_status = 'active';
+            logActivity(id, s.shop_name, 'bulk-extend-expired', `+${days}d`);
+            count++;
+          }
+        }
+      } else { res.writeHead(400); res.end('Invalid action'); return; }
+      saveSubs(subs);
+      json(res, { ok: true, count });
+    } catch { res.writeHead(400); res.end('Bad request'); }
+    return;
+  }
+
+  // GET /admin/api/customers/export.csv
+  if (req.method === 'GET' && pathname === '/admin/api/customers/export.csv') {
+    const subs = loadSubs();
+    const rows = [['shop_name','owner_name','shop_type','phone','email','city','account_status','plan_type','expires_at','registered_at']];
+    for (const s of Object.values(subs)) {
+      rows.push([
+        s.shop_name||'', s.owner_name||'', s.shop_type||'', s.phone||'', s.email||'',
+        s.city||'', s.account_status||'', s.plan_type||'', s.expires_at||'', s.registered_at||''
+      ].map(v => `"${String(v).replace(/"/g,'""')}"`));
+    }
+    const csv = rows.map(r=>r.join(',')).join('\r\n');
+    res.writeHead(200, { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="customers.csv"' });
+    res.end(csv); return;
+  }
+
+  // GET /admin/api/analytics
+  if (req.method === 'GET' && pathname === '/admin/api/analytics') {
+    const subs = loadSubs();
+    const now = new Date();
+    const list = Object.values(subs);
+    let total=0, active=0, trial=0, paid=0, expiring7=0, expiring30=0, churnThisMonth=0;
+    let mrr=0, totalPaid=0;
+    const byType = {};
+    const signupByMonth = {};
+
+    for (const s of list) {
+      total++;
+      const dLeft = s.expires_at ? Math.ceil((new Date(s.expires_at)-now)/864e5) : 0;
+      const isActive = s.account_status==='active' && dLeft>0;
+      if (isActive) active++;
+      const pt = s.plan_type || (isActive ? 'monthly' : 'trial');
+      if (pt==='trial') trial++;
+      else if (isActive) { paid++; }
+      if (isActive && dLeft<=7) expiring7++;
+      if (isActive && dLeft<=30) expiring30++;
+
+      // Revenue estimate
+      if (isActive) {
+        if (pt==='yearly')  { mrr += 999/12; totalPaid += 999; }
+        else                { mrr += 999;    totalPaid += 999; }
+      }
+
+      // Churn: expired this calendar month
+      if (s.expires_at) {
+        const exp = new Date(s.expires_at);
+        if (exp < now && exp.getFullYear()===now.getFullYear() && exp.getMonth()===now.getMonth()) churnThisMonth++;
+      }
+
+      // By app type
+      const st = s.shop_type || 'unknown';
+      byType[st] = (byType[st]||0)+1;
+
+      // Signups by month (last 12)
+      if (s.registered_at) {
+        const d = new Date(s.registered_at);
+        const m = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+        signupByMonth[m] = (signupByMonth[m]||0)+1;
+      }
+    }
+
+    // Build last 12 months array
+    const months = [];
+    for (let i=11; i>=0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+      const m = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      months.push({ month: m, count: signupByMonth[m]||0 });
+    }
+
+    json(res, {
+      revenue: { mrr: Math.round(mrr), arr: Math.round(mrr*12), total_paid: Math.round(totalPaid) },
+      by_app_type: byType,
+      signups_by_month: months,
+      expiring_7d: expiring7, expiring_30d: expiring30,
+      churn_this_month: churnThisMonth,
+      total, active, trial, paid,
+    }); return;
+  }
+
+  // GET /admin/api/health
+  if (req.method === 'GET' && pathname === '/admin/api/health') {
+    const { execSync } = require('child_process');
+    const results = { ollama: { ok: false, models: [] }, cloudflare: { ok: false }, tts: { ok: false }, server_uptime_seconds: Math.floor(process.uptime()) };
+
+    // Ollama
+    try {
+      const r = await fetch('http://127.0.0.1:11434/api/tags', { signal: AbortSignal.timeout(2000) });
+      if (r.ok) {
+        const d = await r.json();
+        results.ollama = { ok: true, models: (d.models||[]).map(m=>m.name) };
+      }
+    } catch {}
+
+    // Cloudflare tunnel
+    try {
+      execSync('pgrep -x cloudflared', { stdio: 'pipe' });
+      results.cloudflare = { ok: true };
+    } catch {}
+
+    // TTS
+    try {
+      const r = await fetch('http://127.0.0.1:8880/health', { signal: AbortSignal.timeout(2000) });
+      results.tts = { ok: r.ok };
+    } catch {}
+
+    json(res, results); return;
+  }
+
+  // GET /admin/api/activity
+  if (req.method === 'GET' && pathname === '/admin/api/activity') {
+    const url2 = new URL(req.url, `http://localhost:${ADMIN_PORT}`);
+    const filterTenant = url2.searchParams.get('tenant_id');
+    let log = loadActivity();
+    if (filterTenant) log = log.filter(e => e.tenant_id === filterTenant);
+    json(res, log.slice(0, 200)); return;
+  }
+
+  // GET /admin/api/broadcast
+  if (req.method === 'GET' && pathname === '/admin/api/broadcast') {
+    json(res, loadBroadcast()); return;
+  }
+
+  // POST /admin/api/broadcast
+  if (req.method === 'POST' && pathname === '/admin/api/broadcast') {
+    const body = await readBody(req);
+    try {
+      const { title, message } = JSON.parse(body);
+      if (!title || !message) { res.writeHead(400); res.end('Missing title or message'); return; }
+      const broadcasts = loadBroadcast();
+      broadcasts.unshift({ id: crypto.randomUUID(), title: sanitize(title, 200), message: sanitize(message, 2000), created_at: new Date().toISOString(), active: true });
+      saveBroadcast(broadcasts);
+      json(res, { ok: true });
+    } catch { res.writeHead(400); res.end('Bad request'); }
+    return;
+  }
+
+  // POST /admin/api/broadcast/:id/deactivate
+  const broadcastDeact = pathname.match(/^\/admin\/api\/broadcast\/([^/]+)\/deactivate$/);
+  if (req.method === 'POST' && broadcastDeact) {
+    const broadcasts = loadBroadcast();
+    const idx = broadcasts.findIndex(b => b.id === broadcastDeact[1]);
+    if (idx !== -1) broadcasts[idx].active = false;
+    saveBroadcast(broadcasts);
+    json(res, { ok: true }); return;
+  }
+
+  // ── Auto-Fix & Deploy ─────────────────────────────────────────────────────
+
+  const AUTOFIX_STATUS_FILE = path.join(DATA_DIR, 'autofix-status.json');
+  const PROJECT_DIR = path.join(__dirname, '..');
+
+  function loadAutofixStatus() {
+    try { return JSON.parse(fs.readFileSync(AUTOFIX_STATUS_FILE, 'utf8')); }
+    catch { return { status: 'idle', log: [], result: null, started_at: null }; }
+  }
+  function saveAutofixStatus(d) { fs.writeFileSync(AUTOFIX_STATUS_FILE, JSON.stringify(d, null, 2)); }
+
+  function findClaudeBin() {
+    const pattern = path.join(process.env.HOME, '.vscode', 'extensions', 'anthropic.claude-code-*', 'resources', 'native-binary', 'claude');
+    try {
+      const result = execSync(`ls ${pattern} 2>/dev/null | sort -V | tail -1`, { encoding: 'utf8' }).trim();
+      if (result && fs.existsSync(result)) return result;
+    } catch {}
+    return null;
+  }
+
+  // GET /admin/api/autofix/status
+  if (req.method === 'GET' && pathname === '/admin/api/autofix/status') {
+    json(res, loadAutofixStatus()); return;
+  }
+
+  // POST /admin/api/autofix/cancel
+  if (req.method === 'POST' && pathname === '/admin/api/autofix/cancel') {
+    const st = loadAutofixStatus();
+    if (st.pid) {
+      try { process.kill(st.pid, 'SIGTERM'); } catch {}
+    }
+    saveAutofixStatus({ status: 'idle', log: [], result: null, started_at: null });
+    json(res, { ok: true }); return;
+  }
+
+  // POST /admin/api/autofix/start
+  if (req.method === 'POST' && pathname === '/admin/api/autofix/start') {
+    const st = loadAutofixStatus();
+    if (st.status === 'running') { json(res, { ok: false, error: 'Already running' }); return; }
+
+    const claudeBin = findClaudeBin();
+    if (!claudeBin) { json(res, { ok: false, error: 'Claude CLI not found. Install Claude Code extension first.' }); return; }
+
+    // Gather all unresolved errors
+    const subs = loadSubs();
+    const allErrors = loadErrors().filter(e => !e.resolved);
+    if (allErrors.length === 0) { json(res, { ok: false, error: 'No unresolved errors to fix.' }); return; }
+
+    // Deduplicate by error message
+    const seen = new Set();
+    const uniqueErrors = allErrors.filter(e => {
+      const key = (e.message || e.error || '').substring(0, 200);
+      if (seen.has(key)) return false;
+      seen.add(key); return true;
+    });
+
+    // Build error summary for Claude
+    const errorList = uniqueErrors.slice(0, 30).map((e, i) => {
+      const shop = subs[e.tenant_id]?.shop_name || 'Unknown';
+      const shopType = subs[e.tenant_id]?.shop_type || '';
+      return `Error ${i+1}: [${shopType}] ${shop}
+Message: ${e.message || e.error || 'No message'}
+${e.stack ? `Stack: ${String(e.stack).substring(0, 500)}` : ''}
+${e.context ? `Context: ${JSON.stringify(e.context).substring(0, 300)}` : ''}
+---`;
+    }).join('\n');
+
+    // Get latest git tag for next version
+    let latestTag = 'v1.0.0';
+    try { latestTag = execSync('git -C "' + PROJECT_DIR + '" tag --sort=-v:refname | head -1', { encoding: 'utf8' }).trim() || 'v1.0.0'; } catch {}
+    const parts = latestTag.replace('v','').split('.').map(Number);
+    const nextTag = `v${parts[0]}.${parts[1]}.${(parts[2]||0)+1}`;
+
+    const prompt = `You are fixing production bugs reported by real customers of the FrontStores app (a Tauri + React desktop app for Indian shop owners).
+
+Working directory: ${PROJECT_DIR}
+
+Here are ${uniqueErrors.length} unique error reports from customer devices (deduplicated from ${allErrors.length} total):
+
+${errorList}
+
+Your tasks — do them IN ORDER, no skipping:
+1. Analyze each error and identify the root cause in the codebase using grep/read tools
+2. Fix each bug. Tag every code change with // [apptype] [all tenants]
+3. Run: cd "${PROJECT_DIR}" && npx tsc --noEmit
+4. If TypeScript check passes, commit: git add -A && git commit -m "fix: auto-fix production errors [all apps] [all tenants] - Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
+5. Create and push tag: git tag ${nextTag} && git push origin main && git push origin ${nextTag}
+6. After everything is done, output this EXACT line at the very end (replace placeholders):
+AUTOFIX_RESULT:{"fixed":["brief description of fix 1","fix 2"],"version":"${nextTag}","count":N}
+
+Rules:
+- Fix real bugs only — don't refactor or change things that aren't causing errors
+- If an error is a data/user issue (not a code bug), still note it but skip it
+- Run tsc check and fix any TypeScript errors before committing
+- If nothing to fix (all user-side issues), output: AUTOFIX_RESULT:{"fixed":[],"version":"${latestTag}","count":0,"note":"All errors are user/data issues, no code changes needed"}`;
+
+    // Init status
+    const status = {
+      status: 'running',
+      started_at: new Date().toISOString(),
+      log: [`🚀 Starting auto-fix for ${uniqueErrors.length} unique errors...`, `📦 Target deploy: ${nextTag}`],
+      result: null,
+      pid: null,
+    };
+    saveAutofixStatus(status);
+
+    // Spawn Claude non-interactively
+    const claudeProc = spawn(claudeBin, ['-p', prompt], {
+      cwd: PROJECT_DIR,
+      env: { ...process.env, HOME: process.env.HOME, PATH: process.env.PATH },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    status.pid = claudeProc.pid;
+    saveAutofixStatus(status);
+
+    const appendLog = (line) => {
+      const st = loadAutofixStatus();
+      st.log.push(line);
+      if (st.log.length > 200) st.log = st.log.slice(-200);
+      saveAutofixStatus(st);
+    };
+
+    let fullOutput = '';
+
+    claudeProc.stdout.on('data', (chunk) => {
+      const text = chunk.toString();
+      fullOutput += text;
+      // Extract meaningful lines for display
+      const lines = text.split('\n').filter(l => l.trim());
+      lines.forEach(line => {
+        // Skip JSON noise, keep human-readable lines
+        if (!line.startsWith('{') && !line.startsWith('[') && line.length > 2) {
+          appendLog(line.substring(0, 200));
+        }
+        // Capture result JSON
+        if (line.startsWith('AUTOFIX_RESULT:')) {
+          try {
+            const result = JSON.parse(line.replace('AUTOFIX_RESULT:', ''));
+            const st = loadAutofixStatus();
+            st.result = result;
+            saveAutofixStatus(st);
+          } catch {}
+        }
+      });
+    });
+
+    claudeProc.stderr.on('data', (chunk) => {
+      const text = chunk.toString().trim();
+      if (text && !text.startsWith('{') && text.length > 2) appendLog(`⚠ ${text.substring(0, 150)}`);
+    });
+
+    claudeProc.on('close', (code) => {
+      const st = loadAutofixStatus();
+
+      // Try to extract result from full output if not already captured
+      if (!st.result) {
+        const match = fullOutput.match(/AUTOFIX_RESULT:({.*})/);
+        if (match) {
+          try { st.result = JSON.parse(match[1]); } catch {}
+        }
+      }
+
+      if (!st.result) {
+        st.result = {
+          fixed: [],
+          version: latestTag,
+          count: 0,
+          note: code === 0 ? 'Completed but no result summary found' : `Process exited with code ${code}`,
+        };
+      }
+
+      st.status = code === 0 ? 'done' : 'error';
+      st.log.push(code === 0 ? `✅ Auto-fix complete! Deployed as ${st.result.version}` : `❌ Process exited with code ${code}`);
+      st.pid = null;
+      saveAutofixStatus(st);
+
+      // Mark fixed errors as resolved if deploy succeeded
+      if (code === 0 && st.result.version !== latestTag) {
+        const errors = loadErrors();
+        const resolved = errors.filter(e => !e.resolved).map(e => ({ ...e, resolved: true, resolved_by: 'autofix', resolved_at: new Date().toISOString() }));
+        saveErrors([...resolved, ...errors.filter(e => e.resolved)]);
+        logActivity('system', 'Auto-Fix', 'autofix', `Fixed ${st.result.fixed.length} issues, deployed ${st.result.version}`);
+      }
+    });
+
+    json(res, { ok: true, started: true, target_version: nextTag }); return;
   }
 
   res.writeHead(404); res.end('Not found');

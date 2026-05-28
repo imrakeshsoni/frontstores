@@ -3,9 +3,16 @@ import { readMigrations } from './migrations';
 import { reportError } from '../errorReporter';
 
 let _db: Database | null = null;
+let _dbPromise: Promise<Database> | null = null; // [all apps] [all tenants] prevent concurrent init race → UNIQUE on _migrations
 
 export async function getDb(): Promise<Database> {
   if (_db) return _db;
+  if (_dbPromise) return _dbPromise;
+  _dbPromise = _initDb();
+  return _dbPromise;
+}
+
+async function _initDb(): Promise<Database> {
   try {
     _db = await Database.load('sqlite:frontstores.db');
     await _db.execute('PRAGMA journal_mode = WAL');
@@ -14,10 +21,11 @@ export async function getDb(): Promise<Database> {
     await _db.execute('PRAGMA synchronous = NORMAL');
     await runMigrations(_db);
   } catch (e: any) {
+    _dbPromise = null; // allow retry on failure
     reportError(String(e?.message || e), e?.stack, 'db.getDb');
     throw e;
   }
-  return _db;
+  return _db!;
 }
 
 async function runMigrations(db: Database) {

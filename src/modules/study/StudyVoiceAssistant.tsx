@@ -459,24 +459,21 @@ export function StudyVoiceAssistant() {
           </>
         )}
 
-        {/* Avatar / AI face */}
-        {status === 'idle' || status === 'speaking' ? (
-          aiAvatar ? (
-            <img src={aiAvatar} alt={aiName}
-              style={{ width: BTN_SIZE, height: BTN_SIZE, borderRadius: '50%', objectFit: 'cover' }} />
-          ) : (
-            <DefaultAIFace size={BTN_SIZE} color={accent} />
-          )
-        ) : status === 'listening' ? (
-          <Mic size={24} color="#fff" />
-        ) : (
-          /* thinking */
+        {/* Mic icon by default; custom avatar if set; dots when thinking */}
+        {status === 'thinking' ? (
           <div style={{ display: 'flex', gap: '3px' }}>
             {[0,1,2].map(i => (
               <div key={i} style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#fff',
                 animation: `bounce 0.8s ease infinite ${i*0.15}s` }} />
             ))}
           </div>
+        ) : aiAvatar ? (
+          <img src={aiAvatar} alt={aiName}
+            style={{ width: BTN_SIZE, height: BTN_SIZE, borderRadius: '50%', objectFit: 'cover' }} />
+        ) : status === 'speaking' ? (
+          <Volume2 size={24} color="#fff" />
+        ) : (
+          <Mic size={24} color="#fff" />
         )}
       </button>
 
