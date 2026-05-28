@@ -16,6 +16,7 @@ import migration0015 from '../../../src-tauri/migrations/0015_restaurant_staff.s
 import migration0016 from '../../../src-tauri/migrations/0016_grocery_wholesale.sql?raw';
 import migration0017 from '../../../src-tauri/migrations/0017_carwash.sql?raw';
 import migration0018 from '../../../src-tauri/migrations/0018_clinic.sql?raw';
+import migration0019 from '../../../src-tauri/migrations/0019_beauty.sql?raw';
 
 export interface Migration {
   name: string;
@@ -42,5 +43,6 @@ export async function readMigrations(): Promise<Migration[]> {
     { name: '0016_grocery_wholesale', sql: migration0016 },
     { name: '0017_carwash', sql: migration0017 },
     { name: '0018_clinic', sql: migration0018 },
+    { name: '0019_beauty', sql: migration0019 },
   ];
 }

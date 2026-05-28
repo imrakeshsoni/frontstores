@@ -14,6 +14,7 @@ const SHOP_TYPES = [
   { value: 'restaurant', label: 'Restaurant / Café',    icon: '🍽️', desc: 'Table orders, KOT, menu, kitchen display' },
   { value: 'carwash',    label: 'Car Wash / Detailing', icon: '🚗', desc: 'Job cards, live queue, memberships, WhatsApp alerts' },
   { value: 'clinic',     label: 'Hospital / Clinic',    icon: '🏥', desc: 'OPD tokens, Rx, lab, IPD beds, pharmacy, billing' },
+  { value: 'beauty',     label: 'Beauty Parlor / Salon', icon: '💅', desc: 'Appointments, services, staff, memberships, billing' },
 ];
 
 interface FormData {

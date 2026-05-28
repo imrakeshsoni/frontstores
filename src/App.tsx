@@ -49,6 +49,16 @@ const IPDPage                 = lazy(() => import('@/modules/clinic/IPDPage').th
 const BillingPage             = lazy(() => import('@/modules/clinic/BillingPage').then(m => ({ default: m.BillingPage })));
 const ClinicReportsPage       = lazy(() => import('@/modules/clinic/ClinicReportsPage').then(m => ({ default: m.ClinicReportsPage })));
 
+// [beauty] [all tenants]
+const BeautyDashboard         = lazy(() => import('@/modules/beauty/BeautyDashboard').then(m => ({ default: m.BeautyDashboard })));
+const BeautyServicesPage      = lazy(() => import('@/modules/beauty/BeautyServicesPage').then(m => ({ default: m.BeautyServicesPage })));
+const BeautyAppointmentListPage = lazy(() => import('@/modules/beauty/BeautyAppointmentPage').then(m => ({ default: m.BeautyAppointmentListPage })));
+const BeautyNewAppointmentPage  = lazy(() => import('@/modules/beauty/BeautyAppointmentPage').then(m => ({ default: m.BeautyNewAppointmentPage })));
+const BeautyAppointmentDetailPage = lazy(() => import('@/modules/beauty/BeautyAppointmentPage').then(m => ({ default: m.BeautyAppointmentDetailPage })));
+const BeautyStaffPage         = lazy(() => import('@/modules/beauty/BeautyStaffPage').then(m => ({ default: m.BeautyStaffPage })));
+const BeautyMembershipsPage   = lazy(() => import('@/modules/beauty/BeautyMembershipsPage').then(m => ({ default: m.BeautyMembershipsPage })));
+const BeautyReportsPage       = lazy(() => import('@/modules/beauty/BeautyReportsPage').then(m => ({ default: m.BeautyReportsPage })));
+
 // [restaurant] [all tenants]
 const TablesPage              = lazy(() => import('@/modules/restaurant/TablesPage').then(m => ({ default: m.TablesPage })));
 const MenuPage                = lazy(() => import('@/modules/restaurant/MenuPage').then(m => ({ default: m.MenuPage })));
@@ -100,6 +110,7 @@ export default function App() {
               config?.shop_type === 'grocery'    ? '/grocery/dashboard' :
               config?.shop_type === 'carwash'    ? '/carwash/dashboard' :
               config?.shop_type === 'clinic'     ? '/clinic/dashboard' :
+              config?.shop_type === 'beauty'     ? '/beauty/dashboard' :
               '/dashboard'
             } replace />} />
             <Route path="dashboard"  element={<Dashboard />} />
@@ -139,6 +150,16 @@ export default function App() {
             <Route path="clinic/ipd"          element={<IPDPage />} />
             <Route path="clinic/billing"      element={<BillingPage />} />
             <Route path="clinic/reports"      element={<ClinicReportsPage />} />
+
+            {/* [beauty] [all tenants] */}
+            <Route path="beauty/dashboard"              element={<BeautyDashboard />} />
+            <Route path="beauty/services"               element={<BeautyServicesPage />} />
+            <Route path="beauty/appointments"           element={<BeautyAppointmentListPage />} />
+            <Route path="beauty/appointments/new"       element={<BeautyNewAppointmentPage />} />
+            <Route path="beauty/appointments/:id"       element={<BeautyAppointmentDetailPage />} />
+            <Route path="beauty/staff"                  element={<BeautyStaffPage />} />
+            <Route path="beauty/memberships"            element={<BeautyMembershipsPage />} />
+            <Route path="beauty/reports"                element={<BeautyReportsPage />} />
 
             {/* [restaurant] [all tenants] */}
             <Route path="restaurant/dashboard" element={<RestaurantDashboard />} />

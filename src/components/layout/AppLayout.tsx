@@ -31,6 +31,9 @@ import {
   Pill,
   BedDouble,
   FileText,
+  Sparkles,
+  HeartHandshake,
+  Scissors,
 } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { getShopTypeLabel } from '@/lib/shop/shopType';
@@ -97,6 +100,19 @@ const CLINIC_NAV_ITEMS = [
   { to: '/settings',            icon: Settings,        label: 'Settings',        iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
 
+// [beauty] [all tenants]
+const BEAUTY_NAV_ITEMS = [
+  { to: '/beauty/dashboard',     icon: LayoutDashboard, label: 'Dashboard',      iconBg: '#fce7f3', iconColor: '#db2777' },
+  { to: '/beauty/appointments',  icon: Sparkles,        label: 'Appointments',   iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/beauty/services',      icon: Scissors,        label: 'Services',       iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/beauty/memberships',   icon: HeartHandshake,  label: 'Memberships',    iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/customers',            icon: Users,           label: 'Customers',      iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/expenses',             icon: Wallet,          label: 'Expenses',       iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/beauty/staff',         icon: UserCheck,       label: 'Staff',          iconBg: '#d1fae5', iconColor: '#059669' },
+  { to: '/beauty/reports',       icon: BarChart3,       label: 'Reports',        iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',             icon: Settings,        label: 'Settings',       iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
 // [carwash] [all tenants]
 const CARWASH_NAV_ITEMS = [
   { to: '/carwash/dashboard', icon: LayoutDashboard, label: 'Dashboard',      iconBg: '#dbeafe', iconColor: '#2563eb' },
@@ -119,6 +135,7 @@ export function AppLayout() {
     config?.shop_type === 'grocery'    ? GROCERY_NAV_ITEMS :
     config?.shop_type === 'carwash'    ? CARWASH_NAV_ITEMS :
     config?.shop_type === 'clinic'     ? CLINIC_NAV_ITEMS :
+    config?.shop_type === 'beauty'     ? BEAUTY_NAV_ITEMS :
     NAV_ITEMS;
 
   useEffect(() => {
