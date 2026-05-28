@@ -39,7 +39,7 @@ Never just give the final answer to homework — always show the method and reas
   const res = await fetch(`${SERVER}/ai/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tenant_id: tenantId, messages }),
+    body: JSON.stringify({ tenant_id: tenantId, messages, model: 'gemma3:4b' }),
     signal,
   });
   if (!res.ok) throw new Error('AI not available. Check your internet connection.');

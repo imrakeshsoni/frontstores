@@ -81,8 +81,11 @@ export function SetupWizard() {
     }
   }
 
+  const isStudy = form.shop_type === 'study';
   const canProceedStep1 = form.shop_type !== '';
-  const canProceedStep2 = form.shop_name.trim() !== '' && form.owner_name.trim() !== '';
+  const canProceedStep2 = isStudy
+    ? form.owner_name.trim() !== ''
+    : form.shop_name.trim() !== '' && form.owner_name.trim() !== '';
   const canProceedStep5 =
     username.trim().length >= 3 &&
     password.length >= 4 &&
@@ -190,7 +193,7 @@ export function SetupWizard() {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-white">FrontStores</h1>
           <p className="text-slate-400 mt-2">
-            {step === 0 ? 'Welcome' : 'Set up your shop — takes 2 minutes'}
+            {step === 0 ? 'Welcome' : isStudy ? 'Set up StudyMate — takes 1 minute' : 'Set up your shop — takes 2 minutes'}
           </p>
           {step > 0 && (
             <div className="flex items-center justify-center gap-2 mt-4">
@@ -316,8 +319,8 @@ export function SetupWizard() {
           {/* Step 1: Shop Type */}
           {step === 1 && (
             <div>
-              <h2 className="text-xl font-semibold text-slate-800 mb-1">What kind of shop do you run?</h2>
-              <p className="text-slate-500 text-sm mb-6">We'll set up the right features for your business.</p>
+              <h2 className="text-xl font-semibold text-slate-800 mb-1">What are you setting up?</h2>
+              <p className="text-slate-500 text-sm mb-6">We'll set up the right features for you.</p>
               <div className="grid grid-cols-1 gap-3">
                 {SHOP_TYPES.map((t) => (
                   <button
@@ -335,59 +338,99 @@ export function SetupWizard() {
                   </button>
                 ))}
               </div>
-              <button onClick={() => setStep(2)} disabled={!canProceedStep1}
+              <button
+                onClick={() => {
+                  if (form.shop_type === 'study') update('shop_name', 'StudyMate');
+                  setStep(2);
+                }}
+                disabled={!canProceedStep1}
                 className="mt-6 w-full btn-primary py-3 text-base disabled:opacity-40 disabled:cursor-not-allowed">
                 Continue →
               </button>
             </div>
           )}
 
-          {/* Step 2: Shop Details */}
+          {/* Step 2: Details — student fields for study, shop fields for others */}
           {step === 2 && (
             <div>
-              <h2 className="text-xl font-semibold text-slate-800 mb-1">Tell us about your shop</h2>
-              <p className="text-slate-500 text-sm mb-6">This appears on your bills and reports.</p>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Shop name *</label>
-                  <input className="input" value={form.shop_name} onChange={(e) => update('shop_name', e.target.value)} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Owner name *</label>
-                  <input className="input" value={form.owner_name} onChange={(e) => update('owner_name', e.target.value)} />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
-                    <input className="input" value={form.phone} onChange={(e) => update('phone', e.target.value)} />
+              {isStudy ? (
+                <>
+                  <h2 className="text-xl font-semibold text-slate-800 mb-1">Tell us about you 📚</h2>
+                  <p className="text-slate-500 text-sm mb-6">Helps personalise your AI tutor and study tracker.</p>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Your name *</label>
+                      <input className="input" placeholder="e.g. Priya Sharma" value={form.owner_name} onChange={(e) => update('owner_name', e.target.value)} autoFocus />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Class / Grade</label>
+                        <input className="input" placeholder="e.g. Class 10 / 2nd Year" value={form.address_line1} onChange={(e) => update('address_line1', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">School / College</label>
+                        <input className="input" placeholder="School or college name" value={form.city} onChange={(e) => update('city', e.target.value)} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Phone (optional)</label>
+                        <input className="input" value={form.phone} onChange={(e) => update('phone', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Email (optional)</label>
+                        <input className="input" type="email" value={form.email} onChange={(e) => update('email', e.target.value)} />
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                    <input className="input" type="email" value={form.email} onChange={(e) => update('email', e.target.value)} />
+                </>
+              ) : (
+                <>
+                  <h2 className="text-xl font-semibold text-slate-800 mb-1">Tell us about your shop</h2>
+                  <p className="text-slate-500 text-sm mb-6">This appears on your bills and reports.</p>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Shop name *</label>
+                      <input className="input" value={form.shop_name} onChange={(e) => update('shop_name', e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Owner name *</label>
+                      <input className="input" value={form.owner_name} onChange={(e) => update('owner_name', e.target.value)} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
+                        <input className="input" value={form.phone} onChange={(e) => update('phone', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                        <input className="input" type="email" value={form.email} onChange={(e) => update('email', e.target.value)} />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Address</label>
+                      <input className="input" value={form.address_line1} onChange={(e) => update('address_line1', e.target.value)} />
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">City</label>
+                        <input className="input" value={form.city} onChange={(e) => update('city', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">State</label>
+                        <input className="input" value={form.state} onChange={(e) => update('state', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Pincode</label>
+                        <input className="input" value={form.pincode} onChange={(e) => update('pincode', e.target.value)} />
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Address</label>
-                  <input className="input" value={form.address_line1} onChange={(e) => update('address_line1', e.target.value)} />
-                </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">City</label>
-                    <input className="input" value={form.city} onChange={(e) => update('city', e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">State</label>
-                    <input className="input" value={form.state} onChange={(e) => update('state', e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Pincode</label>
-                    <input className="input" value={form.pincode} onChange={(e) => update('pincode', e.target.value)} />
-                  </div>
-                </div>
-              </div>
+                </>
+              )}
               <div className="flex gap-3 mt-6">
                 <button onClick={() => setStep(1)} className="btn-secondary py-3 flex-1">← Back</button>
-                <button onClick={() => setStep(3)} disabled={!canProceedStep2} className="btn-primary py-3 flex-1 text-base disabled:opacity-40">Continue →</button>
+                <button onClick={() => setStep(isStudy ? 4 : 3)} disabled={!canProceedStep2} className="btn-primary py-3 flex-1 text-base disabled:opacity-40">Continue →</button>
               </div>
             </div>
           )}
@@ -446,7 +489,7 @@ export function SetupWizard() {
                 <span className="text-sm text-slate-700">I have read and agree to the Terms & Conditions.</span>
               </label>
               <div className="flex gap-3 mt-6">
-                <button onClick={() => setStep(3)} className="btn-secondary py-3 flex-1">← Back</button>
+                <button onClick={() => setStep(isStudy ? 2 : 3)} className="btn-secondary py-3 flex-1">← Back</button>
                 <button onClick={() => setStep(5)} disabled={!tcAgreed}
                   className="btn-primary py-3 flex-1 text-base disabled:opacity-40 disabled:cursor-not-allowed">
                   Continue →
@@ -460,7 +503,9 @@ export function SetupWizard() {
             <div>
               <h2 className="text-xl font-semibold text-slate-800 mb-1">Set your login password</h2>
               <p className="text-slate-500 text-sm mb-6">
-                This protects your shop data. Only you will know this password — it is stored on your computer only and never sent anywhere.
+                {isStudy
+                  ? 'This protects your study data. Stored only on this computer — never sent anywhere.'
+                  : 'This protects your shop data. Only you will know this password — it is stored on your computer only and never sent anywhere.'}
               </p>
               <div className="space-y-4">
                 <div>

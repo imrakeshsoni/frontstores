@@ -551,7 +551,24 @@
 
 <script>
 const API = 'http://localhost:3002';
-const ICONS = { medical:'💊', restaurant:'🍽️' };
+const ICONS = {
+  medical:    '💊',
+  restaurant: '🍽️',
+  grocery:    '🛒',
+  carwash:    '🚗',
+  clinic:     '🏥',
+  beauty:     '💅',
+  study:      '📚',
+};
+const LABELS = {
+  medical:    'Medical Store',
+  restaurant: 'Restaurant / Café',
+  grocery:    'Grocery Store',
+  carwash:    'Car Wash',
+  clinic:     'Hospital / Clinic',
+  beauty:     'Beauty Parlor',
+  study:      'StudyMate',
+};
 const CSRF_TOKEN = window.__CSRF_TOKEN__ || '';
 let password = '', allCustomers = [], allErrors = [], allContacts = [], filter = 'all', eFilter = 'all', cFilter = 'all', openId = null;
 
@@ -713,7 +730,7 @@ function renderCustomers() {
     const tid = escHtml(c.tenant_id||'');
     return `<tr class="${rowClass}" onclick="openPanel('${tid}')">
       <td><div class="shop-name">${escHtml(c.shop_name||'Unknown')}</div><div class="shop-id">${tid.substring(0,20)}…</div></td>
-      <td><span class="type-chip">${icon} ${escHtml(c.shop_type||'—')}</span></td>
+      <td><span class="type-chip">${icon} ${escHtml(LABELS[c.shop_type]||c.shop_type||'—')}</span></td>
       <td><div style="font-size:13px">${escHtml(c.owner_name||'—')}</div><div style="font-size:12px;color:var(--muted)">${escHtml(c.phone||c.email||'—')}</div></td>
       <td style="color:var(--muted);font-size:13px">${reg}</td>
       <td>${badge}${bar}</td>
@@ -745,7 +762,7 @@ function renderPanel(c) {
   else if (st==='revoked')  statusBadge=`<span class="badge badge-revoked">🚫 Revoked</span>`;
 
   document.getElementById('dp-title').textContent = c.shop_name||'Unknown';
-  document.getElementById('dp-sub').innerHTML = `${icon} ${escHtml(c.shop_type||'—')} ${errs>0?`<span style="color:var(--red);margin-left:8px">⚠ ${errs} open error${errs>1?'s':''}</span>`:''}`;
+  document.getElementById('dp-sub').innerHTML = `${icon} ${escHtml(LABELS[c.shop_type]||c.shop_type||'—')} ${errs>0?`<span style="color:var(--red);margin-left:8px">⚠ ${errs} open error${errs>1?'s':''}</span>`:''}`;
 
   document.getElementById('dp-body').innerHTML = `
     <div style="margin-bottom:16px">${statusBadge}</div>
@@ -942,7 +959,7 @@ function renderContacts() {
       <div class="error-top">
         <div>
           <span class="error-shop">${escHtml(c.name||'Unknown')}</span>
-          ${c.shop_type?` <span class="type-chip" style="font-size:11px">${escHtml(c.shop_type)}</span>`:''}
+          ${c.shop_type?` <span class="type-chip" style="font-size:11px">${ICONS[c.shop_type]||'🏪'} ${escHtml(LABELS[c.shop_type]||c.shop_type)}</span>`:''}
         </div>
         <div class="error-time">${t}</div>
       </div>

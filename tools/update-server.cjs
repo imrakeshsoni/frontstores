@@ -241,22 +241,32 @@ const publicServer = http.createServer(async (req, res) => {
 
   if (req.method === 'GET' && pathname === '/update') { res.writeHead(204); res.end(); return; }
 
-  // POST /ai/chat — voice AI assistant, proxies to local Ollama (dolphin3, unrestricted)
+  // POST /ai/chat — AI assistant, auto-selects best available model (gemma3:4b preferred, dolphin3 fallback)
   // Rate limit: 60 requests per minute per IP
   if (req.method === 'POST' && pathname === '/ai/chat') {
     if (rateLimit(req, res, 'ai-chat', 60, 60 * 1000)) return;
     const body = await readBody(req);
     try {
-      const { tenant_id, messages } = JSON.parse(body);
+      const { tenant_id, messages, model: requestedModel } = JSON.parse(body);
       if (!tenant_id || !Array.isArray(messages) || messages.length === 0) {
         res.writeHead(400); res.end('Missing tenant_id or messages'); return;
       }
+      // Auto-select: use requested model, else gemma3 if available, else dolphin3
+      let model = requestedModel || 'gemma3:4b';
+      try {
+        const tagRes = await fetch('http://localhost:11434/api/tags');
+        const tagData = await tagRes.json();
+        const names = (tagData.models||[]).map(m => m.name);
+        if (!names.some(n => n.startsWith(model.split(':')[0]))) {
+          model = names.find(n => n.startsWith('dolphin3')) || names[0] || 'gemma3:4b';
+        }
+      } catch {}
 
       const ollamaRes = await fetch('http://localhost:11434/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'dolphin3',
+          model,
           messages: messages.map(m => ({
             role: sanitize(m.role, 20),
             content: sanitize(m.content, 16000),
@@ -281,14 +291,16 @@ const publicServer = http.createServer(async (req, res) => {
     return;
   }
 
-  // GET /ai/status — check if Ollama + dolphin3 are ready
+  // GET /ai/status — check if Ollama + any supported model is ready
   if (req.method === 'GET' && pathname === '/ai/status') {
     try {
       const r = await fetch('http://localhost:11434/api/tags');
       if (!r.ok) { json(res, { available: false }); return; }
       const data = await r.json();
-      const hasModel = (data.models || []).some(m => m.name.startsWith('dolphin3'));
-      json(res, { available: hasModel });
+      const models = data.models || [];
+      const hasGemma   = models.some(m => m.name.startsWith('gemma3'));
+      const hasDolphin = models.some(m => m.name.startsWith('dolphin3'));
+      json(res, { available: hasGemma || hasDolphin, model: hasGemma ? 'gemma3:4b' : hasDolphin ? 'dolphin3' : null });
     } catch {
       json(res, { available: false });
     }
@@ -309,7 +321,7 @@ Mix easy, medium, and hard questions. Return ONLY the JSON array, no other text.
       const ollamaRes = await fetch('http://localhost:11434/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'dolphin3', messages: [{ role: 'system', content: 'You are a test generator. Return only valid JSON arrays, no markdown, no code blocks.' }, { role: 'user', content: prompt }], stream: false, options: { temperature: 0.4, num_predict: 4096 } }),
+        body: JSON.stringify({ model: 'gemma3:4b', messages: [{ role: 'system', content: 'You are a test generator. Return only valid JSON arrays, no markdown, no code blocks.' }, { role: 'user', content: prompt }], stream: false, options: { temperature: 0.4, num_predict: 4096 } }),
       });
       if (!ollamaRes.ok) { res.writeHead(503); res.end(JSON.stringify({ error: 'AI unavailable' })); return; }
       const data = await ollamaRes.json();
@@ -333,7 +345,7 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
       const ollamaRes = await fetch('http://localhost:11434/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'dolphin3', messages: [{ role: 'system', content: 'You are a flashcard generator. Return only valid JSON arrays, no markdown, no code blocks.' }, { role: 'user', content: prompt }], stream: false, options: { temperature: 0.3, num_predict: 2048 } }),
+        body: JSON.stringify({ model: 'gemma3:4b', messages: [{ role: 'system', content: 'You are a flashcard generator. Return only valid JSON arrays, no markdown, no code blocks.' }, { role: 'user', content: prompt }], stream: false, options: { temperature: 0.3, num_predict: 2048 } }),
       });
       if (!ollamaRes.ok) { res.writeHead(503); res.end(JSON.stringify({ error: 'AI unavailable' })); return; }
       const data = await ollamaRes.json();
