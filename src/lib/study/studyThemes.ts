@@ -98,11 +98,12 @@ export function applyStudyTheme(theme: StudyTheme) {
     el.classList.remove('study-dark');
   }
 
-  const textPrimary   = theme.dark ? '#ffffff' : '#111827';
-  const textSecondary = theme.dark ? rgba(theme.accent, 0.85) : '#374151';
-  const textTertiary  = theme.dark ? rgba(theme.accent, 0.55) : '#6b7280';
+  const textPrimary   = theme.dark ? '#ffffff'           : '#111827';
+  const textSecondary = theme.dark ? 'rgba(255,255,255,0.72)' : '#374151';
+  const textTertiary  = theme.dark ? 'rgba(255,255,255,0.42)' : '#6b7280';
   const accentText    = isLight(theme.accent) ? '#111827' : '#ffffff';
-  const hoverBg       = rgba(theme.accent, theme.dark ? 0.14 : 0.10);
+  const hoverBg       = rgba(theme.accent, theme.dark ? 0.16 : 0.10);
+  const hoverText     = theme.dark ? '#ffffff' : '#111827';
 
   el.style.setProperty('--bg',                theme.bg);
   el.style.setProperty('--surface',           theme.surface);
@@ -117,7 +118,7 @@ export function applyStudyTheme(theme: StudyTheme) {
   el.style.setProperty('--accent-ring',       rgba(theme.accent, 0.32));
   el.style.setProperty('--accent-text',       accentText);
   el.style.setProperty('--hover-bg',          hoverBg);
-  el.style.setProperty('--hover-text',        textPrimary);
+  el.style.setProperty('--hover-text',        hoverText);
   el.style.setProperty('--study-sidebar-from',theme.surface2);
   el.style.setProperty('--study-sidebar-to',  theme.surface);
 

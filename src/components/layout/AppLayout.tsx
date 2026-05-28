@@ -227,17 +227,23 @@ export function AppLayout() {
                   isActive ? 'text-slate-900' : 'text-slate-500 hover:bg-slate-900 hover:text-white'
                 }`
               }
-              style={({ isActive }) => isActive ? { background: iconBg } : {}}
+              style={({ isActive }) => isActive
+                ? { background: config?.shop_type === 'study' ? 'var(--accent-soft)' : iconBg }
+                : {}}
             >
               {({ isActive }) => (
                 <>
                   <span
                     className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg"
-                    style={{ background: iconBg }}
+                    style={{ background: config?.shop_type === 'study' ? 'var(--accent-soft)' : iconBg }}
                   >
-                    <Icon className="h-3.5 w-3.5" style={{ color: iconColor }} />
+                    <Icon className="h-3.5 w-3.5" style={{ color: config?.shop_type === 'study' ? 'var(--accent)' : iconColor }} />
                   </span>
-                  <span style={isActive ? { color: iconColor, fontWeight: 600 } : {}}>{label}</span>
+                  <span style={isActive
+                    ? { color: config?.shop_type === 'study' ? 'var(--accent)' : iconColor, fontWeight: 600 }
+                    : { color: 'var(--text-secondary)' }}>
+                    {label}
+                  </span>
                 </>
               )}
             </NavLink>
@@ -264,7 +270,10 @@ export function AppLayout() {
             <button
               onClick={() => setAuthenticated(false)}
               title="Lock / Sign out"
-              className="flex-shrink-0 p-1.5 rounded-lg hover:bg-red-100 text-slate-400 hover:text-red-600 transition-colors"
+              className="flex-shrink-0 p-1.5 rounded-lg transition-colors"
+              style={{ color: 'var(--text-tertiary)' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#f87171'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-tertiary)'; }}
             >
               <LogOut className="h-3.5 w-3.5" />
             </button>
@@ -296,7 +305,7 @@ export function AppLayout() {
         <div
           className="lg:hidden sticky top-[49px] z-10 flex gap-1.5 overflow-x-auto px-4 py-2.5"
           style={{
-            background: 'rgba(245,245,247,0.85)',
+            background: 'var(--surface)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
             borderBottom: '1px solid var(--surface-border)',
