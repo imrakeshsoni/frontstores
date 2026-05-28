@@ -158,11 +158,15 @@ export function AppLayout() {
     setAINavigator((path) => navigate(path));
   }, [navigate]);
 
-  // [study] [all tenants] — apply midnight purple dark theme for StudyMate
+  // [study] [all tenants] — apply saved theme on mount, remove on shop type change
   useEffect(() => {
     if (config?.shop_type === 'study') {
-      document.documentElement.classList.add('study-theme');
-      return () => document.documentElement.classList.remove('study-theme');
+      import('@/lib/study/studyThemes').then(({ applyStudyThemeById, getSavedThemeId }) => {
+        applyStudyThemeById(getSavedThemeId());
+      });
+      return () => {
+        import('@/lib/study/studyThemes').then(({ removeStudyTheme }) => removeStudyTheme());
+      };
     }
   }, [config?.shop_type]);
 

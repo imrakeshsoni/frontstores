@@ -77,12 +77,12 @@ const THEMES: Record<string, AppTheme> = {
     inputBg: 'rgba(131, 24, 67, 0.4)', labelColor: '#fbcfe8',
   },
   study: {
-    bgFrom: '#2e1065', bgTo: '#1e1b4b',
-    accent: '#a78bfa', accentDark: '#7c3aed', accentLight: '#ddd6fe',
+    bgFrom: '#06121f', bgTo: '#0c1e35',
+    accent: '#7dd3fc', accentDark: '#0ea5e9', accentLight: '#e0f2fe',
     icon: '📚',
     tagline: 'Your AI Study Companion',
-    cardBg: 'rgba(46, 16, 101, 0.85)', cardBorder: 'rgba(167, 139, 250, 0.3)',
-    inputBg: 'rgba(76, 29, 149, 0.4)', labelColor: '#ddd6fe',
+    cardBg: 'rgba(12, 30, 53, 0.92)', cardBorder: 'rgba(125, 211, 252, 0.28)',
+    inputBg: 'rgba(24, 51, 86, 0.85)', labelColor: '#bae6fd',
   },
 };
 
@@ -102,7 +102,24 @@ export function AppLoginScreen() {
   const shopType  = config?.shop_type ?? '';
   const maxAttempts: number = ((config?.settings as Record<string, unknown>)?.maxLoginAttempts as number) ?? 5;
 
-  const theme = THEMES[shopType] ?? DEFAULT_THEME;
+  // For study type, load the user's saved theme colors for the login screen
+  const baseTheme = THEMES[shopType] ?? DEFAULT_THEME;
+  const [studyColors, setStudyColors] = useState<{ accent: string; bg: string } | null>(null);
+  useEffect(() => {
+    if (shopType !== 'study') return;
+    import('@/lib/study/studyThemes').then(({ STUDY_THEMES, getSavedThemeId }) => {
+      const saved = STUDY_THEMES.find(t => t.id === getSavedThemeId());
+      if (saved) setStudyColors({ accent: saved.accent, bg: saved.bg });
+    });
+  }, [shopType]);
+  const theme: AppTheme = shopType === 'study' && studyColors ? {
+    ...baseTheme,
+    bgFrom: studyColors.bg, bgTo: studyColors.bg,
+    accent: studyColors.accent, accentDark: studyColors.accent,
+    cardBg: `${studyColors.bg}ee`,
+    cardBorder: `${studyColors.accent}40`,
+    inputBg: `${studyColors.bg}cc`,
+  } : baseTheme;
 
   const [screen, setScreen]       = useState<Screen>('login');
   const [username, setUsername]   = useState('');

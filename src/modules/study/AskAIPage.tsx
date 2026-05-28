@@ -182,7 +182,7 @@ export function AskAIPage() {
         <div className="p-3" style={{ borderTop: '1px solid var(--surface-border)' }}>
           <div className="flex items-center gap-2 text-xs" style={{ color: aiOnline ? '#16a34a' : '#dc2626' }}>
             {aiOnline ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
-            {aiOnline ? 'AI online · gemma3:4b' : 'AI offline — saved answers available'}
+            {aiOnline ? 'AI online' : 'AI offline — saved answers available'}
           </div>
         </div>
       </div>
@@ -194,7 +194,7 @@ export function AskAIPage() {
           <div className="flex-1">
             <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>Ask AI Anything</p>
             <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-              Your study buddy · {searchWeb ? '🌐 Web search on' : 'Web search off'} · {resources.length} resource{resources.length !== 1 ? 's' : ''} loaded
+              Your study buddy{searchWeb ? ' · 🌐 Web search on' : ''}{resources.length > 0 ? ` · ${resources.length} resource${resources.length !== 1 ? 's' : ''} loaded` : ''}
             </p>
           </div>
           <select value={subject ?? ''} onChange={e => setSubject(e.target.value || null)}
