@@ -396,6 +396,28 @@ export default function App() {
             <Route path="beauty/memberships"            element={<BeautyMembershipsPage />} />
             <Route path="beauty/reports"                element={<BeautyReportsPage />} />
 
+            {/* [laundry] [all tenants] */}
+            <Route path="laundry/dashboard"  element={<LaundryDashboard />} />
+            <Route path="laundry/orders"     element={<LaundryOrdersPage />} />
+            <Route path="laundry/orders/new" element={<LaundryNewOrderPage />} />
+            <Route path="laundry/services"   element={<LaundryServicesPage />} />
+            <Route path="laundry/reports"    element={<LaundryReportsPage />} />
+
+            {/* [catering] [all tenants] */}
+            <Route path="catering/dashboard"    element={<CateringDashboard />} />
+            <Route path="catering/events"       element={<CateringEventsPage />} />
+            <Route path="catering/events/new"   element={<CateringNewEventPage />} />
+            <Route path="catering/menu"         element={<CateringMenuPage />} />
+            <Route path="catering/reports"      element={<CateringReportsPage />} />
+
+            {/* [pestcontrol] [all tenants] */}
+            <Route path="pestcontrol/dashboard"  element={<PestDashboard />} />
+            <Route path="pestcontrol/jobs"       element={<PCJobsPage />} />
+            <Route path="pestcontrol/jobs/new"   element={<PCNewJobPage />} />
+            <Route path="pestcontrol/customers"  element={<PCCustomersPage />} />
+            <Route path="pestcontrol/contracts"  element={<PCContractsPage />} />
+            <Route path="pestcontrol/reports"    element={<PCReportsPage />} />
+
             {/* [restaurant] [all tenants] */}
             <Route path="restaurant/dashboard" element={<RestaurantDashboard />} />
             <Route path="restaurant/tables"    element={<TablesPage />} />

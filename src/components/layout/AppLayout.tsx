@@ -70,6 +70,8 @@ import {
   Gem,
   Star,
   ArrowLeftRight,
+  ShirtIcon,
+  Bug,
 } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { getShopTypeLabel } from '@/lib/shop/shopType';
