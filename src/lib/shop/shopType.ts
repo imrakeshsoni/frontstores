@@ -39,7 +39,7 @@ export const APP_REGISTRY: AppRegistryEntry[] = [
     description: 'Billing, inventory, expiry tracking, Khata',
     color: '#2563eb',
     bgColor: '#dbeafe',
-    dashboardRoute: '/medical/dashboard',
+    dashboardRoute: '/dashboard',
   },
   {
     type: 'restaurant',

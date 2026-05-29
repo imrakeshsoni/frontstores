@@ -69,6 +69,7 @@ import {
   LogIn,
   Gem,
   Star,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { getShopTypeLabel } from '@/lib/shop/shopType';
@@ -407,8 +408,19 @@ export function AppLayout() {
           ))}
         </nav>
 
-        {/* Owner info */}
-        <div className="px-3 pb-4" style={{ borderTop: '1px solid var(--surface-border)', paddingTop: '0.75rem' }}>
+        {/* Switch App + Owner info — [core] [all tenants] */}
+        <div className="px-3 pb-4 space-y-2" style={{ borderTop: '1px solid var(--surface-border)', paddingTop: '0.75rem' }}>
+          {/* Switch App button — clearly visible */}
+          <button
+            onClick={() => setShowSwitchModal(true)}
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-90"
+            style={{ background: 'var(--accent)', color: 'white' }}
+          >
+            <ArrowLeftRight className="h-4 w-4 flex-shrink-0" />
+            Switch App
+          </button>
+
+          {/* Owner info row */}
           <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ background: 'var(--surface-2)' }}>
             <div
               className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
@@ -424,16 +436,6 @@ export function AppLayout() {
                 {config?.shop_name ?? 'FrontStores'}
               </p>
             </div>
-            <button
-              onClick={() => setShowSwitchModal(true)}
-              title="Switch App"
-              className="flex-shrink-0 p-1.5 rounded-lg transition-colors text-xs font-bold"
-              style={{ color: 'var(--text-tertiary)', background: 'var(--surface-2)', borderRadius: 8, padding: '4px 7px' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--accent)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-tertiary)'; }}
-            >
-              ⊕
-            </button>
             <button
               onClick={() => setAuthenticated(false)}
               title="Lock / Sign out"
@@ -470,10 +472,11 @@ export function AppLayout() {
           <button
             onClick={() => setShowSwitchModal(true)}
             title="Switch App"
-            className="flex items-center justify-center h-8 w-8 rounded-xl text-sm font-bold transition-colors"
-            style={{ color: 'var(--text-tertiary)', background: 'var(--surface-2)' }}
+            className="flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-semibold transition-colors"
+            style={{ color: 'white', background: 'var(--accent)' }}
           >
-            ⊕
+            <ArrowLeftRight className="h-3.5 w-3.5" />
+            Switch
           </button>
         </header>
 
