@@ -1,6 +1,6 @@
 import { useAppStore } from '@/app/store/app.store';
 
-export type ShopType = 'medical' | 'restaurant' | 'grocery' | 'carwash' | 'clinic' | 'beauty' | 'study' | 'coaching' | 'gym' | 'jewellery' | 'realestate';
+export type ShopType = 'medical' | 'restaurant' | 'grocery' | 'carwash' | 'clinic' | 'beauty' | 'study' | 'coaching' | 'gym' | 'jewellery' | 'realestate' | 'petrolpump' | 'furniture' | 'printing'; // [petrolpump] [furniture] [printing] [all tenants]
 
 const SHOP_TYPE_LABELS: Record<string, string> = {
   medical: 'Medical Store',
@@ -15,6 +15,9 @@ const SHOP_TYPE_LABELS: Record<string, string> = {
   jewellery: 'Jewellery Shop',
   realestate: 'Real Estate / PropMate',
   hotel: 'Hotel / Lodge', // [hotel] [all tenants]
+  petrolpump: 'Petrol Pump', // [petrolpump] [all tenants]
+  furniture: 'Furniture Store', // [furniture] [all tenants]
+  printing: 'Printing Shop', // [printing] [all tenants]
 };
 
 // ── APP_REGISTRY ─────────────────────────────────────────────────────────────
@@ -140,6 +143,33 @@ export const APP_REGISTRY: AppRegistryEntry[] = [
     bgColor: '#dbeafe',
     dashboardRoute: '/hotel/dashboard',
   }, // [hotel] [all tenants]
+  {
+    type: 'petrolpump',
+    label: 'Petrol Pump',
+    icon: '⛽',
+    description: 'Shifts, fuel rates, credit accounts, daily reports',
+    color: '#d97706',
+    bgColor: '#fef3c7',
+    dashboardRoute: '/petrolpump/dashboard',
+  }, // [petrolpump] [all tenants]
+  {
+    type: 'furniture',
+    label: 'Furniture Store',
+    icon: '🪑',
+    description: 'Orders, custom orders, catalog, delivery tracking',
+    color: '#92400e',
+    bgColor: '#fef3c7',
+    dashboardRoute: '/furniture/dashboard',
+  }, // [furniture] [all tenants]
+  {
+    type: 'printing',
+    label: 'Printing / Stationery',
+    icon: '🖨️',
+    description: 'Print jobs, stationery billing, reports',
+    color: '#2563eb',
+    bgColor: '#dbeafe',
+    dashboardRoute: '/printing/dashboard',
+  }, // [printing] [all tenants]
   // ➕ Add new apps here — they appear automatically in the Switch App modal
 ];
 

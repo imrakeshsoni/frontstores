@@ -131,6 +131,28 @@ const BrainBreakPage          = lazy(() => import('@/modules/study/BrainBreakPag
 const MathConstantsPage       = lazy(() => import('@/modules/study/MathConstantsPage').then(m => ({ default: m.MathConstantsPage })));
 const LocalAISetupPage        = lazy(() => import('@/modules/study/LocalAISetupPage').then(m => ({ default: m.LocalAISetupPage })));
 
+// [petrolpump] [all tenants]
+const PetrolDashboard      = lazy(() => import('@/modules/petrolpump/PetrolDashboard').then(m => ({ default: m.PetrolDashboard })));
+const ShiftPage            = lazy(() => import('@/modules/petrolpump/ShiftPage').then(m => ({ default: m.ShiftPage })));
+const FuelRatesPage        = lazy(() => import('@/modules/petrolpump/FuelRatesPage').then(m => ({ default: m.FuelRatesPage })));
+const CreditAccountsPage   = lazy(() => import('@/modules/petrolpump/CreditAccountsPage').then(m => ({ default: m.CreditAccountsPage })));
+const PetrolReportsPage    = lazy(() => import('@/modules/petrolpump/PetrolReportsPage').then(m => ({ default: m.PetrolReportsPage })));
+
+// [furniture] [all tenants]
+const FurnitureDashboard   = lazy(() => import('@/modules/furniture/FurnitureDashboard').then(m => ({ default: m.FurnitureDashboard })));
+const FurnOrdersPage       = lazy(() => import('@/modules/furniture/OrdersPage').then(m => ({ default: m.OrdersPage })));
+const FurnNewOrderPage     = lazy(() => import('@/modules/furniture/NewOrderPage').then(m => ({ default: m.NewOrderPage })));
+const FurnCustomOrdersPage = lazy(() => import('@/modules/furniture/CustomOrdersPage').then(m => ({ default: m.CustomOrdersPage })));
+const FurnitureProductsPage= lazy(() => import('@/modules/furniture/FurnitureProductsPage').then(m => ({ default: m.FurnitureProductsPage })));
+const FurnitureReportsPage = lazy(() => import('@/modules/furniture/FurnitureReportsPage').then(m => ({ default: m.FurnitureReportsPage })));
+
+// [printing] [all tenants]
+const PrintingDashboard    = lazy(() => import('@/modules/printing/PrintingDashboard').then(m => ({ default: m.PrintingDashboard })));
+const PrintingJobsPage     = lazy(() => import('@/modules/printing/JobsPage').then(m => ({ default: m.JobsPage })));
+const PrintingNewJobPage   = lazy(() => import('@/modules/printing/NewJobPage').then(m => ({ default: m.NewJobPage })));
+const StationeryPage       = lazy(() => import('@/modules/printing/StationeryPage').then(m => ({ default: m.StationeryPage })));
+const PrintingReportsPage  = lazy(() => import('@/modules/printing/PrintingReportsPage').then(m => ({ default: m.PrintingReportsPage })));
+
 // [hotel] [all tenants]
 const HotelDashboard       = lazy(() => import('@/modules/hotel/HotelDashboard').then(m => ({ default: m.HotelDashboard })));
 const HotelRoomGrid        = lazy(() => import('@/modules/hotel/RoomGridPage').then(m => ({ default: m.RoomGridPage })));
@@ -213,6 +235,9 @@ export default function App() {
               config?.shop_type === 'jewellery'   ? '/jewellery/dashboard' :
               config?.shop_type === 'realestate'  ? '/realestate/dashboard' :
               config?.shop_type === 'hotel'       ? '/hotel/dashboard' : // [hotel] [all tenants]
+              config?.shop_type === 'petrolpump'  ? '/petrolpump/dashboard' : // [petrolpump] [all tenants]
+              config?.shop_type === 'furniture'   ? '/furniture/dashboard' : // [furniture] [all tenants]
+              config?.shop_type === 'printing'    ? '/printing/dashboard' : // [printing] [all tenants]
               '/dashboard'
             } replace />} />
             <Route path="dashboard"  element={<Dashboard />} />
@@ -359,6 +384,28 @@ export default function App() {
             <Route path="beauty/staff"                  element={<BeautyStaffPage />} />
             <Route path="beauty/memberships"            element={<BeautyMembershipsPage />} />
             <Route path="beauty/reports"                element={<BeautyReportsPage />} />
+
+            {/* [petrolpump] [all tenants] */}
+            <Route path="petrolpump/dashboard" element={<PetrolDashboard />} />
+            <Route path="petrolpump/shifts"    element={<ShiftPage />} />
+            <Route path="petrolpump/rates"     element={<FuelRatesPage />} />
+            <Route path="petrolpump/credit"    element={<CreditAccountsPage />} />
+            <Route path="petrolpump/reports"   element={<PetrolReportsPage />} />
+
+            {/* [furniture] [all tenants] */}
+            <Route path="furniture/dashboard"     element={<FurnitureDashboard />} />
+            <Route path="furniture/orders"        element={<FurnOrdersPage />} />
+            <Route path="furniture/orders/new"    element={<FurnNewOrderPage />} />
+            <Route path="furniture/custom-orders" element={<FurnCustomOrdersPage />} />
+            <Route path="furniture/products"      element={<FurnitureProductsPage />} />
+            <Route path="furniture/reports"       element={<FurnitureReportsPage />} />
+
+            {/* [printing] [all tenants] */}
+            <Route path="printing/dashboard"  element={<PrintingDashboard />} />
+            <Route path="printing/jobs"       element={<PrintingJobsPage />} />
+            <Route path="printing/jobs/new"   element={<PrintingNewJobPage />} />
+            <Route path="printing/stationery" element={<StationeryPage />} />
+            <Route path="printing/reports"    element={<PrintingReportsPage />} />
 
             {/* [restaurant] [all tenants] */}
             <Route path="restaurant/dashboard" element={<RestaurantDashboard />} />

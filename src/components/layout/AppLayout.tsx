@@ -239,6 +239,40 @@ const HOTEL_NAV_ITEMS = [
   { to: '/settings',           icon: Settings,        label: 'Settings',       iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
 
+// [petrolpump] [all tenants]
+const PETROLPUMP_NAV_ITEMS = [
+  { to: '/petrolpump/dashboard', icon: LayoutDashboard, label: 'Dashboard',        iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/petrolpump/shifts',    icon: ClipboardList,   label: 'Shifts',           iconBg: '#ffedd5', iconColor: '#ea580c' },
+  { to: '/petrolpump/rates',     icon: TrendingUp,      label: 'Fuel Rates',       iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/petrolpump/credit',    icon: CreditCard,      label: 'Credit Accounts',  iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/expenses',             icon: Wallet,          label: 'Expenses',         iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/petrolpump/reports',   icon: BarChart3,       label: 'Reports',          iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',             icon: Settings,        label: 'Settings',         iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [furniture] [all tenants]
+const FURNITURE_NAV_ITEMS = [
+  { to: '/furniture/dashboard',     icon: LayoutDashboard, label: 'Dashboard',     iconBg: '#fef3c7', iconColor: '#92400e' },
+  { to: '/furniture/orders',        icon: ClipboardList,   label: 'Orders',        iconBg: '#ffedd5', iconColor: '#ea580c' },
+  { to: '/furniture/orders/new',    icon: ShoppingCart,    label: 'New Order',     iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/furniture/custom-orders', icon: Wrench,          label: 'Custom Orders', iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/furniture/products',      icon: Package,         label: 'Products',      iconBg: '#cffafe', iconColor: '#0891b2' },
+  { to: '/expenses',                icon: Wallet,          label: 'Expenses',      iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/furniture/reports',       icon: BarChart3,       label: 'Reports',       iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',                icon: Settings,        label: 'Settings',      iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [printing] [all tenants]
+const PRINTING_NAV_ITEMS = [
+  { to: '/printing/dashboard',  icon: LayoutDashboard, label: 'Dashboard',   iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/printing/jobs',       icon: ClipboardList,   label: 'Print Jobs',  iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/printing/jobs/new',   icon: ShoppingCart,    label: 'New Job',     iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/printing/stationery', icon: Package,         label: 'Stationery',  iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/expenses',            icon: Wallet,          label: 'Expenses',    iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/printing/reports',    icon: BarChart3,       label: 'Reports',     iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',            icon: Settings,        label: 'Settings',    iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
 // [realestate] [all tenants]
 const REALESTATE_BASE_NAV = [
   { to: '/realestate/dashboard',   icon: LayoutDashboard, label: 'Dashboard',      iconBg: '#dcfce7', iconColor: '#15803d' },
@@ -311,6 +345,9 @@ export function AppLayout() {
     config?.shop_type === 'jewellery'   ? JEWELLERY_NAV_ITEMS :
     config?.shop_type === 'realestate'  ? getRealEstateNavItems(reRole) :
     config?.shop_type === 'hotel'       ? HOTEL_NAV_ITEMS : // [hotel] [all tenants]
+    config?.shop_type === 'petrolpump'  ? PETROLPUMP_NAV_ITEMS : // [petrolpump] [all tenants]
+    config?.shop_type === 'furniture'   ? FURNITURE_NAV_ITEMS : // [furniture] [all tenants]
+    config?.shop_type === 'printing'    ? PRINTING_NAV_ITEMS : // [printing] [all tenants]
     NAV_ITEMS;
 
   useEffect(() => {
