@@ -224,6 +224,29 @@ const JEWELLERY_NAV_ITEMS = [
   { to: '/settings',                 icon: Settings,        label: 'Settings',       iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
 
+// [repair] [all tenants]
+const REPAIR_NAV_ITEMS = [
+  { to: '/repair/dashboard', icon: LayoutDashboard, label: 'Dashboard',       iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/repair/jobs',      icon: ClipboardList,   label: 'Jobs',            iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/repair/jobs/new',  icon: Wrench,          label: 'New Job',         iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/repair/parts',     icon: Package,         label: 'Parts Inventory', iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/expenses',         icon: Wallet,          label: 'Expenses',        iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/repair/reports',   icon: BarChart3,       label: 'Reports',         iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',         icon: Settings,        label: 'Settings',        iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [drivingschool] [all tenants]
+const DRIVINGSCHOOL_NAV_ITEMS = [
+  { to: '/drivingschool/dashboard',   icon: LayoutDashboard, label: 'Dashboard',   iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/drivingschool/students',    icon: Users,           label: 'Students',    iconBg: '#fce7f3', iconColor: '#db2777' },
+  { to: '/drivingschool/sessions',    icon: CalendarDays,    label: 'Sessions',    iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/drivingschool/vehicles',    icon: Wrench,          label: 'Vehicles',    iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/drivingschool/instructors', icon: UserCheck,       label: 'Instructors', iconBg: '#d1fae5', iconColor: '#059669' },
+  { to: '/expenses',                  icon: Wallet,          label: 'Expenses',    iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/drivingschool/reports',     icon: BarChart3,       label: 'Reports',     iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',                  icon: Settings,        label: 'Settings',    iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
 // [hotel] [all tenants]
 const HOTEL_NAV_ITEMS = [
   { to: '/hotel/dashboard',    icon: LayoutDashboard, label: 'Dashboard',      iconBg: '#dbeafe', iconColor: '#2563eb' },
@@ -310,7 +333,9 @@ export function AppLayout() {
     config?.shop_type === 'gym'         ? GYM_NAV_ITEMS :
     config?.shop_type === 'jewellery'   ? JEWELLERY_NAV_ITEMS :
     config?.shop_type === 'realestate'  ? getRealEstateNavItems(reRole) :
-    config?.shop_type === 'hotel'       ? HOTEL_NAV_ITEMS : // [hotel] [all tenants]
+    config?.shop_type === 'hotel'        ? HOTEL_NAV_ITEMS : // [hotel] [all tenants]
+    config?.shop_type === 'repair'       ? REPAIR_NAV_ITEMS : // [repair] [all tenants]
+    config?.shop_type === 'drivingschool'? DRIVINGSCHOOL_NAV_ITEMS : // [drivingschool] [all tenants]
     NAV_ITEMS;
 
   useEffect(() => {

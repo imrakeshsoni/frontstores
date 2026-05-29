@@ -20,7 +20,9 @@ const SHOP_TYPES = [
   { value: 'gym',        label: 'Gym / Fitness Center',    icon: '💪', desc: 'Members, memberships, check-in, renewals, PT packages, staff' },
   { value: 'jewellery',  label: 'Jewellery Shop',          icon: '💍', desc: 'Gold rate, inventory, billing, custom orders, repairs' },
   { value: 'realestate', label: 'Real Estate / PropMate',  icon: '🏠', desc: 'Leads, deals, commissions, site visits, builder projects' },
-  { value: 'hotel',      label: 'Hotel / Lodge',           icon: '🏨', desc: 'Room bookings, check-in/out, billing, housekeeping, maintenance' },
+  { value: 'hotel',         label: 'Hotel / Lodge',              icon: '🏨', desc: 'Room bookings, check-in/out, billing, housekeeping, maintenance' },
+  { value: 'repair',        label: 'Mobile/Electronics Repair', icon: '🔧', desc: 'Repair jobs, parts inventory, technicians, warranty tracking' }, // [repair] [all tenants]
+  { value: 'drivingschool', label: 'Driving School',            icon: '🚗', desc: 'Students, sessions, vehicles, LL/DL test tracking, fees' }, // [drivingschool] [all tenants]
 ];
 
 const RE_ROLES = [

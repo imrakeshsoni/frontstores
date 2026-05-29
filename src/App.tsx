@@ -131,6 +131,24 @@ const BrainBreakPage          = lazy(() => import('@/modules/study/BrainBreakPag
 const MathConstantsPage       = lazy(() => import('@/modules/study/MathConstantsPage').then(m => ({ default: m.MathConstantsPage })));
 const LocalAISetupPage        = lazy(() => import('@/modules/study/LocalAISetupPage').then(m => ({ default: m.LocalAISetupPage })));
 
+// [repair] [all tenants]
+const RepairDashboard      = lazy(() => import('@/modules/repair/RepairDashboard').then(m => ({ default: m.RepairDashboard })));
+const RepairJobsPage       = lazy(() => import('@/modules/repair/JobsPage').then(m => ({ default: m.JobsPage })));
+const RepairNewJobPage     = lazy(() => import('@/modules/repair/NewJobPage').then(m => ({ default: m.NewJobPage })));
+const RepairJobDetailPage  = lazy(() => import('@/modules/repair/JobDetailPage').then(m => ({ default: m.JobDetailPage })));
+const RepairPartsPage      = lazy(() => import('@/modules/repair/PartsInventoryPage').then(m => ({ default: m.PartsInventoryPage })));
+const RepairReportsPage    = lazy(() => import('@/modules/repair/RepairReportsPage').then(m => ({ default: m.RepairReportsPage })));
+
+// [drivingschool] [all tenants]
+const DrivingDashboard      = lazy(() => import('@/modules/drivingschool/DrivingDashboard').then(m => ({ default: m.DrivingDashboard })));
+const DSStudentsPage        = lazy(() => import('@/modules/drivingschool/StudentsPage').then(m => ({ default: m.StudentsPage })));
+const DSNewStudentPage      = lazy(() => import('@/modules/drivingschool/NewStudentPage').then(m => ({ default: m.NewStudentPage })));
+const DSStudentDetailPage   = lazy(() => import('@/modules/drivingschool/StudentDetailPage').then(m => ({ default: m.StudentDetailPage })));
+const DSSessionsPage        = lazy(() => import('@/modules/drivingschool/SessionsPage').then(m => ({ default: m.SessionsPage })));
+const DSVehiclesPage        = lazy(() => import('@/modules/drivingschool/VehiclesPage').then(m => ({ default: m.VehiclesPage })));
+const DSInstructorsPage     = lazy(() => import('@/modules/drivingschool/InstructorsPage').then(m => ({ default: m.InstructorsPage })));
+const DSDrivingReportsPage  = lazy(() => import('@/modules/drivingschool/DrivingReportsPage').then(m => ({ default: m.DrivingReportsPage })));
+
 // [hotel] [all tenants]
 const HotelDashboard       = lazy(() => import('@/modules/hotel/HotelDashboard').then(m => ({ default: m.HotelDashboard })));
 const HotelRoomGrid        = lazy(() => import('@/modules/hotel/RoomGridPage').then(m => ({ default: m.RoomGridPage })));
@@ -212,7 +230,9 @@ export default function App() {
               config?.shop_type === 'gym'        ? '/gym/dashboard' :
               config?.shop_type === 'jewellery'   ? '/jewellery/dashboard' :
               config?.shop_type === 'realestate'  ? '/realestate/dashboard' :
-              config?.shop_type === 'hotel'       ? '/hotel/dashboard' : // [hotel] [all tenants]
+              config?.shop_type === 'hotel'        ? '/hotel/dashboard' : // [hotel] [all tenants]
+              config?.shop_type === 'repair'       ? '/repair/dashboard' : // [repair] [all tenants]
+              config?.shop_type === 'drivingschool'? '/drivingschool/dashboard' : // [drivingschool] [all tenants]
               '/dashboard'
             } replace />} />
             <Route path="dashboard"  element={<Dashboard />} />
@@ -368,6 +388,24 @@ export default function App() {
             <Route path="restaurant/orders"    element={<RestaurantOrdersPage />} />
             <Route path="restaurant/staff"     element={<StaffPage />} />
             <Route path="restaurant/reports"   element={<RestaurantReportsPage />} />
+
+            {/* [repair] [all tenants] */}
+            <Route path="repair/dashboard" element={<RepairDashboard />} />
+            <Route path="repair/jobs"      element={<RepairJobsPage />} />
+            <Route path="repair/jobs/new"  element={<RepairNewJobPage />} />
+            <Route path="repair/jobs/:id"  element={<RepairJobDetailPage />} />
+            <Route path="repair/parts"     element={<RepairPartsPage />} />
+            <Route path="repair/reports"   element={<RepairReportsPage />} />
+
+            {/* [drivingschool] [all tenants] */}
+            <Route path="drivingschool/dashboard"      element={<DrivingDashboard />} />
+            <Route path="drivingschool/students"       element={<DSStudentsPage />} />
+            <Route path="drivingschool/students/new"   element={<DSNewStudentPage />} />
+            <Route path="drivingschool/students/:id"   element={<DSStudentDetailPage />} />
+            <Route path="drivingschool/sessions"       element={<DSSessionsPage />} />
+            <Route path="drivingschool/vehicles"       element={<DSVehiclesPage />} />
+            <Route path="drivingschool/instructors"    element={<DSInstructorsPage />} />
+            <Route path="drivingschool/reports"        element={<DSDrivingReportsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
