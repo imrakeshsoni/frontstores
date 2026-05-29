@@ -21,6 +21,9 @@ const SHOP_TYPES = [
   { value: 'jewellery',  label: 'Jewellery Shop',          icon: '💍', desc: 'Gold rate, inventory, billing, custom orders, repairs' },
   { value: 'realestate', label: 'Real Estate / PropMate',  icon: '🏠', desc: 'Leads, deals, commissions, site visits, builder projects' },
   { value: 'hotel',      label: 'Hotel / Lodge',           icon: '🏨', desc: 'Room bookings, check-in/out, billing, housekeeping, maintenance' },
+  { value: 'clothing',   label: 'Clothing / Footwear',     icon: '👗', desc: 'Billing, size/color variants, exchanges, stock management' }, // [clothing] [all tenants]
+  { value: 'bakery',     label: 'Bakery / Sweets Shop',    icon: '🎂', desc: 'Counter billing, production log, expiry alerts, bulk orders' }, // [bakery] [all tenants]
+  { value: 'optician',   label: 'Optician / Eye Care',     icon: '👓', desc: 'Patients, eye prescriptions, lens orders, frame inventory' }, // [optician] [all tenants]
 ];
 
 const RE_ROLES = [

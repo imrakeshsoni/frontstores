@@ -70,6 +70,14 @@ import {
   Gem,
   Star,
   ArrowLeftRight,
+  Shirt,
+  Repeat,
+  CakeSlice,
+  Factory,
+  CalendarRange,
+  Eye,
+  FileSearch,
+  ScanLine,
 } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { getShopTypeLabel } from '@/lib/shop/shopType';
@@ -239,6 +247,37 @@ const HOTEL_NAV_ITEMS = [
   { to: '/settings',           icon: Settings,        label: 'Settings',       iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
 
+// [clothing] [all tenants]
+const CLOTHING_NAV_ITEMS = [
+  { to: '/clothing/dashboard', icon: LayoutDashboard, label: 'Dashboard',   iconBg: '#fce7f3', iconColor: '#db2777' },
+  { to: '/clothing/billing',   icon: ShoppingCart,    label: 'Billing',     iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/clothing/products',  icon: Shirt,           label: 'Products',    iconBg: '#fce7f3', iconColor: '#db2777' },
+  { to: '/clothing/exchanges', icon: Repeat,          label: 'Exchanges',   iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/clothing/reports',   icon: BarChart3,       label: 'Reports',     iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',           icon: Settings,        label: 'Settings',    iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [bakery] [all tenants]
+const BAKERY_NAV_ITEMS = [
+  { to: '/bakery/dashboard',   icon: LayoutDashboard, label: 'Dashboard',   iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/bakery/billing',     icon: ShoppingCart,    label: 'Billing',     iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/bakery/production',  icon: Factory,         label: 'Production',  iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/bakery/bulk-orders', icon: CalendarRange,   label: 'Bulk Orders', iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/bakery/reports',     icon: BarChart3,       label: 'Reports',     iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',           icon: Settings,        label: 'Settings',    iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [optician] [all tenants]
+const OPTICIAN_NAV_ITEMS = [
+  { to: '/optician/dashboard',     icon: LayoutDashboard, label: 'Dashboard',     iconBg: '#cffafe', iconColor: '#0891b2' },
+  { to: '/optician/patients',      icon: Users,           label: 'Patients',      iconBg: '#fce7f3', iconColor: '#db2777' },
+  { to: '/optician/prescriptions', icon: FileSearch,      label: 'Prescriptions', iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/optician/orders',        icon: ScanLine,        label: 'Orders',        iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/optician/inventory',     icon: Boxes,           label: 'Inventory',     iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/optician/reports',       icon: BarChart3,       label: 'Reports',       iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',               icon: Settings,        label: 'Settings',      iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
 // [realestate] [all tenants]
 const REALESTATE_BASE_NAV = [
   { to: '/realestate/dashboard',   icon: LayoutDashboard, label: 'Dashboard',      iconBg: '#dcfce7', iconColor: '#15803d' },
@@ -311,6 +350,9 @@ export function AppLayout() {
     config?.shop_type === 'jewellery'   ? JEWELLERY_NAV_ITEMS :
     config?.shop_type === 'realestate'  ? getRealEstateNavItems(reRole) :
     config?.shop_type === 'hotel'       ? HOTEL_NAV_ITEMS : // [hotel] [all tenants]
+    config?.shop_type === 'clothing'    ? CLOTHING_NAV_ITEMS : // [clothing] [all tenants]
+    config?.shop_type === 'bakery'      ? BAKERY_NAV_ITEMS : // [bakery] [all tenants]
+    config?.shop_type === 'optician'    ? OPTICIAN_NAV_ITEMS : // [optician] [all tenants]
     NAV_ITEMS;
 
   useEffect(() => {

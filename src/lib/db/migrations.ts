@@ -29,6 +29,9 @@ import migration0028 from '../../../src-tauri/migrations/0028_gym.sql?raw';
 import migration0029 from '../../../src-tauri/migrations/0029_jewellery.sql?raw';
 import migration0030 from '../../../src-tauri/migrations/0030_realestate.sql?raw';
 import migration0031 from '../../../src-tauri/migrations/0031_hotel.sql?raw';
+import migration0040 from '../../../src-tauri/migrations/0040_clothing.sql?raw'; // [clothing] [all tenants]
+import migration0041 from '../../../src-tauri/migrations/0041_bakery.sql?raw'; // [bakery] [all tenants]
+import migration0042 from '../../../src-tauri/migrations/0042_optician.sql?raw'; // [optician] [all tenants]
 
 export interface Migration {
   name: string;
@@ -68,5 +71,8 @@ export async function readMigrations(): Promise<Migration[]> {
     { name: '0029_jewellery', sql: migration0029 },
     { name: '0030_realestate', sql: migration0030 },
     { name: '0031_hotel', sql: migration0031 },
+    { name: '0040_clothing', sql: migration0040 }, // [clothing] [all tenants]
+    { name: '0041_bakery', sql: migration0041 }, // [bakery] [all tenants]
+    { name: '0042_optician', sql: migration0042 }, // [optician] [all tenants]
   ];
 }

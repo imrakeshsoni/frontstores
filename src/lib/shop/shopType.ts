@@ -1,6 +1,6 @@
 import { useAppStore } from '@/app/store/app.store';
 
-export type ShopType = 'medical' | 'restaurant' | 'grocery' | 'carwash' | 'clinic' | 'beauty' | 'study' | 'coaching' | 'gym' | 'jewellery' | 'realestate';
+export type ShopType = 'medical' | 'restaurant' | 'grocery' | 'carwash' | 'clinic' | 'beauty' | 'study' | 'coaching' | 'gym' | 'jewellery' | 'realestate' | 'clothing' | 'bakery' | 'optician';
 
 const SHOP_TYPE_LABELS: Record<string, string> = {
   medical: 'Medical Store',
@@ -15,6 +15,9 @@ const SHOP_TYPE_LABELS: Record<string, string> = {
   jewellery: 'Jewellery Shop',
   realestate: 'Real Estate / PropMate',
   hotel: 'Hotel / Lodge', // [hotel] [all tenants]
+  clothing: 'Clothing / Footwear', // [clothing] [all tenants]
+  bakery: 'Bakery / Sweets', // [bakery] [all tenants]
+  optician: 'Optician / Eye Care', // [optician] [all tenants]
 };
 
 // ── APP_REGISTRY ─────────────────────────────────────────────────────────────
@@ -140,6 +143,33 @@ export const APP_REGISTRY: AppRegistryEntry[] = [
     bgColor: '#dbeafe',
     dashboardRoute: '/hotel/dashboard',
   }, // [hotel] [all tenants]
+  {
+    type: 'clothing',
+    label: 'Clothing / Footwear',
+    icon: '👗',
+    description: 'Billing, size/color variants, exchanges, reports',
+    color: '#db2777',
+    bgColor: '#fce7f3',
+    dashboardRoute: '/clothing/dashboard',
+  }, // [clothing] [all tenants]
+  {
+    type: 'bakery',
+    label: 'Bakery / Sweets Shop',
+    icon: '🎂',
+    description: 'Counter billing, production log, expiry alerts, bulk orders',
+    color: '#d97706',
+    bgColor: '#fef3c7',
+    dashboardRoute: '/bakery/dashboard',
+  }, // [bakery] [all tenants]
+  {
+    type: 'optician',
+    label: 'Optician / Eye Care',
+    icon: '👓',
+    description: 'Patients, eye prescriptions, lens orders, frame inventory',
+    color: '#0891b2',
+    bgColor: '#cffafe',
+    dashboardRoute: '/optician/dashboard',
+  }, // [optician] [all tenants]
   // ➕ Add new apps here — they appear automatically in the Switch App modal
 ];
 
