@@ -372,6 +372,20 @@ export default function App() {
             <Route path="realestate/builders"    element={<REBuildersPage />} />
             <Route path="realestate/reports"     element={<REReportsPage />} />
 
+            {/* [tailor] [all tenants] */}
+            <Route path="tailor/dashboard"    element={<TailorDashboard />} />
+            <Route path="tailor/orders"       element={<TailorOrdersPage />} />
+            <Route path="tailor/orders/new"   element={<NewOrderPage />} />
+            <Route path="tailor/measurements" element={<MeasurementsPage />} />
+            <Route path="tailor/reports"      element={<TailorReportsPage />} />
+
+            {/* [hardware] [all tenants] */}
+            <Route path="hardware/dashboard" element={<HardwareDashboard />} />
+            <Route path="hardware/pos"       element={<HardwarePOSPage />} />
+            <Route path="hardware/products"  element={<HardwareProductsPage />} />
+            <Route path="hardware/credit"    element={<CreditAccountsPage />} />
+            <Route path="hardware/reports"   element={<HardwareReportsPage />} />
+
             {/* [hotel] [all tenants] */}
             <Route path="hotel/dashboard"    element={<HotelDashboard />} />
             <Route path="hotel/rooms"        element={<HotelRoomGrid />} />
