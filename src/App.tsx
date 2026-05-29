@@ -129,6 +129,7 @@ const StudyWrappedPage        = lazy(() => import('@/modules/study/StudyWrappedP
 const WritingPracticePage     = lazy(() => import('@/modules/study/WritingPracticePage').then(m => ({ default: m.WritingPracticePage })));
 const BrainBreakPage          = lazy(() => import('@/modules/study/BrainBreakPage').then(m => ({ default: m.BrainBreakPage })));
 const MathConstantsPage       = lazy(() => import('@/modules/study/MathConstantsPage').then(m => ({ default: m.MathConstantsPage })));
+const LocalAISetupPage        = lazy(() => import('@/modules/study/LocalAISetupPage').then(m => ({ default: m.LocalAISetupPage })));
 
 // [beauty] [all tenants]
 const BeautyDashboard         = lazy(() => import('@/modules/beauty/BeautyDashboard').then(m => ({ default: m.BeautyDashboard })));
@@ -278,6 +279,7 @@ export default function App() {
             <Route path="study/writing"      element={<WritingPracticePage />} />
             <Route path="study/brain-break"  element={<BrainBreakPage />} />
             <Route path="study/constants"    element={<MathConstantsPage />} />
+            <Route path="study/local-ai"     element={<LocalAISetupPage />} />
 
             {/* [coaching] [all tenants] */}
             <Route path="coaching/dashboard"  element={<CoachingDashboard />} />

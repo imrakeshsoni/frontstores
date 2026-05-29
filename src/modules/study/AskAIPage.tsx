@@ -20,6 +20,7 @@ export function AskAIPage() {
   const [activeId, setActiveId]       = useState<string | null>(null);
   const [input, setInput]             = useState('');
   const [thinking, setThinking]       = useState(false);
+  const [streamingText, setStreamingText] = useState('');
   const [aiOnline, setAiOnline]       = useState<boolean | null>(null);
   const [subject, setSubject]         = useState<string | null>(null);
   const [localMsgs, setLocalMsgs]     = useState<StudyMessage[]>([]);
@@ -106,12 +107,15 @@ export function AskAIPage() {
       const imgForAI = imageData ?? imageResources[0]?.image_data ?? null;
 
       const history = localMsgs.slice(-8).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+      setStreamingText('');
       const reply = await askTutor(tenantId, text || 'Describe what you see in this image and explain it.', subject ?? config?.subjects?.split(',')[0] ?? null, history, {
         resourceContext,
         webResults: webResults.length ? webResults : undefined,
         imageBase64: imgForAI,
         signal: abortRef.current.signal,
+        onChunk: (chunk) => setStreamingText(prev => prev + chunk),
       });
+      setStreamingText('');
 
       const aiMsg: any = { id: 'tmp-ai-' + Date.now(), conversation_id: convId, role: 'assistant', content: reply, created_at: new Date().toISOString() };
       setLocalMsgs(prev => [...prev, aiMsg]);
@@ -121,6 +125,7 @@ export function AskAIPage() {
       if (e?.name !== 'AbortError') toast.error(e?.message ?? 'AI not available. Check internet.');
     } finally {
       setThinking(false);
+      setStreamingText('');
     }
   }
 
@@ -256,7 +261,7 @@ export function AskAIPage() {
             );
           })}
 
-          {thinking && (
+          {thinking && !streamingText && (
             <div className="flex justify-start">
               <div className="rounded-2xl px-4 py-3 text-sm" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
                 <p className="text-xs font-semibold mb-1" style={{ color: 'var(--accent)' }}>🤖 StudyMate</p>
@@ -264,6 +269,14 @@ export function AskAIPage() {
                   {searchWeb && <span className="text-xs mr-2" style={{ color: 'var(--text-tertiary)' }}>🌐 searching…</span>}
                   {[0, 1, 2].map(i => <div key={i} className="h-2 w-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />)}
                 </div>
+              </div>
+            </div>
+          )}
+          {streamingText && (
+            <div className="flex justify-start">
+              <div className="max-w-[82%] rounded-2xl px-4 py-3 text-sm" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)', color: 'var(--text-primary)', borderBottomLeftRadius: '4px' }}>
+                <p className="text-xs font-semibold mb-1.5" style={{ color: 'var(--accent)' }}>🤖 StudyMate</p>
+                <p className="whitespace-pre-wrap leading-relaxed">{streamingText}<span className="inline-block w-1.5 h-4 ml-0.5 bg-current align-middle animate-pulse" /></p>
               </div>
             </div>
           )}

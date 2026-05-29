@@ -259,12 +259,13 @@ const publicServer = http.createServer(async (req, res) => {
   if (req.method === 'GET' && pathname === '/update') { res.writeHead(204); res.end(); return; }
 
   // POST /ai/chat — AI assistant, auto-selects best available model (gemma3:4b preferred, dolphin3 fallback)
+  // Supports streaming SSE when request body includes stream: true
   // Rate limit: 60 requests per minute per IP
   if (req.method === 'POST' && pathname === '/ai/chat') {
     if (rateLimit(req, res, 'ai-chat', 60, 60 * 1000)) return;
     const body = await readBody(req);
     try {
-      const { tenant_id, messages, model: requestedModel } = JSON.parse(body);
+      const { tenant_id, messages, model: requestedModel, stream: wantStream } = JSON.parse(body);
       if (!tenant_id || !Array.isArray(messages) || messages.length === 0) {
         res.writeHead(400); res.end('Missing tenant_id or messages'); return;
       }
@@ -279,31 +280,82 @@ const publicServer = http.createServer(async (req, res) => {
         }
       } catch {}
 
-      const ollamaRes = await fetch('http://localhost:11434/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model,
-          messages: messages.map(m => ({
-            role: sanitize(m.role, 20),
-            content: sanitize(m.content, 16000),
-          })),
-          stream: false,
-          options: { temperature: 0.3, num_predict: 2048 },
-        }),
-      });
+      if (wantStream) {
+        // Streaming mode — SSE [study] [all tenants]
+        res.writeHead(200, {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+          'Access-Control-Allow-Origin': '*',
+        });
 
-      if (!ollamaRes.ok) {
-        const errText = await ollamaRes.text();
-        console.error(`AI error: ${errText.substring(0, 200)}`);
-        res.writeHead(503); res.end(JSON.stringify({ error: 'AI service unavailable' })); return;
+        const ollamaRes = await fetch('http://localhost:11434/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model,
+            messages: messages.map(m => ({ role: sanitize(m.role, 20), content: sanitize(m.content, 16000) })),
+            stream: true,
+            options: { temperature: 0.3, num_predict: 2048 },
+          }),
+        });
+
+        if (!ollamaRes.ok) {
+          res.write('data: [ERROR]\n\n');
+          res.end();
+          return;
+        }
+
+        const reader = ollamaRes.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const lines = buf.split('\n');
+          buf = lines.pop() || '';
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const chunk = JSON.parse(line);
+              if (chunk.message?.content) {
+                res.write(`data: ${JSON.stringify({ content: chunk.message.content })}\n\n`);
+              }
+              if (chunk.done) { res.write('data: [DONE]\n\n'); res.end(); return; }
+            } catch {}
+          }
+        }
+        res.write('data: [DONE]\n\n');
+        res.end();
+      } else {
+        // Non-streaming mode (used by MCQ/flashcard generators)
+        const ollamaRes = await fetch('http://localhost:11434/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model,
+            messages: messages.map(m => ({
+              role: sanitize(m.role, 20),
+              content: sanitize(m.content, 16000),
+            })),
+            stream: false,
+            options: { temperature: 0.3, num_predict: 2048 },
+          }),
+        });
+
+        if (!ollamaRes.ok) {
+          const errText = await ollamaRes.text();
+          console.error(`AI error: ${errText.substring(0, 200)}`);
+          res.writeHead(503); res.end(JSON.stringify({ error: 'AI service unavailable' })); return;
+        }
+
+        const data = await ollamaRes.json();
+        json(res, { ok: true, content: data.message?.content || '' });
       }
-
-      const data = await ollamaRes.json();
-      json(res, { ok: true, content: data.message?.content || '' });
     } catch (e) {
       console.error(`AI chat error: ${e.message}`);
-      res.writeHead(503); res.end(JSON.stringify({ error: 'AI not available' }));
+      if (!res.headersSent) { res.writeHead(503); res.end(JSON.stringify({ error: 'AI not available' })); }
     }
     return;
   }

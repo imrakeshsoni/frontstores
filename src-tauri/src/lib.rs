@@ -17,6 +17,7 @@ pub fn run() {
             commands::inventory::adjust_stock,
             commands::config::get_or_create_tenant,
             commands::config::get_next_bill_number,
+            commands::system::get_system_info,
         ])
         .run(tauri::generate_context!())
         .expect("error while running FrontStores");

@@ -1,7 +1,24 @@
-// [study] [all tenants] — StudyMate AI service via gemma3:4b on Mac server
+// [study] [all tenants] — StudyMate AI: prefers local Ollama, falls back to Mac server
+import { checkLocalOllama, askLocalOllama } from './localAI';
+
 const SERVER = 'https://update.frontstores.com';
+const OLLAMA_LOCAL = 'http://localhost:11434';
+
+// Cached result so we don't check on every message
+let _localOllamaModel: string | null | undefined = undefined;
+
+async function getLocalModel(): Promise<string | null> {
+  if (_localOllamaModel !== undefined) return _localOllamaModel;
+  const { available, model } = await checkLocalOllama();
+  _localOllamaModel = available ? model : null;
+  return _localOllamaModel;
+}
 
 export async function checkAIAvailable(): Promise<boolean> {
+  // Local first
+  const local = await getLocalModel();
+  if (local) return true;
+  // Fall back to server
   try {
     const res = await fetch(`${SERVER}/ai/status`, { signal: AbortSignal.timeout(4000) });
     if (!res.ok) return false;
@@ -10,6 +27,10 @@ export async function checkAIAvailable(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export function resetLocalOllamaCache(): void {
+  _localOllamaModel = undefined;
 }
 
 export interface WebSearchResult {
@@ -45,9 +66,10 @@ export async function askTutor(
     webResults?: WebSearchResult[];
     imageBase64?: string | null;
     signal?: AbortSignal;
+    onChunk?: (chunk: string) => void;
   }
 ): Promise<string> {
-  const { resourceContext, webResults, imageBase64, signal } = options ?? {};
+  const { resourceContext, webResults, imageBase64, signal, onChunk } = options ?? {};
 
   let contextSection = '';
   if (resourceContext) {
@@ -87,6 +109,51 @@ ${subject ? `The subject is: ${subject}` : ''}${contextSection}`;
     ...history.slice(-8).map(m => ({ role: m.role, content: m.content })),
     userMessage,
   ];
+
+  // Use local Ollama if installed on this device, else fall back to server
+  const localModel = await getLocalModel();
+
+  if (onChunk) {
+    if (localModel) {
+      // Local Ollama — direct call, zero server load [study] [all tenants]
+      return askLocalOllama(localModel, messages, onChunk, signal);
+    }
+    // Server streaming SSE
+    const res = await fetch(`${SERVER}/ai/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tenant_id: tenantId, messages, model: 'gemma3:4b', stream: true }),
+      signal,
+    });
+    if (!res.ok) throw new Error('AI not available. Check your internet connection.');
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    let full = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6);
+        if (data === '[DONE]') return full;
+        if (data === '[ERROR]') throw new Error('AI not available. Check your internet connection.');
+        try {
+          const { content } = JSON.parse(data) as { content: string };
+          if (content) { full += content; onChunk(content); }
+        } catch {}
+      }
+    }
+    return full;
+  }
+
+  if (localModel) {
+    let full = '';
+    return askLocalOllama(localModel, messages, c => { full += c; }, signal);
+  }
 
   const res = await fetch(`${SERVER}/ai/chat`, {
     method: 'POST',
