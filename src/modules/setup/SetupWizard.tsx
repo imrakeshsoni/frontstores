@@ -22,7 +22,23 @@ const SHOP_TYPES = [
   { value: 'realestate', label: 'Real Estate / PropMate',  icon: '🏠', desc: 'Leads, deals, commissions, site visits, builder projects' },
   { value: 'hotel',         label: 'Hotel / Lodge',              icon: '🏨', desc: 'Room bookings, check-in/out, billing, housekeeping, maintenance' },
   { value: 'repair',        label: 'Mobile/Electronics Repair', icon: '🔧', desc: 'Repair jobs, parts inventory, technicians, warranty tracking' }, // [repair] [all tenants]
-  { value: 'drivingschool', label: 'Driving School',            icon: '🚗', desc: 'Students, sessions, vehicles, LL/DL test tracking, fees' }, // [drivingschool] [all tenants]
+  { value: 'drivingschool', label: 'Driving School',            icon: '🚗', desc: 'Students, sessions, vehicles, LL/DL test tracking, fees' },
+  { value: 'tailor',       label: 'Tailor / Boutique',         icon: '🧵', desc: 'Orders, measurements, delivery tracking, fabric management' },
+  { value: 'hardware',     label: 'Hardware Store',            icon: '🔩', desc: 'Billing, stock by kg/meter/piece, credit accounts (udhar khata)' },
+  { value: 'laundry',      label: 'Laundry / Dry Clean',       icon: '👕', desc: 'Order tracking, price list, delivery management' },
+  { value: 'catering',     label: 'Catering Business',         icon: '🍱', desc: 'Event bookings, menu, guest count, staff assignments' },
+  { value: 'pestcontrol',  label: 'Pest Control',              icon: '🐛', desc: 'Job cards, AMC contracts, chemical stock, customer tracking' },
+  { value: 'clothing',     label: 'Clothing / Footwear Store', icon: '👗', desc: 'Size+color variants, POS, exchange/return tracking' },
+  { value: 'bakery',       label: 'Bakery / Sweets Shop',      icon: '🎂', desc: 'Production log, expiry alerts, counter billing, bulk orders' },
+  { value: 'optician',     label: 'Optician / Eye Care',       icon: '👓', desc: 'Rx prescriptions, lens orders, frame inventory' },
+  { value: 'petrolpump',   label: 'Petrol Pump',               icon: '⛽', desc: 'Shift management, fuel rates, fleet credit accounts' },
+  { value: 'furniture',    label: 'Furniture Store',           icon: '🪑', desc: 'Regular + custom orders, delivery, carpenter assignment' },
+  { value: 'printing',     label: 'Printing / Stationery',     icon: '🖨️', desc: 'Print jobs, stationery counter billing, stock management' },
+  { value: 'ca',           label: 'CA / Tax Consultant',       icon: '📊', desc: 'Client tasks, ITR/GST filing, document tracker, invoices' },
+  { value: 'events',       label: 'Event Planner',             icon: '🎪', desc: 'Weddings, corporate events, vendor management, expenses' },
+  { value: 'travel',       label: 'Travel Agency',             icon: '✈️', desc: 'Trip bookings, itinerary, visa tracking, payment collection' },
+  { value: 'insurance',    label: 'Insurance Agent',           icon: '🛡️', desc: 'Policies, renewal reminders, claims, commission tracking' },
+  { value: 'homeservice',  label: 'Home Service / Electrician',icon: '🔌', desc: 'Job cards, technicians, parts stock, AMC contracts' },
 ];
 
 const RE_ROLES = [

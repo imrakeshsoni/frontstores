@@ -1,6 +1,6 @@
 import { useAppStore } from '@/app/store/app.store';
 
-export type ShopType = 'medical' | 'restaurant' | 'grocery' | 'carwash' | 'clinic' | 'beauty' | 'study' | 'coaching' | 'gym' | 'jewellery' | 'realestate' | 'repair' | 'drivingschool';
+export type ShopType = 'medical' | 'restaurant' | 'grocery' | 'carwash' | 'clinic' | 'beauty' | 'study' | 'coaching' | 'gym' | 'jewellery' | 'realestate' | 'hotel' | 'tailor' | 'hardware' | 'repair' | 'drivingschool' | 'laundry' | 'catering' | 'pestcontrol' | 'clothing' | 'bakery' | 'optician' | 'petrolpump' | 'furniture' | 'printing' | 'ca' | 'events' | 'travel' | 'insurance' | 'homeservice';
 
 const SHOP_TYPE_LABELS: Record<string, string> = {
   medical: 'Medical Store / Pharmacy', // [medical] [all tenants]
@@ -15,8 +15,24 @@ const SHOP_TYPE_LABELS: Record<string, string> = {
   jewellery: 'Jewellery Shop',
   realestate: 'Real Estate / PropMate',
   hotel: 'Hotel / Lodge', // [hotel] [all tenants]
-  repair: 'Mobile/Electronics Repair', // [repair] [all tenants]
-  drivingschool: 'Driving School', // [drivingschool] [all tenants]
+  repair: 'Mobile / Electronics Repair',
+  drivingschool: 'Driving School',
+  tailor: 'Tailor / Boutique',
+  hardware: 'Hardware Store',
+  laundry: 'Laundry / Dry Clean',
+  catering: 'Catering Business',
+  pestcontrol: 'Pest Control',
+  clothing: 'Clothing / Footwear Store',
+  bakery: 'Bakery / Sweets Shop',
+  optician: 'Optician / Eye Care',
+  petrolpump: 'Petrol Pump',
+  furniture: 'Furniture Store',
+  printing: 'Printing / Stationery',
+  ca: 'CA / Tax Consultant',
+  events: 'Event Planner',
+  travel: 'Travel Agency',
+  insurance: 'Insurance Agent',
+  homeservice: 'Home Service / Electrician',
 };
 
 // ── APP_REGISTRY ─────────────────────────────────────────────────────────────
@@ -160,6 +176,22 @@ export const APP_REGISTRY: AppRegistryEntry[] = [
     bgColor: '#dbeafe',
     dashboardRoute: '/drivingschool/dashboard',
   }, // [drivingschool] [all tenants]
+  { type: 'tailor',      label: 'Tailor / Boutique',           icon: '🧵', description: 'Orders, measurements, delivery tracking', color: '#7c3aed', bgColor: '#ede9fe', dashboardRoute: '/tailor/dashboard' },
+  { type: 'hardware',    label: 'Hardware Store',               icon: '🔧', description: 'Billing, stock, credit accounts (udhar khata)', color: '#d97706', bgColor: '#fef3c7', dashboardRoute: '/hardware/dashboard' },
+  { type: 'laundry',     label: 'Laundry / Dry Clean',          icon: '👕', description: 'Order tracking, price list, delivery management', color: '#0891b2', bgColor: '#cffafe', dashboardRoute: '/laundry/dashboard' },
+  { type: 'catering',    label: 'Catering Business',            icon: '🍱', description: 'Events, menu, guest count, staff assignments', color: '#dc2626', bgColor: '#fee2e2', dashboardRoute: '/catering/dashboard' },
+  { type: 'pestcontrol', label: 'Pest Control',                 icon: '🐛', description: 'Job cards, AMC contracts, chemical stock', color: '#16a34a', bgColor: '#dcfce7', dashboardRoute: '/pestcontrol/dashboard' },
+  { type: 'clothing',    label: 'Clothing / Footwear Store',    icon: '👗', description: 'Size+color variants, POS, exchange tracking', color: '#db2777', bgColor: '#fce7f3', dashboardRoute: '/clothing/dashboard' },
+  { type: 'bakery',      label: 'Bakery / Sweets Shop',         icon: '🎂', description: 'Production log, expiry alerts, bulk orders', color: '#d97706', bgColor: '#fef3c7', dashboardRoute: '/bakery/dashboard' },
+  { type: 'optician',    label: 'Optician / Eye Care',          icon: '👓', description: 'Prescriptions, lens orders, frame inventory', color: '#0891b2', bgColor: '#cffafe', dashboardRoute: '/optician/dashboard' },
+  { type: 'petrolpump',  label: 'Petrol Pump',                  icon: '⛽', description: 'Shift management, fuel rates, fleet credit accounts', color: '#d97706', bgColor: '#fef3c7', dashboardRoute: '/petrolpump/dashboard' },
+  { type: 'furniture',   label: 'Furniture Store',              icon: '🪑', description: 'Regular + custom orders, delivery, carpenter tracking', color: '#92400e', bgColor: '#fef3c7', dashboardRoute: '/furniture/dashboard' },
+  { type: 'printing',    label: 'Printing / Stationery',        icon: '🖨️', description: 'Print jobs, stationery counter billing', color: '#2563eb', bgColor: '#dbeafe', dashboardRoute: '/printing/dashboard' },
+  { type: 'ca',          label: 'CA / Tax Consultant',          icon: '📊', description: 'Clients, ITR/GST tasks, documents, invoices', color: '#2563eb', bgColor: '#dbeafe', dashboardRoute: '/ca/dashboard' },
+  { type: 'events',      label: 'Event Planner',                icon: '🎪', description: 'Events, vendors, task checklists, expenses', color: '#db2777', bgColor: '#fce7f3', dashboardRoute: '/events/dashboard' },
+  { type: 'travel',      label: 'Travel Agency',                icon: '✈️', description: 'Trip bookings, itinerary, visa tracking', color: '#0891b2', bgColor: '#cffafe', dashboardRoute: '/travel/dashboard' },
+  { type: 'insurance',   label: 'Insurance Agent',              icon: '🛡️', description: 'Policies, renewals, claims, commission tracking', color: '#16a34a', bgColor: '#dcfce7', dashboardRoute: '/insurance/dashboard' },
+  { type: 'homeservice', label: 'Home Service / Electrician',   icon: '🔌', description: 'Job cards, technicians, materials, AMC contracts', color: '#d97706', bgColor: '#fef3c7', dashboardRoute: '/homeservice/dashboard' },
   // ➕ Add new apps here — they appear automatically in the Switch App modal
 ];
 

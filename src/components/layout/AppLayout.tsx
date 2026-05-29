@@ -275,8 +275,8 @@ const HOTEL_NAV_ITEMS = [
 const CLOTHING_NAV_ITEMS = [
   { to: '/clothing/dashboard', icon: LayoutDashboard, label: 'Dashboard',   iconBg: '#fce7f3', iconColor: '#db2777' },
   { to: '/clothing/billing',   icon: ShoppingCart,    label: 'Billing',     iconBg: '#dcfce7', iconColor: '#16a34a' },
-  { to: '/clothing/products',  icon: Shirt,           label: 'Products',    iconBg: '#fce7f3', iconColor: '#db2777' },
-  { to: '/clothing/exchanges', icon: Repeat,          label: 'Exchanges',   iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/clothing/products',  icon: Package,         label: 'Products',    iconBg: '#fce7f3', iconColor: '#db2777' },
+  { to: '/clothing/exchanges', icon: RefreshCw,       label: 'Exchanges',   iconBg: '#ede9fe', iconColor: '#7c3aed' },
   { to: '/clothing/reports',   icon: BarChart3,       label: 'Reports',     iconBg: '#e0f2fe', iconColor: '#0284c7' },
   { to: '/settings',           icon: Settings,        label: 'Settings',    iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
@@ -285,8 +285,8 @@ const CLOTHING_NAV_ITEMS = [
 const BAKERY_NAV_ITEMS = [
   { to: '/bakery/dashboard',   icon: LayoutDashboard, label: 'Dashboard',   iconBg: '#fef3c7', iconColor: '#d97706' },
   { to: '/bakery/billing',     icon: ShoppingCart,    label: 'Billing',     iconBg: '#dcfce7', iconColor: '#16a34a' },
-  { to: '/bakery/production',  icon: Factory,         label: 'Production',  iconBg: '#fef3c7', iconColor: '#d97706' },
-  { to: '/bakery/bulk-orders', icon: CalendarRange,   label: 'Bulk Orders', iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/bakery/production',  icon: PackagePlus,     label: 'Production',  iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/bakery/bulk-orders', icon: CalendarDays,    label: 'Bulk Orders', iconBg: '#ede9fe', iconColor: '#7c3aed' },
   { to: '/bakery/reports',     icon: BarChart3,       label: 'Reports',     iconBg: '#e0f2fe', iconColor: '#0284c7' },
   { to: '/settings',           icon: Settings,        label: 'Settings',    iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
@@ -295,11 +295,146 @@ const BAKERY_NAV_ITEMS = [
 const OPTICIAN_NAV_ITEMS = [
   { to: '/optician/dashboard',     icon: LayoutDashboard, label: 'Dashboard',     iconBg: '#cffafe', iconColor: '#0891b2' },
   { to: '/optician/patients',      icon: Users,           label: 'Patients',      iconBg: '#fce7f3', iconColor: '#db2777' },
-  { to: '/optician/prescriptions', icon: FileSearch,      label: 'Prescriptions', iconBg: '#dbeafe', iconColor: '#2563eb' },
-  { to: '/optician/orders',        icon: ScanLine,        label: 'Orders',        iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/optician/prescriptions', icon: FileText,        label: 'Prescriptions', iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/optician/orders',        icon: ClipboardList,   label: 'Orders',        iconBg: '#dcfce7', iconColor: '#16a34a' },
   { to: '/optician/inventory',     icon: Boxes,           label: 'Inventory',     iconBg: '#fef3c7', iconColor: '#d97706' },
   { to: '/optician/reports',       icon: BarChart3,       label: 'Reports',       iconBg: '#e0f2fe', iconColor: '#0284c7' },
   { to: '/settings',               icon: Settings,        label: 'Settings',      iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [tailor] [all tenants]
+const TAILOR_NAV_ITEMS = [
+  { to: '/tailor/dashboard',    icon: LayoutDashboard, label: 'Dashboard',    iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/tailor/orders',       icon: ClipboardList,   label: 'Orders',       iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/tailor/orders/new',   icon: Receipt,         label: 'New Order',    iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/tailor/measurements', icon: Ruler,           label: 'Measurements', iconBg: '#fce7f3', iconColor: '#db2777' },
+  { to: '/tailor/reports',      icon: BarChart3,       label: 'Reports',      iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',            icon: Settings,        label: 'Settings',     iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [hardware] [all tenants]
+const HARDWARE_NAV_ITEMS = [
+  { to: '/hardware/dashboard', icon: LayoutDashboard, label: 'Dashboard',    iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/hardware/pos',       icon: ShoppingCart,    label: 'Billing',      iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/hardware/products',  icon: Package,         label: 'Products',     iconBg: '#cffafe', iconColor: '#0891b2' },
+  { to: '/hardware/credit',    icon: BookOpen,        label: 'Udhar Khata',  iconBg: '#f3e8ff', iconColor: '#9333ea' },
+  { to: '/hardware/reports',   icon: BarChart3,       label: 'Reports',      iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',           icon: Settings,        label: 'Settings',     iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [laundry] [all tenants]
+const LAUNDRY_NAV_ITEMS = [
+  { to: '/laundry/dashboard',  icon: LayoutDashboard, label: 'Dashboard',  iconBg: '#cffafe', iconColor: '#0891b2' },
+  { to: '/laundry/orders',     icon: ClipboardList,   label: 'Orders',     iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/laundry/orders/new', icon: Receipt,         label: 'New Order',  iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/laundry/services',   icon: Package,         label: 'Price List', iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/laundry/reports',    icon: BarChart3,       label: 'Reports',    iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',           icon: Settings,        label: 'Settings',   iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [catering] [all tenants]
+const CATERING_NAV_ITEMS = [
+  { to: '/catering/dashboard',  icon: LayoutDashboard, label: 'Dashboard', iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/catering/events',     icon: CalendarDays,    label: 'Events',    iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/catering/events/new', icon: Receipt,         label: 'New Event', iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/catering/menu',       icon: BookOpen,        label: 'Menu',      iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/catering/reports',    icon: BarChart3,       label: 'Reports',   iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',            icon: Settings,        label: 'Settings',  iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [pestcontrol] [all tenants]
+const PESTCONTROL_NAV_ITEMS = [
+  { to: '/pestcontrol/dashboard', icon: LayoutDashboard, label: 'Dashboard', iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/pestcontrol/jobs',      icon: ClipboardList,   label: 'Jobs',      iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/pestcontrol/jobs/new',  icon: Receipt,         label: 'New Job',   iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/pestcontrol/customers', icon: Users,           label: 'Customers', iconBg: '#fce7f3', iconColor: '#db2777' },
+  { to: '/pestcontrol/contracts', icon: FileText,        label: 'Contracts', iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/pestcontrol/reports',   icon: BarChart3,       label: 'Reports',   iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',              icon: Settings,        label: 'Settings',  iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [petrolpump] [all tenants]
+const PETROLPUMP_NAV_ITEMS = [
+  { to: '/petrolpump/dashboard', icon: LayoutDashboard, label: 'Dashboard',     iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/petrolpump/shift',     icon: ClipboardCheck,  label: 'Today\'s Shift',iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/petrolpump/rates',     icon: Receipt,         label: 'Fuel Rates',    iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/petrolpump/credit',    icon: BookOpen,        label: 'Credit Accts',  iconBg: '#f3e8ff', iconColor: '#9333ea' },
+  { to: '/petrolpump/reports',   icon: BarChart3,       label: 'Reports',       iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',             icon: Settings,        label: 'Settings',      iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [furniture] [all tenants]
+const FURNITURE_NAV_ITEMS = [
+  { to: '/furniture/dashboard',     icon: LayoutDashboard, label: 'Dashboard',     iconBg: '#fef3c7', iconColor: '#92400e' },
+  { to: '/furniture/orders',        icon: ClipboardList,   label: 'Orders',        iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/furniture/orders/new',    icon: Receipt,         label: 'New Order',     iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/furniture/custom-orders', icon: Wrench,          label: 'Custom Orders', iconBg: '#fce7f3', iconColor: '#db2777' },
+  { to: '/furniture/products',      icon: Package,         label: 'Products',      iconBg: '#cffafe', iconColor: '#0891b2' },
+  { to: '/furniture/reports',       icon: BarChart3,       label: 'Reports',       iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',                icon: Settings,        label: 'Settings',      iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [printing] [all tenants]
+const PRINTING_NAV_ITEMS = [
+  { to: '/printing/dashboard', icon: LayoutDashboard, label: 'Dashboard',  iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/printing/jobs',      icon: ClipboardList,   label: 'Print Jobs', iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/printing/jobs/new',  icon: Receipt,         label: 'New Job',    iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/printing/stationery',icon: Package,         label: 'Stationery', iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/printing/reports',   icon: BarChart3,       label: 'Reports',    iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',           icon: Settings,        label: 'Settings',   iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [ca] [all tenants]
+const CA_NAV_ITEMS = [
+  { to: '/ca/dashboard',  icon: LayoutDashboard, label: 'Dashboard',  iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/ca/clients',    icon: Users,           label: 'Clients',    iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/ca/tasks',      icon: ClipboardList,   label: 'Tasks',      iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/ca/documents',  icon: FileText,        label: 'Documents',  iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/ca/reports',    icon: BarChart3,       label: 'Reports',    iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/settings',      icon: Settings,        label: 'Settings',   iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [events] [all tenants]
+const EVENTS_NAV_ITEMS = [
+  { to: '/events/dashboard', icon: LayoutDashboard, label: 'Dashboard', iconBg: '#fce7f3', iconColor: '#db2777' },
+  { to: '/events/list',      icon: CalendarDays,    label: 'Events',    iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/events/new',       icon: Receipt,         label: 'New Event', iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/events/vendors',   icon: Truck,           label: 'Vendors',   iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/events/reports',   icon: BarChart3,       label: 'Reports',   iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/settings',         icon: Settings,        label: 'Settings',  iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [travel] [all tenants]
+const TRAVEL_NAV_ITEMS = [
+  { to: '/travel/dashboard', icon: LayoutDashboard, label: 'Dashboard',    iconBg: '#cffafe', iconColor: '#0891b2' },
+  { to: '/travel/bookings',  icon: ClipboardList,   label: 'Bookings',     iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/travel/new',       icon: Receipt,         label: 'New Booking',  iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/travel/visa',      icon: FileText,        label: 'Visa Tracker', iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/travel/reports',   icon: BarChart3,       label: 'Reports',      iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/settings',         icon: Settings,        label: 'Settings',     iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [insurance] [all tenants]
+const INSURANCE_NAV_ITEMS = [
+  { to: '/insurance/dashboard', icon: LayoutDashboard, label: 'Dashboard', iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/insurance/clients',   icon: Users,           label: 'Clients',   iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/insurance/policies',  icon: FileText,        label: 'Policies',  iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/insurance/renewals',  icon: CalendarDays,    label: 'Renewals',  iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/insurance/claims',    icon: ClipboardList,   label: 'Claims',    iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/insurance/reports',   icon: BarChart3,       label: 'Reports',   iconBg: '#cffafe', iconColor: '#0891b2' },
+  { to: '/settings',            icon: Settings,        label: 'Settings',  iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [homeservice] [all tenants]
+const HOMESERVICE_NAV_ITEMS = [
+  { to: '/homeservice/dashboard',  icon: LayoutDashboard, label: 'Dashboard',   iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/homeservice/jobs',       icon: ClipboardList,   label: 'Jobs',        iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/homeservice/new-job',    icon: Receipt,         label: 'New Job',     iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/homeservice/techs',      icon: Users,           label: 'Technicians', iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/homeservice/materials',  icon: Boxes,           label: 'Materials',   iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/homeservice/amc',        icon: CalendarDays,    label: 'AMC',         iconBg: '#cffafe', iconColor: '#0891b2' },
+  { to: '/homeservice/reports',    icon: BarChart3,       label: 'Reports',     iconBg: '#f1f5f9', iconColor: '#64748b' },
+  { to: '/settings',               icon: Settings,        label: 'Settings',    iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
 
 // [realestate] [all tenants]
@@ -374,8 +509,24 @@ export function AppLayout() {
     config?.shop_type === 'jewellery'   ? JEWELLERY_NAV_ITEMS :
     config?.shop_type === 'realestate'  ? getRealEstateNavItems(reRole) :
     config?.shop_type === 'hotel'        ? HOTEL_NAV_ITEMS : // [hotel] [all tenants]
-    config?.shop_type === 'repair'       ? REPAIR_NAV_ITEMS : // [repair] [all tenants]
-    config?.shop_type === 'drivingschool'? DRIVINGSCHOOL_NAV_ITEMS : // [drivingschool] [all tenants]
+    config?.shop_type === 'repair'        ? REPAIR_NAV_ITEMS :
+    config?.shop_type === 'drivingschool' ? DRIVINGSCHOOL_NAV_ITEMS :
+    config?.shop_type === 'clothing'      ? CLOTHING_NAV_ITEMS :
+    config?.shop_type === 'bakery'        ? BAKERY_NAV_ITEMS :
+    config?.shop_type === 'optician'      ? OPTICIAN_NAV_ITEMS :
+    config?.shop_type === 'tailor'        ? TAILOR_NAV_ITEMS :
+    config?.shop_type === 'hardware'      ? HARDWARE_NAV_ITEMS :
+    config?.shop_type === 'laundry'       ? LAUNDRY_NAV_ITEMS :
+    config?.shop_type === 'catering'      ? CATERING_NAV_ITEMS :
+    config?.shop_type === 'pestcontrol'   ? PESTCONTROL_NAV_ITEMS :
+    config?.shop_type === 'petrolpump'    ? PETROLPUMP_NAV_ITEMS :
+    config?.shop_type === 'furniture'     ? FURNITURE_NAV_ITEMS :
+    config?.shop_type === 'printing'      ? PRINTING_NAV_ITEMS :
+    config?.shop_type === 'ca'            ? CA_NAV_ITEMS :
+    config?.shop_type === 'events'        ? EVENTS_NAV_ITEMS :
+    config?.shop_type === 'travel'        ? TRAVEL_NAV_ITEMS :
+    config?.shop_type === 'insurance'     ? INSURANCE_NAV_ITEMS :
+    config?.shop_type === 'homeservice'   ? HOMESERVICE_NAV_ITEMS :
     NAV_ITEMS;
 
   useEffect(() => {

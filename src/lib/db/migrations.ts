@@ -30,8 +30,24 @@ import migration0029 from '../../../src-tauri/migrations/0029_jewellery.sql?raw'
 import migration0030 from '../../../src-tauri/migrations/0030_realestate.sql?raw';
 import migration0031 from '../../../src-tauri/migrations/0031_hotel.sql?raw';
 import migration0032 from '../../../src-tauri/migrations/0032_pharmacy.sql?raw';
+import migration0033 from '../../../src-tauri/migrations/0033_tailor.sql?raw';
+import migration0034 from '../../../src-tauri/migrations/0034_hardware.sql?raw';
 import migration0035 from '../../../src-tauri/migrations/0035_repair.sql?raw';
 import migration0036 from '../../../src-tauri/migrations/0036_drivingschool.sql?raw';
+import migration0037 from '../../../src-tauri/migrations/0037_laundry.sql?raw';
+import migration0038 from '../../../src-tauri/migrations/0038_catering.sql?raw';
+import migration0039 from '../../../src-tauri/migrations/0039_pestcontrol.sql?raw';
+import migration0040 from '../../../src-tauri/migrations/0040_clothing.sql?raw';
+import migration0041 from '../../../src-tauri/migrations/0041_bakery.sql?raw';
+import migration0042 from '../../../src-tauri/migrations/0042_optician.sql?raw';
+import migration0043 from '../../../src-tauri/migrations/0043_petrolpump.sql?raw';
+import migration0044 from '../../../src-tauri/migrations/0044_furniture.sql?raw';
+import migration0045 from '../../../src-tauri/migrations/0045_printing.sql?raw';
+import migration0046 from '../../../src-tauri/migrations/0046_ca.sql?raw';
+import migration0047 from '../../../src-tauri/migrations/0047_events.sql?raw';
+import migration0048 from '../../../src-tauri/migrations/0048_travel.sql?raw';
+import migration0049 from '../../../src-tauri/migrations/0049_insurance.sql?raw';
+import migration0050 from '../../../src-tauri/migrations/0050_homeservice.sql?raw';
 
 export interface Migration {
   name: string;
@@ -72,7 +88,23 @@ export async function readMigrations(): Promise<Migration[]> {
     { name: '0030_realestate', sql: migration0030 },
     { name: '0031_hotel', sql: migration0031 },
     { name: '0032_pharmacy', sql: migration0032 },
+    { name: '0033_tailor', sql: migration0033 },
+    { name: '0034_hardware', sql: migration0034 },
     { name: '0035_repair', sql: migration0035 },
     { name: '0036_drivingschool', sql: migration0036 },
+    { name: '0037_laundry', sql: migration0037 },
+    { name: '0038_catering', sql: migration0038 },
+    { name: '0039_pestcontrol', sql: migration0039 },
+    { name: '0040_clothing', sql: migration0040 },
+    { name: '0041_bakery', sql: migration0041 },
+    { name: '0042_optician', sql: migration0042 },
+    { name: '0043_petrolpump', sql: migration0043 },
+    { name: '0044_furniture', sql: migration0044 },
+    { name: '0045_printing', sql: migration0045 },
+    { name: '0046_ca', sql: migration0046 },
+    { name: '0047_events', sql: migration0047 },
+    { name: '0048_travel', sql: migration0048 },
+    { name: '0049_insurance', sql: migration0049 },
+    { name: '0050_homeservice', sql: migration0050 },
   ];
 }

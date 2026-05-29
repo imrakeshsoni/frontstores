@@ -157,6 +157,86 @@ const DSVehiclesPage        = lazy(() => import('@/modules/drivingschool/Vehicle
 const DSInstructorsPage     = lazy(() => import('@/modules/drivingschool/InstructorsPage').then(m => ({ default: m.InstructorsPage })));
 const DSDrivingReportsPage  = lazy(() => import('@/modules/drivingschool/DrivingReportsPage').then(m => ({ default: m.DrivingReportsPage })));
 
+// [tailor] [all tenants]
+const TailorDashboard    = lazy(() => import('@/modules/tailor/TailorDashboard').then(m => ({ default: m.TailorDashboard })));
+const TailorOrdersPage   = lazy(() => import('@/modules/tailor/TailorOrdersPage').then(m => ({ default: m.TailorOrdersPage })));
+const TailorNewOrderPage = lazy(() => import('@/modules/tailor/NewOrderPage').then(m => ({ default: m.NewOrderPage })));
+const TailorMeasurements = lazy(() => import('@/modules/tailor/MeasurementsPage').then(m => ({ default: m.MeasurementsPage })));
+const TailorReports      = lazy(() => import('@/modules/tailor/TailorReportsPage').then(m => ({ default: m.TailorReportsPage })));
+
+// [hardware] [all tenants]
+const HardwareDashboard  = lazy(() => import('@/modules/hardware/HardwareDashboard').then(m => ({ default: m.HardwareDashboard })));
+const HardwarePOSPage    = lazy(() => import('@/modules/hardware/HardwarePOSPage').then(m => ({ default: m.HardwarePOSPage })));
+const HardwareProductsPage = lazy(() => import('@/modules/hardware/HardwareProductsPage').then(m => ({ default: m.HardwareProductsPage })));
+const HardwareCreditPage = lazy(() => import('@/modules/hardware/CreditAccountsPage').then(m => ({ default: m.CreditAccountsPage })));
+const HardwareReports    = lazy(() => import('@/modules/hardware/HardwareReportsPage').then(m => ({ default: m.HardwareReportsPage })));
+
+// [laundry] [all tenants]
+const LaundryDashboard   = lazy(() => import('@/modules/laundry/LaundryDashboard').then(m => ({ default: m.LaundryDashboard })));
+const LaundryOrdersPage  = lazy(() => import('@/modules/laundry/LaundryOrdersPage').then(m => ({ default: m.LaundryOrdersPage })));
+const LaundryNewOrderPage = lazy(() => import('@/modules/laundry/LaundryNewOrderPage').then(m => ({ default: m.LaundryNewOrderPage })));
+const LaundryServicesPage = lazy(() => import('@/modules/laundry/LaundryServicesPage').then(m => ({ default: m.LaundryServicesPage })));
+const LaundryReports     = lazy(() => import('@/modules/laundry/LaundryReportsPage').then(m => ({ default: m.LaundryReportsPage })));
+
+// [catering] [all tenants]
+const CateringDashboard  = lazy(() => import('@/modules/catering/CateringDashboard').then(m => ({ default: m.CateringDashboard })));
+const CateringEventsPage = lazy(() => import('@/modules/catering/CateringEventsPage').then(m => ({ default: m.CateringEventsPage })));
+const CateringNewEventPage = lazy(() => import('@/modules/catering/CateringNewEventPage').then(m => ({ default: m.CateringNewEventPage })));
+const CateringMenuPage   = lazy(() => import('@/modules/catering/CateringMenuPage').then(m => ({ default: m.CateringMenuPage })));
+const CateringReports    = lazy(() => import('@/modules/catering/CateringReportsPage').then(m => ({ default: m.CateringReportsPage })));
+
+// [pestcontrol] [all tenants]
+const PestDashboard      = lazy(() => import('@/modules/pestcontrol/PestDashboard').then(m => ({ default: m.PestDashboard })));
+const PCJobsPage         = lazy(() => import('@/modules/pestcontrol/PCJobsPage').then(m => ({ default: m.PCJobsPage })));
+const PCNewJobPage       = lazy(() => import('@/modules/pestcontrol/PCNewJobPage').then(m => ({ default: m.PCNewJobPage })));
+const PCCustomersPage    = lazy(() => import('@/modules/pestcontrol/PCCustomersPage').then(m => ({ default: m.PCCustomersPage })));
+const PCContractsPage    = lazy(() => import('@/modules/pestcontrol/PCContractsPage').then(m => ({ default: m.PCContractsPage })));
+const PCReportsPage      = lazy(() => import('@/modules/pestcontrol/PCReportsPage').then(m => ({ default: m.PCReportsPage })));
+
+// [clothing] [all tenants]
+const ClothingDashboard  = lazy(() => import('@/modules/clothing/ClothingDashboard').then(m => ({ default: m.ClothingDashboard })));
+const ClothingPOSPage    = lazy(() => import('@/modules/clothing/ClothingPOSPage').then(m => ({ default: m.ClothingPOSPage })));
+const ClothingProductsPage = lazy(() => import('@/modules/clothing/ClothingProductsPage').then(m => ({ default: m.ClothingProductsPage })));
+const ClothingExchangesPage = lazy(() => import('@/modules/clothing/ExchangesPage').then(m => ({ default: m.ExchangesPage })));
+const ClothingReports    = lazy(() => import('@/modules/clothing/ClothingReportsPage').then(m => ({ default: m.ClothingReportsPage })));
+
+// [bakery] [all tenants]
+const BakeryDashboard    = lazy(() => import('@/modules/bakery/BakeryDashboard').then(m => ({ default: m.BakeryDashboard })));
+const BakeryPOSPage      = lazy(() => import('@/modules/bakery/BakeryPOSPage').then(m => ({ default: m.BakeryPOSPage })));
+const BakeryProductionPage = lazy(() => import('@/modules/bakery/ProductionPage').then(m => ({ default: m.ProductionPage })));
+const BakeryBulkOrdersPage = lazy(() => import('@/modules/bakery/BulkOrdersPage').then(m => ({ default: m.BulkOrdersPage })));
+const BakeryReports      = lazy(() => import('@/modules/bakery/BakeryReportsPage').then(m => ({ default: m.BakeryReportsPage })));
+
+// [optician] [all tenants]
+const OpticianDashboard  = lazy(() => import('@/modules/optician/OpticianDashboard').then(m => ({ default: m.OpticianDashboard })));
+const OpticianPatientsPage = lazy(() => import('@/modules/optician/PatientsPage').then(m => ({ default: m.PatientsPage })));
+const OpticianRxPage     = lazy(() => import('@/modules/optician/PrescriptionPage').then(m => ({ default: m.PrescriptionPage })));
+const OpticianOrdersPage = lazy(() => import('@/modules/optician/OrdersPage').then(m => ({ default: m.OrdersPage })));
+const OpticianInventoryPage = lazy(() => import('@/modules/optician/InventoryPage').then(m => ({ default: m.InventoryPage })));
+const OpticianReports    = lazy(() => import('@/modules/optician/OpticianReportsPage').then(m => ({ default: m.OpticianReportsPage })));
+
+// [petrolpump] [all tenants]
+const PetrolDashboard    = lazy(() => import('@/modules/petrolpump/PetrolDashboard').then(m => ({ default: m.PetrolDashboard })));
+const ShiftPage          = lazy(() => import('@/modules/petrolpump/ShiftPage').then(m => ({ default: m.ShiftPage })));
+const FuelRatesPage      = lazy(() => import('@/modules/petrolpump/FuelRatesPage').then(m => ({ default: m.FuelRatesPage })));
+const PPCreditAccountsPage = lazy(() => import('@/modules/petrolpump/CreditAccountsPage').then(m => ({ default: m.CreditAccountsPage })));
+const PetrolReports      = lazy(() => import('@/modules/petrolpump/PetrolReportsPage').then(m => ({ default: m.PetrolReportsPage })));
+
+// [furniture] [all tenants]
+const FurnitureDashboard  = lazy(() => import('@/modules/furniture/FurnitureDashboard').then(m => ({ default: m.FurnitureDashboard })));
+const FurnitureOrdersPage = lazy(() => import('@/modules/furniture/OrdersPage').then(m => ({ default: m.OrdersPage })));
+const FurnitureNewOrderPage = lazy(() => import('@/modules/furniture/NewOrderPage').then(m => ({ default: m.NewOrderPage })));
+const FurnitureCustomOrdersPage = lazy(() => import('@/modules/furniture/CustomOrdersPage').then(m => ({ default: m.CustomOrdersPage })));
+const FurnitureProductsPage = lazy(() => import('@/modules/furniture/FurnitureProductsPage').then(m => ({ default: m.FurnitureProductsPage })));
+const FurnitureReports    = lazy(() => import('@/modules/furniture/FurnitureReportsPage').then(m => ({ default: m.FurnitureReportsPage })));
+
+// [printing] [all tenants]
+const PrintingDashboard  = lazy(() => import('@/modules/printing/PrintingDashboard').then(m => ({ default: m.PrintingDashboard })));
+const PrintingJobsPage   = lazy(() => import('@/modules/printing/JobsPage').then(m => ({ default: m.JobsPage })));
+const PrintingNewJobPage = lazy(() => import('@/modules/printing/NewJobPage').then(m => ({ default: m.NewJobPage })));
+const PrintingStationeryPage = lazy(() => import('@/modules/printing/StationeryPage').then(m => ({ default: m.StationeryPage })));
+const PrintingReports    = lazy(() => import('@/modules/printing/PrintingReportsPage').then(m => ({ default: m.PrintingReportsPage })));
+
 // [hotel] [all tenants]
 const HotelDashboard       = lazy(() => import('@/modules/hotel/HotelDashboard').then(m => ({ default: m.HotelDashboard })));
 const HotelRoomGrid        = lazy(() => import('@/modules/hotel/RoomGridPage').then(m => ({ default: m.RoomGridPage })));
@@ -277,8 +357,24 @@ export default function App() {
               config?.shop_type === 'jewellery'   ? '/jewellery/dashboard' :
               config?.shop_type === 'realestate'  ? '/realestate/dashboard' :
               config?.shop_type === 'hotel'        ? '/hotel/dashboard' : // [hotel] [all tenants]
-              config?.shop_type === 'repair'       ? '/repair/dashboard' : // [repair] [all tenants]
-              config?.shop_type === 'drivingschool'? '/drivingschool/dashboard' : // [drivingschool] [all tenants]
+              config?.shop_type === 'repair'       ? '/repair/dashboard' :
+              config?.shop_type === 'drivingschool'? '/drivingschool/dashboard' :
+              config?.shop_type === 'tailor'       ? '/tailor/dashboard' :
+              config?.shop_type === 'hardware'     ? '/hardware/dashboard' :
+              config?.shop_type === 'laundry'      ? '/laundry/dashboard' :
+              config?.shop_type === 'catering'     ? '/catering/dashboard' :
+              config?.shop_type === 'pestcontrol'  ? '/pestcontrol/dashboard' :
+              config?.shop_type === 'clothing'     ? '/clothing/dashboard' :
+              config?.shop_type === 'bakery'       ? '/bakery/dashboard' :
+              config?.shop_type === 'optician'     ? '/optician/dashboard' :
+              config?.shop_type === 'petrolpump'   ? '/petrolpump/dashboard' :
+              config?.shop_type === 'furniture'    ? '/furniture/dashboard' :
+              config?.shop_type === 'printing'     ? '/printing/dashboard' :
+              config?.shop_type === 'ca'           ? '/ca/dashboard' :
+              config?.shop_type === 'events'       ? '/events/dashboard' :
+              config?.shop_type === 'travel'       ? '/travel/dashboard' :
+              config?.shop_type === 'insurance'    ? '/insurance/dashboard' :
+              config?.shop_type === 'homeservice'  ? '/homeservice/dashboard' :
               '/dashboard'
             } replace />} />
             <Route path="dashboard"  element={<Dashboard />} />
@@ -413,16 +509,16 @@ export default function App() {
             {/* [tailor] [all tenants] */}
             <Route path="tailor/dashboard"    element={<TailorDashboard />} />
             <Route path="tailor/orders"       element={<TailorOrdersPage />} />
-            <Route path="tailor/orders/new"   element={<NewOrderPage />} />
-            <Route path="tailor/measurements" element={<MeasurementsPage />} />
-            <Route path="tailor/reports"      element={<TailorReportsPage />} />
+            <Route path="tailor/orders/new"   element={<TailorNewOrderPage />} />
+            <Route path="tailor/measurements" element={<TailorMeasurements />} />
+            <Route path="tailor/reports"      element={<TailorReports />} />
 
             {/* [hardware] [all tenants] */}
             <Route path="hardware/dashboard" element={<HardwareDashboard />} />
             <Route path="hardware/pos"       element={<HardwarePOSPage />} />
             <Route path="hardware/products"  element={<HardwareProductsPage />} />
-            <Route path="hardware/credit"    element={<CreditAccountsPage />} />
-            <Route path="hardware/reports"   element={<HardwareReportsPage />} />
+            <Route path="hardware/credit"    element={<HardwareCreditPage />} />
+            <Route path="hardware/reports"   element={<HardwareReports />} />
 
             {/* [hotel] [all tenants] */}
             <Route path="hotel/dashboard"    element={<HotelDashboard />} />
@@ -442,23 +538,23 @@ export default function App() {
             <Route path="clothing/dashboard" element={<ClothingDashboard />} />
             <Route path="clothing/billing"   element={<ClothingPOSPage />} />
             <Route path="clothing/products"  element={<ClothingProductsPage />} />
-            <Route path="clothing/exchanges" element={<ExchangesPage />} />
-            <Route path="clothing/reports"   element={<ClothingReportsPage />} />
+            <Route path="clothing/exchanges" element={<ClothingExchangesPage />} />
+            <Route path="clothing/reports"   element={<ClothingReports />} />
 
             {/* [bakery] [all tenants] */}
             <Route path="bakery/dashboard"   element={<BakeryDashboard />} />
             <Route path="bakery/billing"     element={<BakeryPOSPage />} />
-            <Route path="bakery/production"  element={<ProductionPage />} />
-            <Route path="bakery/bulk-orders" element={<BulkOrdersPage />} />
-            <Route path="bakery/reports"     element={<BakeryReportsPage />} />
+            <Route path="bakery/production"  element={<BakeryProductionPage />} />
+            <Route path="bakery/bulk-orders" element={<BakeryBulkOrdersPage />} />
+            <Route path="bakery/reports"     element={<BakeryReports />} />
 
             {/* [optician] [all tenants] */}
             <Route path="optician/dashboard"     element={<OpticianDashboard />} />
-            <Route path="optician/patients"      element={<OptPatientsPage />} />
-            <Route path="optician/prescriptions" element={<PrescriptionPage />} />
-            <Route path="optician/orders"        element={<OptOrdersPage />} />
-            <Route path="optician/inventory"     element={<OptInventoryPage />} />
-            <Route path="optician/reports"       element={<OpticianReportsPage />} />
+            <Route path="optician/patients"      element={<OpticianPatientsPage />} />
+            <Route path="optician/prescriptions" element={<OpticianRxPage />} />
+            <Route path="optician/orders"        element={<OpticianOrdersPage />} />
+            <Route path="optician/inventory"     element={<OpticianInventoryPage />} />
+            <Route path="optician/reports"       element={<OpticianReports />} />
 
             {/* [beauty] [all tenants] */}
             <Route path="beauty/dashboard"              element={<BeautyDashboard />} />
@@ -475,14 +571,14 @@ export default function App() {
             <Route path="laundry/orders"     element={<LaundryOrdersPage />} />
             <Route path="laundry/orders/new" element={<LaundryNewOrderPage />} />
             <Route path="laundry/services"   element={<LaundryServicesPage />} />
-            <Route path="laundry/reports"    element={<LaundryReportsPage />} />
+            <Route path="laundry/reports"    element={<LaundryReports />} />
 
             {/* [catering] [all tenants] */}
             <Route path="catering/dashboard"    element={<CateringDashboard />} />
             <Route path="catering/events"       element={<CateringEventsPage />} />
             <Route path="catering/events/new"   element={<CateringNewEventPage />} />
             <Route path="catering/menu"         element={<CateringMenuPage />} />
-            <Route path="catering/reports"      element={<CateringReportsPage />} />
+            <Route path="catering/reports"      element={<CateringReports />} />
 
             {/* [pestcontrol] [all tenants] */}
             <Route path="pestcontrol/dashboard"  element={<PestDashboard />} />
@@ -518,6 +614,28 @@ export default function App() {
             <Route path="drivingschool/vehicles"       element={<DSVehiclesPage />} />
             <Route path="drivingschool/instructors"    element={<DSInstructorsPage />} />
             <Route path="drivingschool/reports"        element={<DSDrivingReportsPage />} />
+
+            {/* [petrolpump] [all tenants] */}
+            <Route path="petrolpump/dashboard" element={<PetrolDashboard />} />
+            <Route path="petrolpump/shift"     element={<ShiftPage />} />
+            <Route path="petrolpump/rates"     element={<FuelRatesPage />} />
+            <Route path="petrolpump/credit"    element={<PPCreditAccountsPage />} />
+            <Route path="petrolpump/reports"   element={<PetrolReports />} />
+
+            {/* [furniture] [all tenants] */}
+            <Route path="furniture/dashboard"      element={<FurnitureDashboard />} />
+            <Route path="furniture/orders"         element={<FurnitureOrdersPage />} />
+            <Route path="furniture/orders/new"     element={<FurnitureNewOrderPage />} />
+            <Route path="furniture/custom-orders"  element={<FurnitureCustomOrdersPage />} />
+            <Route path="furniture/products"       element={<FurnitureProductsPage />} />
+            <Route path="furniture/reports"        element={<FurnitureReports />} />
+
+            {/* [printing] [all tenants] */}
+            <Route path="printing/dashboard" element={<PrintingDashboard />} />
+            <Route path="printing/jobs"      element={<PrintingJobsPage />} />
+            <Route path="printing/jobs/new"  element={<PrintingNewJobPage />} />
+            <Route path="printing/stationery" element={<PrintingStationeryPage />} />
+            <Route path="printing/reports"   element={<PrintingReports />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
