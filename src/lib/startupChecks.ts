@@ -3,8 +3,50 @@ import { toast } from 'sonner';
 
 export async function runStartupChecks(tenantId: string) {
   if (!tenantId) return;
+  await ensureRegistered(tenantId);
   await checkLowStock(tenantId);
   await checkExpiringProducts(tenantId);
+}
+
+// Re-queue registration on every launch if it was never successfully synced to server.
+// Prevents lost registrations when server was down during setup or database was reset.
+// [core] [all tenants]
+async function ensureRegistered(tenantId: string) {
+  try {
+    const db = await getDb();
+    const synced = await db.select<{ id: string }[]>(
+      `SELECT id FROM sync_queue WHERE tenant_id = ? AND type = 'register' AND synced_at IS NOT NULL LIMIT 1`,
+      [tenantId]
+    );
+    if (synced.length > 0) return; // already registered with server
+
+    // Not synced yet — check if queued already
+    const queued = await db.select<{ id: string }[]>(
+      `SELECT id FROM sync_queue WHERE tenant_id = ? AND type = 'register' AND synced_at IS NULL LIMIT 1`,
+      [tenantId]
+    );
+    if (queued.length > 0) return; // already in queue, will be flushed
+
+    // Neither synced nor queued — re-enqueue from app_config
+    const configs = await db.select<{
+      tenant_id: string; shop_name: string; owner_name: string;
+      shop_type: string; phone: string; email: string; city: string; gstin: string;
+    }[]>(`SELECT tenant_id, shop_name, owner_name, shop_type, phone, email, city, gstin FROM app_config WHERE tenant_id = ? LIMIT 1`, [tenantId]);
+    if (configs.length === 0) return;
+
+    const { enqueue, flushQueue } = await import('./syncQueue');
+    await enqueue('register', tenantId, {
+      tenant_id: configs[0].tenant_id,
+      shop_name: configs[0].shop_name ?? '',
+      owner_name: configs[0].owner_name ?? '',
+      shop_type: configs[0].shop_type ?? '',
+      phone: configs[0].phone ?? '',
+      email: configs[0].email ?? '',
+      city: configs[0].city ?? '',
+      gstin: configs[0].gstin ?? '',
+    });
+    await flushQueue().catch(() => {});
+  } catch { /* non-fatal */ }
 }
 
 async function checkLowStock(tenantId: string) {

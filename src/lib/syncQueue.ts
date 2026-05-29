@@ -22,7 +22,7 @@ export async function flushQueue() {
   const db = await getDb();
   const pending = await db.select<{ id: string; type: string; payload: string; attempts: number }[]>(
     `SELECT id, type, payload, attempts FROM sync_queue
-     WHERE synced_at IS NULL AND attempts < ?
+     WHERE synced_at IS NULL AND (type = 'register' OR attempts < ?)
      ORDER BY created_at ASC LIMIT 50`,
     [MAX_ATTEMPTS]
   );
