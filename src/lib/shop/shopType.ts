@@ -1,6 +1,6 @@
 import { useAppStore } from '@/app/store/app.store';
 
-export type ShopType = 'medical' | 'restaurant' | 'grocery' | 'carwash' | 'clinic' | 'beauty' | 'study' | 'coaching' | 'gym' | 'jewellery' | 'realestate';
+export type ShopType = 'medical' | 'restaurant' | 'grocery' | 'carwash' | 'clinic' | 'beauty' | 'study' | 'coaching' | 'gym' | 'jewellery' | 'realestate' | 'tailor' | 'hardware'; // [tailor] [hardware] [all tenants]
 
 const SHOP_TYPE_LABELS: Record<string, string> = {
   medical: 'Medical Store',
@@ -15,6 +15,8 @@ const SHOP_TYPE_LABELS: Record<string, string> = {
   jewellery: 'Jewellery Shop',
   realestate: 'Real Estate / PropMate',
   hotel: 'Hotel / Lodge', // [hotel] [all tenants]
+  tailor: 'Tailor / Boutique', // [tailor] [all tenants]
+  hardware: 'Hardware Store', // [hardware] [all tenants]
 };
 
 // ── APP_REGISTRY ─────────────────────────────────────────────────────────────
@@ -140,6 +142,24 @@ export const APP_REGISTRY: AppRegistryEntry[] = [
     bgColor: '#dbeafe',
     dashboardRoute: '/hotel/dashboard',
   }, // [hotel] [all tenants]
+  {
+    type: 'tailor',
+    label: 'Tailor / Boutique',
+    icon: '🧵',
+    description: 'Orders, measurements, delivery tracking, billing',
+    color: '#7c3aed',
+    bgColor: '#ede9fe',
+    dashboardRoute: '/tailor/dashboard',
+  }, // [tailor] [all tenants]
+  {
+    type: 'hardware',
+    label: 'Hardware Store',
+    icon: '🔧',
+    description: 'POS billing, stock management, credit/udhar khata',
+    color: '#d97706',
+    bgColor: '#fef3c7',
+    dashboardRoute: '/hardware/dashboard',
+  }, // [hardware] [all tenants]
   // ➕ Add new apps here — they appear automatically in the Switch App modal
 ];
 

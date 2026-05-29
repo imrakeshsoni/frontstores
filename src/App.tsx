@@ -131,6 +131,20 @@ const BrainBreakPage          = lazy(() => import('@/modules/study/BrainBreakPag
 const MathConstantsPage       = lazy(() => import('@/modules/study/MathConstantsPage').then(m => ({ default: m.MathConstantsPage })));
 const LocalAISetupPage        = lazy(() => import('@/modules/study/LocalAISetupPage').then(m => ({ default: m.LocalAISetupPage })));
 
+// [tailor] [all tenants]
+const TailorDashboard    = lazy(() => import('@/modules/tailor/TailorDashboard').then(m => ({ default: m.TailorDashboard })));
+const TailorOrdersPage   = lazy(() => import('@/modules/tailor/TailorOrdersPage').then(m => ({ default: m.TailorOrdersPage })));
+const NewOrderPage       = lazy(() => import('@/modules/tailor/NewOrderPage').then(m => ({ default: m.NewOrderPage })));
+const MeasurementsPage   = lazy(() => import('@/modules/tailor/MeasurementsPage').then(m => ({ default: m.MeasurementsPage })));
+const TailorReportsPage  = lazy(() => import('@/modules/tailor/TailorReportsPage').then(m => ({ default: m.TailorReportsPage })));
+
+// [hardware] [all tenants]
+const HardwareDashboard     = lazy(() => import('@/modules/hardware/HardwareDashboard').then(m => ({ default: m.HardwareDashboard })));
+const HardwarePOSPage       = lazy(() => import('@/modules/hardware/HardwarePOSPage').then(m => ({ default: m.HardwarePOSPage })));
+const HardwareProductsPage  = lazy(() => import('@/modules/hardware/HardwareProductsPage').then(m => ({ default: m.HardwareProductsPage })));
+const CreditAccountsPage    = lazy(() => import('@/modules/hardware/CreditAccountsPage').then(m => ({ default: m.CreditAccountsPage })));
+const HardwareReportsPage   = lazy(() => import('@/modules/hardware/HardwareReportsPage').then(m => ({ default: m.HardwareReportsPage })));
+
 // [hotel] [all tenants]
 const HotelDashboard       = lazy(() => import('@/modules/hotel/HotelDashboard').then(m => ({ default: m.HotelDashboard })));
 const HotelRoomGrid        = lazy(() => import('@/modules/hotel/RoomGridPage').then(m => ({ default: m.RoomGridPage })));
@@ -213,6 +227,8 @@ export default function App() {
               config?.shop_type === 'jewellery'   ? '/jewellery/dashboard' :
               config?.shop_type === 'realestate'  ? '/realestate/dashboard' :
               config?.shop_type === 'hotel'       ? '/hotel/dashboard' : // [hotel] [all tenants]
+              config?.shop_type === 'tailor'      ? '/tailor/dashboard' : // [tailor] [all tenants]
+              config?.shop_type === 'hardware'    ? '/hardware/dashboard' : // [hardware] [all tenants]
               '/dashboard'
             } replace />} />
             <Route path="dashboard"  element={<Dashboard />} />
@@ -335,6 +351,20 @@ export default function App() {
             <Route path="realestate/documents"   element={<REDocumentsPage />} />
             <Route path="realestate/builders"    element={<REBuildersPage />} />
             <Route path="realestate/reports"     element={<REReportsPage />} />
+
+            {/* [tailor] [all tenants] */}
+            <Route path="tailor/dashboard"    element={<TailorDashboard />} />
+            <Route path="tailor/orders"       element={<TailorOrdersPage />} />
+            <Route path="tailor/orders/new"   element={<NewOrderPage />} />
+            <Route path="tailor/measurements" element={<MeasurementsPage />} />
+            <Route path="tailor/reports"      element={<TailorReportsPage />} />
+
+            {/* [hardware] [all tenants] */}
+            <Route path="hardware/dashboard" element={<HardwareDashboard />} />
+            <Route path="hardware/pos"       element={<HardwarePOSPage />} />
+            <Route path="hardware/products"  element={<HardwareProductsPage />} />
+            <Route path="hardware/credit"    element={<CreditAccountsPage />} />
+            <Route path="hardware/reports"   element={<HardwareReportsPage />} />
 
             {/* [hotel] [all tenants] */}
             <Route path="hotel/dashboard"    element={<HotelDashboard />} />

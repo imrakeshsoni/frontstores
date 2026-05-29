@@ -21,6 +21,8 @@ const SHOP_TYPES = [
   { value: 'jewellery',  label: 'Jewellery Shop',          icon: '💍', desc: 'Gold rate, inventory, billing, custom orders, repairs' },
   { value: 'realestate', label: 'Real Estate / PropMate',  icon: '🏠', desc: 'Leads, deals, commissions, site visits, builder projects' },
   { value: 'hotel',      label: 'Hotel / Lodge',           icon: '🏨', desc: 'Room bookings, check-in/out, billing, housekeeping, maintenance' },
+  { value: 'tailor',    label: 'Tailor / Boutique',       icon: '🧵', desc: 'Orders, measurements, delivery tracking, billing, expenses' }, // [tailor] [all tenants]
+  { value: 'hardware',  label: 'Hardware Store',          icon: '🔧', desc: 'POS billing, stock by kg/meter/piece, credit/udhar khata' }, // [hardware] [all tenants]
 ];
 
 const RE_ROLES = [

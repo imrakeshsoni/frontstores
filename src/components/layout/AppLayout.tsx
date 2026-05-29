@@ -224,6 +224,28 @@ const JEWELLERY_NAV_ITEMS = [
   { to: '/settings',                 icon: Settings,        label: 'Settings',       iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
 
+// [tailor] [all tenants]
+const TAILOR_NAV_ITEMS = [
+  { to: '/tailor/dashboard',    icon: Scissors,       label: 'Dashboard',     iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/tailor/orders',       icon: ClipboardList,  label: 'Orders',        iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/tailor/orders/new',   icon: Receipt,        label: 'New Order',     iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/tailor/measurements', icon: Ruler,          label: 'Measurements',  iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/expenses',            icon: Wallet,         label: 'Expenses',      iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/tailor/reports',      icon: BarChart3,      label: 'Reports',       iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',            icon: Settings,       label: 'Settings',      iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [hardware] [all tenants]
+const HARDWARE_NAV_ITEMS = [
+  { to: '/hardware/dashboard', icon: LayoutDashboard, label: 'Dashboard',     iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/hardware/pos',       icon: ShoppingCart,    label: 'Billing / POS', iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/hardware/products',  icon: Package,         label: 'Products',      iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/hardware/credit',    icon: BookOpen,        label: 'Credit / Udhar',iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/expenses',           icon: Wallet,          label: 'Expenses',      iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/hardware/reports',   icon: BarChart3,       label: 'Reports',       iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',           icon: Settings,        label: 'Settings',      iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
 // [hotel] [all tenants]
 const HOTEL_NAV_ITEMS = [
   { to: '/hotel/dashboard',    icon: LayoutDashboard, label: 'Dashboard',      iconBg: '#dbeafe', iconColor: '#2563eb' },
@@ -311,6 +333,8 @@ export function AppLayout() {
     config?.shop_type === 'jewellery'   ? JEWELLERY_NAV_ITEMS :
     config?.shop_type === 'realestate'  ? getRealEstateNavItems(reRole) :
     config?.shop_type === 'hotel'       ? HOTEL_NAV_ITEMS : // [hotel] [all tenants]
+    config?.shop_type === 'tailor'      ? TAILOR_NAV_ITEMS : // [tailor] [all tenants]
+    config?.shop_type === 'hardware'    ? HARDWARE_NAV_ITEMS : // [hardware] [all tenants]
     NAV_ITEMS;
 
   useEffect(() => {
