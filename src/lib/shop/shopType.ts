@@ -1,6 +1,6 @@
 import { useAppStore } from '@/app/store/app.store';
 
-export type ShopType = 'medical' | 'restaurant' | 'grocery' | 'carwash' | 'clinic' | 'beauty' | 'study' | 'coaching' | 'gym' | 'jewellery' | 'realestate';
+export type ShopType = 'medical' | 'restaurant' | 'grocery' | 'carwash' | 'clinic' | 'beauty' | 'study' | 'coaching' | 'gym' | 'jewellery' | 'realestate' | 'hotel' | 'ca' | 'events' | 'travel' | 'insurance' | 'homeservice';
 
 const SHOP_TYPE_LABELS: Record<string, string> = {
   medical: 'Medical Store',
@@ -14,7 +14,12 @@ const SHOP_TYPE_LABELS: Record<string, string> = {
   gym: 'Gym / Fitness',
   jewellery: 'Jewellery Shop',
   realestate: 'Real Estate / PropMate',
-  hotel: 'Hotel / Lodge', // [hotel] [all tenants]
+  hotel: 'Hotel / Lodge',
+  ca: 'CA / Tax Consultant',
+  events: 'Event Planner',
+  travel: 'Travel Agency',
+  insurance: 'Insurance Agent',
+  homeservice: 'Home Service / Electrician',
 };
 
 // ── APP_REGISTRY ─────────────────────────────────────────────────────────────
@@ -140,6 +145,11 @@ export const APP_REGISTRY: AppRegistryEntry[] = [
     bgColor: '#dbeafe',
     dashboardRoute: '/hotel/dashboard',
   }, // [hotel] [all tenants]
+  { type: 'ca', label: 'CA / Tax Consultant', icon: '📊', description: 'Clients, ITR/GST tasks, documents, invoices', color: '#2563eb', bgColor: '#dbeafe', dashboardRoute: '/ca/dashboard' },
+  { type: 'events', label: 'Event Planner', icon: '🎪', description: 'Events, vendors, task checklists, expenses', color: '#db2777', bgColor: '#fce7f3', dashboardRoute: '/events/dashboard' },
+  { type: 'travel', label: 'Travel Agency', icon: '✈️', description: 'Trip bookings, itinerary, visa tracking', color: '#0891b2', bgColor: '#cffafe', dashboardRoute: '/travel/dashboard' },
+  { type: 'insurance', label: 'Insurance Agent', icon: '🛡️', description: 'Policies, renewals, claims, commissions', color: '#16a34a', bgColor: '#dcfce7', dashboardRoute: '/insurance/dashboard' },
+  { type: 'homeservice', label: 'Home Service / Electrician', icon: '🔌', description: 'Job cards, technicians, AMC contracts', color: '#d97706', bgColor: '#fef3c7', dashboardRoute: '/homeservice/dashboard' },
   // ➕ Add new apps here — they appear automatically in the Switch App modal
 ];
 

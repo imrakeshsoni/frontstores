@@ -145,6 +145,44 @@ const HotelReports         = lazy(() => import('@/modules/hotel/HotelReportsPage
 const HotelRoomSetup       = lazy(() => import('@/modules/hotel/RoomSetupPage').then(m => ({ default: m.RoomSetupPage })));
 const HotelSettings        = lazy(() => import('@/modules/hotel/HotelSettingsPage').then(m => ({ default: m.HotelSettingsPage })));
 
+// [ca] [all tenants]
+const CADashboard      = lazy(() => import('@/modules/ca/CADashboard').then(m => ({ default: m.CADashboard })));
+const CAClientsPage    = lazy(() => import('@/modules/ca/ClientsPage').then(m => ({ default: m.CAClientsPage })));
+const CATasksPage      = lazy(() => import('@/modules/ca/TasksPage').then(m => ({ default: m.CATasksPage })));
+const CADocumentsPage  = lazy(() => import('@/modules/ca/DocumentsPage').then(m => ({ default: m.CADocumentsPage })));
+const CAReportsPage    = lazy(() => import('@/modules/ca/CAReportsPage').then(m => ({ default: m.CAReportsPage })));
+
+// [events] [all tenants]
+const EventsDashboard  = lazy(() => import('@/modules/events/EventsDashboard').then(m => ({ default: m.EventsDashboard })));
+const EventsListPage   = lazy(() => import('@/modules/events/EventsListPage').then(m => ({ default: m.EventsListPage })));
+const NewEventPage     = lazy(() => import('@/modules/events/NewEventPage').then(m => ({ default: m.NewEventPage })));
+const VendorsPage      = lazy(() => import('@/modules/events/VendorsPage').then(m => ({ default: m.VendorsPage })));
+const EventReportsPage = lazy(() => import('@/modules/events/EventReportsPage').then(m => ({ default: m.EventReportsPage })));
+
+// [travel] [all tenants]
+const TravelDashboard  = lazy(() => import('@/modules/travel/TravelDashboard').then(m => ({ default: m.TravelDashboard })));
+const BookingsPage     = lazy(() => import('@/modules/travel/BookingsPage').then(m => ({ default: m.BookingsPage })));
+const NewBookingPage   = lazy(() => import('@/modules/travel/NewBookingPage').then(m => ({ default: m.NewBookingPage })));
+const VisaPage         = lazy(() => import('@/modules/travel/VisaPage').then(m => ({ default: m.VisaPage })));
+const TravelReports    = lazy(() => import('@/modules/travel/TravelReportsPage').then(m => ({ default: m.TravelReportsPage })));
+
+// [insurance] [all tenants]
+const InsuranceDashboard = lazy(() => import('@/modules/insurance/InsuranceDashboard').then(m => ({ default: m.InsuranceDashboard })));
+const InsClientsPage     = lazy(() => import('@/modules/insurance/InsClientsPage').then(m => ({ default: m.InsClientsPage })));
+const PoliciesPage       = lazy(() => import('@/modules/insurance/PoliciesPage').then(m => ({ default: m.PoliciesPage })));
+const RenewalsPage       = lazy(() => import('@/modules/insurance/RenewalsPage').then(m => ({ default: m.InsRenewalsPage })));
+const ClaimsPage         = lazy(() => import('@/modules/insurance/ClaimsPage').then(m => ({ default: m.InsClaimsPage })));
+const InsReportsPage     = lazy(() => import('@/modules/insurance/InsReportsPage').then(m => ({ default: m.InsReportsPage })));
+
+// [homeservice] [all tenants]
+const ServiceDashboard   = lazy(() => import('@/modules/homeservice/ServiceDashboard').then(m => ({ default: m.ServiceDashboard })));
+const HSJobsPage         = lazy(() => import('@/modules/homeservice/JobsPage').then(m => ({ default: m.JobsPage })));
+const HSNewJobPage       = lazy(() => import('@/modules/homeservice/NewJobPage').then(m => ({ default: m.NewJobPage })));
+const TechniciansPage    = lazy(() => import('@/modules/homeservice/TechniciansPage').then(m => ({ default: m.TechniciansPage })));
+const MaterialsPage      = lazy(() => import('@/modules/homeservice/MaterialsPage').then(m => ({ default: m.MaterialsPage })));
+const AMCPage            = lazy(() => import('@/modules/homeservice/AMCPage').then(m => ({ default: m.AMCPage })));
+const ServiceReportsPage = lazy(() => import('@/modules/homeservice/ServiceReportsPage').then(m => ({ default: m.ServiceReportsPage })));
+
 // [beauty] [all tenants]
 const BeautyDashboard         = lazy(() => import('@/modules/beauty/BeautyDashboard').then(m => ({ default: m.BeautyDashboard })));
 const BeautyServicesPage      = lazy(() => import('@/modules/beauty/BeautyServicesPage').then(m => ({ default: m.BeautyServicesPage })));
@@ -212,7 +250,12 @@ export default function App() {
               config?.shop_type === 'gym'        ? '/gym/dashboard' :
               config?.shop_type === 'jewellery'   ? '/jewellery/dashboard' :
               config?.shop_type === 'realestate'  ? '/realestate/dashboard' :
-              config?.shop_type === 'hotel'       ? '/hotel/dashboard' : // [hotel] [all tenants]
+              config?.shop_type === 'hotel'        ? '/hotel/dashboard' :
+              config?.shop_type === 'ca'           ? '/ca/dashboard' :
+              config?.shop_type === 'events'       ? '/events/dashboard' :
+              config?.shop_type === 'travel'       ? '/travel/dashboard' :
+              config?.shop_type === 'insurance'    ? '/insurance/dashboard' :
+              config?.shop_type === 'homeservice'  ? '/homeservice/dashboard' :
               '/dashboard'
             } replace />} />
             <Route path="dashboard"  element={<Dashboard />} />
@@ -349,6 +392,44 @@ export default function App() {
             <Route path="hotel/reports"      element={<HotelReports />} />
             <Route path="hotel/setup/rooms"  element={<HotelRoomSetup />} />
             <Route path="hotel/settings"     element={<HotelSettings />} />
+
+            {/* [ca] [all tenants] */}
+            <Route path="ca/dashboard" element={<CADashboard />} />
+            <Route path="ca/clients"   element={<CAClientsPage />} />
+            <Route path="ca/tasks"     element={<CATasksPage />} />
+            <Route path="ca/documents" element={<CADocumentsPage />} />
+            <Route path="ca/reports"   element={<CAReportsPage />} />
+
+            {/* [events] [all tenants] */}
+            <Route path="events/dashboard" element={<EventsDashboard />} />
+            <Route path="events/list"      element={<EventsListPage />} />
+            <Route path="events/new"       element={<NewEventPage />} />
+            <Route path="events/vendors"   element={<VendorsPage />} />
+            <Route path="events/reports"   element={<EventReportsPage />} />
+
+            {/* [travel] [all tenants] */}
+            <Route path="travel/dashboard" element={<TravelDashboard />} />
+            <Route path="travel/bookings"  element={<BookingsPage />} />
+            <Route path="travel/new"       element={<NewBookingPage />} />
+            <Route path="travel/visa"      element={<VisaPage />} />
+            <Route path="travel/reports"   element={<TravelReports />} />
+
+            {/* [insurance] [all tenants] */}
+            <Route path="insurance/dashboard" element={<InsuranceDashboard />} />
+            <Route path="insurance/clients"   element={<InsClientsPage />} />
+            <Route path="insurance/policies"  element={<PoliciesPage />} />
+            <Route path="insurance/renewals"  element={<RenewalsPage />} />
+            <Route path="insurance/claims"    element={<ClaimsPage />} />
+            <Route path="insurance/reports"   element={<InsReportsPage />} />
+
+            {/* [homeservice] [all tenants] */}
+            <Route path="homeservice/dashboard" element={<ServiceDashboard />} />
+            <Route path="homeservice/jobs"      element={<HSJobsPage />} />
+            <Route path="homeservice/new-job"   element={<HSNewJobPage />} />
+            <Route path="homeservice/techs"     element={<TechniciansPage />} />
+            <Route path="homeservice/materials" element={<MaterialsPage />} />
+            <Route path="homeservice/amc"       element={<AMCPage />} />
+            <Route path="homeservice/reports"   element={<ServiceReportsPage />} />
 
             {/* [beauty] [all tenants] */}
             <Route path="beauty/dashboard"              element={<BeautyDashboard />} />

@@ -239,6 +239,59 @@ const HOTEL_NAV_ITEMS = [
   { to: '/settings',           icon: Settings,        label: 'Settings',       iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
 
+// [ca] [all tenants]
+const CA_NAV_ITEMS = [
+  { to: '/ca/dashboard',  icon: LayoutDashboard, label: 'Dashboard',  iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/ca/clients',    icon: Users,           label: 'Clients',    iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/ca/tasks',      icon: ClipboardList,   label: 'Tasks',      iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/ca/documents',  icon: FileText,        label: 'Documents',  iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/ca/reports',    icon: BarChart3,       label: 'Reports',    iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/settings',      icon: Settings,        label: 'Settings',   iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [events] [all tenants]
+const EVENTS_NAV_ITEMS = [
+  { to: '/events/dashboard', icon: LayoutDashboard, label: 'Dashboard',  iconBg: '#fce7f3', iconColor: '#db2777' },
+  { to: '/events/list',      icon: CalendarDays,    label: 'Events',     iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/events/new',       icon: Receipt,         label: 'New Event',  iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/events/vendors',   icon: Truck,           label: 'Vendors',    iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/events/reports',   icon: BarChart3,       label: 'Reports',    iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/settings',         icon: Settings,        label: 'Settings',   iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [travel] [all tenants]
+const TRAVEL_NAV_ITEMS = [
+  { to: '/travel/dashboard', icon: LayoutDashboard, label: 'Dashboard',    iconBg: '#cffafe', iconColor: '#0891b2' },
+  { to: '/travel/bookings',  icon: ClipboardList,   label: 'Bookings',     iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/travel/new',       icon: Receipt,         label: 'New Booking',  iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/travel/visa',      icon: FileText,        label: 'Visa Tracker', iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/travel/reports',   icon: BarChart3,       label: 'Reports',      iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/settings',         icon: Settings,        label: 'Settings',     iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [insurance] [all tenants]
+const INSURANCE_NAV_ITEMS = [
+  { to: '/insurance/dashboard', icon: LayoutDashboard, label: 'Dashboard', iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/insurance/clients',   icon: Users,           label: 'Clients',   iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/insurance/policies',  icon: FileText,        label: 'Policies',  iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/insurance/renewals',  icon: CalendarDays,    label: 'Renewals',  iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/insurance/claims',    icon: ClipboardList,   label: 'Claims',    iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/insurance/reports',   icon: BarChart3,       label: 'Reports',   iconBg: '#cffafe', iconColor: '#0891b2' },
+  { to: '/settings',            icon: Settings,        label: 'Settings',  iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [homeservice] [all tenants]
+const HOMESERVICE_NAV_ITEMS = [
+  { to: '/homeservice/dashboard',  icon: LayoutDashboard, label: 'Dashboard',   iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/homeservice/jobs',       icon: ClipboardList,   label: 'Jobs',        iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/homeservice/new-job',    icon: Receipt,         label: 'New Job',     iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/homeservice/techs',      icon: Users,           label: 'Technicians', iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/homeservice/materials',  icon: Boxes,           label: 'Materials',   iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/homeservice/amc',        icon: CalendarDays,    label: 'AMC',         iconBg: '#cffafe', iconColor: '#0891b2' },
+  { to: '/homeservice/reports',    icon: BarChart3,       label: 'Reports',     iconBg: '#f1f5f9', iconColor: '#64748b' },
+  { to: '/settings',               icon: Settings,        label: 'Settings',    iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
 // [realestate] [all tenants]
 const REALESTATE_BASE_NAV = [
   { to: '/realestate/dashboard',   icon: LayoutDashboard, label: 'Dashboard',      iconBg: '#dcfce7', iconColor: '#15803d' },
@@ -310,7 +363,12 @@ export function AppLayout() {
     config?.shop_type === 'gym'         ? GYM_NAV_ITEMS :
     config?.shop_type === 'jewellery'   ? JEWELLERY_NAV_ITEMS :
     config?.shop_type === 'realestate'  ? getRealEstateNavItems(reRole) :
-    config?.shop_type === 'hotel'       ? HOTEL_NAV_ITEMS : // [hotel] [all tenants]
+    config?.shop_type === 'hotel'        ? HOTEL_NAV_ITEMS :
+    config?.shop_type === 'ca'           ? CA_NAV_ITEMS :
+    config?.shop_type === 'events'       ? EVENTS_NAV_ITEMS :
+    config?.shop_type === 'travel'       ? TRAVEL_NAV_ITEMS :
+    config?.shop_type === 'insurance'    ? INSURANCE_NAV_ITEMS :
+    config?.shop_type === 'homeservice'  ? HOMESERVICE_NAV_ITEMS :
     NAV_ITEMS;
 
   useEffect(() => {
