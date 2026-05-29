@@ -386,6 +386,28 @@ export default function App() {
             <Route path="hotel/setup/rooms"  element={<HotelRoomSetup />} />
             <Route path="hotel/settings"     element={<HotelSettings />} />
 
+            {/* [clothing] [all tenants] */}
+            <Route path="clothing/dashboard" element={<ClothingDashboard />} />
+            <Route path="clothing/billing"   element={<ClothingPOSPage />} />
+            <Route path="clothing/products"  element={<ClothingProductsPage />} />
+            <Route path="clothing/exchanges" element={<ExchangesPage />} />
+            <Route path="clothing/reports"   element={<ClothingReportsPage />} />
+
+            {/* [bakery] [all tenants] */}
+            <Route path="bakery/dashboard"   element={<BakeryDashboard />} />
+            <Route path="bakery/billing"     element={<BakeryPOSPage />} />
+            <Route path="bakery/production"  element={<ProductionPage />} />
+            <Route path="bakery/bulk-orders" element={<BulkOrdersPage />} />
+            <Route path="bakery/reports"     element={<BakeryReportsPage />} />
+
+            {/* [optician] [all tenants] */}
+            <Route path="optician/dashboard"     element={<OpticianDashboard />} />
+            <Route path="optician/patients"      element={<OptPatientsPage />} />
+            <Route path="optician/prescriptions" element={<PrescriptionPage />} />
+            <Route path="optician/orders"        element={<OptOrdersPage />} />
+            <Route path="optician/inventory"     element={<OptInventoryPage />} />
+            <Route path="optician/reports"       element={<OpticianReportsPage />} />
+
             {/* [beauty] [all tenants] */}
             <Route path="beauty/dashboard"              element={<BeautyDashboard />} />
             <Route path="beauty/services"               element={<BeautyServicesPage />} />
