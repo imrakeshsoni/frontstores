@@ -178,8 +178,8 @@ const STUDY_NAV_ITEMS = [
   { to: '/study/brain-break',  icon: Gamepad2,        label: 'Brain Break',   iconBg: '#dcfce7', iconColor: '#16a34a' },
   { to: '/study/constants',    icon: Sigma,           label: 'Constants',     iconBg: '#ede9fe', iconColor: '#7c3aed' },
   { to: '/study/backup',       icon: HardDrive,       label: 'Backup',        iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/study/local-ai',     icon: Brain,           label: 'Local AI Setup',iconBg: '#ede9fe', iconColor: '#7c3aed' },
   { to: '/study/setup',        icon: Settings,        label: 'Profile',       iconBg: '#f1f5f9', iconColor: '#64748b' },
-  { to: '/settings',           icon: Settings,        label: 'Settings',      iconBg: '#f1f5f9', iconColor: '#64748b' }, // [study] [all tenants]
 ];
 
 // [coaching] [all tenants]
@@ -410,6 +410,15 @@ export function AppLayout() {
 
         {/* Switch App + Owner info — [core] [all tenants] */}
         <div className="px-3 pb-4 space-y-2" style={{ borderTop: '1px solid var(--surface-border)', paddingTop: '0.75rem' }}>
+          {/* Settings — always visible regardless of nav scroll [core] [all tenants] */}
+          <NavLink to="/settings"
+            className={({ isActive }) => `w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-all ${isActive ? 'text-slate-900' : ''}`}
+            style={({ isActive }) => isActive ? { background: '#f1f5f9', color: '#334155' } : { color: 'var(--text-secondary)' }}>
+            <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg" style={{ background: '#f1f5f9' }}>
+              <Settings className="h-3.5 w-3.5" style={{ color: '#64748b' }} />
+            </span>
+            Settings &amp; Updates
+          </NavLink>
           {/* Switch App button — clearly visible */}
           <button
             onClick={() => setShowSwitchModal(true)}
