@@ -8,32 +8,13 @@ import { reportError } from './lib/errorReporter';
 import { flushQueue } from './lib/syncQueue';
 import { setAIQueryClient } from './lib/voice/aiQueryInvalidator';
 
-// Check for updates on startup — show toast so user can install without going to Settings [core] [all tenants]
+// Check for updates silently on startup — store result for Settings page, no notification
 async function checkForUpdate() {
   try {
     const { check } = await import('@tauri-apps/plugin-updater');
     const update = await check();
     if (!update) return;
     (window as any).__pendingUpdate = update;
-
-    toast(`Update v${update.version} available`, {
-      description: 'A new version of FrontStores is ready to install.',
-      duration: Infinity,
-      action: {
-        label: 'Install Now',
-        onClick: async () => {
-          try {
-            toast.loading('Downloading update…', { id: 'update-install' });
-            await update.downloadAndInstall();
-            toast.success('Update downloaded — restarting…', { id: 'update-install' });
-            const { relaunch } = await import('@tauri-apps/plugin-process');
-            await relaunch();
-          } catch {
-            toast.error('Update failed. Try from Settings.', { id: 'update-install' });
-          }
-        },
-      },
-    });
   } catch {
     // Non-fatal — ignore silently
   }
