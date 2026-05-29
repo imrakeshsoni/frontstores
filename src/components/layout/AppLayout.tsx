@@ -70,6 +70,8 @@ import {
   Gem,
   Star,
   ArrowLeftRight,
+  ShirtIcon,
+  Bug,
 } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { getShopTypeLabel } from '@/lib/shop/shopType';
@@ -224,6 +226,37 @@ const JEWELLERY_NAV_ITEMS = [
   { to: '/settings',                 icon: Settings,        label: 'Settings',       iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
 
+// [laundry] [all tenants]
+const LAUNDRY_NAV_ITEMS = [
+  { to: '/laundry/dashboard', icon: LayoutDashboard, label: 'Dashboard',    iconBg: '#cffafe', iconColor: '#0891b2' },
+  { to: '/laundry/orders',    icon: ClipboardList,   label: 'Orders',        iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/laundry/orders/new',icon: ShirtIcon,       label: 'New Order',     iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/laundry/services',  icon: Receipt,         label: 'Price List',    iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/laundry/reports',   icon: BarChart3,       label: 'Reports',       iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',          icon: Settings,        label: 'Settings',      iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [catering] [all tenants]
+const CATERING_NAV_ITEMS = [
+  { to: '/catering/dashboard',    icon: LayoutDashboard, label: 'Dashboard',    iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/catering/events',       icon: CalendarDays,    label: 'Events',       iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/catering/events/new',   icon: ClipboardList,   label: 'New Event',    iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/catering/menu',         icon: ChefHat,         label: 'Menu',         iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/catering/reports',      icon: BarChart3,       label: 'Reports',      iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',              icon: Settings,        label: 'Settings',     iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
+// [pestcontrol] [all tenants]
+const PESTCONTROL_NAV_ITEMS = [
+  { to: '/pestcontrol/dashboard',  icon: LayoutDashboard, label: 'Dashboard',    iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/pestcontrol/jobs',       icon: ClipboardCheck,  label: 'Jobs',         iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/pestcontrol/jobs/new',   icon: Bug,             label: 'New Job',      iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/pestcontrol/customers',  icon: Users,           label: 'Customers',    iconBg: '#fce7f3', iconColor: '#db2777' },
+  { to: '/pestcontrol/contracts',  icon: FileText,        label: 'Contracts',    iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/pestcontrol/reports',    icon: BarChart3,       label: 'Reports',      iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',               icon: Settings,        label: 'Settings',     iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
 // [hotel] [all tenants]
 const HOTEL_NAV_ITEMS = [
   { to: '/hotel/dashboard',    icon: LayoutDashboard, label: 'Dashboard',      iconBg: '#dbeafe', iconColor: '#2563eb' },
@@ -310,7 +343,10 @@ export function AppLayout() {
     config?.shop_type === 'gym'         ? GYM_NAV_ITEMS :
     config?.shop_type === 'jewellery'   ? JEWELLERY_NAV_ITEMS :
     config?.shop_type === 'realestate'  ? getRealEstateNavItems(reRole) :
-    config?.shop_type === 'hotel'       ? HOTEL_NAV_ITEMS : // [hotel] [all tenants]
+    config?.shop_type === 'hotel'        ? HOTEL_NAV_ITEMS : // [hotel] [all tenants]
+    config?.shop_type === 'laundry'     ? LAUNDRY_NAV_ITEMS : // [laundry] [all tenants]
+    config?.shop_type === 'catering'    ? CATERING_NAV_ITEMS : // [catering] [all tenants]
+    config?.shop_type === 'pestcontrol' ? PESTCONTROL_NAV_ITEMS : // [pestcontrol] [all tenants]
     NAV_ITEMS;
 
   useEffect(() => {

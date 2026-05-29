@@ -131,6 +131,28 @@ const BrainBreakPage          = lazy(() => import('@/modules/study/BrainBreakPag
 const MathConstantsPage       = lazy(() => import('@/modules/study/MathConstantsPage').then(m => ({ default: m.MathConstantsPage })));
 const LocalAISetupPage        = lazy(() => import('@/modules/study/LocalAISetupPage').then(m => ({ default: m.LocalAISetupPage })));
 
+// [laundry] [all tenants]
+const LaundryDashboard    = lazy(() => import('@/modules/laundry/LaundryDashboard').then(m => ({ default: m.LaundryDashboard })));
+const LaundryOrdersPage   = lazy(() => import('@/modules/laundry/LaundryOrdersPage').then(m => ({ default: m.LaundryOrdersPage })));
+const LaundryNewOrderPage = lazy(() => import('@/modules/laundry/LaundryNewOrderPage').then(m => ({ default: m.LaundryNewOrderPage })));
+const LaundryServicesPage = lazy(() => import('@/modules/laundry/LaundryServicesPage').then(m => ({ default: m.LaundryServicesPage })));
+const LaundryReportsPage  = lazy(() => import('@/modules/laundry/LaundryReportsPage').then(m => ({ default: m.LaundryReportsPage })));
+
+// [catering] [all tenants]
+const CateringDashboard   = lazy(() => import('@/modules/catering/CateringDashboard').then(m => ({ default: m.CateringDashboard })));
+const CateringEventsPage  = lazy(() => import('@/modules/catering/CateringEventsPage').then(m => ({ default: m.CateringEventsPage })));
+const CateringNewEventPage = lazy(() => import('@/modules/catering/CateringNewEventPage').then(m => ({ default: m.CateringNewEventPage })));
+const CateringMenuPage    = lazy(() => import('@/modules/catering/CateringMenuPage').then(m => ({ default: m.CateringMenuPage })));
+const CateringReportsPage = lazy(() => import('@/modules/catering/CateringReportsPage').then(m => ({ default: m.CateringReportsPage })));
+
+// [pestcontrol] [all tenants]
+const PestDashboard       = lazy(() => import('@/modules/pestcontrol/PestDashboard').then(m => ({ default: m.PestDashboard })));
+const PCJobsPage          = lazy(() => import('@/modules/pestcontrol/PCJobsPage').then(m => ({ default: m.PCJobsPage })));
+const PCNewJobPage        = lazy(() => import('@/modules/pestcontrol/PCNewJobPage').then(m => ({ default: m.PCNewJobPage })));
+const PCCustomersPage     = lazy(() => import('@/modules/pestcontrol/PCCustomersPage').then(m => ({ default: m.PCCustomersPage })));
+const PCContractsPage     = lazy(() => import('@/modules/pestcontrol/PCContractsPage').then(m => ({ default: m.PCContractsPage })));
+const PCReportsPage       = lazy(() => import('@/modules/pestcontrol/PCReportsPage').then(m => ({ default: m.PCReportsPage })));
+
 // [hotel] [all tenants]
 const HotelDashboard       = lazy(() => import('@/modules/hotel/HotelDashboard').then(m => ({ default: m.HotelDashboard })));
 const HotelRoomGrid        = lazy(() => import('@/modules/hotel/RoomGridPage').then(m => ({ default: m.RoomGridPage })));
@@ -212,7 +234,10 @@ export default function App() {
               config?.shop_type === 'gym'        ? '/gym/dashboard' :
               config?.shop_type === 'jewellery'   ? '/jewellery/dashboard' :
               config?.shop_type === 'realestate'  ? '/realestate/dashboard' :
-              config?.shop_type === 'hotel'       ? '/hotel/dashboard' : // [hotel] [all tenants]
+              config?.shop_type === 'hotel'        ? '/hotel/dashboard' : // [hotel] [all tenants]
+              config?.shop_type === 'laundry'     ? '/laundry/dashboard' : // [laundry] [all tenants]
+              config?.shop_type === 'catering'    ? '/catering/dashboard' : // [catering] [all tenants]
+              config?.shop_type === 'pestcontrol' ? '/pestcontrol/dashboard' : // [pestcontrol] [all tenants]
               '/dashboard'
             } replace />} />
             <Route path="dashboard"  element={<Dashboard />} />
@@ -359,6 +384,28 @@ export default function App() {
             <Route path="beauty/staff"                  element={<BeautyStaffPage />} />
             <Route path="beauty/memberships"            element={<BeautyMembershipsPage />} />
             <Route path="beauty/reports"                element={<BeautyReportsPage />} />
+
+            {/* [laundry] [all tenants] */}
+            <Route path="laundry/dashboard"  element={<LaundryDashboard />} />
+            <Route path="laundry/orders"     element={<LaundryOrdersPage />} />
+            <Route path="laundry/orders/new" element={<LaundryNewOrderPage />} />
+            <Route path="laundry/services"   element={<LaundryServicesPage />} />
+            <Route path="laundry/reports"    element={<LaundryReportsPage />} />
+
+            {/* [catering] [all tenants] */}
+            <Route path="catering/dashboard"    element={<CateringDashboard />} />
+            <Route path="catering/events"       element={<CateringEventsPage />} />
+            <Route path="catering/events/new"   element={<CateringNewEventPage />} />
+            <Route path="catering/menu"         element={<CateringMenuPage />} />
+            <Route path="catering/reports"      element={<CateringReportsPage />} />
+
+            {/* [pestcontrol] [all tenants] */}
+            <Route path="pestcontrol/dashboard"  element={<PestDashboard />} />
+            <Route path="pestcontrol/jobs"       element={<PCJobsPage />} />
+            <Route path="pestcontrol/jobs/new"   element={<PCNewJobPage />} />
+            <Route path="pestcontrol/customers"  element={<PCCustomersPage />} />
+            <Route path="pestcontrol/contracts"  element={<PCContractsPage />} />
+            <Route path="pestcontrol/reports"    element={<PCReportsPage />} />
 
             {/* [restaurant] [all tenants] */}
             <Route path="restaurant/dashboard" element={<RestaurantDashboard />} />

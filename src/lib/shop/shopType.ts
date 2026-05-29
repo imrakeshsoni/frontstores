@@ -1,6 +1,6 @@
 import { useAppStore } from '@/app/store/app.store';
 
-export type ShopType = 'medical' | 'restaurant' | 'grocery' | 'carwash' | 'clinic' | 'beauty' | 'study' | 'coaching' | 'gym' | 'jewellery' | 'realestate';
+export type ShopType = 'medical' | 'restaurant' | 'grocery' | 'carwash' | 'clinic' | 'beauty' | 'study' | 'coaching' | 'gym' | 'jewellery' | 'realestate' | 'laundry' | 'catering' | 'pestcontrol';
 
 const SHOP_TYPE_LABELS: Record<string, string> = {
   medical: 'Medical Store',
@@ -15,6 +15,9 @@ const SHOP_TYPE_LABELS: Record<string, string> = {
   jewellery: 'Jewellery Shop',
   realestate: 'Real Estate / PropMate',
   hotel: 'Hotel / Lodge', // [hotel] [all tenants]
+  laundry: 'Laundry / Dry Clean', // [laundry] [all tenants]
+  catering: 'Catering Business', // [catering] [all tenants]
+  pestcontrol: 'Pest Control', // [pestcontrol] [all tenants]
 };
 
 // ── APP_REGISTRY ─────────────────────────────────────────────────────────────
@@ -140,6 +143,36 @@ export const APP_REGISTRY: AppRegistryEntry[] = [
     bgColor: '#dbeafe',
     dashboardRoute: '/hotel/dashboard',
   }, // [hotel] [all tenants]
+  // [laundry] [all tenants]
+  {
+    type: 'laundry',
+    label: 'Laundry / Dry Clean',
+    icon: '👕',
+    description: 'Order tracking, price list, delivery status, reports',
+    color: '#0891b2',
+    bgColor: '#cffafe',
+    dashboardRoute: '/laundry/dashboard',
+  },
+  // [catering] [all tenants]
+  {
+    type: 'catering',
+    label: 'Catering Business',
+    icon: '🍱',
+    description: 'Events, menu management, staff, billing, reports',
+    color: '#dc2626',
+    bgColor: '#fee2e2',
+    dashboardRoute: '/catering/dashboard',
+  },
+  // [pestcontrol] [all tenants]
+  {
+    type: 'pestcontrol',
+    label: 'Pest Control',
+    icon: '🐛',
+    description: 'Jobs, AMC contracts, chemicals, customer tracking',
+    color: '#16a34a',
+    bgColor: '#dcfce7',
+    dashboardRoute: '/pestcontrol/dashboard',
+  },
   // ➕ Add new apps here — they appear automatically in the Switch App modal
 ];
 
