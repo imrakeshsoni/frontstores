@@ -1,6 +1,6 @@
 import { useAppStore } from '@/app/store/app.store';
 
-export type ShopType = 'medical' | 'restaurant' | 'grocery' | 'carwash' | 'clinic' | 'beauty' | 'study' | 'coaching' | 'gym' | 'jewellery' | 'realestate';
+export type ShopType = 'medical' | 'restaurant' | 'grocery' | 'carwash' | 'clinic' | 'beauty' | 'study' | 'coaching' | 'gym' | 'jewellery' | 'realestate' | 'repair' | 'drivingschool';
 
 const SHOP_TYPE_LABELS: Record<string, string> = {
   medical: 'Medical Store / Pharmacy', // [medical] [all tenants]
@@ -15,6 +15,8 @@ const SHOP_TYPE_LABELS: Record<string, string> = {
   jewellery: 'Jewellery Shop',
   realestate: 'Real Estate / PropMate',
   hotel: 'Hotel / Lodge', // [hotel] [all tenants]
+  repair: 'Mobile/Electronics Repair', // [repair] [all tenants]
+  drivingschool: 'Driving School', // [drivingschool] [all tenants]
 };
 
 // ── APP_REGISTRY ─────────────────────────────────────────────────────────────
@@ -140,6 +142,24 @@ export const APP_REGISTRY: AppRegistryEntry[] = [
     bgColor: '#dbeafe',
     dashboardRoute: '/hotel/dashboard',
   }, // [hotel] [all tenants]
+  {
+    type: 'repair',
+    label: 'Mobile/Electronics Repair',
+    icon: '🔧',
+    description: 'Repair jobs, parts inventory, technicians, warranty tracking',
+    color: '#dc2626',
+    bgColor: '#fee2e2',
+    dashboardRoute: '/repair/dashboard',
+  }, // [repair] [all tenants]
+  {
+    type: 'drivingschool',
+    label: 'Driving School',
+    icon: '🚗',
+    description: 'Students, sessions, vehicles, instructors, LL/DL test tracking',
+    color: '#2563eb',
+    bgColor: '#dbeafe',
+    dashboardRoute: '/drivingschool/dashboard',
+  }, // [drivingschool] [all tenants]
   // ➕ Add new apps here — they appear automatically in the Switch App modal
 ];
 
