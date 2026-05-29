@@ -8,12 +8,26 @@ import { reportError } from './lib/errorReporter';
 import { flushQueue } from './lib/syncQueue';
 import { setAIQueryClient } from './lib/voice/aiQueryInvalidator';
 
-// Check for updates silently on startup — store result for Settings page, no notification
+// Check for updates silently on startup — only notify if this release affects the user's app.
+// Release notes contain app tags like [medical] [all apps] — user only gets update if their
+// shop type is tagged, or if [all apps] / [all tenants] / [core] is present. [core] [all tenants]
 async function checkForUpdate() {
   try {
     const { check } = await import('@tauri-apps/plugin-updater');
     const update = await check();
     if (!update) return;
+
+    // Read current shop type from Zustand store
+    const { useAppStore } = await import('./app/store/app.store');
+    const shopType = useAppStore.getState().config?.shop_type ?? '';
+
+    // Parse release notes for app tags
+    const notes = (update.body ?? '').toLowerCase();
+    const isAllApps = notes.includes('[all apps]') || notes.includes('[all tenants]') || notes.includes('[core]');
+    const isThisApp = shopType && notes.includes(`[${shopType}]`);
+
+    if (!isAllApps && !isThisApp) return; // This release doesn't affect this user's app
+
     (window as any).__pendingUpdate = update;
   } catch {
     // Non-fatal — ignore silently

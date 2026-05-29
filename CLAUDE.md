@@ -22,18 +22,63 @@ Website: frontstores.com
 ```
 Which app are you working on?
 
-1) Medical Store (medical)
-2) Restaurant / Café (restaurant)
-3) Grocery Store (grocery)
-4) Car Wash / Detailing (carwash)
-5) Hospital / Clinic (clinic)
-6) Beauty Parlor / Salon (beauty)
-7) StudyMate — Student App (study)
-8) Core / Shared (affects all apps)
-9) Website — frontstores.com
-10) Admin Panel (tools/update-server, admin-app)
-11) ➕ Create new app
+── Retail ──
+1)  Medical Store / Pharmacy (medical)
+2)  Grocery Store (grocery)
+3)  Hardware Store (hardware)
+4)  Clothing / Footwear Store (clothing)
+5)  Jewellery Shop (jewellery)
+6)  Furniture Store (furniture)
+7)  Bakery / Sweets Shop (bakery)
+8)  Petrol Pump (petrolpump)
+9)  Printing / Stationery (printing)
+10) Optician / Eye Care (optician)
+
+── Food & Hospitality ──
+11) Restaurant / Café (restaurant)
+12) Hotel / Lodge (hotel)
+13) Catering Business (catering)
+
+── Services ──
+14) Car Wash / Detailing (carwash)
+15) Beauty Parlor / Salon (beauty)
+16) Tailor / Boutique (tailor)
+17) Mobile / Electronics Repair (repair)
+18) Laundry / Dry Clean (laundry)
+19) Pest Control (pestcontrol)
+20) Home Service / Electrician (homeservice)
+
+── Health ──
+21) Hospital / Clinic (clinic)
+
+── Professional ──
+22) CA / Tax Consultant (ca)
+23) Insurance Agent (insurance)
+24) Travel Agency (travel)
+25) Event Planner (events)
+26) Driving School (drivingschool)
+
+── Education ──
+27) StudyMate — Student App (study)
+28) Coaching Institute (coaching)
+
+── Fitness ──
+29) Gym / Fitness Center (gym)
+
+── Real Estate ──
+30) Real Estate / PropMate (realestate)
+
+── System ──
+31) Core / Shared (affects all apps)
+32) 🌐 All Apps (change applies to every app)
+33) Website — frontstores.com
+34) Admin Panel (tools/update-server, admin-app)
+35) ➕ Create new app
+36) ❓ General Question (not tied to any specific app)
 ```
+
+If user picks **32 (All Apps)**, tag changes as `// [all apps] [all tenants]` and implement for every shopType.
+If user picks **36 (General Question)**, answer the question directly — no Q2 needed, no app tagging required.
 
 ---
 

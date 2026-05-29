@@ -290,6 +290,19 @@ jobs:
           BASE="https://github.com/imrakeshsoni/frontstores/releases/download/${TAG}"
           PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
+          # Extract app tags from commits since previous tag to determine which apps changed.
+          # Tags like [medical], [all apps], [all tenants] in commit messages control who gets this update.
+          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${TAG}$" | head -1 || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            COMMIT_LOG=$(git log "${PREV_TAG}..${TAG}" --pretty=format:"%s %b" 2>/dev/null || echo "")
+          else
+            COMMIT_LOG=$(git log --pretty=format:"%s %b" -20 2>/dev/null || echo "")
+          fi
+          # Collect unique app tags — used by client to decide if update is relevant
+          APP_TAGS=$(echo "$COMMIT_LOG" | grep -oE '\[(medical|restaurant|grocery|carwash|clinic|beauty|study|coaching|gym|jewellery|realestate|hotel|tailor|hardware|repair|drivingschool|laundry|catering|pestcontrol|clothing|bakery|optician|petrolpump|furniture|printing|ca|events|travel|insurance|homeservice|all apps|all tenants|core)\]' | sort -u | tr '\n' ' ' | sed 's/ $//')
+          [ -z "$APP_TAGS" ] && APP_TAGS="[all apps]"
+          echo "App tags for this release: $APP_TAGS"
+
           echo "=== Sig file contents ==="
           find sigs -type f | xargs -I{} sh -c 'echo "--- {} ---"; wc -c {}'
 
@@ -332,7 +345,7 @@ jobs:
           echo "$PLATFORMS" | jq \
             --arg version "$VERSION" \
             --arg pub_date "$PUB_DATE" \
-            --arg notes "FrontStores $TAG — bug fixes and improvements" \
+            --arg notes "FrontStores $TAG — $APP_TAGS" \
             '{"version": $version, "notes": $notes, "pub_date": $pub_date, "platforms": .}' \
             > latest.json
 
