@@ -14,6 +14,7 @@ const SHOP_TYPE_LABELS: Record<string, string> = {
   gym: 'Gym / Fitness',
   jewellery: 'Jewellery Shop',
   realestate: 'Real Estate / PropMate',
+  hotel: 'Hotel / Lodge', // [hotel] [all tenants]
 };
 
 // ── APP_REGISTRY ─────────────────────────────────────────────────────────────
@@ -130,6 +131,15 @@ export const APP_REGISTRY: AppRegistryEntry[] = [
     bgColor: '#dcfce7',
     dashboardRoute: '/realestate/dashboard',
   },
+  {
+    type: 'hotel',
+    label: 'Hotel / Lodge',
+    icon: '🏨',
+    description: 'Room bookings, check-in/out, billing, housekeeping',
+    color: '#2563eb',
+    bgColor: '#dbeafe',
+    dashboardRoute: '/hotel/dashboard',
+  }, // [hotel] [all tenants]
   // ➕ Add new apps here — they appear automatically in the Switch App modal
 ];
 

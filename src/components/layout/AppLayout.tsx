@@ -223,6 +223,21 @@ const JEWELLERY_NAV_ITEMS = [
   { to: '/settings',                 icon: Settings,        label: 'Settings',       iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
 
+// [hotel] [all tenants]
+const HOTEL_NAV_ITEMS = [
+  { to: '/hotel/dashboard',    icon: LayoutDashboard, label: 'Dashboard',      iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/hotel/rooms',        icon: BedDouble,       label: 'Rooms',          iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/hotel/bookings',     icon: CalendarDays,    label: 'Bookings',       iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/hotel/checkin',      icon: LogIn,           label: 'Check-In',       iconBg: '#d1fae5', iconColor: '#059669' },
+  { to: '/hotel/checkout',     icon: LogOut,          label: 'Check-Out',      iconBg: '#ffedd5', iconColor: '#ea580c' },
+  { to: '/hotel/guests',       icon: Users,           label: 'Guests',         iconBg: '#fce7f3', iconColor: '#db2777' },
+  { to: '/hotel/housekeeping', icon: Sparkles,        label: 'Housekeeping',   iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/hotel/maintenance',  icon: Wrench,          label: 'Maintenance',    iconBg: '#f1f5f9', iconColor: '#64748b' },
+  { to: '/hotel/reports',      icon: BarChart3,       label: 'Reports',        iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/hotel/setup/rooms',  icon: ClipboardList,   label: 'Room Setup',     iconBg: '#cffafe', iconColor: '#0891b2' },
+  { to: '/settings',           icon: Settings,        label: 'Settings',       iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
 // [realestate] [all tenants]
 const REALESTATE_BASE_NAV = [
   { to: '/realestate/dashboard',   icon: LayoutDashboard, label: 'Dashboard',      iconBg: '#dcfce7', iconColor: '#15803d' },
@@ -294,6 +309,7 @@ export function AppLayout() {
     config?.shop_type === 'gym'         ? GYM_NAV_ITEMS :
     config?.shop_type === 'jewellery'   ? JEWELLERY_NAV_ITEMS :
     config?.shop_type === 'realestate'  ? getRealEstateNavItems(reRole) :
+    config?.shop_type === 'hotel'       ? HOTEL_NAV_ITEMS : // [hotel] [all tenants]
     NAV_ITEMS;
 
   useEffect(() => {

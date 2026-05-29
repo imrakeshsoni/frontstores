@@ -131,6 +131,20 @@ const BrainBreakPage          = lazy(() => import('@/modules/study/BrainBreakPag
 const MathConstantsPage       = lazy(() => import('@/modules/study/MathConstantsPage').then(m => ({ default: m.MathConstantsPage })));
 const LocalAISetupPage        = lazy(() => import('@/modules/study/LocalAISetupPage').then(m => ({ default: m.LocalAISetupPage })));
 
+// [hotel] [all tenants]
+const HotelDashboard       = lazy(() => import('@/modules/hotel/HotelDashboard').then(m => ({ default: m.HotelDashboard })));
+const HotelRoomGrid        = lazy(() => import('@/modules/hotel/RoomGridPage').then(m => ({ default: m.RoomGridPage })));
+const HotelBookings        = lazy(() => import('@/modules/hotel/BookingsPage').then(m => ({ default: m.BookingsPage })));
+const HotelNewBooking      = lazy(() => import('@/modules/hotel/NewBookingPage').then(m => ({ default: m.NewBookingPage })));
+const HotelCheckIn         = lazy(() => import('@/modules/hotel/CheckInPage').then(m => ({ default: m.CheckInPage })));
+const HotelCheckOut        = lazy(() => import('@/modules/hotel/CheckOutPage').then(m => ({ default: m.CheckOutPage })));
+const HotelGuests          = lazy(() => import('@/modules/hotel/GuestsPage').then(m => ({ default: m.GuestsPage })));
+const HotelHousekeeping    = lazy(() => import('@/modules/hotel/HousekeepingPage').then(m => ({ default: m.HousekeepingPage })));
+const HotelMaintenance     = lazy(() => import('@/modules/hotel/MaintenancePage').then(m => ({ default: m.MaintenancePage })));
+const HotelReports         = lazy(() => import('@/modules/hotel/HotelReportsPage').then(m => ({ default: m.HotelReportsPage })));
+const HotelRoomSetup       = lazy(() => import('@/modules/hotel/RoomSetupPage').then(m => ({ default: m.RoomSetupPage })));
+const HotelSettings        = lazy(() => import('@/modules/hotel/HotelSettingsPage').then(m => ({ default: m.HotelSettingsPage })));
+
 // [beauty] [all tenants]
 const BeautyDashboard         = lazy(() => import('@/modules/beauty/BeautyDashboard').then(m => ({ default: m.BeautyDashboard })));
 const BeautyServicesPage      = lazy(() => import('@/modules/beauty/BeautyServicesPage').then(m => ({ default: m.BeautyServicesPage })));
@@ -198,6 +212,7 @@ export default function App() {
               config?.shop_type === 'gym'        ? '/gym/dashboard' :
               config?.shop_type === 'jewellery'   ? '/jewellery/dashboard' :
               config?.shop_type === 'realestate'  ? '/realestate/dashboard' :
+              config?.shop_type === 'hotel'       ? '/hotel/dashboard' : // [hotel] [all tenants]
               '/dashboard'
             } replace />} />
             <Route path="dashboard"  element={<Dashboard />} />
@@ -320,6 +335,20 @@ export default function App() {
             <Route path="realestate/documents"   element={<REDocumentsPage />} />
             <Route path="realestate/builders"    element={<REBuildersPage />} />
             <Route path="realestate/reports"     element={<REReportsPage />} />
+
+            {/* [hotel] [all tenants] */}
+            <Route path="hotel/dashboard"    element={<HotelDashboard />} />
+            <Route path="hotel/rooms"        element={<HotelRoomGrid />} />
+            <Route path="hotel/bookings"     element={<HotelBookings />} />
+            <Route path="hotel/bookings/new" element={<HotelNewBooking />} />
+            <Route path="hotel/checkin"      element={<HotelCheckIn />} />
+            <Route path="hotel/checkout"     element={<HotelCheckOut />} />
+            <Route path="hotel/guests"       element={<HotelGuests />} />
+            <Route path="hotel/housekeeping" element={<HotelHousekeeping />} />
+            <Route path="hotel/maintenance"  element={<HotelMaintenance />} />
+            <Route path="hotel/reports"      element={<HotelReports />} />
+            <Route path="hotel/setup/rooms"  element={<HotelRoomSetup />} />
+            <Route path="hotel/settings"     element={<HotelSettings />} />
 
             {/* [beauty] [all tenants] */}
             <Route path="beauty/dashboard"              element={<BeautyDashboard />} />

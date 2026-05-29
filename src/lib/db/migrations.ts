@@ -28,6 +28,7 @@ import migration0027 from '../../../src-tauri/migrations/0027_coaching.sql?raw';
 import migration0028 from '../../../src-tauri/migrations/0028_gym.sql?raw';
 import migration0029 from '../../../src-tauri/migrations/0029_jewellery.sql?raw';
 import migration0030 from '../../../src-tauri/migrations/0030_realestate.sql?raw';
+import migration0031 from '../../../src-tauri/migrations/0031_hotel.sql?raw';
 
 export interface Migration {
   name: string;
@@ -66,5 +67,6 @@ export async function readMigrations(): Promise<Migration[]> {
     { name: '0028_gym', sql: migration0028 },
     { name: '0029_jewellery', sql: migration0029 },
     { name: '0030_realestate', sql: migration0030 },
+    { name: '0031_hotel', sql: migration0031 },
   ];
 }

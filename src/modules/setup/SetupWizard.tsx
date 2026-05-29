@@ -20,6 +20,7 @@ const SHOP_TYPES = [
   { value: 'gym',        label: 'Gym / Fitness Center',    icon: '💪', desc: 'Members, memberships, check-in, renewals, PT packages, staff' },
   { value: 'jewellery',  label: 'Jewellery Shop',          icon: '💍', desc: 'Gold rate, inventory, billing, custom orders, repairs' },
   { value: 'realestate', label: 'Real Estate / PropMate',  icon: '🏠', desc: 'Leads, deals, commissions, site visits, builder projects' },
+  { value: 'hotel',      label: 'Hotel / Lodge',           icon: '🏨', desc: 'Room bookings, check-in/out, billing, housekeeping, maintenance' },
 ];
 
 const RE_ROLES = [
