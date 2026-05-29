@@ -3,7 +3,7 @@ import { useAppStore } from '@/app/store/app.store';
 export type ShopType = 'medical' | 'restaurant' | 'grocery' | 'carwash' | 'clinic' | 'beauty' | 'study' | 'coaching' | 'gym' | 'jewellery' | 'realestate';
 
 const SHOP_TYPE_LABELS: Record<string, string> = {
-  medical: 'Medical Store',
+  medical: 'Medical Store / Pharmacy', // [medical] [all tenants]
   restaurant: 'Restaurant',
   grocery: 'Grocery Store',
   carwash: 'Car Wash',
@@ -34,9 +34,9 @@ export interface AppRegistryEntry {
 export const APP_REGISTRY: AppRegistryEntry[] = [
   {
     type: 'medical',
-    label: 'Medical Store',
+    label: 'Medical Store / Pharmacy', // [medical] [all tenants]
     icon: '💊',
-    description: 'Billing, inventory, expiry tracking, Khata',
+    description: 'Billing, inventory, expiry tracking, Khata, batch manager, prescriptions',
     color: '#2563eb',
     bgColor: '#dbeafe',
     dashboardRoute: '/dashboard',

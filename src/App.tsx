@@ -131,6 +131,14 @@ const BrainBreakPage          = lazy(() => import('@/modules/study/BrainBreakPag
 const MathConstantsPage       = lazy(() => import('@/modules/study/MathConstantsPage').then(m => ({ default: m.MathConstantsPage })));
 const LocalAISetupPage        = lazy(() => import('@/modules/study/LocalAISetupPage').then(m => ({ default: m.LocalAISetupPage })));
 
+// [medical] [all tenants] — Pharmacy
+const BatchManagerPage    = lazy(() => import('@/modules/pharmacy/BatchManagerPage').then(m => ({ default: m.BatchManagerPage })));
+const PrescriptionsPage   = lazy(() => import('@/modules/pharmacy/PrescriptionsPage').then(m => ({ default: m.PrescriptionsPage })));
+const PatientHistoryPage  = lazy(() => import('@/modules/pharmacy/PatientHistoryPage').then(m => ({ default: m.PatientHistoryPage })));
+const ScheduleRegisterPage = lazy(() => import('@/modules/pharmacy/ScheduleRegisterPage').then(m => ({ default: m.ScheduleRegisterPage })));
+const SupplierReturnsPage  = lazy(() => import('@/modules/pharmacy/SupplierReturnsPage').then(m => ({ default: m.SupplierReturnsPage })));
+const SaltSearchPage       = lazy(() => import('@/modules/pharmacy/SaltSearchPage').then(m => ({ default: m.SaltSearchPage })));
+
 // [hotel] [all tenants]
 const HotelDashboard       = lazy(() => import('@/modules/hotel/HotelDashboard').then(m => ({ default: m.HotelDashboard })));
 const HotelRoomGrid        = lazy(() => import('@/modules/hotel/RoomGridPage').then(m => ({ default: m.RoomGridPage })));
@@ -227,6 +235,14 @@ export default function App() {
             <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
             <Route path="reports"    element={<ReportsPage />} />
             <Route path="settings"   element={<SettingsPage />} />
+            {/* [medical] [all tenants] — Pharmacy */}
+            <Route path="pharmacy/batches"  element={<BatchManagerPage />} />
+            <Route path="pharmacy/rx"       element={<PrescriptionsPage />} />
+            <Route path="pharmacy/patients" element={<PatientHistoryPage />} />
+            <Route path="pharmacy/schedule" element={<ScheduleRegisterPage />} />
+            <Route path="pharmacy/returns"  element={<SupplierReturnsPage />} />
+            <Route path="pharmacy/salt"     element={<SaltSearchPage />} />
+
             {/* [grocery] [all tenants] */}
             <Route path="grocery/dashboard" element={<GroceryDashboard />} />
             <Route path="grocery/cash"      element={<CashDrawerPage />} />

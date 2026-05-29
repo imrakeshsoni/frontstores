@@ -89,6 +89,13 @@ export const NAV_ITEMS = [
   { to: '/purchase-orders', icon: ClipboardList,   label: 'Purchase Orders', iconBg: '#d1fae5', iconColor: '#059669' },
   { to: '/reports',         icon: BarChart3,       label: 'Reports',         iconBg: '#e0f2fe', iconColor: '#0284c7' },
   { to: '/settings',        icon: Settings,        label: 'Settings',        iconBg: '#f1f5f9', iconColor: '#64748b' },
+  // [medical] [all tenants] — Pharmacy features
+  { to: '/pharmacy/batches',   icon: Boxes,         label: 'Batch Manager',     iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/pharmacy/rx',        icon: FileText,      label: 'Prescriptions',     iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/pharmacy/patients',  icon: Users,         label: 'Patient History',   iconBg: '#fce7f3', iconColor: '#db2777' },
+  { to: '/pharmacy/schedule',  icon: ClipboardList, label: 'Schedule Register', iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/pharmacy/returns',   icon: PackagePlus,   label: 'Supplier Returns',  iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/pharmacy/salt',      icon: FlaskConical,  label: 'Salt Search',       iconBg: '#cffafe', iconColor: '#0891b2' },
 ];
 
 // [grocery] [all tenants]
