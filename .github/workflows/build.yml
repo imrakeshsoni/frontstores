@@ -197,7 +197,7 @@ jobs:
           path: update.sig
           if-no-files-found: warn
 
-      # ── Windows: sign NSIS manually (Tauri v2 doesn't auto-sign on Windows)
+      # ── Windows: sign MSI for updates (MSI upgrades in-place, NSIS installs a second copy)
       - name: Upload Windows artifacts
         if: matrix.platform == 'windows-latest'
         env:
@@ -210,26 +210,28 @@ jobs:
           $msi  = Get-ChildItem -Path "src-tauri/target/release/bundle/msi"  -Filter "*.msi" | Select-Object -First 1
           $nsis = Get-ChildItem -Path "src-tauri/target/release/bundle/nsis" -Filter "*.exe" | Select-Object -First 1
 
-          # Copy to fixed names (# rename unreliable in PowerShell with gh CLI)
+          # Copy to fixed names
           if ($msi)  { Copy-Item $msi.FullName  -Destination "FrontStores_x64_en-US.msi" }
           if ($nsis) { Copy-Item $nsis.FullName -Destination "FrontStores_x64-setup.exe" }
 
+          # Upload both installers (MSI for updates, NSIS as alternative download)
           if (Test-Path "FrontStores_x64_en-US.msi") { gh release upload $env:TAG "FrontStores_x64_en-US.msi" --clobber }
           if (Test-Path "FrontStores_x64-setup.exe")  { gh release upload $env:TAG "FrontStores_x64-setup.exe"  --clobber }
 
-          # Tauri v2 doesn't auto-sign on Windows — manually sign the fixed-name NSIS exe
-          if (Test-Path "FrontStores_x64-setup.exe") {
-            Write-Host "Signing NSIS installer..."
-            npx tauri signer sign --private-key $env:TAURI_SIGNING_PRIVATE_KEY "FrontStores_x64-setup.exe"
-            if (Test-Path "FrontStores_x64-setup.exe.sig") {
-              Copy-Item "FrontStores_x64-setup.exe.sig" -Destination "update.sig"
-              Write-Host "Win sig captured: $((Get-Item update.sig).Length) bytes"
+          # Sign the MSI for the updater — MSI upgrades in-place, never creates a second app
+          # NSIS would install alongside existing MSI as a separate app (do NOT use for updates)
+          if (Test-Path "FrontStores_x64_en-US.msi") {
+            Write-Host "Signing MSI for updater..."
+            npx tauri signer sign --private-key $env:TAURI_SIGNING_PRIVATE_KEY "FrontStores_x64_en-US.msi"
+            if (Test-Path "FrontStores_x64_en-US.msi.sig") {
+              Copy-Item "FrontStores_x64_en-US.msi.sig" -Destination "update.sig"
+              Write-Host "Win MSI sig captured: $((Get-Item update.sig).Length) bytes"
             } else {
-              Write-Host "WARNING: signing produced no .sig file"
+              Write-Host "WARNING: MSI signing produced no .sig file"
               New-Item -Path "update.sig" -ItemType File -Force | Out-Null
             }
           } else {
-            Write-Host "WARNING: No NSIS exe found to sign"
+            Write-Host "WARNING: No MSI found to sign"
             New-Item -Path "update.sig" -ItemType File -Force | Out-Null
           }
 
@@ -320,9 +322,9 @@ jobs:
           if [ -n "$WIN_SIG" ] && [ $(echo -n "$WIN_SIG" | wc -c) -gt 10 ]; then
             PLATFORMS=$(echo "$PLATFORMS" | jq \
               --arg sig "$WIN_SIG" \
-              --arg url "${BASE}/FrontStores_x64-setup.exe" \
+              --arg url "${BASE}/FrontStores_x64_en-US.msi" \
               '. + {"windows-x86_64": {"signature": $sig, "url": $url}}')
-            echo "Added windows-x86_64"
+            echo "Added windows-x86_64 (MSI)"
           else
             echo "WARNING: windows sig empty or missing"
           fi
