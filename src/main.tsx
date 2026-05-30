@@ -49,9 +49,9 @@ window.onunhandledrejection = (event) => {
   reportError(String(event.reason?.message || event.reason), event.reason?.stack, 'unhandledrejection');
 };
 
-// Apply saved theme before first render to avoid flash
-const savedTheme = localStorage.getItem('theme');
-if (savedTheme === 'dark') document.documentElement.classList.add('dark');
+// Apply saved theme before first render to avoid flash — default is dark
+const savedTheme = localStorage.getItem('theme') ?? 'dark';
+if (savedTheme !== 'light') document.documentElement.classList.add('dark');
 
 const queryClient = new QueryClient({
   defaultOptions: {

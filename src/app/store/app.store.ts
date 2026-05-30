@@ -32,7 +32,7 @@ export const useAppStore = create<AppState>((set) => ({
       const config = await getAppConfig();
       if (config?.tenant_id) {
         setReporterTenantId(config.tenant_id);
-        if (config.is_setup_complete) runStartupChecks(config.tenant_id).catch(() => {});
+        if (config.is_setup_complete) runStartupChecks(config.tenant_id, config.shop_type).catch(() => {});
       }
       set({ config, isSetupComplete: config?.is_setup_complete ?? false, isLoading: false });
     } catch {

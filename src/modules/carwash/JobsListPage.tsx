@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Car } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
-import { listJobs, type JobStatus } from '@/lib/db/carwash';
+import { listJobs, countJobs, type JobStatus } from '@/lib/db/carwash';
 
 const STATUS_LABELS: Record<string, string> = {
   waiting: 'Waiting', in_progress: 'In Progress', ready: 'Ready', delivered: 'Delivered',
@@ -24,20 +24,40 @@ export function JobsListPage() {
   const navigate  = useNavigate();
   const [date, setDate]     = useState(todayISO());
   const [filter, setFilter] = useState<string>('all');
+  const [page, setPage]     = useState(0);
+  const PAGE_SIZE = 50;
 
   const { data: jobs = [], isLoading } = useQuery({
-    queryKey: ['carwash-jobs-list', tenantId, date],
-    queryFn: () => listJobs(tenantId, { date }),
+    queryKey: ['carwash-jobs-list', tenantId, date, filter, page],
+    queryFn: () => listJobs(tenantId, {
+      date: date || undefined,
+      status: (filter !== 'all' ? filter : undefined) as JobStatus | undefined,
+      limit: PAGE_SIZE,
+      offset: page * PAGE_SIZE,
+    }),
     enabled: !!tenantId,
     refetchInterval: 15000,
   });
 
-  const filtered = filter === 'all' ? jobs : jobs.filter(j => j.status === filter);
+  const { data: totalCount = 0 } = useQuery({
+    queryKey: ['carwash-jobs-count', tenantId, date, filter],
+    queryFn: () => countJobs(tenantId, {
+      date: date || undefined,
+      status: (filter !== 'all' ? filter : undefined) as JobStatus | undefined,
+    }),
+    enabled: !!tenantId,
+  });
+
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+  const filtered = jobs;
 
   const counts = jobs.reduce<Record<string, number>>((acc, j) => {
     acc[j.status] = (acc[j.status] ?? 0) + 1;
     return acc;
   }, {});
+
+  const handleFilterChange = (f: string) => { setFilter(f); setPage(0); };
+  const handleDateChange = (d: string) => { setDate(d); setPage(0); };
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-5">
@@ -55,14 +75,14 @@ export function JobsListPage() {
 
       {/* Date picker + filters */}
       <div className="flex flex-wrap items-center gap-3">
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+        <input type="date" value={date} onChange={(e) => handleDateChange(e.target.value)}
           className="rounded-xl border px-3 py-2 text-sm outline-none"
           style={{ borderColor: 'var(--surface-border)', background: 'var(--surface)', color: 'var(--text-primary)' }} />
         {(['all', 'waiting', 'in_progress', 'ready', 'delivered'] as const).map(s => {
           const cnt = s === 'all' ? jobs.length : (counts[s] ?? 0);
           const sc = STATUS_COLORS[s] ?? { color: '#6b7280', bg: '#f3f4f6' };
           return (
-            <button key={s} onClick={() => setFilter(s)}
+            <button key={s} onClick={() => handleFilterChange(s)}
               className={`px-3 py-1.5 rounded-full text-xs font-semibold capitalize transition-all ${filter === s ? 'text-white' : ''}`}
               style={filter === s ? { background: sc.color } : { background: sc.bg, color: sc.color }}>
               {s === 'all' ? 'All' : STATUS_LABELS[s]} {cnt > 0 && `(${cnt})`}
@@ -118,6 +138,25 @@ export function JobsListPage() {
           );
         })}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between pt-2">
+          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+            Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalCount)} of {totalCount}
+          </p>
+          <div className="flex gap-2">
+            <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold btn-secondary disabled:opacity-40">
+              ← Prev
+            </button>
+            <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold btn-secondary disabled:opacity-40">
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

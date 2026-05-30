@@ -3,6 +3,7 @@ import { getDb, uuid, now } from './index';
 
 export type VehicleType = 'hatchback' | 'sedan' | 'suv' | 'luxury';
 export type JobStatus = 'waiting' | 'in_progress' | 'ready' | 'delivered';
+export type AppointmentStatus = 'scheduled' | 'confirmed' | 'arrived' | 'done' | 'cancelled';
 
 export interface CarwashService {
   id: string;
@@ -99,6 +100,61 @@ export interface CarwashMembership {
   created_at: string;
 }
 
+export interface CarwashAppointment {
+  id: string;
+  tenant_id: string;
+  appointment_date: string;
+  appointment_time: string;
+  duration_minutes: number;
+  reg_number: string | null;
+  vehicle_type: VehicleType;
+  make: string | null;
+  model: string | null;
+  customer_name: string | null;
+  customer_phone: string | null;
+  staff_id: string | null;
+  staff_name: string | null;
+  services_note: string | null;
+  status: AppointmentStatus;
+  notes: string | null;
+  job_id: string | null;
+  created_at: string;
+}
+
+export interface CarwashInventoryItem {
+  id: string;
+  tenant_id: string;
+  name: string;
+  category: string;
+  unit: string;
+  quantity: number;
+  min_quantity: number;
+  cost_per_unit: number;
+  notes: string | null;
+  updated_at: string;
+}
+
+export interface CarwashVehicleTypeRecord {
+  id: string;
+  tenant_id: string;
+  name: string;
+  icon: string;
+  price_multiplier: number;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export interface CarwashLoyalty {
+  id: string;
+  tenant_id: string;
+  customer_phone: string;
+  customer_name: string;
+  reg_number: string | null;
+  total_points: number;
+  redeemed_points: number;
+  available_points: number;
+}
+
 function mapService(r: any): CarwashService {
   return { ...r, is_active: r.is_active === 1 };
 }
@@ -146,6 +202,17 @@ export async function updateService(tenantId: string, id: string, data: Partial<
     [data.name, data.description ?? null, data.price_hatchback, data.price_sedan, data.price_suv, data.price_luxury,
      data.duration_minutes, data.gst_rate, data.is_active ? 1 : 0, now(), id, tenantId]
   );
+}
+
+export async function isServiceInActiveJobs(tenantId: string, serviceId: string): Promise<boolean> {
+  const db = await getDb();
+  const rows = await db.select<{ count: number }[]>(
+    `SELECT COUNT(*) as count FROM carwash_job_items ji
+     JOIN carwash_jobs j ON j.id = ji.job_id
+     WHERE j.tenant_id = ? AND ji.service_id = ? AND j.status != 'delivered' AND j.deleted_at IS NULL`,
+    [tenantId, serviceId]
+  );
+  return (rows[0]?.count ?? 0) > 0;
 }
 
 export async function deleteService(tenantId: string, id: string): Promise<void> {
@@ -217,6 +284,54 @@ export async function getVehicleHistory(tenantId: string, vehicleId: string, lim
   );
 }
 
+export async function getVehicleServiceHistory(tenantId: string, regNumber: string): Promise<{
+  lastVisit: string | null;
+  visitCount: number;
+  totalSpent: number;
+  serviceHistory: Array<{ service_name: string; last_used: string; count: number }>;
+}> {
+  const db = await getDb();
+  const clean = regNumber.toUpperCase().replace(/\s+/g, '');
+  const jobs = await db.select<any[]>(
+    `SELECT j.id, j.created_at, j.total FROM carwash_jobs j
+     WHERE j.tenant_id = ? AND UPPER(REPLACE(j.reg_number,' ','')) = ? AND j.deleted_at IS NULL AND j.status = 'delivered'
+     ORDER BY j.created_at DESC`,
+    [tenantId, clean]
+  );
+  if (jobs.length === 0) return { lastVisit: null, visitCount: 0, totalSpent: 0, serviceHistory: [] };
+
+  const jobIds = jobs.map(j => j.id);
+  const placeholders = jobIds.map(() => '?').join(',');
+  const items = await db.select<any[]>(
+    `SELECT ji.service_name, ji.job_id FROM carwash_job_items ji WHERE ji.job_id IN (${placeholders})`,
+    jobIds
+  );
+
+  const jobDateMap: Record<string, string> = {};
+  for (const j of jobs) jobDateMap[j.id] = j.created_at;
+
+  const svcMap: Record<string, { count: number; last_used: string }> = {};
+  for (const item of items) {
+    const date = jobDateMap[item.job_id] ?? '';
+    if (!svcMap[item.service_name]) {
+      svcMap[item.service_name] = { count: 0, last_used: date };
+    }
+    svcMap[item.service_name].count++;
+    if (date > svcMap[item.service_name].last_used) svcMap[item.service_name].last_used = date;
+  }
+
+  const serviceHistory = Object.entries(svcMap)
+    .map(([service_name, v]) => ({ service_name, ...v }))
+    .sort((a, b) => b.count - a.count);
+
+  return {
+    lastVisit: jobs[0]?.created_at ?? null,
+    visitCount: jobs.length,
+    totalSpent: jobs.reduce((s, j) => s + (j.total ?? 0), 0),
+    serviceHistory,
+  };
+}
+
 export async function searchVehicles(tenantId: string, search: string): Promise<CarwashVehicle[]> {
   const db = await getDb();
   return db.select<any[]>(
@@ -231,13 +346,14 @@ export async function searchVehicles(tenantId: string, search: string): Promise<
 
 async function nextJobNumber(tenantId: string): Promise<string> {
   const db = await getDb();
-  const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const today = new Date().toISOString().slice(0, 10);
   const rows = await db.select<{ count: number }[]>(
     `SELECT COUNT(*) as count FROM carwash_jobs WHERE tenant_id = ? AND created_at LIKE ?`,
-    [tenantId, `${new Date().toISOString().slice(0, 10)}%`]
+    [tenantId, `${today}%`]
   );
   const seq = (rows[0]?.count ?? 0) + 1;
-  return `WS${today.slice(4)}-${String(seq).padStart(3, '0')}`;
+  const mmdd = today.slice(5).replace('-', '');
+  return `WS${mmdd}-${String(seq).padStart(3, '0')}`;
 }
 
 export async function createJob(tenantId: string, data: {
@@ -257,7 +373,6 @@ export async function createJob(tenantId: string, data: {
 }): Promise<CarwashJob> {
   const db = await getDb();
 
-  // Upsert vehicle
   const vehicle = await upsertVehicle(tenantId, {
     reg_number: data.reg_number,
     vehicle_type: data.vehicle_type,
@@ -274,7 +389,12 @@ export async function createJob(tenantId: string, data: {
   const jobNumber = await nextJobNumber(tenantId);
   const subtotal = data.items.reduce((s, i) => s + i.price, 0);
   const discount = data.discount ?? 0;
-  const gstAmount = data.items.reduce((s, i) => s + (i.price - discount / data.items.length) * i.gst_rate / 100, 0);
+  // GST calculated on discounted amount, distributed proportionally
+  const gstAmount = data.items.reduce((s, i) => {
+    const itemShare = subtotal > 0 ? i.price / subtotal : 1 / data.items.length;
+    const itemDiscount = discount * itemShare;
+    return s + (i.price - itemDiscount) * i.gst_rate / 100;
+  }, 0);
   const total = subtotal - discount + gstAmount;
 
   await db.execute(
@@ -296,7 +416,6 @@ export async function createJob(tenantId: string, data: {
     );
   }
 
-  // Deduct membership wash if used
   if (data.membership_id) {
     await db.execute(
       `UPDATE carwash_memberships SET used_washes = used_washes + 1, updated_at = ? WHERE id = ?`,
@@ -304,8 +423,33 @@ export async function createJob(tenantId: string, data: {
     );
   }
 
+  // Award loyalty points: 1 point per ₹10 spent
+  if (data.customer_phone && data.customer_phone.replace(/\D/g, '').length >= 10) {
+    await awardLoyaltyPoints(tenantId, {
+      customer_phone: data.customer_phone,
+      customer_name: data.customer_name ?? 'Customer',
+      reg_number: data.reg_number,
+      job_id: jobId,
+      amount: total,
+    });
+  }
+
   const rows = await db.select<any[]>(`SELECT * FROM carwash_jobs WHERE id = ?`, [jobId]);
   return rows[0];
+}
+
+export async function updateJob(tenantId: string, jobId: string, data: {
+  customer_name?: string;
+  customer_phone?: string;
+  staff_id?: string;
+  staff_name?: string;
+  notes?: string;
+}): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `UPDATE carwash_jobs SET customer_name=?, customer_phone=?, staff_id=?, staff_name=?, notes=?, updated_at=? WHERE id=? AND tenant_id=?`,
+    [data.customer_name ?? null, data.customer_phone ?? null, data.staff_id ?? null, data.staff_name ?? null, data.notes ?? null, now(), jobId, tenantId]
+  );
 }
 
 export async function updateJobStatus(tenantId: string, jobId: string, status: JobStatus): Promise<void> {
@@ -319,6 +463,34 @@ export async function updateJobStatus(tenantId: string, jobId: string, status: J
   );
 }
 
+export async function deleteJob(tenantId: string, jobId: string): Promise<void> {
+  const db = await getDb();
+  const jobs = await db.select<any[]>(`SELECT membership_id, customer_phone, total FROM carwash_jobs WHERE id = ? AND tenant_id = ?`, [jobId, tenantId]);
+  if (jobs.length === 0) return;
+  const job = jobs[0];
+
+  // Restore membership wash if it was used
+  if (job.membership_id) {
+    await db.execute(
+      `UPDATE carwash_memberships SET used_washes = MAX(0, used_washes - 1), updated_at = ? WHERE id = ?`,
+      [now(), job.membership_id]
+    );
+  }
+
+  // Reverse loyalty points
+  if (job.customer_phone) {
+    const points = Math.floor((job.total ?? 0) / 10);
+    if (points > 0) {
+      await db.execute(
+        `UPDATE carwash_loyalty SET total_points = MAX(0, total_points - ?), updated_at = ? WHERE tenant_id = ? AND customer_phone = ?`,
+        [points, now(), tenantId, job.customer_phone]
+      );
+    }
+  }
+
+  await db.execute(`UPDATE carwash_jobs SET deleted_at = ? WHERE id = ? AND tenant_id = ?`, [now(), jobId, tenantId]);
+}
+
 export async function settleJob(tenantId: string, jobId: string, paymentMethod: string): Promise<void> {
   const db = await getDb();
   await db.execute(
@@ -327,14 +499,16 @@ export async function settleJob(tenantId: string, jobId: string, paymentMethod: 
   );
 }
 
-export async function listJobs(tenantId: string, opts: { date?: string; status?: JobStatus; limit?: number } = {}): Promise<CarwashJob[]> {
+export async function listJobs(tenantId: string, opts: { date?: string; status?: JobStatus; limit?: number; offset?: number } = {}): Promise<CarwashJob[]> {
   const db = await getDb();
   const conditions = [`j.tenant_id = ?`, `j.deleted_at IS NULL`];
   const params: any[] = [tenantId];
   if (opts.date) { conditions.push(`j.created_at LIKE ?`); params.push(`${opts.date}%`); }
   if (opts.status) { conditions.push(`j.status = ?`); params.push(opts.status); }
+  const limit = opts.limit ?? 50;
+  const offset = opts.offset ?? 0;
   const jobs = await db.select<any[]>(
-    `SELECT j.* FROM carwash_jobs j WHERE ${conditions.join(' AND ')} ORDER BY j.created_at DESC LIMIT ${opts.limit ?? 200}`,
+    `SELECT j.* FROM carwash_jobs j WHERE ${conditions.join(' AND ')} ORDER BY j.created_at DESC LIMIT ${limit} OFFSET ${offset}`,
     params
   );
   if (jobs.length === 0) return [];
@@ -352,13 +526,23 @@ export async function listJobs(tenantId: string, opts: { date?: string; status?:
   return jobs.map(j => ({ ...j, items: itemMap[j.id] ?? [] }));
 }
 
+export async function countJobs(tenantId: string, opts: { date?: string; status?: JobStatus } = {}): Promise<number> {
+  const db = await getDb();
+  const conditions = [`tenant_id = ?`, `deleted_at IS NULL`];
+  const params: any[] = [tenantId];
+  if (opts.date) { conditions.push(`created_at LIKE ?`); params.push(`${opts.date}%`); }
+  if (opts.status) { conditions.push(`status = ?`); params.push(opts.status); }
+  const rows = await db.select<{ count: number }[]>(`SELECT COUNT(*) as count FROM carwash_jobs WHERE ${conditions.join(' AND ')}`, params);
+  return rows[0]?.count ?? 0;
+}
+
 export async function getTodayStats(tenantId: string): Promise<{
   totalJobs: number; revenue: number; pending: number; inProgress: number; ready: number; delivered: number;
 }> {
   const db = await getDb();
   const today = new Date().toISOString().slice(0, 10);
   const rows = await db.select<any[]>(
-    `SELECT status, payment_status, COUNT(*) as count, COALESCE(SUM(total),0) as revenue
+    `SELECT status, COUNT(*) as count, COALESCE(SUM(total),0) as revenue
      FROM carwash_jobs WHERE tenant_id = ? AND created_at LIKE ? AND deleted_at IS NULL GROUP BY status`,
     [tenantId, `${today}%`]
   );
@@ -380,6 +564,18 @@ export async function getStaffPerformance(tenantId: string, date: string): Promi
      FROM carwash_jobs WHERE tenant_id = ? AND created_at LIKE ? AND deleted_at IS NULL AND staff_name IS NOT NULL
      GROUP BY staff_name ORDER BY jobs DESC`,
     [tenantId, `${date}%`]
+  );
+}
+
+export async function getStaffWeeklyPerformance(tenantId: string): Promise<Array<{ staff_name: string; date: string; jobs: number; revenue: number }>> {
+  const db = await getDb();
+  return db.select<any[]>(
+    `SELECT staff_name, strftime('%Y-%m-%d', created_at) as date, COUNT(*) as jobs, COALESCE(SUM(total),0) as revenue
+     FROM carwash_jobs
+     WHERE tenant_id = ? AND deleted_at IS NULL AND staff_name IS NOT NULL
+       AND created_at >= date('now', '-7 days')
+     GROUP BY staff_name, date ORDER BY date ASC`,
+    [tenantId]
   );
 }
 
@@ -412,7 +608,7 @@ export async function getLapsedCustomers(tenantId: string, daysSince = 30): Prom
     `SELECT customer_name, customer_phone, reg_number, MAX(created_at) as last_visit
      FROM carwash_jobs WHERE tenant_id = ? AND customer_phone IS NOT NULL AND deleted_at IS NULL
      GROUP BY customer_phone HAVING MAX(created_at) < ?
-     ORDER BY last_visit ASC LIMIT 50`,
+     ORDER BY last_visit ASC`,
     [tenantId, `${cutoff}T23:59:59`]
   );
 }
@@ -454,10 +650,22 @@ export async function findActiveMembership(tenantId: string, regNumber: string):
   const clean = regNumber.toUpperCase().replace(/\s+/g, '');
   const rows = await db.select<any[]>(
     `SELECT * FROM carwash_memberships WHERE tenant_id = ? AND UPPER(REPLACE(reg_number,' ','')) = ? AND is_active = 1 AND deleted_at IS NULL
-     AND used_washes < total_washes AND (valid_until IS NULL OR valid_until >= date('now')) LIMIT 1`,
+     AND used_washes < total_washes AND (valid_until IS NULL OR date(valid_until) >= date('now')) LIMIT 1`,
     [tenantId, clean]
   );
   return rows.length ? mapMembership(rows[0]) : null;
+}
+
+export async function getExpiringMemberships(tenantId: string, withinDays = 7): Promise<CarwashMembership[]> {
+  const db = await getDb();
+  const rows = await db.select<any[]>(
+    `SELECT * FROM carwash_memberships WHERE tenant_id = ? AND deleted_at IS NULL AND is_active = 1
+     AND valid_until IS NOT NULL AND date(valid_until) >= date('now')
+     AND date(valid_until) <= date('now', '+${withinDays} days')
+     AND used_washes < total_washes`,
+    [tenantId]
+  );
+  return rows.map(mapMembership);
 }
 
 export async function createMembership(tenantId: string, data: {
@@ -470,5 +678,240 @@ export async function createMembership(tenantId: string, data: {
      VALUES (?,?,?,?,?,?,?,?,?)`,
     [uuid(), tenantId, data.customer_name, data.customer_phone ?? null, data.reg_number ?? null,
      data.package_name, data.total_washes, data.amount_paid, data.valid_until ?? null]
+  );
+}
+
+// ── Appointments ──────────────────────────────────────────────────────────────
+
+export async function listAppointments(tenantId: string, date: string): Promise<CarwashAppointment[]> {
+  const db = await getDb();
+  return db.select<any[]>(
+    `SELECT * FROM carwash_appointments WHERE tenant_id = ? AND appointment_date = ? AND deleted_at IS NULL ORDER BY appointment_time ASC`,
+    [tenantId, date]
+  );
+}
+
+export async function createAppointment(tenantId: string, data: {
+  appointment_date: string;
+  appointment_time: string;
+  duration_minutes?: number;
+  reg_number?: string;
+  vehicle_type?: VehicleType;
+  make?: string;
+  model?: string;
+  customer_name?: string;
+  customer_phone?: string;
+  staff_id?: string;
+  staff_name?: string;
+  services_note?: string;
+  notes?: string;
+}): Promise<CarwashAppointment> {
+  const db = await getDb();
+  const id = uuid();
+  await db.execute(
+    `INSERT INTO carwash_appointments (id, tenant_id, appointment_date, appointment_time, duration_minutes, reg_number, vehicle_type, make, model, customer_name, customer_phone, staff_id, staff_name, services_note, notes)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [id, tenantId, data.appointment_date, data.appointment_time, data.duration_minutes ?? 60,
+     data.reg_number ?? null, data.vehicle_type ?? 'sedan', data.make ?? null, data.model ?? null,
+     data.customer_name ?? null, data.customer_phone ?? null, data.staff_id ?? null, data.staff_name ?? null,
+     data.services_note ?? null, data.notes ?? null]
+  );
+  const rows = await db.select<any[]>(`SELECT * FROM carwash_appointments WHERE id = ?`, [id]);
+  return rows[0];
+}
+
+export async function updateAppointmentStatus(tenantId: string, id: string, status: AppointmentStatus, jobId?: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `UPDATE carwash_appointments SET status = ?, job_id = ?, updated_at = ? WHERE id = ? AND tenant_id = ?`,
+    [status, jobId ?? null, now(), id, tenantId]
+  );
+}
+
+export async function deleteAppointment(tenantId: string, id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(`UPDATE carwash_appointments SET deleted_at = ?, status = 'cancelled', updated_at = ? WHERE id = ? AND tenant_id = ?`, [now(), now(), id, tenantId]);
+}
+
+// ── Inventory ─────────────────────────────────────────────────────────────────
+
+export async function listInventory(tenantId: string): Promise<CarwashInventoryItem[]> {
+  const db = await getDb();
+  return db.select<any[]>(
+    `SELECT * FROM carwash_inventory WHERE tenant_id = ? AND deleted_at IS NULL ORDER BY category, name`,
+    [tenantId]
+  );
+}
+
+export async function createInventoryItem(tenantId: string, data: {
+  name: string; category: string; unit: string; quantity: number; min_quantity: number; cost_per_unit: number; notes?: string;
+}): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `INSERT INTO carwash_inventory (id, tenant_id, name, category, unit, quantity, min_quantity, cost_per_unit, notes) VALUES (?,?,?,?,?,?,?,?,?)`,
+    [uuid(), tenantId, data.name, data.category, data.unit, data.quantity, data.min_quantity, data.cost_per_unit, data.notes ?? null]
+  );
+}
+
+export async function updateInventoryItem(tenantId: string, id: string, data: Partial<CarwashInventoryItem>): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `UPDATE carwash_inventory SET name=?, category=?, unit=?, quantity=?, min_quantity=?, cost_per_unit=?, notes=?, updated_at=? WHERE id=? AND tenant_id=?`,
+    [data.name, data.category, data.unit, data.quantity, data.min_quantity, data.cost_per_unit, data.notes ?? null, now(), id, tenantId]
+  );
+}
+
+export async function adjustInventoryQuantity(tenantId: string, id: string, delta: number): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `UPDATE carwash_inventory SET quantity = MAX(0, quantity + ?), updated_at = ? WHERE id = ? AND tenant_id = ?`,
+    [delta, now(), id, tenantId]
+  );
+}
+
+export async function deleteInventoryItem(tenantId: string, id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(`UPDATE carwash_inventory SET deleted_at = ? WHERE id = ? AND tenant_id = ?`, [now(), id, tenantId]);
+}
+
+export async function getLowStockInventory(tenantId: string): Promise<CarwashInventoryItem[]> {
+  const db = await getDb();
+  return db.select<any[]>(
+    `SELECT * FROM carwash_inventory WHERE tenant_id = ? AND deleted_at IS NULL AND min_quantity > 0 AND quantity <= min_quantity`,
+    [tenantId]
+  );
+}
+
+// ── Vehicle Types ─────────────────────────────────────────────────────────────
+
+const DEFAULT_VEHICLE_TYPES: Omit<CarwashVehicleTypeRecord, 'id' | 'tenant_id'>[] = [
+  { name: 'Hatchback',    icon: '🚗', price_multiplier: 0.75, is_active: true, sort_order: 0 },
+  { name: 'Sedan',        icon: '🚙', price_multiplier: 1.0,  is_active: true, sort_order: 1 },
+  { name: 'SUV',          icon: '🚐', price_multiplier: 1.4,  is_active: true, sort_order: 2 },
+  { name: 'Luxury',       icon: '🏎️', price_multiplier: 2.0,  is_active: true, sort_order: 3 },
+  { name: 'Van / Tempo',  icon: '🚌', price_multiplier: 1.8,  is_active: true, sort_order: 4 },
+  { name: 'Truck',        icon: '🚛', price_multiplier: 2.5,  is_active: true, sort_order: 5 },
+  { name: 'Bike',         icon: '🏍️', price_multiplier: 0.4,  is_active: true, sort_order: 6 },
+  { name: 'Auto',         icon: '🛺', price_multiplier: 0.5,  is_active: true, sort_order: 7 },
+];
+
+export async function listVehicleTypes(tenantId: string): Promise<CarwashVehicleTypeRecord[]> {
+  const db = await getDb();
+  const rows = await db.select<any[]>(
+    `SELECT * FROM carwash_vehicle_types WHERE tenant_id = ? AND deleted_at IS NULL AND is_active = 1 ORDER BY sort_order, name`,
+    [tenantId]
+  );
+  return rows.map(r => ({ ...r, is_active: r.is_active === 1 }));
+}
+
+export async function listAllVehicleTypes(tenantId: string): Promise<CarwashVehicleTypeRecord[]> {
+  const db = await getDb();
+  const rows = await db.select<any[]>(
+    `SELECT * FROM carwash_vehicle_types WHERE tenant_id = ? AND deleted_at IS NULL ORDER BY sort_order, name`,
+    [tenantId]
+  );
+  return rows.map(r => ({ ...r, is_active: r.is_active === 1 }));
+}
+
+export async function seedDefaultVehicleTypes(tenantId: string): Promise<void> {
+  const existing = await listAllVehicleTypes(tenantId);
+  if (existing.length > 0) return;
+  const db = await getDb();
+  for (const vt of DEFAULT_VEHICLE_TYPES) {
+    await db.execute(
+      `INSERT INTO carwash_vehicle_types (id, tenant_id, name, icon, price_multiplier, is_active, sort_order) VALUES (?,?,?,?,?,?,?)`,
+      [uuid(), tenantId, vt.name, vt.icon, vt.price_multiplier, 1, vt.sort_order]
+    );
+  }
+}
+
+export async function createVehicleType(tenantId: string, data: { name: string; icon: string; price_multiplier: number; sort_order?: number }): Promise<void> {
+  const db = await getDb();
+  const rows = await db.select<{ max_order: number }[]>(`SELECT COALESCE(MAX(sort_order),0) as max_order FROM carwash_vehicle_types WHERE tenant_id = ?`, [tenantId]);
+  const sortOrder = data.sort_order ?? (rows[0]?.max_order ?? 0) + 1;
+  await db.execute(
+    `INSERT INTO carwash_vehicle_types (id, tenant_id, name, icon, price_multiplier, is_active, sort_order) VALUES (?,?,?,?,?,1,?)`,
+    [uuid(), tenantId, data.name.trim(), data.icon, data.price_multiplier, sortOrder]
+  );
+}
+
+export async function updateVehicleType(tenantId: string, id: string, data: Partial<Pick<CarwashVehicleTypeRecord, 'name' | 'icon' | 'price_multiplier' | 'is_active' | 'sort_order'>>): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `UPDATE carwash_vehicle_types SET name=?, icon=?, price_multiplier=?, is_active=?, sort_order=?, updated_at=? WHERE id=? AND tenant_id=?`,
+    [data.name, data.icon, data.price_multiplier, data.is_active ? 1 : 0, data.sort_order, now(), id, tenantId]
+  );
+}
+
+export async function deleteVehicleType(tenantId: string, id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(`UPDATE carwash_vehicle_types SET deleted_at=?, updated_at=? WHERE id=? AND tenant_id=?`, [now(), now(), id, tenantId]);
+}
+
+// ── Loyalty ───────────────────────────────────────────────────────────────────
+
+async function awardLoyaltyPoints(tenantId: string, data: {
+  customer_phone: string;
+  customer_name: string;
+  reg_number: string;
+  job_id: string;
+  amount: number;
+}): Promise<void> {
+  const db = await getDb();
+  const points = Math.floor(data.amount / 10);
+  if (points <= 0) return;
+
+  const existing = await db.select<any[]>(
+    `SELECT id FROM carwash_loyalty WHERE tenant_id = ? AND customer_phone = ? AND deleted_at IS NULL LIMIT 1`,
+    [tenantId, data.customer_phone]
+  );
+
+  let loyaltyId: string;
+  if (existing.length > 0) {
+    loyaltyId = existing[0].id;
+    await db.execute(
+      `UPDATE carwash_loyalty SET total_points = total_points + ?, customer_name = ?, reg_number = ?, updated_at = ? WHERE id = ?`,
+      [points, data.customer_name, data.reg_number, now(), loyaltyId]
+    );
+  } else {
+    loyaltyId = uuid();
+    await db.execute(
+      `INSERT INTO carwash_loyalty (id, tenant_id, customer_phone, customer_name, reg_number, total_points) VALUES (?,?,?,?,?,?)`,
+      [loyaltyId, tenantId, data.customer_phone, data.customer_name, data.reg_number, points]
+    );
+  }
+
+  await db.execute(
+    `INSERT INTO carwash_loyalty_transactions (id, tenant_id, loyalty_id, job_id, points, type, note) VALUES (?,?,?,?,?,?,?)`,
+    [uuid(), tenantId, loyaltyId, data.job_id, points, 'earn', `₹${Math.round(data.amount)} job`]
+  );
+}
+
+export async function getLoyaltyByPhone(tenantId: string, phone: string): Promise<CarwashLoyalty | null> {
+  const db = await getDb();
+  const rows = await db.select<any[]>(
+    `SELECT *, (total_points - redeemed_points) as available_points FROM carwash_loyalty WHERE tenant_id = ? AND customer_phone = ? AND deleted_at IS NULL LIMIT 1`,
+    [tenantId, phone.replace(/\D/g, '')]
+  );
+  return rows.length ? rows[0] : null;
+}
+
+export async function redeemLoyaltyPoints(tenantId: string, loyaltyId: string, points: number, jobId?: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `UPDATE carwash_loyalty SET redeemed_points = redeemed_points + ?, updated_at = ? WHERE id = ? AND tenant_id = ?`,
+    [points, now(), loyaltyId, tenantId]
+  );
+  await db.execute(
+    `INSERT INTO carwash_loyalty_transactions (id, tenant_id, loyalty_id, job_id, points, type, note) VALUES (?,?,?,?,?,?,?)`,
+    [uuid(), tenantId, loyaltyId, jobId ?? null, points, 'redeem', `Redeemed ${points} pts = ₹${points}`]
+  );
+}
+
+export async function listTopLoyaltyCustomers(tenantId: string): Promise<CarwashLoyalty[]> {
+  const db = await getDb();
+  return db.select<any[]>(
+    `SELECT *, (total_points - redeemed_points) as available_points FROM carwash_loyalty WHERE tenant_id = ? AND deleted_at IS NULL ORDER BY total_points DESC LIMIT 20`,
+    [tenantId]
   );
 }

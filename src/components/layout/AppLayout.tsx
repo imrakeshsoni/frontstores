@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { SwitchAppModal } from '@/modules/switch/SwitchAppModal';
 import { setAINavigator } from '@/lib/voice/aiNavigator';
 import {
+  Car,
   LayoutDashboard,
   ShoppingCart,
   Package,
@@ -480,15 +481,18 @@ const BEAUTY_NAV_ITEMS = [
 
 // [carwash] [all tenants]
 const CARWASH_NAV_ITEMS = [
-  { to: '/carwash/dashboard', icon: LayoutDashboard, label: 'Dashboard',      iconBg: '#dbeafe', iconColor: '#2563eb' },
-  { to: '/carwash/jobs',      icon: ClipboardCheck,  label: 'Job Cards',      iconBg: '#dcfce7', iconColor: '#16a34a' },
-  { to: '/carwash/services',  icon: Droplets,        label: 'Services',       iconBg: '#cffafe', iconColor: '#0891b2' },
-  { to: '/carwash/membership',icon: CreditCard,      label: 'Memberships',    iconBg: '#f3e8ff', iconColor: '#9333ea' },
-  { to: '/customers',         icon: Users,           label: 'Customers',      iconBg: '#fce7f3', iconColor: '#db2777' },
-  { to: '/expenses',          icon: Wallet,          label: 'Expenses',       iconBg: '#fee2e2', iconColor: '#dc2626' },
-  { to: '/carwash/staff',     icon: Wrench,          label: 'Staff',          iconBg: '#d1fae5', iconColor: '#059669' },
-  { to: '/carwash/reports',   icon: BarChart3,       label: 'Reports',        iconBg: '#e0f2fe', iconColor: '#0284c7' },
-  { to: '/settings',          icon: Settings,        label: 'Settings',       iconBg: '#f1f5f9', iconColor: '#64748b' },
+  { to: '/carwash/dashboard',     icon: LayoutDashboard, label: 'Dashboard',     iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/carwash/jobs',          icon: ClipboardCheck,  label: 'Job Cards',     iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/carwash/appointments',  icon: Calendar,        label: 'Appointments',  iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/carwash/services',      icon: Droplets,        label: 'Services',      iconBg: '#cffafe', iconColor: '#0891b2' },
+  { to: '/carwash/vehicle-types', icon: Car,             label: 'Vehicle Types', iconBg: '#fef3c7', iconColor: '#b45309' },
+  { to: '/carwash/membership',    icon: CreditCard,      label: 'Memberships',   iconBg: '#f3e8ff', iconColor: '#9333ea' },
+  { to: '/carwash/inventory',     icon: Package,         label: 'Inventory',     iconBg: '#ffedd5', iconColor: '#ea580c' },
+  { to: '/customers',             icon: Users,           label: 'Customers',     iconBg: '#fce7f3', iconColor: '#db2777' },
+  { to: '/expenses',              icon: Wallet,          label: 'Expenses',      iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/carwash/staff',         icon: Wrench,          label: 'Staff',         iconBg: '#d1fae5', iconColor: '#059669' },
+  { to: '/carwash/reports',       icon: BarChart3,       label: 'Reports',       iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/settings',              icon: Settings,        label: 'Settings',      iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
 
 export function AppLayout() {
@@ -596,26 +600,20 @@ export function AppLayout() {
             <NavLink
               key={to}
               to={to}
-              className={({ isActive }) =>
-                `flex items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all ${
-                  isActive ? 'text-slate-900' : 'text-slate-500 hover:bg-slate-900 hover:text-white'
-                }`
-              }
+              className="flex items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all"
               style={({ isActive }) => isActive
-                ? { background: config?.shop_type === 'study' ? 'var(--accent-soft)' : iconBg }
+                ? { background: 'var(--accent-soft)' }
                 : {}}
             >
               {({ isActive }) => (
                 <>
                   <span
                     className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg"
-                    style={{ background: config?.shop_type === 'study' ? 'var(--accent-soft)' : iconBg }}
+                    style={{ background: isActive ? 'transparent' : 'var(--surface-2)', opacity: isActive ? 1 : 0.9 }}
                   >
-                    <Icon className="h-3.5 w-3.5" style={{ color: config?.shop_type === 'study' ? 'var(--accent)' : iconColor }} />
+                    <Icon className="h-3.5 w-3.5" style={{ color: isActive ? 'var(--accent)' : iconColor }} />
                   </span>
-                  <span style={isActive
-                    ? { color: config?.shop_type === 'study' ? 'var(--accent)' : iconColor, fontWeight: 600 }
-                    : { color: 'var(--text-secondary)' }}>
+                  <span style={{ color: isActive ? 'var(--accent)' : 'var(--text-secondary)', fontWeight: isActive ? 600 : 500 }}>
                     {label}
                   </span>
                 </>
@@ -628,10 +626,12 @@ export function AppLayout() {
         <div className="px-3 pb-4 space-y-2" style={{ borderTop: '1px solid var(--surface-border)', paddingTop: '0.75rem' }}>
           {/* Settings — always visible regardless of nav scroll [core] [all tenants] */}
           <NavLink to="/settings"
-            className={({ isActive }) => `w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-all ${isActive ? 'text-slate-900' : ''}`}
-            style={({ isActive }) => isActive ? { background: '#f1f5f9', color: '#334155' } : { color: 'var(--text-secondary)' }}>
-            <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg" style={{ background: '#f1f5f9' }}>
-              <Settings className="h-3.5 w-3.5" style={{ color: '#64748b' }} />
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+            style={({ isActive }) => isActive
+              ? { background: 'var(--accent-soft)', color: 'var(--accent)' }
+              : { color: 'var(--text-secondary)' }}>
+            <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg" style={{ background: 'var(--surface-2)' }}>
+              <Settings className="h-3.5 w-3.5" style={{ color: 'var(--text-tertiary)' }} />
             </span>
             Settings &amp; Updates
           </NavLink>

@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Plus, Edit2, Trash2, Zap } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
-import { listAllServices, createService, updateService, deleteService, seedDefaultServices, type CarwashService } from '@/lib/db/carwash';
+import { listAllServices, createService, updateService, deleteService, seedDefaultServices, isServiceInActiveJobs, type CarwashService } from '@/lib/db/carwash';
 
 type ServiceForm = {
   name: string; description: string;
@@ -70,8 +70,13 @@ export function CarwashServicesPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => deleteService(tenantId, id),
+    mutationFn: async (id: string) => {
+      const inUse = await isServiceInActiveJobs(tenantId, id);
+      if (inUse) throw new Error('This service is in active jobs. Complete those jobs first.');
+      return deleteService(tenantId, id);
+    },
     onSuccess: () => { toast.success('Service removed'); invalidate(); },
+    onError: (e: any) => toast.error(e?.message ?? 'Cannot delete service'),
   });
 
   const seedMutation = useMutation({

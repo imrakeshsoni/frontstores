@@ -1,11 +1,16 @@
 import { getDb } from './db/index';
 import { toast } from 'sonner';
 
-export async function runStartupChecks(tenantId: string) {
+export async function runStartupChecks(tenantId: string, shopType?: string) {
   if (!tenantId) return;
   await ensureRegistered(tenantId);
   await checkLowStock(tenantId);
   await checkExpiringProducts(tenantId);
+  if (shopType === 'carwash') {
+    await seedCarwashVehicleTypes(tenantId);
+    await checkExpiringMemberships(tenantId);
+    await checkLowCarwashInventory(tenantId);
+  }
 }
 
 // Re-queue registration on every launch if it was never successfully synced to server.
@@ -66,6 +71,44 @@ async function checkLowStock(tenantId: string) {
     duration: 8000,
     description: 'Go to Inventory to restock',
   });
+}
+
+// [carwash] [all tenants]
+async function seedCarwashVehicleTypes(tenantId: string) {
+  try {
+    const { seedDefaultVehicleTypes } = await import('./db/carwash');
+    await seedDefaultVehicleTypes(tenantId);
+  } catch { /* non-fatal */ }
+}
+
+// [carwash] [all tenants]
+async function checkExpiringMemberships(tenantId: string) {
+  try {
+    const { getExpiringMemberships } = await import('./db/carwash');
+    const memberships = await getExpiringMemberships(tenantId, 7);
+    if (memberships.length === 0) return;
+    const names = memberships.slice(0, 2).map(m => `${m.customer_name} (${m.total_washes - m.used_washes} washes left)`).join(', ');
+    const more = memberships.length > 2 ? ` +${memberships.length - 2} more` : '';
+    toast.warning(`⚠ Memberships expiring soon: ${names}${more}`, {
+      duration: 8000,
+      description: 'Go to Memberships to notify customers',
+    });
+  } catch { /* non-fatal */ }
+}
+
+// [carwash] [all tenants]
+async function checkLowCarwashInventory(tenantId: string) {
+  try {
+    const { getLowStockInventory } = await import('./db/carwash');
+    const items = await getLowStockInventory(tenantId);
+    if (items.length === 0) return;
+    const names = items.slice(0, 3).map(i => `${i.name} (${i.quantity} ${i.unit})`).join(', ');
+    const more = items.length > 3 ? ` +${items.length - 3} more` : '';
+    toast.warning(`⚠ Low supply stock: ${names}${more}`, {
+      duration: 8000,
+      description: 'Go to Inventory to restock',
+    });
+  } catch { /* non-fatal */ }
 }
 
 async function checkExpiringProducts(tenantId: string) {

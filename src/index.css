@@ -28,20 +28,22 @@
 
   html.dark {
     color-scheme: dark;
-    --bg:              #0A0A0A;
-    --surface:         #1C1C1E;
-    --surface-2:       #2C2C2E;
-    --surface-border:  rgba(255, 255, 255, 0.10);
-    --text-primary:    #F5F5F7;
-    --text-secondary:  #A1A1A6;
-    --text-tertiary:   #6E6E73;
-    --accent:          #2997FF;
-    --accent-hover:    #3DA5FF;
-    --accent-soft:     rgba(41, 151, 255, 0.15);
-    --accent-ring:     rgba(41, 151, 255, 0.30);
-    --shadow-sm:       0 1px 3px rgba(0, 0, 0, 0.30), 0 1px 2px rgba(0, 0, 0, 0.20);
-    --shadow-md:       0 4px 16px rgba(0, 0, 0, 0.40), 0 1px 4px rgba(0, 0, 0, 0.20);
-    --shadow-lg:       0 8px 32px rgba(0, 0, 0, 0.50), 0 2px 8px rgba(0, 0, 0, 0.30);
+    /* Deep dark — rich, not pure black. Warm-neutral undertone. */
+    --bg:              #0F1117;
+    --surface:         #181B23;
+    --surface-2:       #21252F;
+    --surface-border:  rgba(255, 255, 255, 0.09);
+    /* All three text levels clearly readable — WCAG AA+ contrast */
+    --text-primary:    #F0F2F7;   /* near-white, slight cool tint */
+    --text-secondary:  #C2C7D6;   /* warm-light grey — clearly readable */
+    --text-tertiary:   #9299AC;   /* medium-light — visible, not faded out */
+    --accent:          #4D9FFF;
+    --accent-hover:    #6AB4FF;
+    --accent-soft:     rgba(77, 159, 255, 0.15);
+    --accent-ring:     rgba(77, 159, 255, 0.30);
+    --shadow-sm:       0 1px 3px rgba(0, 0, 0, 0.40), 0 1px 2px rgba(0, 0, 0, 0.25);
+    --shadow-md:       0 4px 16px rgba(0, 0, 0, 0.55), 0 1px 4px rgba(0, 0, 0, 0.30);
+    --shadow-lg:       0 8px 32px rgba(0, 0, 0, 0.65), 0 2px 8px rgba(0, 0, 0, 0.40);
   }
 
   /* [study] [all tenants] — Night-friendly midnight purple theme for StudyMate */
@@ -263,7 +265,8 @@
     transform: scale(0.985);
   }
   .btn-secondary {
-    @apply btn text-slate-700;
+    @apply btn;
+    color: var(--text-primary);
     background: var(--surface);
     border: 1px solid var(--surface-border);
     box-shadow: var(--shadow-sm);
@@ -391,6 +394,99 @@
   .text-primary   { color: var(--text-primary) !important; }
   .text-secondary { color: var(--text-secondary) !important; }
   .text-accent    { color: var(--accent) !important; }
+}
+
+/* ── Dark mode global fixes — ensure every element is readable ── */
+html.dark {
+  /* Inputs, textareas, selects */
+  input, textarea, select {
+    color: var(--text-primary) !important;
+    background: var(--surface-2) !important;
+  }
+  input::placeholder, textarea::placeholder {
+    color: var(--text-tertiary) !important;
+    opacity: 1 !important;
+  }
+  select option {
+    background: var(--surface) !important;
+    color: var(--text-primary) !important;
+  }
+
+  /* Hardcoded Tailwind text colors → CSS vars */
+  .text-slate-900, .text-slate-800, .text-slate-700 { color: var(--text-primary) !important; }
+  .text-slate-600, .text-slate-500 { color: var(--text-secondary) !important; }
+  .text-slate-400, .text-slate-300 { color: var(--text-tertiary) !important; }
+
+  /* Hardcoded light backgrounds → dark surfaces */
+  .bg-white, .bg-slate-50, .bg-slate-100 { background: var(--surface) !important; }
+  .bg-slate-200 { background: var(--surface-2) !important; }
+
+  /* Hover backgrounds */
+  .hover\:bg-slate-50:hover,
+  .hover\:bg-slate-100:hover { background: var(--surface-2) !important; }
+  .hover\:bg-slate-900:hover { background: var(--surface-2) !important; }
+
+  /* Borders */
+  .border-slate-200, .border-slate-100 { border-color: var(--surface-border) !important; }
+  .border-black\/\[0\.06\] { border-color: var(--surface-border) !important; }
+
+  /* Skeleton shimmer */
+  .skeleton, .animate-pulse {
+    background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface) 50%, var(--surface-2) 75%) !important;
+    background-size: 200% 100% !important;
+  }
+
+  /* Badge colours — invert to dark-friendly */
+  .badge-green  { background: rgba(16,  185, 129, 0.18) !important; color: #6ee7b7 !important; }
+  .badge-yellow { background: rgba(245, 158,  11, 0.18) !important; color: #fcd34d !important; }
+  .badge-red    { background: rgba(239,  68,  68, 0.18) !important; color: #fca5a5 !important; }
+  .badge-blue   { background: rgba(59,  130, 246, 0.18) !important; color: #93c5fd !important; }
+  .badge-gray   { background: rgba(156, 163, 175, 0.18) !important; color: var(--text-secondary) !important; }
+
+  /* Danger / coloured hover buttons */
+  .hover\:bg-red-50:hover  { background: rgba(239, 68, 68, 0.15) !important; }
+  .hover\:bg-blue-50:hover { background: rgba(59, 130, 246, 0.15) !important; }
+  .hover\:text-red-600:hover, .hover\:text-red-500:hover { color: #f87171 !important; }
+  .hover\:text-blue-600:hover, .hover\:text-blue-500:hover { color: #93c5fd !important; }
+  .hover\:text-green-600:hover { color: #6ee7b7 !important; }
+
+  /* Checkboxes & radios */
+  input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
+
+  /* Focus rings */
+  input:focus, textarea:focus, select:focus {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 3px var(--accent-ring) !important;
+    outline: none !important;
+  }
+
+  /* Hardcoded inline bg colours used in carwash status chips — boost contrast */
+  /* Green tones */
+  [style*="background: #d1fae5"], [style*="background:#d1fae5"] { background: rgba(16,185,129,0.18) !important; }
+  [style*="background: #dcfce7"], [style*="background:#dcfce7"] { background: rgba(16,185,129,0.18) !important; }
+  /* Yellow/amber tones */
+  [style*="background: #fef3c7"], [style*="background:#fef3c7"] { background: rgba(245,158,11,0.18) !important; }
+  [style*="background: #fef9c3"], [style*="background:#fef9c3"] { background: rgba(245,158,11,0.18) !important; }
+  [style*="background: #fffbeb"], [style*="background:#fffbeb"] { background: rgba(245,158,11,0.12) !important; }
+  /* Blue tones */
+  [style*="background: #dbeafe"], [style*="background:#dbeafe"] { background: rgba(59,130,246,0.18) !important; }
+  [style*="background: #eff6ff"], [style*="background:#eff6ff"] { background: rgba(59,130,246,0.12) !important; }
+  [style*="background: #e0f2fe"], [style*="background:#e0f2fe"] { background: rgba(14,165,233,0.15) !important; }
+  /* Purple tones */
+  [style*="background: #ede9fe"], [style*="background:#ede9fe"] { background: rgba(124,58,237,0.18) !important; }
+  [style*="background: #f3e8ff"], [style*="background:#f3e8ff"] { background: rgba(124,58,237,0.18) !important; }
+  /* Red tones */
+  [style*="background: #fee2e2"], [style*="background:#fee2e2"] { background: rgba(239,68,68,0.18) !important; }
+  [style*="background: #fef2f2"], [style*="background:#fef2f2"] { background: rgba(239,68,68,0.12) !important; }
+  /* Cyan/teal */
+  [style*="background: #cffafe"], [style*="background:#cffafe"] { background: rgba(6,182,212,0.15) !important; }
+  /* Orange */
+  [style*="background: #ffedd5"], [style*="background:#ffedd5"] { background: rgba(234,88,12,0.15) !important; }
+  [style*="background: #fce7f3"], [style*="background:#fce7f3"] { background: rgba(219,39,119,0.15) !important; }
+  /* Info blue */
+  [style*="background: #f0f9ff"], [style*="background:#f0f9ff"] { background: rgba(14,165,233,0.12) !important; }
+  /* Green subtle */
+  [style*="background: #f0fdf4"], [style*="background:#f0fdf4"] { background: rgba(16,185,129,0.10) !important; }
 }
 
 /* ── Keyframes ── */
