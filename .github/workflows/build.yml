@@ -355,3 +355,90 @@ jobs:
           gh release upload "${TAG}" latest.json \
             --repo imrakeshsoni/frontstores \
             --clobber
+
+  # ── Android APK build ────────────────────────────────────────────────────────
+  build-android:
+    needs: create-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set app version from git tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          node -e "
+            const fs = require('fs');
+            const c = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8'));
+            c.version = '${VERSION}';
+            fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(c, null, 2) + '\n');
+          "
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        run: |
+          sdkmanager --install "ndk;27.0.11902837" "build-tools;34.0.0" "platforms;android-34"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install Rust stable + Android targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android,i686-linux-android
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Initialize Android project (if not already done)
+        run: |
+          if [ ! -f "src-tauri/gen/android/app/build.gradle" ]; then
+            echo "Running tauri android init..."
+            npx tauri android init
+          else
+            echo "Android project already initialized"
+          fi
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
+          NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/27.0.11902837
+
+      - name: Build Android APK
+        run: npx tauri android build --apk
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
+          NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/27.0.11902837
+
+      - name: Upload Android APK to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          APK=$(find src-tauri/gen/android -name "*.apk" | head -1)
+          if [ -n "$APK" ]; then
+            cp "$APK" "FrontStores_android.apk"
+            gh release upload "$TAG" "FrontStores_android.apk" --clobber
+            echo "✅ Android APK uploaded"
+          else
+            echo "⚠️ No APK found — build may have failed"
+            find src-tauri/gen/android -name "*.apk" || true
+          fi

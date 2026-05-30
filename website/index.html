@@ -191,6 +191,15 @@
     }
     .dl-btn-mac a:hover { background: var(--border); }
     .dl-meta { text-align: center; font-size: 12px; color: var(--light); }
+    .dl-btn-android {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      background: linear-gradient(135deg, #16a34a, #15803d);
+      color: #fff; font-size: 14px; font-weight: 700; padding: 13px 20px; border-radius: 14px;
+      transition: opacity .15s; box-shadow: 0 4px 16px rgba(22,163,74,.3);
+      text-decoration: none; margin-top: 8px;
+    }
+    .dl-btn-android:hover { opacity: .88; }
+    .dl-badge-new { display: inline-block; background: #f59e0b; color: #fff; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 999px; margin-left: 6px; vertical-align: middle; }
     .dl-coming {
       text-align: center; padding: 14px; background: var(--bg3);
       border-radius: 12px; font-size: 13px; color: var(--muted); font-weight: 500;
@@ -828,6 +837,15 @@
           <div class="dl-row-arrow">↓</div>
         </a>
       </div>
+        <a href="#" class="dl-row" id="dl-android">
+          <div class="dl-row-icon">🤖</div>
+          <div class="dl-row-info">
+            <div class="dl-row-label">Android Phone / Tablet <span class="dl-badge" style="background:linear-gradient(135deg,#16a34a,#15803d)">NEW</span></div>
+            <div class="dl-row-meta">Android 7.0+ · .apk · Works with WiFi Sync</div>
+          </div>
+          <div class="dl-row-arrow">↓</div>
+        </a>
+      </div>
       <div class="dl-version" id="dl-version">Fetching latest version…</div>
 
       <div id="mac-install-note" class="install-note mac">
@@ -955,6 +973,7 @@
       const winUrl    = find(/x64[_-]en-US\.msi$/i) || find(/\.msi$/i) || find(/x64.*setup\.exe$/i);
       const macArm   = find(/aarch64\.dmg$/i);
       const macIntel = find(/x86_64\.dmg$/i);
+      const androidApk = find(/android\.apk$/i) || find(/\.apk$/i);
 
       if (winUrl) {
         document.getElementById('dl-win').href = winUrl;
@@ -967,6 +986,10 @@
       if (macIntel) {
         document.getElementById('dl-mac-intel').href = macIntel;
         ['medical-mac-intel-btn', 'beauty-mac-intel-btn', 'study-mac-intel-btn'].forEach(id => { const b = document.getElementById(id); if (b) b.href = macIntel; });
+      }
+      if (androidApk) {
+        const btn = document.getElementById('dl-android');
+        if (btn) btn.href = androidApk;
       }
       document.getElementById('dl-version').textContent = `Latest: ${data.tag_name} · Free 30-day trial`;
     } catch {

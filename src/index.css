@@ -499,3 +499,26 @@ html.dark {
   0%   { background-position: -200% 0; }
   100% { background-position:  200% 0; }
 }
+
+/* ── Mobile / Android responsive ── */
+@media (max-width: 768px) {
+  /* Hide desktop sidebar on mobile */
+  .sidebar-desktop { display: none !important; }
+  /* Show mobile bottom nav */
+  .mobile-nav-visible { display: flex !important; }
+  /* Add padding at bottom for mobile nav bar */
+  .main-content-mobile { padding-bottom: 80px !important; }
+  /* Single column layouts */
+  .desktop-grid-3 { grid-template-columns: 1fr !important; }
+  .desktop-grid-2 { grid-template-columns: 1fr !important; }
+  /* Full width tables scroll horizontally */
+  .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* Touch-friendly min tap targets */
+  button, a, [role="button"] { min-height: 44px; }
+  /* Larger font for readability */
+  .mobile-text-lg { font-size: 16px !important; }
+}
+
+@media (min-width: 769px) {
+  .mobile-only { display: none !important; }
+}

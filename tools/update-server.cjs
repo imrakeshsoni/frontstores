@@ -110,6 +110,10 @@ function addDays(from, days) {
   const d = new Date(from); d.setDate(d.getDate() + days);
   return d.toISOString().replace('T',' ').substring(0,19);
 }
+function addMonths(from, months) {
+  const d = new Date(from); d.setMonth(d.getMonth() + months);
+  return d.toISOString().replace('T',' ').substring(0,19);
+}
 function readBody(req) {
   return new Promise(r => { let b=''; req.on('data',c=>b+=c); req.on('end',()=>r(b)); });
 }
@@ -745,7 +749,7 @@ const adminServer = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
   if (!checkAuth(req)) {
-    res.writeHead(401, {'WWW-Authenticate':'Basic realm="FrontStores Admin"'});
+    res.writeHead(401);
     res.end('Unauthorized'); return;
   }
 
@@ -786,13 +790,16 @@ const adminServer = http.createServer(async (req, res) => {
       subs[tenantId].revoked_at = new Date().toISOString();
       console.log(`🚫 Revoked: ${subs[tenantId].shop_name}`);
     } else if (action === 'approve') {
+      let months = 1;
+      try { const b = await readBody(req); months = parseInt(JSON.parse(b).months) || 1; } catch {}
+      subs[tenantId].prev_expires_at = subs[tenantId].expires_at || null;
       subs[tenantId].account_status = 'active';
-      subs[tenantId].expires_at = addDays(new Date().toISOString(), 30);
+      subs[tenantId].expires_at = addMonths(new Date().toISOString(), months);
       subs[tenantId].approved_at = new Date().toISOString();
-      console.log(`✅ Approved: ${subs[tenantId].shop_name} → 30-day trial starts now`);
+      console.log(`✅ Approved: ${subs[tenantId].shop_name} → ${months}-month trial starts now`);
     }
     saveSubs(subs);
-    const actionLabels = { extend: '+30 days', freeze: 'Frozen', unfreeze: 'Unfrozen', revoke: 'Revoked', approve: 'Approved — 30d trial' };
+    const actionLabels = { extend: '+30 days', freeze: 'Frozen', unfreeze: 'Unfrozen', revoke: 'Revoked', approve: 'Approved — trial started' };
     logActivity(tenantId, subs[tenantId].shop_name, action, actionLabels[action] || action);
     json(res, { ok: true, expires_at: subs[tenantId].expires_at }); return;
   }
@@ -868,25 +875,46 @@ const adminServer = http.createServer(async (req, res) => {
     const tenantId = extendCustomAction[1];
     const body = await readBody(req);
     try {
-      const { days, expiry_date } = JSON.parse(body);
+      const { days, months, expiry_date, from_today } = JSON.parse(body);
       const subs = loadSubs();
       if (!subs[tenantId]) { json(res, { ok: false, error: 'Not found' }, 404); return; }
       let newExpiry;
+      const now = new Date().toISOString();
+      const base = from_today ? now : (new Date(subs[tenantId].expires_at) > new Date() ? subs[tenantId].expires_at : now);
       if (expiry_date) {
         newExpiry = new Date(expiry_date).toISOString().replace('T',' ').substring(0,19);
         logActivity(tenantId, subs[tenantId].shop_name, 'extend-custom', `Set expiry to ${expiry_date}`);
+      } else if (months) {
+        newExpiry = addMonths(base, parseInt(months));
+        logActivity(tenantId, subs[tenantId].shop_name, 'extend-custom', from_today ? `Set ${months}m from today` : `Extended +${months}m`);
       } else if (days) {
-        const base = new Date(subs[tenantId].expires_at) > new Date() ? subs[tenantId].expires_at : new Date().toISOString();
         newExpiry = addDays(base, parseInt(days));
         logActivity(tenantId, subs[tenantId].shop_name, 'extend-custom', `Extended +${days}d`);
-      } else { json(res, { ok: false, error: 'Provide days or expiry_date' }, 400); return; }
+      } else { json(res, { ok: false, error: 'Provide months, days, or expiry_date' }, 400); return; }
+      subs[tenantId].prev_expires_at = subs[tenantId].expires_at || null;
       subs[tenantId].expires_at = newExpiry;
       subs[tenantId].account_status = 'active';
       subs[tenantId].extended_at = new Date().toISOString();
       saveSubs(subs);
-      json(res, { ok: true, expires_at: newExpiry });
+      json(res, { ok: true, expires_at: newExpiry, prev_expires_at: subs[tenantId].prev_expires_at });
     } catch { res.writeHead(400); res.end('Bad request'); }
     return;
+  }
+
+  // POST /admin/api/customers/:id/revert
+  const revertAction = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/revert$/);
+  if (req.method === 'POST' && revertAction) {
+    const tenantId = revertAction[1];
+    const subs = loadSubs();
+    if (!subs[tenantId]) { json(res, { ok: false, error: 'Not found' }, 404); return; }
+    const prev = subs[tenantId].prev_expires_at;
+    if (!prev) { json(res, { ok: false, error: 'No previous state to revert to' }, 400); return; }
+    subs[tenantId].expires_at = prev;
+    subs[tenantId].prev_expires_at = null;
+    subs[tenantId].extended_at = new Date().toISOString();
+    saveSubs(subs);
+    logActivity(tenantId, subs[tenantId].shop_name, 'revert', `Reverted expiry to ${prev}`);
+    json(res, { ok: true, expires_at: prev }); return;
   }
 
   // POST /admin/api/customers/:id/set-plan-type
@@ -1099,6 +1127,13 @@ const adminServer = http.createServer(async (req, res) => {
     } catch {}
 
     json(res, results); return;
+  }
+
+  // GET /admin/api/customers/:id/activity
+  const tenantActivityRoute = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/activity$/);
+  if (req.method === 'GET' && tenantActivityRoute) {
+    const log = loadActivity().filter(e => e.tenant_id === tenantActivityRoute[1]);
+    json(res, log); return;
   }
 
   // GET /admin/api/activity

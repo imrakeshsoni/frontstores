@@ -28,3 +28,10 @@ tools/tunnel.log
 # AI model files — too large for git (copy with the project folder manually)
 tools/ollama/models/
 tools/kokoro/models/
+tools/models/
+
+# APK binary — uploaded to GitHub Releases instead
+*.apk
+
+# Tauri Android generated files
+src-tauri/gen/

@@ -7,7 +7,6 @@ export async function runStartupChecks(tenantId: string, shopType?: string) {
   await checkLowStock(tenantId);
   await checkExpiringProducts(tenantId);
   if (shopType === 'carwash') {
-    await seedCarwashVehicleTypes(tenantId);
     await checkExpiringMemberships(tenantId);
     await checkLowCarwashInventory(tenantId);
   }
@@ -71,14 +70,6 @@ async function checkLowStock(tenantId: string) {
     duration: 8000,
     description: 'Go to Inventory to restock',
   });
-}
-
-// [carwash] [all tenants]
-async function seedCarwashVehicleTypes(tenantId: string) {
-  try {
-    const { seedDefaultVehicleTypes } = await import('./db/carwash');
-    await seedDefaultVehicleTypes(tenantId);
-  } catch { /* non-fatal */ }
 }
 
 // [carwash] [all tenants]

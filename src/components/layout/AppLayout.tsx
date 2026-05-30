@@ -78,6 +78,7 @@ import { useAppStore } from '@/app/store/app.store';
 import { getShopTypeLabel } from '@/lib/shop/shopType';
 import { VoiceAssistant } from '@/components/voice/VoiceAssistant';
 import { StudyVoiceAssistant } from '@/modules/study/StudyVoiceAssistant';
+import { MobileNav } from './MobileNav';
 
 export const NAV_ITEMS = [
   { to: '/dashboard',       icon: LayoutDashboard, label: 'Dashboard',       iconBg: '#ede9fe', iconColor: '#7c3aed' },
@@ -625,6 +626,17 @@ export function AppLayout() {
         {/* Switch App + Owner info — [core] [all tenants] */}
         <div className="px-3 pb-4 space-y-2" style={{ borderTop: '1px solid var(--surface-border)', paddingTop: '0.75rem' }}>
           {/* Settings — always visible regardless of nav scroll [core] [all tenants] */}
+          {/* Sync — [core] [all tenants] */}
+          <NavLink to="/sync"
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+            style={({ isActive }) => isActive
+              ? { background: 'var(--accent-soft)', color: 'var(--accent)' }
+              : { color: 'var(--text-secondary)' }}>
+            <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg" style={{ background: 'var(--surface-2)' }}>
+              <RefreshCw className="h-3.5 w-3.5" style={{ color: 'var(--text-tertiary)' }} />
+            </span>
+            Sync
+          </NavLink>
           <NavLink to="/settings"
             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-all"
             style={({ isActive }) => isActive
@@ -739,6 +751,10 @@ export function AppLayout() {
       {/* Voice assistants — shop apps get VoiceAssistant, StudyMate gets StudyVoiceAssistant */}
       {config?.shop_type !== 'study' && <VoiceAssistant />}
       {config?.shop_type === 'study'  && <StudyVoiceAssistant />}
+      {/* [core] [all tenants] — Mobile bottom nav (shown only on small screens) */}
+      <div className="lg:hidden">
+        <MobileNav />
+      </div>
       {/* [core] [all tenants] — Switch App modal */}
       {showSwitchModal && <SwitchAppModal onClose={() => setShowSwitchModal(false)} />}
     </div>
