@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Sun, Moon } from 'lucide-react';
+import { shareWhatsApp } from '@/lib/whatsapp';
 import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { useAppStore } from '@/app/store/app.store';
 import { updateAppConfig } from '@/lib/db/config';
@@ -137,6 +138,7 @@ export function SettingsPage() {
     enabled: !!tenantId,
   });
 
+  const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState<SettingsForm>({
     shop_name: '', owner_name: '', phone: '', email: '', gstin: '', drug_license_no: '',
     address_line1: '', city: '',
@@ -148,8 +150,9 @@ export function SettingsPage() {
     maxLoginAttempts: 5,
   });
 
+  // Only reset form from config when NOT editing — prevents typing from being wiped
   useEffect(() => {
-    if (config) {
+    if (config && !isEditing) {
       const s = (config.settings ?? {}) as any;
       setForm({
         shop_name: config.shop_name ?? '',
@@ -172,7 +175,7 @@ export function SettingsPage() {
         maxLoginAttempts: (s.maxLoginAttempts as number) ?? 5,
       });
     }
-  }, [config]);
+  }, [config, isEditing]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -202,11 +205,13 @@ export function SettingsPage() {
       });
       await loadConfig();
     },
-    onSuccess: () => toast.success('Settings saved'),
+    onSuccess: () => { toast.success('Settings saved'); setIsEditing(false); },
     onError: (err: any) => toast.error(err.message ?? 'Unable to save settings'),
   });
 
   const set = (key: keyof SettingsForm, value: any) => setForm((c) => ({ ...c, [key]: value }));
+
+  const fieldClass = `input text-sm py-1.5 ${!isEditing ? 'opacity-70 cursor-pointer' : ''}`;
 
   return (
     <div className="page-shell page-stack">
@@ -215,17 +220,120 @@ export function SettingsPage() {
         title="Your store, your way."
         description="Update shop details, invoice template, and billing preferences."
         actions={
-          <button className="btn-primary" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-            {saveMutation.isPending ? 'Saving…' : 'Save Settings'}
+          <button
+            className={isEditing ? 'btn-primary' : 'btn-secondary'}
+            onClick={() => isEditing ? saveMutation.mutate() : setIsEditing(true)}
+            disabled={saveMutation.isPending}
+          >
+            {saveMutation.isPending ? 'Saving…' : isEditing ? '💾 Save Settings' : '✏️ Edit Settings'}
           </button>
         }
       />
 
-      {/* Appearance */}
-      <div className="card p-6">
-        <p className="section-label mb-4">Appearance</p>
+      {/* App Updates — indigo tint */}
+      <div className="card p-4 border-l-4 border-l-indigo-500">
+        <div className="flex items-center justify-between mb-1">
+          <p className="section-label text-indigo-300">🔄 App Updates</p>
+          {currentVersion && <span className="text-xs text-slate-500 font-mono">v{currentVersion}</span>}
+        </div>
+        <p className="text-xs text-slate-400 mb-3">Updates only replace the app — your data, bills, and products are never touched.</p>
+        {updateStatus === 'found' && (
+          <div className="mb-3 bg-indigo-950 border border-indigo-700 rounded-xl p-3 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-indigo-200 font-semibold text-sm">🎉 New version v{updateVersion} available</p>
+              <p className="text-indigo-400 text-xs mt-0.5">⚠️ App will close and relaunch. Do this when not billing.</p>
+            </div>
+            <button onClick={handleInstallUpdate} className="shrink-0 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold px-3 py-1.5 rounded-xl transition-colors">
+              Update & Relaunch
+            </button>
+          </div>
+        )}
+        <div className="flex items-center gap-3 flex-wrap">
+          <button onClick={handleCheckUpdate} disabled={updateStatus === 'checking' || updateStatus === 'installing' || updateStatus === 'found'} className="btn-secondary disabled:opacity-50">
+            {updateStatus === 'checking' ? '⏳ Checking…' : updateStatus === 'installing' ? '⬇️ Installing…' : updateStatus === 'found' ? '✅ Update found' : updateStatus === 'up-to-date' ? '✅ Up to date' : '🔄 Check for Updates'}
+          </button>
+          {updateStatus === 'up-to-date' && <p className="text-sm text-emerald-400">FrontStores is up to date.</p>}
+        </div>
+      </div>
+
+      {/* Shop Details — blue tint */}
+      <div className="card p-4 border-l-4 border-l-blue-500">
+        <p className="section-label mb-3 text-blue-300">🏪 Shop Details</p>
+        <div className="grid gap-3 grid-cols-2">
+          {([
+            { label: 'Shop Name *', key: 'shop_name' },
+            { label: 'Owner Name', key: 'owner_name' },
+            { label: 'Phone', key: 'phone' },
+            { label: 'Email', key: 'email' },
+            { label: 'GSTIN', key: 'gstin' },
+            { label: 'Drug License No', key: 'drug_license_no' },
+            { label: 'Address', key: 'address_line1' },
+            { label: 'City', key: 'city' },
+          ] as { label: string; key: keyof SettingsForm }[]).map(({ label, key }) => (
+            <div key={key}>
+              <label className="mb-1 block text-xs font-medium text-slate-400">{label}</label>
+              <input
+                className={fieldClass}
+                value={form[key] as string}
+                onChange={(e) => set(key, e.target.value)}
+                readOnly={!isEditing}
+                onClick={() => { if (!isEditing) setIsEditing(true); }}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Invoice Template — emerald tint */}
+      <div className="card p-4 border-l-4 border-l-emerald-500">
+        <p className="section-label mb-3 text-emerald-300">🧾 Invoice Template</p>
+        <div className="grid gap-3 grid-cols-2">
+          {([
+            { label: 'Store Display Name', key: 'invoiceStoreDisplayName' },
+            { label: 'Address on Invoice', key: 'invoiceAddressLine' },
+            { label: 'WhatsApp Number', key: 'invoiceWhatsappNumber' },
+            { label: 'Header Left', key: 'invoiceHeaderLeft' },
+            { label: 'Header Right', key: 'invoiceHeaderRight' },
+            { label: 'Footer Note', key: 'invoiceFooterNote' },
+            { label: 'Signature Label', key: 'invoiceSignatureLabel' },
+          ] as { label: string; key: keyof SettingsForm }[]).map(({ label, key }) => (
+            <div key={key}>
+              <label className="mb-1 block text-xs font-medium text-slate-400">{label}</label>
+              <input
+                className={fieldClass}
+                value={form[key] as string}
+                onChange={(e) => set(key, e.target.value)}
+                readOnly={!isEditing}
+                onClick={() => { if (!isEditing) setIsEditing(true); }}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Billing Preferences — violet tint */}
+      <div className="card p-4 border-l-4 border-l-violet-500">
+        <p className="section-label mb-3 text-violet-300">⌨️ Billing Preferences</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-slate-200">Keyboard Billing Mode</p>
+            <p className="text-xs text-slate-500 mt-0.5">Navigate POS entirely with keyboard — ideal for fast-paced counters</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => set('enableKeyboardBillingMode', !form.enableKeyboardBillingMode)}
+            className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors ${form.enableKeyboardBillingMode ? 'bg-emerald-500' : 'bg-slate-600'}`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${form.enableKeyboardBillingMode ? 'translate-x-5' : 'translate-x-1'}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* Appearance — slate tint */}
+      <div className="card p-4 border-l-4 border-l-slate-400">
+        <p className="section-label mb-3 text-slate-300">🎨 Appearance</p>
         <div className="flex items-center gap-4">
-          <p className="text-sm font-medium text-slate-700">Theme</p>
+          <p className="text-sm font-medium text-slate-300">Theme</p>
           <button onClick={toggleTheme} className="btn-secondary flex items-center gap-2">
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             {theme === 'dark' ? 'Light mode' : 'Dark mode'}
@@ -233,115 +341,9 @@ export function SettingsPage() {
         </div>
       </div>
 
-      {/* App Updates */}
-      <div className="card p-6">
-        <div className="flex items-center justify-between mb-1">
-          <p className="section-label">App Updates</p>
-          {currentVersion && (
-            <span className="text-xs text-slate-500 font-mono">v{currentVersion}</span>
-          )}
-        </div>
-        <p className="text-xs text-slate-400 mb-4">Updates only replace the app — your data, bills, and products are never touched.</p>
-
-        {/* [core] [all tenants] — show update-available banner with explicit install step */}
-        {updateStatus === 'found' && (
-          <div className="mb-4 bg-indigo-950 border border-indigo-700 rounded-2xl p-4 flex items-center justify-between gap-4">
-            <div>
-              <p className="text-indigo-200 font-semibold text-sm">🎉 New version v{updateVersion} is available</p>
-              <p className="text-indigo-400 text-xs mt-0.5">⚠️ App will close and relaunch to install. Do this when not billing a customer.</p>
-            </div>
-            <button
-              onClick={handleInstallUpdate}
-              className="shrink-0 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
-            >
-              Update & Relaunch
-            </button>
-          </div>
-        )}
-
-        <div className="flex items-center gap-4 flex-wrap">
-          <button
-            onClick={handleCheckUpdate}
-            disabled={updateStatus === 'checking' || updateStatus === 'installing' || updateStatus === 'found'}
-            className="btn-secondary disabled:opacity-50"
-          >
-            {updateStatus === 'checking' && '⏳ Checking…'}
-            {updateStatus === 'installing' && '⬇️ Installing…'}
-            {(updateStatus === 'idle') && '🔄 Check for Updates'}
-            {updateStatus === 'found' && '✅ Update found'}
-            {updateStatus === 'up-to-date' && '✅ You\'re up to date'}
-          </button>
-          {updateStatus === 'up-to-date' && (
-            <p className="text-sm text-emerald-400">FrontStores is up to date.</p>
-          )}
-        </div>
-      </div>
-
-      {/* Shop details */}
-      <div className="card p-6">
-        <p className="section-label mb-4">Shop Details</p>
-        <div className="grid gap-4 md:grid-cols-2">
-          {[
-            { label: 'Shop Name *', key: 'shop_name' as const },
-            { label: 'Owner Name', key: 'owner_name' as const },
-            { label: 'Phone', key: 'phone' as const },
-            { label: 'Email', key: 'email' as const },
-            { label: 'GSTIN', key: 'gstin' as const },
-            { label: 'Drug License No', key: 'drug_license_no' as const },
-            { label: 'Address Line 1', key: 'address_line1' as const },
-            { label: 'City', key: 'city' as const },
-          ].map(({ label, key }) => (
-            <div key={key}>
-              <label className="mb-2 block text-sm font-medium text-slate-700">{label}</label>
-              <input className="input" value={form[key] as string} onChange={(e) => set(key, e.target.value)} />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Invoice template */}
-      <div className="card p-6">
-        <p className="section-label mb-4">Invoice Template</p>
-        <div className="grid gap-4 md:grid-cols-2">
-          {[
-            { label: 'Store Display Name', key: 'invoiceStoreDisplayName' as const },
-            { label: 'Address Line (on invoice)', key: 'invoiceAddressLine' as const },
-            { label: 'WhatsApp Number', key: 'invoiceWhatsappNumber' as const, hint: 'Used on invoice header' },
-            { label: 'Header Left', key: 'invoiceHeaderLeft' as const },
-            { label: 'Header Right', key: 'invoiceHeaderRight' as const },
-            { label: 'Footer Note', key: 'invoiceFooterNote' as const },
-            { label: 'Signature Label', key: 'invoiceSignatureLabel' as const },
-          ].map(({ label, key, hint }) => (
-            <div key={key}>
-              <label className="mb-2 block text-sm font-medium text-slate-700">{label}</label>
-              <input className="input" value={form[key] as string} onChange={(e) => set(key, e.target.value)} />
-              {hint && <p className="mt-1 text-xs text-slate-400">{hint}</p>}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Billing preferences */}
-      <div className="card p-6">
-        <p className="section-label mb-4">Billing Preferences</p>
-        <div className="flex items-center gap-4">
-          <div>
-            <p className="text-sm font-semibold text-slate-900">Keyboard Billing Mode</p>
-            <p className="text-xs text-slate-500 mt-0.5">Navigate POS entirely with keyboard — ideal for fast-paced counters</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => set('enableKeyboardBillingMode', !form.enableKeyboardBillingMode)}
-            className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors ${form.enableKeyboardBillingMode ? 'bg-emerald-500' : 'bg-slate-300'}`}
-          >
-            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${form.enableKeyboardBillingMode ? 'translate-x-5' : 'translate-x-1'}`} />
-          </button>
-        </div>
-      </div>
-
-      {/* Data Backup */}
-      <div className="card p-6">
-        <p className="section-label mb-1">Data Backup</p>
+      {/* Data Backup — amber tint */}
+      <div className="card p-4 border-l-4 border-l-amber-500">
+        <p className="section-label mb-1 text-amber-300">💾 Data Backup</p>
         <p className="text-xs text-slate-400 mb-4">Export all your data as a backup file. Store it on a USB drive or Google Drive.</p>
         <div className="flex gap-3 flex-wrap">
           <button
@@ -407,7 +409,7 @@ export function SettingsPage() {
                 );
                 const o = orders[0];
                 const msg = `📊 *Daily Report - ${config?.shop_name}*\n📅 ${new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}\n💰 Sales: ₹${Number(o?.revenue??0).toFixed(0)}\n🧾 Orders: ${o?.count??0}\n\n_Sent from FrontStores_`;
-                await shellOpen(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`);
+                await shareWhatsApp(msg);
               } catch (e: any) { toast.error('Could not open WhatsApp: ' + e?.message); }
             }}
           >
@@ -438,8 +440,8 @@ export function SettingsPage() {
       </div>
 
       {/* Switch to New Computer */}
-      <div className="card p-6 border border-amber-500/20">
-        <p className="section-label mb-1">🖥️ Switch to New Computer</p>
+      <div className="card p-4 border-l-4 border-l-orange-500">
+        <p className="section-label mb-1 text-orange-300">🖥️ Switch to New Computer</p>
         <p className="text-xs text-slate-400 mb-4">
           Moving to a new computer? Download a secure backup file (.fsbak) and copy it to your new machine.
           When you install FrontStores there, choose <strong className="text-slate-300">"Restore from backup"</strong> — all your data, products, bills, and customers will be restored instantly.
@@ -485,8 +487,8 @@ export function SettingsPage() {
       </div>
 
       {/* Security — Lock settings */}
-      <div className="card p-6">
-        <p className="section-label mb-1">Security — Auto-Lock & Login Protection</p>
+      <div className="card p-4 border-l-4 border-l-red-500">
+        <p className="section-label mb-1 text-red-300">🔒 Security — Auto-Lock & Login Protection</p>
         <p className="text-xs text-slate-400 mb-5">Protect your data when you step away from the computer.</p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -530,8 +532,8 @@ export function SettingsPage() {
       </div>
 
       {/* Security — Login & Password */}
-      <div className="card p-6">
-        <p className="section-label mb-1">Security — Login & Password</p>
+      <div className="card p-4 border-l-4 border-l-pink-500">
+        <p className="section-label mb-1 text-pink-300">🔑 Security — Login & Password</p>
         <p className="text-xs text-slate-400 mb-4">Your password is stored only on this device and never sent anywhere.</p>
         <p className="text-xs text-slate-500 mb-5">Current username: <span className="font-semibold text-slate-300">{currentUsername || '—'}</span></p>
 
@@ -557,8 +559,8 @@ export function SettingsPage() {
       </div>
 
       {/* Export Audit Log */}
-      <div className="card p-6">
-        <p className="section-label mb-1">Export Audit Log</p>
+      <div className="card p-4 border-l-4 border-l-teal-500">
+        <p className="section-label mb-1 text-teal-300">📋 Export Audit Log</p>
         <p className="text-xs text-slate-400 mb-4">Every backup and CSV export is recorded here with a timestamp.</p>
         {(exportLogs?.length ?? 0) === 0 ? (
           <p className="text-sm text-slate-500">No exports yet.</p>
@@ -577,11 +579,6 @@ export function SettingsPage() {
         )}
       </div>
 
-      <div className="flex justify-end">
-        <button className="btn-primary" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-          {saveMutation.isPending ? 'Saving…' : 'Save Settings'}
-        </button>
-      </div>
     </div>
   );
 }

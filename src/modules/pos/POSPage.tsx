@@ -15,6 +15,7 @@ import { isMedicalShopType, useActiveShopType } from '@/lib/shop/shopType';
 import { listProducts, createProduct, getProductByBarcode, searchProductsForPOS } from '@/lib/db/products';
 import { listCustomers, createCustomer } from '@/lib/db/customers';
 import { createOrder } from '@/lib/db/orders';
+import { sendWhatsApp, shareWhatsApp } from '@/lib/whatsapp';
 
 type PaymentMethod = 'cash' | 'upi' | 'card' | 'credit';
 
@@ -34,6 +35,8 @@ type InvoiceSnapshot = {
     expiry?: string;
     quantityLabel: string;
     quantity: number;
+    unit?: string;
+    totalUnits?: number;
     unitPrice: number;
     amount: number;
     gstRate: number;
@@ -47,6 +50,8 @@ type InvoiceSnapshot = {
   dlNumbers: string;
   storeName: string;
   storeAddress: string;
+  storePhone: string;
+  storeGstin: string;
   headerLeft: string;
   headerRight: string;
   whatsappNumber: string;
@@ -494,23 +499,40 @@ export function POSPage() {
         id: order.customer_id ?? null,
         name: order.customer_name ?? null,
       });
-      const snapshotItems = cart.items.map((item) => ({
-        name: item.name,
-        batchNo: item.batchNo,
-        manufactureDate: item.manufactureDate,
-        expiry: item.expiryDate,
-        quantityLabel: item.isLoose && (item.looseQty ?? 0) > 0
-          ? `${item.quantity} ${item.unit} + ${item.looseQty} loose`
-          : `${item.quantity} ${item.unit}`,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        amount:
-          item.unitPrice * item.quantity +
-          (item.isLoose ? (item.looseUnitPrice ?? 0) * (item.looseQty ?? 0) : 0) -
-          item.discount,
-        gstRate: item.gstRate ?? 0,
-        discountAmount: item.discount ?? 0,
-      }));
+      // [medical] [all tenants]
+      const snapshotItems = cart.items.map((item) => {
+        const isStrip = item.unit === 'strip' && Number(item.totalUnits ?? 0) > 0;
+        const stripUnits = Number(item.totalUnits ?? 0);
+        const looseQty = item.looseQty ?? 0;
+        const totalTablets = isStrip ? item.quantity * stripUnits + (item.isLoose ? looseQty : 0) : 0;
+        let quantityLabel: string;
+        if (item.isLoose && looseQty > 0) {
+          quantityLabel = isStrip
+            ? `${item.quantity} strip + ${looseQty} loose (${totalTablets} tabs)`
+            : `${item.quantity} ${item.unit} + ${looseQty} loose`;
+        } else {
+          quantityLabel = isStrip
+            ? `${item.quantity} strip (${totalTablets} tabs)`
+            : `${item.quantity} ${item.unit}`;
+        }
+        return {
+          name: item.name,
+          batchNo: item.batchNo,
+          manufactureDate: item.manufactureDate,
+          expiry: item.expiryDate,
+          quantityLabel,
+          quantity: item.quantity,
+          unit: item.unit,
+          totalUnits: item.totalUnits,
+          unitPrice: item.unitPrice,
+          amount:
+            item.unitPrice * item.quantity +
+            (item.isLoose ? (item.looseUnitPrice ?? 0) * looseQty : 0) -
+            item.discount,
+          gstRate: item.gstRate ?? 0,
+          discountAmount: item.discount ?? 0,
+        };
+      });
       const totalDiscount = cart.items.reduce((sum, item) => sum + (item.discount ?? 0), 0);
 
       setInvoiceSnapshot({
@@ -530,6 +552,8 @@ export function POSPage() {
         dlNumbers: invoiceTemplate.dlNumbers ?? '',
         storeName: invoiceTemplate.storeDisplayName || config?.shop_name || '',
         storeAddress: invoiceTemplate.addressLine || '',
+        storePhone: config?.phone ?? '',
+        storeGstin: config?.gstin ?? '',
         headerLeft: invoiceTemplate.headerLeft || 'Chemist & Druggist',
         headerRight: invoiceTemplate.headerRight || 'Cash/Credit Memo',
         whatsappNumber: invoiceTemplate.whatsappNumber ?? '',
@@ -665,10 +689,8 @@ export function POSPage() {
     if (!invoiceSnapshot) return;
     const phone = String(invoiceSnapshot.customerPhone ?? '').replace(/\D/g, '');
     const message = buildInvoiceSummary();
-    const url = phone
-      ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
-      : `https://wa.me/?text=${encodeURIComponent(message)}`;
-    window.open(url, '_blank');
+    if (phone) sendWhatsApp(phone, message);
+    else shareWhatsApp(message);
   };
 
   // [medical] [all tenants] — write HTML to cache dir, open in system browser for printing
@@ -690,6 +712,8 @@ export function POSPage() {
 
     const storeName = invoiceSnapshot.storeName || 'Medical Store';
     const address = invoiceSnapshot.storeAddress || '';
+    const storePhone = invoiceSnapshot.storePhone || '';
+    const storeGstin = invoiceSnapshot.storeGstin || '';
     const headerLeft = invoiceSnapshot.headerLeft;
     const dlNumbers = invoiceSnapshot.dlNumbers;
     const headerRight = invoiceSnapshot.headerRight;
@@ -740,8 +764,16 @@ export function POSPage() {
     .store-name { font-size: 20px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
     .store-addr { font-size: 10px; font-weight: 600; margin-top: 2px; }
 
-    .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px;
-            padding: 7px 14px; border-bottom: 2px solid #1e3a8a; font-size: 10px; }
+    .meta-cred { display: grid; grid-template-columns: 1fr 1fr;
+                 border-bottom: 1px solid #bfdbfe; font-size: 9px; font-weight: 600; }
+    .meta-cred > div { padding: 4px 14px; }
+    .meta-cred > div:first-child { border-right: 1px solid #bfdbfe; }
+    .meta-cred span { font-weight: 700; }
+    .meta { display: grid; grid-template-columns: 1fr 1fr;
+            border-bottom: 2px solid #1e3a8a; font-size: 10px; }
+    .meta-col { padding: 7px 14px; }
+    .meta-col:first-child { border-right: 1px solid #bfdbfe; }
+    .meta-col > div { margin-bottom: 3px; }
     .meta span { font-weight: 700; }
 
     table { width: 100%; border-collapse: collapse; font-size: 10px; }
@@ -776,14 +808,22 @@ export function POSPage() {
   <div class="banner">
     <div class="store-name">${storeName}</div>
     ${address ? `<div class="store-addr">${address}</div>` : ''}
+    ${storePhone ? `<div class="store-addr">Ph: ${storePhone}</div>` : ''}
+  </div>
+  <div class="meta-cred">
+    <div><span>DL No.</span> ${dlNumbers || '-'}</div>
+    <div><span>GSTIN.</span> ${storeGstin || '-'}</div>
   </div>
   <div class="meta">
-    <div><span>DL No.</span> ${dlNumbers || '-'}</div>
-    <div><span>Date.</span> ${dateStr}</div>
-    <div><span>Patient.</span> ${invoiceSnapshot.patientName || invoiceSnapshot.customerName || '-'}</div>
-    <div><span>Doctor.</span> ${invoiceSnapshot.doctorName || '-'}</div>
-    <div><span>Bill No.</span> ${invoiceSnapshot.billNumber}</div>
-    <div><span>Payment.</span> ${invoiceSnapshot.paymentMethod === 'credit' ? 'Credit' : invoiceSnapshot.paymentMethod.toUpperCase()}</div>
+    <div class="meta-col">
+      <div><span>Bill No.</span> ${invoiceSnapshot.billNumber}</div>
+      <div><span>Date.</span> ${dateStr}</div>
+      <div><span>Payment.</span> ${invoiceSnapshot.paymentMethod === 'credit' ? 'Credit' : invoiceSnapshot.paymentMethod.toUpperCase()}</div>
+    </div>
+    <div class="meta-col">
+      <div><span>Name of Patient.</span> ${invoiceSnapshot.patientName || invoiceSnapshot.customerName || '-'}</div>
+      <div><span>Rx. by Doctor / Other.</span> ${invoiceSnapshot.doctorName || '-'}</div>
+    </div>
   </div>
   <table>
     <thead>
@@ -843,6 +883,8 @@ export function POSPage() {
 </style></head><body>
 <div class="store">${storeName}</div>
 ${invoiceSnapshot.storeAddress ? `<div class="center" style="font-size:9px">${invoiceSnapshot.storeAddress}</div>` : ''}
+${invoiceSnapshot.storePhone ? `<div class="center" style="font-size:9px">Ph: ${invoiceSnapshot.storePhone}</div>` : ''}
+${invoiceSnapshot.storeGstin ? `<div class="center" style="font-size:9px">GSTIN: ${invoiceSnapshot.storeGstin}</div>` : ''}
 ${invoiceSnapshot.whatsappNumber ? `<div class="center" style="font-size:9px">${invoiceSnapshot.whatsappNumber}</div>` : ''}
 <div class="divider"></div>
 <div class="row"><span>Bill: ${invoiceSnapshot.billNumber}</span><span>${dateStr}</span></div>
@@ -2149,31 +2191,38 @@ ${invoiceSnapshot.gstAmount > 0 ? `<div class="row"><span>GST</span><span>₹${i
                   <div className="mt-1 text-base font-semibold">
                     {invoiceSnapshot.storeAddress}
                   </div>
+                  {invoiceSnapshot.storePhone && <div className="text-sm font-medium">Ph: {invoiceSnapshot.storePhone}</div>}
                 </div>
 
-                <div className="grid gap-3 border-b-2 border-blue-900 px-6 py-4 text-sm text-blue-900 md:grid-cols-2">
-                  <div><span className="font-bold">DL Number.</span> {invoiceSnapshot.dlNumbers || '-'}</div>
-                  <div className="space-y-2">
-                    <div><span className="font-bold">Date.</span> {getInvoiceDisplayDate(invoiceSnapshot, invoiceDateTime, canEditInvoiceDateTime).toLocaleString('en-IN')}</div>
-                    {canEditInvoiceDateTime && (
-                      <div className="flex flex-wrap gap-2">
-                        <input
-                          type="date"
-                          className="input h-9 min-w-[148px] px-3 py-1 text-sm"
-                          value={invoiceDateTime.slice(0, 10)}
-                          onChange={(e) => setInvoiceDateTime((current) => mergeInvoiceDatePart(current, e.target.value, 'date'))}
-                        />
-                        <input
-                          type="time"
-                          className="input h-9 min-w-[120px] px-3 py-1 text-sm"
-                          value={invoiceDateTime.slice(11, 16)}
-                          onChange={(e) => setInvoiceDateTime((current) => mergeInvoiceDatePart(current, e.target.value, 'time'))}
-                        />
-                      </div>
-                    )}
+                {/* Row 1 — Store credentials: DL No | GSTIN */}
+                <div className="grid grid-cols-2 border-b border-blue-200 text-xs text-blue-900 font-medium">
+                  <div className="px-6 py-2 border-r border-blue-200">
+                    <span className="font-bold">DL No.</span> {invoiceSnapshot.dlNumbers || '-'}
                   </div>
-                  <div><span className="font-bold">Name of Patient.</span> {invoiceSnapshot.patientName || invoiceSnapshot.customerName || '-'}</div>
-                  <div><span className="font-bold">Rx. by Doctor / Other.</span> {invoiceSnapshot.doctorName || '-'}</div>
+                  <div className="px-6 py-2">
+                    <span className="font-bold">GSTIN.</span> {invoiceSnapshot.storeGstin || '-'}
+                  </div>
+                </div>
+
+                {/* Row 2 — Transaction: Bill/Date/Payment | Patient/Doctor */}
+                <div className="grid grid-cols-2 border-b-2 border-blue-900 text-sm text-blue-900">
+                  <div className="px-6 py-3 space-y-1.5 border-r border-blue-200">
+                    <div><span className="font-bold">Bill No.</span> {invoiceSnapshot.billNumber}</div>
+                    <div className="space-y-1">
+                      <div><span className="font-bold">Date.</span> {getInvoiceDisplayDate(invoiceSnapshot, invoiceDateTime, canEditInvoiceDateTime).toLocaleString('en-IN')}</div>
+                      {canEditInvoiceDateTime && (
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          <input type="date" className="input h-9 min-w-[148px] px-3 py-1 text-sm" value={invoiceDateTime.slice(0, 10)} onChange={(e) => setInvoiceDateTime((current) => mergeInvoiceDatePart(current, e.target.value, 'date'))} />
+                          <input type="time" className="input h-9 min-w-[120px] px-3 py-1 text-sm" value={invoiceDateTime.slice(11, 16)} onChange={(e) => setInvoiceDateTime((current) => mergeInvoiceDatePart(current, e.target.value, 'time'))} />
+                        </div>
+                      )}
+                    </div>
+                    <div><span className="font-bold">Payment.</span> {invoiceSnapshot.paymentMethod === 'credit' ? 'Credit' : invoiceSnapshot.paymentMethod.toUpperCase()}</div>
+                  </div>
+                  <div className="px-6 py-3 space-y-1.5">
+                    <div><span className="font-bold">Name of Patient.</span> {invoiceSnapshot.patientName || invoiceSnapshot.customerName || '-'}</div>
+                    <div><span className="font-bold">Rx. by Doctor / Other.</span> {invoiceSnapshot.doctorName || '-'}</div>
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto">

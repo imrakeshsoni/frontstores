@@ -560,8 +560,11 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
       const subs = loadSubs();
       if (subs[tenant_id]) {
         subs[tenant_id].reset_requested_at = requested_at || new Date().toISOString();
-        subs[tenant_id].reset_token = null;
-        subs[tenant_id].reset_token_expires = null;
+        // Only clear token if admin hasn't already set one — don't wipe a pre-set code
+        if (!subs[tenant_id].reset_token) {
+          subs[tenant_id].reset_token = null;
+          subs[tenant_id].reset_token_expires = null;
+        }
         saveSubs(subs);
         console.log(`🔑 Reset request from ${shop_name || tenant_id.substring(0, 8)}`);
       }

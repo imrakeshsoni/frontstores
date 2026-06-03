@@ -1201,11 +1201,11 @@ function renderPanel(c) {
         <div style="font-size:13px;font-weight:700;color:#34d399;margin-bottom:8px">🔑 Reset code is active</div>
         <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Share this code with the customer to reset their password.</div>
         <button class="action-btn btn-revoke" style="padding:9px" onclick="clearResetCode('${tid}')">✕ Clear Code</button>
-      </div>` : hasResetReq ? `
+      </div>` : `
       <button class="action-btn" style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.2);color:#fbbf24;margin-bottom:10px" onclick="generateResetCode('${tid}')">
         🔑 Generate Reset Code
-        <span style="display:block;font-size:11px;font-weight:400;color:var(--muted);margin-top:3px">Requested ${new Date(c.reset_requested_at).toLocaleDateString('en-IN')}</span>
-      </button>` : ''}
+        ${hasResetReq ? `<span style="display:block;font-size:11px;font-weight:400;color:var(--muted);margin-top:3px">Requested ${new Date(c.reset_requested_at).toLocaleDateString('en-IN')}</span>` : ''}
+      </button>`}
 
       ${c.switch_request ? `
       <div style="border-top:1px solid var(--border);margin:12px 0"></div>
