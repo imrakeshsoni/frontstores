@@ -34,6 +34,9 @@ export function InventoryPage() {
   const [productSearchInput, setProductSearchInput] = useState('');
   const [showProductDropdown, setShowProductDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const productSearchRef = useRef<HTMLInputElement>(null);
+  const dropdownItemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [dropdownIndex, setDropdownIndex] = useState(-1);
   const [adjustment, setAdjustment] = useState({
     productId: '', quantity: '1', direction: 'add', type: 'adjustment',
     supplierId: '', invoiceNumber: '', challanNumber: '', batchNo: '', expiryDate: '', notes: '',
@@ -49,6 +52,13 @@ export function InventoryPage() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Auto-focus product search when modal opens
+  useEffect(() => {
+    if (showAdjust && !adjustment.productId) {
+      setTimeout(() => productSearchRef.current?.focus(), 50);
+    }
+  }, [showAdjust]);
 
   useEffect(() => {
     if (!navigationState?.openAdjustStock || !navigationState.productId) return;
@@ -290,17 +300,44 @@ export function InventoryPage() {
               <div ref={dropdownRef} className="relative">
                 <label className="mb-2 block text-sm font-medium text-slate-700">Product *</label>
                 <input
+                  ref={productSearchRef}
                   className="input"
                   value={productSearchInput}
-                  onChange={(e) => { setProductSearchInput(e.target.value); setShowProductDropdown(true); setAdjustment((c) => ({ ...c, productId: '' })); }}
+                  onChange={(e) => { setProductSearchInput(e.target.value); setShowProductDropdown(true); setDropdownIndex(-1); setAdjustment((c) => ({ ...c, productId: '' })); }}
                   onFocus={() => setShowProductDropdown(true)}
                   placeholder="Type to search products…"
+                  onKeyDown={(e) => {
+                    const items = filteredAdjustProducts.slice(0, 20);
+                    if (!showProductDropdown || items.length === 0) return;
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      const next = Math.min(dropdownIndex + 1, items.length - 1);
+                      setDropdownIndex(next);
+                      dropdownItemRefs.current[next]?.scrollIntoView({ block: 'nearest' });
+                    } else if (e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      const prev = Math.max(dropdownIndex - 1, 0);
+                      setDropdownIndex(prev);
+                      dropdownItemRefs.current[prev]?.scrollIntoView({ block: 'nearest' });
+                    } else if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const idx = dropdownIndex >= 0 ? dropdownIndex : 0;
+                      const p = items[idx];
+                      if (p) { setAdjustment((c) => ({ ...c, productId: p.id })); setProductSearchInput(p.name); setShowProductDropdown(false); setDropdownIndex(-1); }
+                    } else if (e.key === 'Escape') {
+                      setShowProductDropdown(false);
+                    }
+                  }}
                 />
                 {showProductDropdown && filteredAdjustProducts.length > 0 && (
                   <div className="absolute top-full left-0 right-0 z-10 mt-1 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
-                    {filteredAdjustProducts.slice(0, 20).map((p) => (
-                      <button key={p.id} className="w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50"
-                        onClick={() => { setAdjustment((c) => ({ ...c, productId: p.id })); setProductSearchInput(p.name); setShowProductDropdown(false); }}>
+                    {filteredAdjustProducts.slice(0, 20).map((p, idx) => (
+                      <button
+                        key={p.id}
+                        ref={(el) => { dropdownItemRefs.current[idx] = el; }}
+                        className={`w-full px-4 py-2.5 text-left text-sm ${idx === dropdownIndex ? 'bg-blue-50 text-blue-900' : 'hover:bg-slate-50'}`}
+                        onClick={() => { setAdjustment((c) => ({ ...c, productId: p.id })); setProductSearchInput(p.name); setShowProductDropdown(false); setDropdownIndex(-1); }}
+                      >
                         <span className="font-medium">{p.name}</span>
                         <span className="ml-2 text-slate-400">({p.stock_qty} in stock)</span>
                       </button>
