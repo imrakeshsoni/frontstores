@@ -1,7 +1,7 @@
 # FrontStores — AI Assistant Instructions
 
 Multi-app, multi-tenant **desktop software** for Indian shop owners.
-Owner: imrakeshsoni@gmail.com
+Owner: (private)
 Platform: Tauri v2 (Rust + React) — Windows + Mac desktop app
 Website: frontstores.com
 

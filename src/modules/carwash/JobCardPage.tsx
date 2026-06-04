@@ -713,6 +713,12 @@ export function JobCardPage() {
               <span className="text-sm font-semibold" style={{ color: '#dc2626' }}>-{fmt(job.discount)}</span>
             </div>
           )}
+          {job.gst_amount > 0 && (
+            <div className="flex justify-between py-2" style={{ borderBottom: '1px solid var(--surface-border)' }}>
+              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>GST</span>
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{fmt(job.gst_amount)}</span>
+            </div>
+          )}
           <div className="flex justify-between pt-3">
             <span className="font-bold" style={{ color: 'var(--text-primary)' }}>Total</span>
             <span className="text-lg font-bold" style={{ color: 'var(--accent)' }}>{fmt(job.total)}</span>
