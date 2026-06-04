@@ -266,18 +266,16 @@ export function JobCardPage() {
   };
 
   const getPriceForType = (svc: any): number => {
-    // 1. Check manual per-vehicle-type price from carwash_service_prices table
+    // 1. Manual price from carwash_service_prices (set in Setup → Services grid)
     const vt = vehicleTypes.find(v => v.name === vehicleType);
     if (vt && servicePrices[svc.id]?.[vt.id] != null) {
       return Number(servicePrices[svc.id][vt.id]);
     }
-    // 2. Legacy fixed-column fallback (hatchback / sedan / suv / luxury)
+    // 2. Legacy fixed-column fallback for services created before the new pricing system
     const legacyKey = `price_${vehicleType.toLowerCase()}` as keyof typeof svc;
     if (svc[legacyKey] != null && Number(svc[legacyKey]) > 0) return Number(svc[legacyKey]);
-    // 3. Base price × vehicle type multiplier
-    const mul = vt?.price_multiplier ?? 1.0;
-    const base = Math.max(Number(svc.price_sedan ?? 0), Number(svc.price_hatchback ?? 0));
-    return Math.round(base * mul);
+    // 3. No price set — return 0 (user must set prices in Setup → Services)
+    return 0;
   };
 
   const toggleService = (svc: any) => {
@@ -338,11 +336,10 @@ export function JobCardPage() {
       for (const svc of services) {
         if (requestedNames.some(r => svc.name.toLowerCase().includes(r) || r.includes(svc.name.toLowerCase()))) {
           const vt = vehicleTypes.find(v => v.name === (vtype || vehicleTypes[0]?.name));
-          const mul = vt?.price_multiplier ?? 1.0;
           const legacyKey = `price_${(vtype || 'sedan').toLowerCase()}` as keyof typeof svc;
-          const price = (svc as any)[legacyKey] != null
-            ? Number((svc as any)[legacyKey])
-            : Math.round((svc.price_sedan ?? 0) * mul);
+          const customPrice = vt ? servicePrices[svc.id]?.[vt.id] : undefined;
+          const price = customPrice != null ? Number(customPrice)
+            : (Number((svc as any)[legacyKey] ?? 0) > 0 ? Number((svc as any)[legacyKey]) : 0);
           matched.push({ service_id: svc.id, service_name: svc.name, price, gst_rate: svc.gst_rate });
         }
       }

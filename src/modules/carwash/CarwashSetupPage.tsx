@@ -168,7 +168,9 @@ function ServicesTab({ tenantId }: { tenantId: string }) {
   const [svcActive, setSvcActive] = useState(true);
   const [svcBasePrice, setSvcBasePrice] = useState('');
   const [priceEdits, setPriceEdits] = useState<Record<string, string>>({});
+  const [savedCells, setSavedCells] = useState<Record<string, boolean>>({});
   const savingRef = useRef<Set<string>>(new Set());
+  const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const { data: vtypes = [] } = useQuery({
     queryKey: ['cw-vtypes-all', tenantId],
@@ -216,7 +218,7 @@ function ServicesTab({ tenantId }: { tenantId: string }) {
       if (created && basePrice > 0) {
         const activeVtypes = vtypes.filter(v => v.is_active);
         await Promise.all(activeVtypes.map(vt =>
-          upsertServicePrice(tenantId, created.id, vt.id, Math.round(basePrice * vt.price_multiplier))
+          upsertServicePrice(tenantId, created.id, vt.id, basePrice)
         ));
       }
     },
@@ -253,19 +255,25 @@ function ServicesTab({ tenantId }: { tenantId: string }) {
     if (savingRef.current.has(key)) return;
     const price = parseInt(raw, 10);
     const stored = pricesMap[serviceId]?.[vtypeId] ?? 0;
-    if (isNaN(price) && !raw.trim()) {
-      if (stored === 0) { setPriceEdits(e => { const n = { ...e }; delete n[key]; return n; }); return; }
-      savingRef.current.add(key);
-      await upsertServicePrice(tenantId, serviceId, vtypeId, 0);
+    const finalPrice = isNaN(price) ? 0 : price;
+    if (finalPrice === stored) { setPriceEdits(e => { const n = { ...e }; delete n[key]; return n; }); return; }
+    savingRef.current.add(key);
+    try {
+      await upsertServicePrice(tenantId, serviceId, vtypeId, finalPrice);
+      refetchPrices();
+      setSavedCells(c => ({ ...c, [key]: true }));
+      setTimeout(() => setSavedCells(c => { const n = { ...c }; delete n[key]; return n; }), 1500);
+    } finally {
       savingRef.current.delete(key);
       setPriceEdits(e => { const n = { ...e }; delete n[key]; return n; });
-      refetchPrices(); return;
     }
-    if (isNaN(price)) return;
-    if (price === stored) { setPriceEdits(e => { const n = { ...e }; delete n[key]; return n; }); return; }
-    savingRef.current.add(key);
-    try { await upsertServicePrice(tenantId, serviceId, vtypeId, price); refetchPrices(); }
-    finally { savingRef.current.delete(key); setPriceEdits(e => { const n = { ...e }; delete n[key]; return n; }); }
+  }
+
+  function handlePriceChange(serviceId: string, vtypeId: string, value: string) {
+    const key = priceKey(serviceId, vtypeId);
+    setPriceEdits(p => ({ ...p, [key]: value }));
+    if (debounceRef.current[key]) clearTimeout(debounceRef.current[key]);
+    debounceRef.current[key] = setTimeout(() => savePrice(serviceId, vtypeId, value), 800);
   }
 
   const activeVtypes = vtypes.filter(v => v.is_active);
@@ -323,20 +331,25 @@ function ServicesTab({ tenantId }: { tenantId: string }) {
                       const key = priceKey(svc.id, vt.id);
                       const val = getCellValue(svc.id, vt.id);
                       const isDirty = key in priceEdits;
+                      const isSaved = savedCells[key];
                       return (
                         <td key={vt.id} className="px-2 py-1.5">
                           <div className="relative">
                             <input type="number" min="0" value={val} placeholder="—"
-                              onChange={e => setPriceEdits(p => ({ ...p, [key]: e.target.value }))}
+                              onChange={e => handlePriceChange(svc.id, vt.id, e.target.value)}
                               onBlur={e => savePrice(svc.id, vt.id, e.target.value)}
                               onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
                               className="w-full rounded-lg border px-2 py-1.5 text-sm text-center font-semibold outline-none"
                               style={{
-                                borderColor: isDirty ? 'var(--accent)' : 'var(--surface-border)',
-                                background: isDirty ? 'color-mix(in srgb, var(--accent) 8%, var(--surface-2))' : 'var(--surface-2)',
+                                borderColor: isSaved ? '#16a34a' : isDirty ? 'var(--accent)' : 'var(--surface-border)',
+                                background: isSaved ? '#f0fdf4' : isDirty ? 'color-mix(in srgb, var(--accent) 8%, var(--surface-2))' : 'var(--surface-2)',
                                 color: 'var(--text-primary)',
+                                transition: 'border-color 0.3s, background 0.3s',
                               }} />
-                            {val && <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs pointer-events-none" style={{ color: 'var(--text-tertiary)' }}>₹</span>}
+                            {isSaved
+                              ? <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs pointer-events-none font-bold" style={{ color: '#16a34a' }}>✓</span>
+                              : val && <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs pointer-events-none" style={{ color: 'var(--text-tertiary)' }}>₹</span>
+                            }
                           </div>
                         </td>
                       );
