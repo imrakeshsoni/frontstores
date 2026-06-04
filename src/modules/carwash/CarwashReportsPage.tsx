@@ -315,10 +315,6 @@ export function CarwashReportsPage() {
             <h2 className="font-bold" style={{ color: 'var(--text-primary)' }}>
               Payroll — {new Date(now.getFullYear(), now.getMonth()).toLocaleString('en-IN', { month: 'long', year: 'numeric' })}
             </h2>
-            <button onClick={() => navigate('/carwash/attendance')}
-              className="text-xs font-semibold px-3 py-1.5 rounded-lg btn-secondary">
-              Manage Attendance
-            </button>
           </div>
           <div className="divide-y" style={{ borderColor: 'var(--surface-border)' }}>
             {salarySummaries.map(sm => (
