@@ -557,6 +557,7 @@ function AttendanceTab({ tenantId }: { tenantId: string }) {
   const [advanceModal, setAdvanceModal] = useState<CarwashStaff | null>(null);
   const [advanceAmount, setAdvanceAmount] = useState('');
   const [advanceNote, setAdvanceNote] = useState('');
+  const [advanceGivenAt, setAdvanceGivenAt] = useState('');
 
   const { data: staff = [] } = useQuery({
     queryKey: ['carwash-staff-list', tenantId],
@@ -589,11 +590,13 @@ function AttendanceTab({ tenantId }: { tenantId: string }) {
       const alreadyAdvanced = advances.filter(a => a.staff_id === advanceModal!.id).reduce((t, a) => t + a.amount, 0);
       if (summary && alreadyAdvanced + amt > summary.net_salary) throw new Error(`Total advance (₹${alreadyAdvanced + amt}) cannot exceed net salary (₹${summary.net_salary})`);
 
-      return addSalaryAdvance(tenantId, advanceModal.id, monthStr, amt, advanceNote || undefined);
+      // convert local datetime-local value to ISO string, fallback to now
+      const givenAt = advanceGivenAt ? new Date(advanceGivenAt).toISOString().replace('T', ' ').slice(0, 19) : undefined;
+      return addSalaryAdvance(tenantId, advanceModal.id, monthStr, amt, advanceNote || undefined, givenAt);
     },
     onSuccess: () => {
       toast.success('Advance recorded');
-      setAdvanceModal(null); setAdvanceAmount(''); setAdvanceNote('');
+      setAdvanceModal(null); setAdvanceAmount(''); setAdvanceNote(''); setAdvanceGivenAt('');
       qc.invalidateQueries({ queryKey: ['carwash-advances', tenantId, monthStr] });
     },
     onError: (e: any) => toast.error(e?.message ?? 'Failed'),
@@ -678,7 +681,14 @@ function AttendanceTab({ tenantId }: { tenantId: string }) {
     <div class="row"><span style="color:#0891b2">Holidays</span><span style="color:#0891b2">${summary.holiday}</span></div>
     ${summary.deductions > 0 ? `<div class="row"><span class="red">Deductions</span><span class="red">− ${fmt(summary.deductions)}</span></div>` : ''}
     <div class="row bold"><span>Net Salary</span><span class="big green">${fmt(summary.net_salary)}</span></div>
-    ${summary.advance > 0 ? `<div class="row"><span style="color:#d97706">Advance Paid</span><span style="color:#d97706">− ${fmt(summary.advance)}</span></div><div class="row bold"><span>Balance Payable</span><span class="big green">${fmt(summary.payable_amount)}</span></div>` : ''}
+    ${summary.advance > 0 ? (() => {
+      const staffAdvances = advances.filter(a => a.staff_id === s.id);
+      const advanceRows = staffAdvances.map(a => {
+        const dt = new Date(a.given_at ?? a.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        return `<div class="row" style="font-size:12px"><span style="color:#d97706">Advance — ${dt}</span><span style="color:#d97706">− ${fmt(a.amount)}${a.note ? ` (${a.note})` : ''}</span></div>`;
+      }).join('');
+      return `<div class="section-title" style="color:#d97706">Advance Details</div>${advanceRows}<div class="row bold"><span>Balance Payable</span><span class="big green">${fmt(summary.payable_amount)}</span></div>`;
+    })() : ''}
     <div class="footer">Generated on ${new Date().toLocaleDateString('en-IN')}</div>
     </body></html>`;
     const finalHtml = html.replace('</body>', `<script>window.addEventListener('load',()=>setTimeout(window.print,400))<\/script></body>`);
@@ -788,7 +798,7 @@ function AttendanceTab({ tenantId }: { tenantId: string }) {
                         ) : <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>—</p>}
                       </td>
                       <td className="text-center px-3 py-2">
-                        <button onClick={() => { setAdvanceModal(s); setAdvanceAmount(''); setAdvanceNote(''); }}
+                        <button onClick={() => { setAdvanceModal(s); setAdvanceAmount(''); setAdvanceNote(''); setAdvanceGivenAt(new Date().toISOString().slice(0, 16)); }}
                           className="text-xs font-semibold px-2 py-1 rounded-lg"
                           style={{ background: summary.advance > 0 ? '#fef3c7' : 'var(--surface-2)', color: summary.advance > 0 ? '#d97706' : 'var(--text-tertiary)', border: '1px solid var(--surface-border)' }}>
                           {summary.advance > 0 ? fmt(summary.advance) : '+ Advance'}
@@ -834,6 +844,11 @@ function AttendanceTab({ tenantId }: { tenantId: string }) {
                   <div key={a.id} className="flex items-center justify-between px-3 py-2" style={{ borderTop: '1px solid var(--surface-border)' }}>
                     <div>
                       <p className="font-semibold text-sm" style={{ color: '#d97706' }}>{fmt(a.amount)}</p>
+                      {(a.given_at || a.created_at) && (
+                        <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                          {new Date(a.given_at ?? a.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      )}
                       {a.note && <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{a.note}</p>}
                     </div>
                     <button onClick={() => deleteAdvanceMutation.mutate(a.id)} className="p-1 rounded text-slate-400 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
@@ -844,6 +859,10 @@ function AttendanceTab({ tenantId }: { tenantId: string }) {
             <div>
               <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Advance Amount (₹) *</label>
               <input type="number" value={advanceAmount} onChange={e => setAdvanceAmount(e.target.value)} placeholder="e.g. 2000" className={inp()} style={inpStyle} autoFocus />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Date & Time Given</label>
+              <input type="datetime-local" value={advanceGivenAt} onChange={e => setAdvanceGivenAt(e.target.value)} className={inp()} style={inpStyle} />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Note (optional)</label>

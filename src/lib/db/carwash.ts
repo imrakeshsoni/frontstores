@@ -124,6 +124,7 @@ export interface CarwashSalaryAdvance {
   month: string;
   amount: number;
   note: string | null;
+  given_at: string | null;
   created_at: string;
 }
 
@@ -1057,11 +1058,11 @@ export async function getSalaryAdvancesForMonth(tenantId: string, month: string)
   );
 }
 
-export async function addSalaryAdvance(tenantId: string, staffId: string, month: string, amount: number, note?: string): Promise<void> {
+export async function addSalaryAdvance(tenantId: string, staffId: string, month: string, amount: number, note?: string, givenAt?: string): Promise<void> {
   const db = await getDb();
   await db.execute(
-    `INSERT INTO carwash_salary_advance (id, tenant_id, staff_id, month, amount, note) VALUES (?,?,?,?,?,?)`,
-    [uuid(), tenantId, staffId, month, amount, note ?? null]
+    `INSERT INTO carwash_salary_advance (id, tenant_id, staff_id, month, amount, note, given_at) VALUES (?,?,?,?,?,?,?)`,
+    [uuid(), tenantId, staffId, month, amount, note ?? null, givenAt ?? now()]
   );
 }
 
