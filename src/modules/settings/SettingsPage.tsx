@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Sun, Moon } from 'lucide-react';
+import { Sun, Moon, Cloud, RefreshCw, Smartphone } from 'lucide-react';
 import { shareWhatsApp, testWaCredentials } from '@/lib/whatsapp';
 import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { useAppStore } from '@/app/store/app.store';
@@ -11,6 +11,7 @@ import { exportBackup } from '@/lib/db/backup';
 import { PageIntro } from '@/components/ui/PageIntro';
 import { useTheme } from '@/lib/theme/useTheme';
 import { reportError } from '@/lib/errorReporter';
+import { getCloudSyncStatus, activateCloudSync, pushSyncData } from '@/lib/db/cloudSync';
 
 type SettingsForm = {
   shop_name: string;
@@ -428,6 +429,9 @@ export function SettingsPage() {
       {/* WhatsApp Business API */}
       <WhatsAppBusinessSection />
 
+      {/* Cloud Sync */}
+      <CloudSyncSection />
+
       {/* Data Backup — amber tint */}
       <div className="card p-4 border-l-4 border-l-amber-500">
         <p className="section-label mb-1 text-amber-300">💾 Data Backup</p>
@@ -762,6 +766,138 @@ function WhatsAppBusinessSection() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Cloud Sync Section ────────────────────────────────────────────────────────
+function CloudSyncSection() {
+  const tenantId = useAppStore(s => s.config?.tenant_id ?? '');
+  const qc = useQueryClient();
+  const [codeInput, setCodeInput] = useState('');
+  const [syncing, setSyncing] = useState(false);
+  const [activating, setActivating] = useState(false);
+
+  const { data: syncStatus, refetch: refetchStatus } = useQuery({
+    queryKey: ['cloud-sync-status'],
+    queryFn: () => getCloudSyncStatus(),
+    enabled: !!tenantId,
+    refetchInterval: 60_000,
+  });
+
+  const handleActivate = async () => {
+    if (!codeInput.trim()) { toast.error('Enter your sync code'); return; }
+    setActivating(true);
+    try {
+      const result = await activateCloudSync(tenantId, codeInput.trim());
+      if (!result.ok) { toast.error(result.error ?? 'Invalid code'); return; }
+      toast.success('Cloud Sync activated! 🎉');
+      setCodeInput('');
+      refetchStatus();
+    } catch (e: any) {
+      toast.error('Activation failed: ' + (e?.message ?? 'Check internet connection'));
+    } finally { setActivating(false); }
+  };
+
+  const handleSync = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      const result = await pushSyncData(tenantId);
+      if (!result.ok) { toast.error(result.error ?? 'Sync failed'); return; }
+      toast.success(`✅ Synced! ${result.counts?.jobs ?? 0} jobs, ${result.counts?.customers ?? 0} customers`);
+      refetchStatus();
+    } catch (e: any) {
+      toast.error('Sync failed: ' + (e?.message ?? 'Check internet connection'));
+    } finally { setSyncing(false); }
+  };
+
+  const lastSynced = syncStatus?.last_synced_at
+    ? (() => {
+        const diff = Math.round((Date.now() - new Date(syncStatus.last_synced_at).getTime()) / 60000);
+        if (diff < 1) return 'just now';
+        if (diff < 60) return `${diff} min ago`;
+        if (diff < 1440) return `${Math.floor(diff / 60)}h ago`;
+        return `${Math.floor(diff / 1440)}d ago`;
+      })()
+    : null;
+
+  return (
+    <div className="card p-4 border-l-4 border-l-sky-500">
+      <div className="flex items-center gap-2 mb-1">
+        <Cloud className="h-4 w-4 text-sky-400" />
+        <p className="section-label text-sky-300">☁️ Cloud Sync — Mobile Access</p>
+      </div>
+      <p className="text-xs text-slate-400 mb-4">
+        Sync your shop data to the cloud so you can view it from your mobile phone from anywhere in India.
+      </p>
+
+      {!syncStatus?.enabled ? (
+        /* Not activated */
+        <div className="space-y-3">
+          <div className="rounded-xl p-3" style={{ background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)' }}>
+            <p className="text-xs text-sky-300 font-semibold mb-1">How it works</p>
+            <p className="text-xs text-slate-400">1. Contact FrontStores to get your sync activation code</p>
+            <p className="text-xs text-slate-400">2. Enter the code below to activate</p>
+            <p className="text-xs text-slate-400">3. Click "Sync Now" whenever you want to update mobile view</p>
+            <p className="text-xs text-slate-400">4. Open your mobile dashboard link on any phone</p>
+          </div>
+          <div className="flex gap-2">
+            <input
+              value={codeInput}
+              onChange={e => setCodeInput(e.target.value.toUpperCase())}
+              placeholder="Enter sync code (e.g. SYNC-ABCD)"
+              className="flex-1 rounded-xl border px-3 py-2 text-sm font-mono outline-none uppercase"
+              style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }}
+              onKeyDown={e => e.key === 'Enter' && handleActivate()}
+            />
+            <button
+              onClick={handleActivate}
+              disabled={activating || !codeInput.trim()}
+              className="px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-50"
+              style={{ background: '#0ea5e9', color: '#fff' }}>
+              {activating ? 'Activating…' : 'Activate'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* Activated */
+        <div className="space-y-3">
+          <div className="rounded-xl p-3 flex items-center gap-3" style={{ background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)' }}>
+            <div className="h-8 w-8 rounded-full bg-sky-500 flex items-center justify-center flex-shrink-0">
+              <Cloud className="h-4 w-4 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-sky-300">Cloud Sync Active ✓</p>
+              <p className="text-xs text-slate-400">{lastSynced ? `Last synced ${lastSynced}` : 'Never synced — tap Sync Now'}</p>
+            </div>
+            <button onClick={handleSync} disabled={syncing}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold disabled:opacity-50"
+              style={{ background: '#0ea5e9', color: '#fff' }}>
+              <RefreshCw className={`h-3.5 w-3.5 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Syncing…' : 'Sync Now'}
+            </button>
+          </div>
+
+          {syncStatus.dashboard_url && (
+            <div className="rounded-xl p-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-border)' }}>
+              <p className="text-xs font-semibold text-slate-300 mb-1 flex items-center gap-1.5">
+                <Smartphone className="h-3.5 w-3.5 text-sky-400" /> Your Mobile Dashboard
+              </p>
+              <p className="text-xs text-slate-400 mb-2">Open this link on your phone to see live shop data:</p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 text-xs text-sky-300 truncate">{syncStatus.dashboard_url}</code>
+                <button
+                  onClick={() => { navigator.clipboard?.writeText(syncStatus.dashboard_url!); toast.success('Link copied!'); }}
+                  className="text-xs px-2 py-1 rounded-lg font-semibold btn-secondary flex-shrink-0">
+                  Copy
+                </button>
+              </div>
+              <p className="text-xs text-slate-500 mt-2">💡 Bookmark this on your phone for quick access. Works best in Chrome or Safari.</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -81,9 +81,20 @@ const CONTACTS_FILE = path.join(DATA_DIR, 'contacts.json');
 const ACTIVITY_FILE  = path.join(DATA_DIR, 'activity.json');
 const BROADCAST_FILE = path.join(DATA_DIR, 'broadcast.json');
 const NOTES_FILE     = path.join(DATA_DIR, 'notes.json');
+const SYNC_DIR      = path.join(DATA_DIR, 'sync');
 
-// Ensure data dir exists
+// Ensure data dirs exist
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+if (!fs.existsSync(SYNC_DIR)) fs.mkdirSync(SYNC_DIR, { recursive: true });
+
+// ── Sync helpers ─────────────────────────────────────────────────────────────
+function syncFile(tenantId) { return path.join(SYNC_DIR, `${tenantId}.json`); }
+function loadSync(tenantId) {
+  try { return JSON.parse(fs.readFileSync(syncFile(tenantId), 'utf8')); } catch { return null; }
+}
+function saveSync(tenantId, data) {
+  fs.writeFileSync(syncFile(tenantId), JSON.stringify(data));
+}
 
 // ── Data helpers ────────────────────────────────────────────────────────────
 function loadSubs()         { try { return JSON.parse(fs.readFileSync(SUBS_FILE,      'utf8')); } catch { return {}; } }
@@ -98,6 +109,151 @@ function loadBroadcast()    { try { return JSON.parse(fs.readFileSync(BROADCAST_
 function saveBroadcast(d)   { fs.writeFileSync(BROADCAST_FILE, JSON.stringify(d, null, 2)); }
 function loadNotes()        { try { return JSON.parse(fs.readFileSync(NOTES_FILE,     'utf8')); } catch { return {}; } }
 function saveNotes(d)       { fs.writeFileSync(NOTES_FILE,     JSON.stringify(d, null, 2)); }
+
+// Merge incoming sync data — update existing records by id, append new ones
+function mergeSyncData(existing, incoming) {
+  const tables = ['jobs', 'job_items', 'customers', 'vehicles', 'staff', 'attendance', 'services', 'memberships', 'inventory', 'appointments'];
+  const result = {};
+  for (const table of tables) {
+    if (!incoming[table]) { result[table] = existing[table] || []; continue; }
+    const existingMap = {};
+    for (const r of (existing[table] || [])) if (r.id) existingMap[r.id] = r;
+    for (const r of incoming[table]) if (r.id) existingMap[r.id] = r;
+    result[table] = Object.values(existingMap);
+  }
+  return result;
+}
+
+function fmtINR(n) { return '₹' + Number(n||0).toLocaleString('en-IN', { maximumFractionDigits: 0 }); }
+function fmtDate(iso) { try { return new Date(iso).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }); } catch { return iso||''; } }
+
+function buildMobileDashboard(data) {
+  const today = new Date().toISOString().slice(0, 10);
+  const allJobs = (data.jobs || []).filter(j => !j.deleted_at);
+  const todayJobs = allJobs.filter(j => (j.created_at||'').startsWith(today));
+  const todayRevenue = todayJobs.filter(j => j.status === 'delivered').reduce((s, j) => s + (j.total||0), 0);
+  const activeJobs = todayJobs.filter(j => j.status !== 'delivered');
+  const recentJobs = allJobs.sort((a, b) => (b.created_at||'').localeCompare(a.created_at||'')).slice(0, 30);
+  const statusColor = { waiting: '#d97706', in_progress: '#2563eb', ready: '#7c3aed', delivered: '#16a34a' };
+  const statusLabel = { waiting: 'Waiting', in_progress: 'In Progress', ready: 'Ready', delivered: 'Delivered' };
+  const syncAge = data.synced_at ? Math.round((Date.now() - new Date(data.synced_at).getTime()) / 60000) : null;
+  const syncLabel = syncAge === null ? 'Never synced' : syncAge < 1 ? 'Just now' : syncAge < 60 ? `${syncAge}m ago` : syncAge < 1440 ? `${Math.floor(syncAge/60)}h ago` : `${Math.floor(syncAge/1440)}d ago`;
+
+  return `<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>${data.shop_name||'Shop'} Dashboard</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f172a;color:#f1f5f9;min-height:100vh}
+.header{background:linear-gradient(135deg,#f59e0b,#d97706);padding:16px 20px 12px;position:sticky;top:0;z-index:100}
+.header h1{font-size:18px;font-weight:800;color:#111;line-height:1.2}
+.header .sync{font-size:11px;color:#78350f;margin-top:2px}
+.tabs{display:flex;background:#1e293b;border-bottom:1px solid #334155;position:sticky;top:56px;z-index:99}
+.tab{flex:1;padding:10px 4px;text-align:center;font-size:11px;font-weight:600;color:#64748b;cursor:pointer;border-bottom:2px solid transparent;transition:.2s}
+.tab.active{color:#f59e0b;border-color:#f59e0b}
+.page{display:none;padding:16px}
+.page.active{display:block}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.stat{background:#1e293b;border-radius:14px;padding:14px;border:1px solid #334155}
+.stat .label{font-size:11px;color:#64748b;margin-bottom:4px}
+.stat .val{font-size:22px;font-weight:800}
+.card{background:#1e293b;border-radius:14px;padding:14px;margin-bottom:10px;border:1px solid #334155}
+.card .top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+.card .job-num{font-size:13px;font-weight:700;color:#f59e0b}
+.card .amount{font-size:15px;font-weight:800;color:#f59e0b}
+.badge{display:inline-block;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700;text-transform:capitalize}
+.card .reg{font-size:14px;font-weight:700;color:#f1f5f9;margin-bottom:3px}
+.card .sub{font-size:12px;color:#94a3b8}
+.card .services{font-size:11px;color:#64748b;margin-top:4px}
+.empty{text-align:center;padding:40px 20px;color:#475569;font-size:14px}
+.section-title{font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.customer-card{background:#1e293b;border-radius:14px;padding:12px;margin-bottom:8px;border:1px solid #334155;display:flex;align-items:center;gap:12px}
+.avatar{width:40px;height:40px;border-radius:50%;background:#f59e0b;display:flex;align-items:center;justify-content:center;font-weight:800;color:#111;font-size:16px;flex-shrink:0}
+.customer-info .name{font-weight:700;font-size:14px}
+.customer-info .phone{font-size:12px;color:#94a3b8;margin-top:2px}
+.search-input{width:100%;background:#1e293b;border:1px solid #334155;border-radius:12px;padding:10px 14px;color:#f1f5f9;font-size:14px;margin-bottom:12px;outline:none}
+.search-input:focus{border-color:#f59e0b}
+</style></head>
+<body>
+<div class="header">
+  <h1>🚗 ${data.shop_name||'Car Wash'}</h1>
+  <div class="sync">☁️ Synced ${syncLabel}</div>
+</div>
+<div class="tabs">
+  <div class="tab active" onclick="showTab('dashboard')">📊 Dashboard</div>
+  <div class="tab" onclick="showTab('active')">🔄 Active (${activeJobs.length})</div>
+  <div class="tab" onclick="showTab('history')">📋 History</div>
+  <div class="tab" onclick="showTab('customers')">👥 Customers</div>
+</div>
+
+<div id="dashboard" class="page active">
+  <div class="stat-grid">
+    <div class="stat"><div class="label">Today's Revenue</div><div class="val" style="color:#f59e0b">${fmtINR(todayRevenue)}</div></div>
+    <div class="stat"><div class="label">Jobs Today</div><div class="val" style="color:#2563eb">${todayJobs.length}</div></div>
+    <div class="stat"><div class="label">Active Now</div><div class="val" style="color:#d97706">${activeJobs.length}</div></div>
+    <div class="stat"><div class="label">Completed</div><div class="val" style="color:#16a34a">${todayJobs.filter(j=>j.status==='delivered').length}</div></div>
+  </div>
+  ${activeJobs.length > 0 ? `
+  <div class="section-title">Active Jobs</div>
+  ${activeJobs.map(j => `
+  <div class="card">
+    <div class="top"><span class="job-num">${j.job_number||''}</span><span class="badge" style="background:${(statusColor[j.status]||'#475569')}22;color:${statusColor[j.status]||'#94a3b8'}">${statusLabel[j.status]||j.status}</span></div>
+    <div class="reg">🚗 ${j.reg_number||''}${j.make?` · ${j.make}`:''}${j.model?` ${j.model}`:''}</div>
+    ${j.customer_name?`<div class="sub">👤 ${j.customer_name}${j.customer_phone?` · ${j.customer_phone}`:''}</div>`:''}
+    ${j.staff_name?`<div class="sub">🧑 ${j.staff_name}</div>`:''}
+  </div>`).join('')}` : '<div class="empty">No active jobs right now</div>'}
+</div>
+
+<div id="active" class="page">
+  ${activeJobs.length === 0 ? '<div class="empty">No active jobs</div>' : activeJobs.map(j => `
+  <div class="card">
+    <div class="top"><span class="job-num">${j.job_number||''}</span><span class="badge" style="background:${(statusColor[j.status]||'#475569')}22;color:${statusColor[j.status]||'#94a3b8'}">${statusLabel[j.status]||j.status}</span></div>
+    <div class="reg">🚗 ${j.reg_number||''}${j.vehicle_type?` · ${j.vehicle_type}`:''}</div>
+    ${j.make||j.model?`<div class="sub">${[j.make,j.model,j.color].filter(Boolean).join(' · ')}</div>`:''}
+    ${j.customer_name?`<div class="sub">👤 ${j.customer_name}${j.customer_phone?` · ${j.customer_phone}`:''}</div>`:''}
+    ${j.staff_name?`<div class="sub">🧑 ${j.staff_name}</div>`:''}
+  </div>`).join('')}
+</div>
+
+<div id="history" class="page">
+  <div class="section-title">Recent Jobs</div>
+  ${recentJobs.map(j => `
+  <div class="card">
+    <div class="top">
+      <div><span class="job-num">${j.job_number||''}</span> <span style="font-size:11px;color:#64748b">${fmtDate(j.created_at)}</span></div>
+      <div><div class="amount">${fmtINR(j.total)}</div><div style="text-align:right;margin-top:2px"><span class="badge" style="background:${(statusColor[j.status]||'#475569')}22;color:${statusColor[j.status]||'#94a3b8'}">${statusLabel[j.status]||j.status}</span></div></div>
+    </div>
+    <div class="reg">🚗 ${j.reg_number||''}</div>
+    ${j.customer_name?`<div class="sub">👤 ${j.customer_name}</div>`:''}
+  </div>`).join('')}
+</div>
+
+<div id="customers" class="page">
+  <input class="search-input" id="cust-search" placeholder="🔍 Search customers..." oninput="filterCustomers(this.value)">
+  <div id="cust-list">
+  ${(data.customers||[]).filter(c=>!c.deleted_at).slice(0,50).map(c=>`
+  <div class="customer-card" data-name="${(c.name||'').toLowerCase()}" data-phone="${c.phone||''}">
+    <div class="avatar">${(c.name||'?')[0].toUpperCase()}</div>
+    <div class="customer-info"><div class="name">${c.name||'—'}</div><div class="phone">${c.phone||'No phone'}</div></div>
+  </div>`).join('')}
+  </div>
+</div>
+
+<script>
+function showTab(id) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['dashboard','active','history','customers'][i]===id));
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id===id));
+}
+function filterCustomers(q) {
+  const v = q.toLowerCase();
+  document.querySelectorAll('#cust-list .customer-card').forEach(c => {
+    c.style.display = (c.dataset.name.includes(v) || c.dataset.phone.includes(v)) ? '' : 'none';
+  });
+}
+</script>
+</body></html>`;
+}
 
 function logActivity(tenantId, shopName, action, detail='') {
   const log = loadActivity();
@@ -724,6 +880,106 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
   // Block any attempt to reach admin from public port
   if (pathname.startsWith('/admin')) { res.writeHead(403); res.end('Forbidden'); return; }
 
+  // ── CLOUD SYNC ENDPOINTS ──────────────────────────────────────────────────
+
+  // POST /sync/activate — validate sync code, enable cloud sync for tenant
+  if (req.method === 'POST' && pathname === '/sync/activate') {
+    if (rateLimit(req, res, 'sync-activate', 5, 60 * 60 * 1000)) return;
+    const body = JSON.parse(await readBody(req));
+    const { tenant_id, sync_code } = body;
+    if (!tenant_id || !sync_code) { json(res, { ok: false, error: 'Missing fields' }, 400); return; }
+    const subs = loadSubs();
+    const sub = subs[tenant_id];
+    if (!sub) { json(res, { ok: false, error: 'Shop not found' }, 404); return; }
+    if (!sub.sync_code || sub.sync_code !== sync_code.trim().toUpperCase()) {
+      json(res, { ok: false, error: 'Invalid sync code' }, 401); return;
+    }
+    sub.sync_enabled = true;
+    sub.sync_activated_at = new Date().toISOString();
+    saveSubs(subs);
+    logActivity(tenant_id, sub.shop_name, 'sync_activated', 'Cloud sync activated');
+    console.log(`☁️  Cloud sync activated for ${sub.shop_name}`);
+    json(res, { ok: true, shop_name: sub.shop_name, dashboard_url: `https://update.frontstores.com/shop/${tenant_id}` });
+    return;
+  }
+
+  // POST /sync/push — receive shop data from tenant app
+  if (req.method === 'POST' && pathname === '/sync/push') {
+    if (rateLimit(req, res, 'sync-push', 60, 60 * 60 * 1000)) return;
+    let body;
+    try { body = JSON.parse(await readBody(req)); } catch { json(res, { ok: false, error: 'Invalid JSON' }, 400); return; }
+    const { tenant_id, sync_code } = body;
+    if (!tenant_id || !sync_code) { json(res, { ok: false, error: 'Missing auth' }, 400); return; }
+    const subs = loadSubs();
+    const sub = subs[tenant_id];
+    if (!sub || !sub.sync_enabled || sub.sync_code !== sync_code.trim().toUpperCase()) {
+      json(res, { ok: false, error: 'Unauthorized' }, 401); return;
+    }
+    const existing = loadSync(tenant_id) || {};
+    const merged = {
+      ...existing,
+      tenant_id,
+      shop_name: sub.shop_name,
+      shop_type: sub.shop_type,
+      synced_at: new Date().toISOString(),
+      // Merge each table — keep all records, update by id
+      ...mergeSyncData(existing, body),
+    };
+    saveSync(tenant_id, merged);
+    sub.last_synced_at = new Date().toISOString();
+    saveSubs(subs);
+    console.log(`☁️  Sync push from ${sub.shop_name} — ${JSON.stringify({jobs: body.jobs?.length, customers: body.customers?.length})}`);
+    json(res, { ok: true, synced_at: merged.synced_at });
+    return;
+  }
+
+  // GET /shop/:tenant_id — mobile dashboard (PIN protected)
+  const shopMatch = pathname.match(/^\/shop\/([a-f0-9-]{36})$/);
+  if (req.method === 'GET' && shopMatch) {
+    const tenant_id = shopMatch[1];
+    const data = loadSync(tenant_id);
+    if (!data) { res.writeHead(404); res.end('Shop not found or not synced yet'); return; }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(buildMobileDashboard(data));
+    return;
+  }
+
+  // GET /shop/:tenant_id/api/* — mobile API (JSON)
+  const shopApiMatch = pathname.match(/^\/shop\/([a-f0-9-]{36})\/api\/(.+)$/);
+  if (req.method === 'GET' && shopApiMatch) {
+    const tenant_id = shopApiMatch[1];
+    const endpoint  = shopApiMatch[2];
+    const data = loadSync(tenant_id);
+    if (!data) { json(res, { error: 'Not found' }, 404); return; }
+    const today = new Date().toISOString().slice(0, 10);
+    if (endpoint === 'stats') {
+      const jobs = (data.jobs || []).filter(j => !j.deleted_at);
+      const todayJobs = jobs.filter(j => j.created_at?.startsWith(today));
+      json(res, {
+        today_jobs: todayJobs.length,
+        today_revenue: todayJobs.filter(j => j.status === 'delivered').reduce((s, j) => s + (j.total || 0), 0),
+        active_jobs: jobs.filter(j => j.status !== 'delivered' && j.created_at?.startsWith(today)).length,
+        synced_at: data.synced_at,
+        shop_name: data.shop_name,
+      });
+      return;
+    }
+    if (endpoint === 'jobs') {
+      const jobs = (data.jobs || []).filter(j => !j.deleted_at).slice(0, 100);
+      json(res, { jobs }); return;
+    }
+    if (endpoint === 'customers') {
+      const customers = (data.customers || []).filter(c => !c.deleted_at).slice(0, 200);
+      json(res, { customers }); return;
+    }
+    if (endpoint === 'attendance') {
+      const month = url.searchParams.get('month') || today.slice(0, 7);
+      const att = (data.attendance || []).filter(a => a.date?.startsWith(month) && !a.deleted_at);
+      json(res, { attendance: att, staff: data.staff || [] }); return;
+    }
+    json(res, { error: 'Unknown endpoint' }, 404); return;
+  }
+
   res.writeHead(404); res.end('Not found');
 });
 
@@ -835,6 +1091,29 @@ const adminServer = http.createServer(async (req, res) => {
     subs[tenantId].reset_token_expires = expires || null;
     saveSubs(subs);
     if (code) console.log(`🔑 Reset code set for ${subs[tenantId].shop_name}`);
+    json(res, { ok: true }); return;
+  }
+
+  // POST /admin/api/customers/:id/set-sync-code
+  const syncCodeAction = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/set-sync-code$/);
+  if (req.method === 'POST' && syncCodeAction) {
+    if (!checkAuth(req)) { res.writeHead(401); res.end(); return; }
+    const tenantId = syncCodeAction[1];
+    const body = JSON.parse(await readBody(req));
+    const subs = loadSubs();
+    if (!subs[tenantId]) { json(res, { ok: false, error: 'Not found' }, 404); return; }
+    if (body.disable) {
+      subs[tenantId].sync_enabled = false;
+      subs[tenantId].sync_code = null;
+      logActivity(tenantId, subs[tenantId].shop_name, 'sync_disabled', 'Cloud sync disabled by admin');
+      console.log(`☁️  Cloud sync disabled for ${subs[tenantId].shop_name}`);
+    } else {
+      subs[tenantId].sync_code = body.sync_code || null;
+      subs[tenantId].sync_enabled = false; // customer must activate via app
+      logActivity(tenantId, subs[tenantId].shop_name, 'sync_code_generated', `Sync code issued`);
+      console.log(`☁️  Sync code generated for ${subs[tenantId].shop_name}: ${body.sync_code}`);
+    }
+    saveSubs(subs);
     json(res, { ok: true }); return;
   }
 

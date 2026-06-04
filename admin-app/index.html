@@ -1207,6 +1207,22 @@ function renderPanel(c) {
         ${hasResetReq ? `<span style="display:block;font-size:11px;font-weight:400;color:var(--muted);margin-top:3px">Requested ${new Date(c.reset_requested_at).toLocaleDateString('en-IN')}</span>` : ''}
       </button>`}
 
+      <div style="border-top:1px solid var(--border);margin:12px 0"></div>
+      ${c.sync_enabled ? `
+      <div style="background:rgba(14,165,233,.08);border:1px solid rgba(14,165,233,.2);border-radius:12px;padding:14px;margin-bottom:10px">
+        <div style="font-size:13px;font-weight:700;color:#38bdf8;margin-bottom:6px">☁️ Cloud Sync Active</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px">Code: <b style="color:#f1f5f9;font-family:monospace">${c.sync_code||'—'}</b></div>
+        ${c.last_synced_at ? `<div style="font-size:11px;color:var(--muted)">Last synced: ${new Date(c.last_synced_at).toLocaleString('en-IN')}</div>` : '<div style="font-size:11px;color:#f87171">Not yet synced</div>'}
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <a href="https://update.frontstores.com/shop/${tid}" target="_blank" style="flex:1;text-align:center;padding:8px;background:rgba(14,165,233,.15);border:1px solid rgba(14,165,233,.3);border-radius:10px;color:#38bdf8;font-size:12px;font-weight:600;text-decoration:none">📱 View Dashboard</a>
+          <button onclick="disableSync('${tid}')" style="flex:1;padding:8px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:10px;color:#f87171;font-size:12px;font-weight:600;cursor:pointer">Disable Sync</button>
+        </div>
+      </div>` : `
+      <button class="action-btn" style="background:rgba(14,165,233,.1);border:1px solid rgba(14,165,233,.25);color:#38bdf8;margin-bottom:10px" onclick="generateSyncCode('${tid}')">
+        ☁️ Generate Sync Code
+        <span style="display:block;font-size:11px;font-weight:400;color:var(--muted);margin-top:3px">Enables cloud sync + mobile dashboard for this customer</span>
+      </button>`}
+
       ${c.switch_request ? `
       <div style="border-top:1px solid var(--border);margin:12px 0"></div>
       <div style="background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.2);border-radius:12px;padding:14px">
@@ -1467,6 +1483,25 @@ async function clearUnlockCode(id) {
   await withBtnLoad(null, async () => {
     await api(`/admin/api/customers/${id}/set-unlock-code`, { method:'POST', body: JSON.stringify({ code: null, expires: null }) });
     showToast('Unlock code cleared'); await loadAll();
+  });
+}
+
+// CLOUD SYNC
+async function generateSyncCode(id) {
+  await withBtnLoad(null, async () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const code = 'SYNC-' + Array.from({length: 6}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+    const r = await api(`/admin/api/customers/${id}/set-sync-code`, { method:'POST', body: JSON.stringify({ sync_code: code }) });
+    if (r.ok) { showCodeModal('☁️ Cloud Sync Code', code); await loadAll(); }
+    else showToast('Failed to generate sync code', true);
+  });
+}
+async function disableSync(id) {
+  if (!confirm('Disable cloud sync for this customer? They will lose mobile dashboard access.')) return;
+  await withBtnLoad(null, async () => {
+    const r = await api(`/admin/api/customers/${id}/set-sync-code`, { method:'POST', body: JSON.stringify({ sync_code: null, disable: true }) });
+    if (r.ok) { showToast('Cloud sync disabled'); await loadAll(); }
+    else showToast('Failed', true);
   });
 }
 
