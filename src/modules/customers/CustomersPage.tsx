@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Trash2, Users, X, Edit2, Car, Phone, Mail, Tag, Star } from 'lucide-react';
+import { Plus, Search, Trash2, Users, X, Edit2, Car, Phone, Mail, Tag, Star, ClipboardList, Printer } from 'lucide-react';
 import { toast } from 'sonner';
+import { open as shellOpen } from '@tauri-apps/plugin-shell';
+import { writeTextFile } from '@tauri-apps/plugin-fs';
+import { appCacheDir } from '@tauri-apps/api/path';
 import { useAppStore } from '@/app/store/app.store';
 import { listCustomers, createCustomer, updateCustomer, deleteCustomer } from '@/lib/db/customers';
-import { findVehiclesByPhone, upsertVehicle, listAllVehicleTypes, type CarwashVehicle } from '@/lib/db/carwash';
+import { findVehiclesByPhone, upsertVehicle, listAllVehicleTypes, getJobsByCustomerPhone, type CarwashVehicle } from '@/lib/db/carwash';
 import { PageIntro } from '@/components/ui/PageIntro';
 import { EmptyState } from '@/components/ui/EmptyState';
 
@@ -29,6 +32,7 @@ export function CustomersPage() {
   const [editing, setEditing] = useState<any | null>(null);
   const [form, setForm] = useState<CustomerForm>(emptyForm);
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
+  const [detailTab, setDetailTab] = useState<'vehicles' | 'jobs'>('vehicles');
   const [showAddVehicle, setShowAddVehicle] = useState(false);
   const [vehicleForm, setVehicleForm] = useState({ reg_number: '', vehicle_type: '', make: '', model: '', color: '' });
 
@@ -38,11 +42,21 @@ export function CustomersPage() {
     enabled: !!tenantId,
   });
 
+  const config = useAppStore((s) => s.config);
+  const isCarwash = config?.shop_type === 'carwash';
+
   // Load vehicles for selected customer via phone lookup
   const { data: customerVehicles = [], refetch: refetchVehicles } = useQuery<CarwashVehicle[]>({
     queryKey: ['customer-vehicles', tenantId, selectedCustomer?.phone],
     queryFn: () => findVehiclesByPhone(tenantId, selectedCustomer.phone),
     enabled: !!selectedCustomer?.phone,
+  });
+
+  // Load job history for carwash customers
+  const { data: customerJobs = [] } = useQuery({
+    queryKey: ['customer-jobs', tenantId, selectedCustomer?.phone],
+    queryFn: () => getJobsByCustomerPhone(tenantId, selectedCustomer.phone),
+    enabled: !!selectedCustomer?.phone && isCarwash,
   });
 
   const { data: vehicleTypes = [] } = useQuery({
@@ -302,8 +316,28 @@ export function CustomersPage() {
                 </div>
               </div>
 
-              {/* Right — Vehicles */}
+              {/* Right — Tabs: Vehicles | Job History */}
               <div className="px-7 py-6 space-y-4 overflow-y-auto">
+
+                {/* Tab switcher — show Job History tab only for carwash */}
+                {isCarwash && (
+                  <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-border)' }}>
+                    <button onClick={() => setDetailTab('vehicles')}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all"
+                      style={{ background: detailTab === 'vehicles' ? 'var(--accent)' : 'transparent', color: detailTab === 'vehicles' ? '#111' : 'var(--text-secondary)' }}>
+                      <Car className="h-3.5 w-3.5" /> Vehicles {customerVehicles.length > 0 && `(${customerVehicles.length})`}
+                    </button>
+                    <button onClick={() => setDetailTab('jobs')}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all"
+                      style={{ background: detailTab === 'jobs' ? 'var(--accent)' : 'transparent', color: detailTab === 'jobs' ? '#111' : 'var(--text-secondary)' }}>
+                      <ClipboardList className="h-3.5 w-3.5" /> Job History {customerJobs.length > 0 && `(${customerJobs.length})`}
+                    </button>
+                  </div>
+                )}
+
+                {/* Vehicles tab */}
+                {(!isCarwash || detailTab === 'vehicles') && (
+                <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--accent)' }}>Vehicles</p>
@@ -427,6 +461,117 @@ export function CustomersPage() {
                     </div>
                   ))}
                 </div>
+                </div>
+                )}
+
+                {/* Job History tab */}
+                {isCarwash && detailTab === 'jobs' && (
+                  <div className="space-y-3">
+                    {!selectedCustomer.phone && (
+                      <div className="rounded-xl p-6 text-center" style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-border)' }}>
+                        <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Add a phone number to see job history</p>
+                      </div>
+                    )}
+                    {selectedCustomer.phone && customerJobs.length === 0 && (
+                      <div className="rounded-xl p-6 text-center" style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-border)' }}>
+                        <ClipboardList className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                        <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No job cards yet</p>
+                      </div>
+                    )}
+
+                    {customerJobs.length > 0 && (
+                      <>
+                        {/* Summary + Print All */}
+                        <div className="flex items-center justify-between rounded-xl px-4 py-3"
+                          style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-border)' }}>
+                          <div>
+                            <p className="text-xs font-semibold" style={{ color: 'var(--text-tertiary)' }}>Total Jobs</p>
+                            <p className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{customerJobs.length}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold" style={{ color: 'var(--text-tertiary)' }}>Total Spent</p>
+                            <p className="text-lg font-bold" style={{ color: 'var(--accent)' }}>
+                              ₹{customerJobs.reduce((s: number, j: any) => s + (j.total ?? 0), 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                            </p>
+                          </div>
+                          <button onClick={async () => {
+                            const logo = (config?.settings as any)?.logo_base64;
+                            const shopName = config?.shop_name ?? 'Car Wash';
+                            const rows = customerJobs.map((j: any) => `
+                              <tr>
+                                <td>${new Date(j.created_at).toLocaleDateString('en-IN')}</td>
+                                <td><b>${j.job_number}</b></td>
+                                <td>${j.reg_number}</td>
+                                <td>${(j.items ?? []).map((i: any) => i.service_name).join(', ')}</td>
+                                <td style="color:${j.status==='delivered'?'#16a34a':'#d97706'};font-weight:600">${j.status}</td>
+                                <td style="text-align:right;font-weight:700">₹${Math.round(j.total).toLocaleString('en-IN')}</td>
+                              </tr>`).join('');
+                            const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+                            <style>body{font-family:Arial,sans-serif;padding:20px;font-size:13px}
+                            .header{text-align:center;margin-bottom:20px;padding-bottom:12px;border-bottom:2px solid #f59e0b}
+                            .logo{max-height:60px;max-width:150px;object-fit:contain}
+                            h1{font-size:18px;margin:4px 0}.subtitle{color:#6b7280;font-size:12px}
+                            table{width:100%;border-collapse:collapse;margin-top:12px}
+                            th{background:#f59e0b;color:#111;padding:8px;text-align:left;font-size:12px}
+                            td{padding:7px 8px;border-bottom:1px solid #e5e7eb;font-size:12px}
+                            tr:nth-child(even){background:#f9fafb}
+                            .total{text-align:right;font-size:14px;font-weight:700;padding:12px 0;color:#f59e0b}
+                            .footer{text-align:center;font-size:11px;color:#9ca3af;margin-top:16px}</style>
+                            </head><body>
+                            <div class="header">${logo?`<div><img src="${logo}" class="logo"/></div>`:''}
+                            <h1>${shopName}</h1>
+                            ${config?.phone?`<div class="subtitle">📞 ${config.phone}</div>`:''}
+                            </div>
+                            <h2 style="margin:0 0 4px">Customer: ${selectedCustomer.name}</h2>
+                            <div class="subtitle">${selectedCustomer.phone ? `📞 ${selectedCustomer.phone}` : ''}</div>
+                            <table><thead><tr><th>Date</th><th>Job #</th><th>Vehicle</th><th>Services</th><th>Status</th><th style="text-align:right">Amount</th></tr></thead>
+                            <tbody>${rows}</tbody></table>
+                            <div class="total">Total Spent: ₹${customerJobs.reduce((s:number,j:any)=>s+(j.total??0),0).toLocaleString('en-IN',{maximumFractionDigits:0})}</div>
+                            <div class="footer">Printed on ${new Date().toLocaleDateString('en-IN')}</div>
+                            </body></html>`;
+                            const finalHtml = html.replace('</body>', `<script>window.addEventListener('load',()=>setTimeout(window.print,400))<\/script></body>`);
+                            try {
+                              const cacheDir = await appCacheDir();
+                              const sep = cacheDir.endsWith('/')||cacheDir.endsWith('\\')?'':'/';
+                              const path = `${cacheDir}${sep}customer-history-${selectedCustomer.id}.html`;
+                              await writeTextFile(path, finalHtml);
+                              await shellOpen(path);
+                            } catch(e:any) { toast.error('Print failed: '+(e?.message??e)); }
+                          }}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold"
+                            style={{ background: 'var(--accent)', color: '#111' }}>
+                            <Printer className="h-3.5 w-3.5" /> Print History
+                          </button>
+                        </div>
+
+                        {/* Job list */}
+                        {customerJobs.map((j: any) => (
+                          <div key={j.id} className="rounded-xl p-3 space-y-2"
+                            style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-border)' }}>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold" style={{ color: 'var(--accent)' }}>{j.job_number}</span>
+                                <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{new Date(j.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold" style={{ color: 'var(--accent)' }}>₹{Math.round(j.total).toLocaleString('en-IN')}</span>
+                                <span className="text-xs font-semibold px-2 py-0.5 rounded-full capitalize"
+                                  style={{ background: j.status === 'delivered' ? '#dcfce7' : '#fef3c7', color: j.status === 'delivered' ? '#16a34a' : '#d97706' }}>
+                                  {j.status}
+                                </span>
+                              </div>
+                            </div>
+                            <p className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>🚗 {j.reg_number} · {j.vehicle_type}</p>
+                            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                              {(j.items ?? []).map((i: any) => i.service_name).join(' · ')}
+                            </p>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                )}
+
               </div>
             </div>
           </div>

@@ -488,6 +488,17 @@ export async function createJob(tenantId: string, data: {
 }): Promise<CarwashJob> {
   const db = await getDb();
 
+  // Auto-create/find customer first so we can link customer_id to the job
+  await autoCreateCustomer(tenantId, data.customer_name, data.customer_phone);
+  let customerId: string | null = null;
+  if (data.customer_phone) {
+    const cleanPhone = data.customer_phone.replace(/\D/g, '');
+    if (cleanPhone.length === 10) {
+      const found = await getCustomerByPhone(tenantId, cleanPhone);
+      customerId = found?.id ?? null;
+    }
+  }
+
   const vehicle = await upsertVehicle(tenantId, {
     reg_number: data.reg_number,
     vehicle_type: data.vehicle_type,
@@ -496,18 +507,14 @@ export async function createJob(tenantId: string, data: {
     color: data.color ?? null,
     customer_name: data.customer_name ?? null,
     customer_phone: data.customer_phone ?? null,
-    customer_id: null,
+    customer_id: customerId,
     notes: null,
   });
-
-  // Auto-create customer if not already in customers table
-  await autoCreateCustomer(tenantId, data.customer_name, data.customer_phone);
 
   const jobId = uuid();
   const jobNumber = await nextJobNumber(tenantId);
   const subtotal = data.items.reduce((s, i) => s + i.price, 0);
   const discount = data.discount ?? 0;
-  // GST calculated on discounted amount, distributed proportionally
   const gstAmount = data.items.reduce((s, i) => {
     const itemShare = subtotal > 0 ? i.price / subtotal : 1 / data.items.length;
     const itemDiscount = discount * itemShare;
@@ -517,11 +524,11 @@ export async function createJob(tenantId: string, data: {
 
   await db.execute(
     `INSERT INTO carwash_jobs (id, tenant_id, job_number, vehicle_id, reg_number, vehicle_type, make, model, color,
-      customer_name, customer_phone, staff_id, staff_name, status, subtotal, discount, gst_amount, total, membership_id, notes)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      customer_name, customer_phone, customer_id, staff_id, staff_name, status, subtotal, discount, gst_amount, total, membership_id, notes)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [jobId, tenantId, jobNumber, vehicle.id, data.reg_number, data.vehicle_type,
      data.make ?? null, data.model ?? null, data.color ?? null,
-     data.customer_name ?? null, data.customer_phone ?? null,
+     data.customer_name ?? null, data.customer_phone ?? null, customerId,
      data.staff_id ?? null, data.staff_name ?? null,
      'waiting', subtotal, discount, gstAmount, total,
      data.membership_id ?? null, data.notes ?? null]
@@ -641,6 +648,25 @@ export async function listJobs(tenantId: string, opts: { date?: string; status?:
     if (!itemMap[it.job_id]) itemMap[it.job_id] = [];
     itemMap[it.job_id].push(it);
   }
+  return jobs.map(j => ({ ...j, items: itemMap[j.id] ?? [] }));
+}
+
+export async function getJobsByCustomerPhone(tenantId: string, phone: string): Promise<CarwashJob[]> {
+  const db = await getDb();
+  const clean = phone.replace(/\D/g, '');
+  const jobs = await db.select<any[]>(
+    `SELECT j.* FROM carwash_jobs j
+     WHERE j.tenant_id = ? AND j.deleted_at IS NULL
+       AND REPLACE(REPLACE(REPLACE(j.customer_phone,'+',''),' ',''),'-','') LIKE ?
+     ORDER BY j.created_at DESC LIMIT 200`,
+    [tenantId, `%${clean}`]
+  );
+  if (jobs.length === 0) return [];
+  const jobIds = jobs.map(j => j.id);
+  const placeholders = jobIds.map(() => '?').join(',');
+  const items = await db.select<any[]>(`SELECT * FROM carwash_job_items WHERE job_id IN (${placeholders})`, jobIds);
+  const itemMap: Record<string, CarwashJobItem[]> = {};
+  for (const it of items) { if (!itemMap[it.job_id]) itemMap[it.job_id] = []; itemMap[it.job_id].push(it); }
   return jobs.map(j => ({ ...j, items: itemMap[j.id] ?? [] }));
 }
 
