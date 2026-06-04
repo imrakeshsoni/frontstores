@@ -1,7 +1,24 @@
 // [carwash] [all tenants]
 import { getDb, uuid, now } from './index';
+import { getCustomerByPhone, createCustomer } from './customers';
 
 export type VehicleType = 'hatchback' | 'sedan' | 'suv' | 'luxury';
+
+// [carwash] [all tenants] — Indian vehicle registration validation
+// State format:  MH12AB1234  (2 letters + 1-2 digits + 1-3 letters + 1-4 digits)
+// BH series:     22BH0001AA  (2 digits + BH + 4 digits + 1-2 letters)
+const STATE_REG = /^[A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{1,4}$/;
+const BH_REG    = /^[0-9]{2}BH[0-9]{4}[A-Z]{1,2}$/;
+
+export function validateRegNumber(raw: string): { valid: boolean; cleaned: string; error?: string } {
+  const cleaned = raw.toUpperCase().replace(/[\s-]/g, '');
+  if (!cleaned) return { valid: false, cleaned, error: 'Registration number is required' };
+  if (STATE_REG.test(cleaned) || BH_REG.test(cleaned)) return { valid: true, cleaned };
+  return {
+    valid: false, cleaned,
+    error: 'Invalid registration number. Use state format (MH12AB1234) or BH series (22BH0001AA)',
+  };
+}
 export type JobStatus = 'waiting' | 'in_progress' | 'ready' | 'delivered';
 export type AppointmentStatus = 'scheduled' | 'confirmed' | 'arrived' | 'done' | 'cancelled';
 
@@ -245,6 +262,21 @@ export async function seedDefaultServices(tenantId: string): Promise<void> {
 
 // ── Vehicles ────────────────────────────────────────────────────────────────
 
+export async function findVehiclesByPhone(tenantId: string, phone: string): Promise<CarwashVehicle[]> {
+  const db = await getDb();
+  const clean = phone.replace(/\D/g, '');
+  if (clean.length < 10) return [];
+  // Match last 10 digits — handles +91, 0 prefix, spaces, dashes
+  const last10 = clean.slice(-10);
+  return db.select<any[]>(
+    `SELECT * FROM carwash_vehicles WHERE tenant_id = ? AND deleted_at IS NULL
+     AND customer_phone IS NOT NULL AND customer_phone != ''
+     AND REPLACE(REPLACE(REPLACE(customer_phone,'+',''),' ',''),'-','') LIKE ?
+     ORDER BY updated_at DESC LIMIT 10`,
+    [tenantId, `%${last10}`]
+  );
+}
+
 export async function findVehicleByReg(tenantId: string, regNumber: string): Promise<CarwashVehicle | null> {
   const db = await getDb();
   const clean = regNumber.toUpperCase().replace(/\s+/g, '');
@@ -356,6 +388,41 @@ async function nextJobNumber(tenantId: string): Promise<string> {
   return `WS${mmdd}-${String(seq).padStart(3, '0')}`;
 }
 
+// [carwash] [all tenants] — Auto-create customer record from job card / appointment data
+async function autoCreateCustomer(tenantId: string, name?: string, phone?: string): Promise<void> {
+  const cleanPhone = phone?.replace(/\D/g, '') ?? '';
+  const hasPhone = cleanPhone.length === 10;
+  const hasName  = !!(name?.trim());
+  if (!hasPhone && !hasName) return;
+
+  // Look up by phone if available
+  if (hasPhone) {
+    const existing = await getCustomerByPhone(tenantId, cleanPhone);
+    if (existing) {
+      // Fill in missing name
+      if (!existing.name && hasName) {
+        const db = await getDb();
+        await db.execute(`UPDATE customers SET name=?, updated_at=? WHERE id=?`, [name!.trim(), now(), existing.id]);
+      }
+      return;
+    }
+  } else {
+    // No phone — check by name to avoid duplicates
+    const db = await getDb();
+    const rows = await db.select<any[]>(
+      `SELECT id FROM customers WHERE tenant_id=? AND name=? AND deleted_at IS NULL LIMIT 1`,
+      [tenantId, name!.trim()]
+    );
+    if (rows.length > 0) return;
+  }
+
+  await createCustomer(tenantId, {
+    name: name?.trim() || 'Customer',
+    phone: hasPhone ? cleanPhone : null,
+    email: null, address: null, city: null, tags: [], credit_limit: 0, notes: null,
+  });
+}
+
 export async function createJob(tenantId: string, data: {
   reg_number: string;
   vehicle_type: VehicleType;
@@ -384,6 +451,9 @@ export async function createJob(tenantId: string, data: {
     customer_id: null,
     notes: null,
   });
+
+  // Auto-create customer if not already in customers table
+  await autoCreateCustomer(tenantId, data.customer_name, data.customer_phone);
 
   const jobId = uuid();
   const jobNumber = await nextJobNumber(tenantId);
@@ -601,6 +671,73 @@ export async function getPopularServices(tenantId: string, date: string): Promis
   );
 }
 
+export async function getDateStats(tenantId: string, date: string): Promise<{
+  totalJobs: number; revenue: number; avgJobValue: number;
+}> {
+  const db = await getDb();
+  const rows = await db.select<any[]>(
+    `SELECT COUNT(*) as totalJobs, COALESCE(SUM(total),0) as revenue
+     FROM carwash_jobs WHERE tenant_id = ? AND created_at LIKE ? AND deleted_at IS NULL AND status = 'delivered'`,
+    [tenantId, `${date}%`]
+  );
+  const r = rows[0] ?? { totalJobs: 0, revenue: 0 };
+  return { totalJobs: r.totalJobs, revenue: r.revenue, avgJobValue: r.totalJobs > 0 ? Math.round(r.revenue / r.totalJobs) : 0 };
+}
+
+export async function getHourlyStats(tenantId: string, date: string): Promise<Array<{ hour: number; jobs: number; revenue: number }>> {
+  const db = await getDb();
+  const rows = await db.select<any[]>(
+    `SELECT CAST(strftime('%H', created_at) AS INTEGER) as hour, COUNT(*) as jobs, COALESCE(SUM(total),0) as revenue
+     FROM carwash_jobs WHERE tenant_id = ? AND created_at LIKE ? AND deleted_at IS NULL
+     GROUP BY hour ORDER BY hour ASC`,
+    [tenantId, `${date}%`]
+  );
+  return rows;
+}
+
+export async function getNewVsReturning(tenantId: string, date: string): Promise<{ newCustomers: number; returning: number }> {
+  const db = await getDb();
+  const jobs = await db.select<any[]>(
+    `SELECT customer_phone, MIN(created_at) as first_visit
+     FROM carwash_jobs WHERE tenant_id = ? AND deleted_at IS NULL AND customer_phone IS NOT NULL
+     GROUP BY customer_phone`,
+    [tenantId]
+  );
+  const todayJobs = await db.select<any[]>(
+    `SELECT DISTINCT customer_phone FROM carwash_jobs
+     WHERE tenant_id = ? AND created_at LIKE ? AND deleted_at IS NULL AND customer_phone IS NOT NULL`,
+    [tenantId, `${date}%`]
+  );
+  let newC = 0, returning = 0;
+  for (const tj of todayJobs) {
+    const rec = jobs.find(j => j.customer_phone === tj.customer_phone);
+    if (rec && rec.first_visit.startsWith(date)) newC++;
+    else returning++;
+  }
+  return { newCustomers: newC, returning };
+}
+
+export async function getPaymentBreakdown(tenantId: string, date: string): Promise<Array<{ method: string; count: number; revenue: number }>> {
+  const db = await getDb();
+  return db.select<any[]>(
+    `SELECT COALESCE(payment_method, 'cash') as method, COUNT(*) as count, COALESCE(SUM(total),0) as revenue
+     FROM carwash_jobs WHERE tenant_id = ? AND created_at LIKE ? AND deleted_at IS NULL AND status = 'delivered'
+     GROUP BY method ORDER BY revenue DESC`,
+    [tenantId, `${date}%`]
+  );
+}
+
+export async function getDailyRevenueLast30(tenantId: string): Promise<Array<{ date: string; revenue: number; jobs: number }>> {
+  const db = await getDb();
+  return db.select<any[]>(
+    `SELECT strftime('%Y-%m-%d', created_at) as date, COALESCE(SUM(total),0) as revenue, COUNT(*) as jobs
+     FROM carwash_jobs WHERE tenant_id = ? AND deleted_at IS NULL AND status = 'delivered'
+       AND created_at >= date('now', '-30 days')
+     GROUP BY date ORDER BY date ASC`,
+    [tenantId]
+  );
+}
+
 export async function getLapsedCustomers(tenantId: string, daysSince = 30): Promise<Array<{ customer_name: string; customer_phone: string; reg_number: string; last_visit: string }>> {
   const db = await getDb();
   const cutoff = new Date(Date.now() - daysSince * 86400000).toISOString().slice(0, 10);
@@ -716,6 +853,8 @@ export async function createAppointment(tenantId: string, data: {
      data.customer_name ?? null, data.customer_phone ?? null, data.staff_id ?? null, data.staff_name ?? null,
      data.services_note ?? null, data.notes ?? null]
   );
+  // Auto-create customer if not already in customers table
+  await autoCreateCustomer(tenantId, data.customer_name, data.customer_phone);
   const rows = await db.select<any[]>(`SELECT * FROM carwash_appointments WHERE id = ?`, [id]);
   return rows[0];
 }
@@ -785,14 +924,26 @@ export async function getLowStockInventory(tenantId: string): Promise<CarwashInv
 // ── Vehicle Types ─────────────────────────────────────────────────────────────
 
 const DEFAULT_VEHICLE_TYPES: Omit<CarwashVehicleTypeRecord, 'id' | 'tenant_id'>[] = [
-  { name: 'Hatchback',    icon: '🚗', price_multiplier: 0.75, is_active: true, sort_order: 0 },
-  { name: 'Sedan',        icon: '🚙', price_multiplier: 1.0,  is_active: true, sort_order: 1 },
-  { name: 'SUV',          icon: '🚐', price_multiplier: 1.4,  is_active: true, sort_order: 2 },
-  { name: 'Luxury',       icon: '🏎️', price_multiplier: 2.0,  is_active: true, sort_order: 3 },
-  { name: 'Van / Tempo',  icon: '🚌', price_multiplier: 1.8,  is_active: true, sort_order: 4 },
-  { name: 'Truck',        icon: '🚛', price_multiplier: 2.5,  is_active: true, sort_order: 5 },
-  { name: 'Bike',         icon: '🏍️', price_multiplier: 0.4,  is_active: true, sort_order: 6 },
-  { name: 'Auto',         icon: '🛺', price_multiplier: 0.5,  is_active: true, sort_order: 7 },
+  // ── Two-wheelers ──
+  { name: 'Scooter',        icon: '🛵', price_multiplier: 0.3,  is_active: true, sort_order: 0 },
+  { name: 'Motorcycle',     icon: '🏍️', price_multiplier: 0.35, is_active: true, sort_order: 1 },
+  // ── Three-wheelers ──
+  { name: 'Auto Rickshaw',  icon: '🛺', price_multiplier: 0.5,  is_active: true, sort_order: 2 },
+  // ── Cars ──
+  { name: 'Hatchback',      icon: '🚗', price_multiplier: 0.75, is_active: true, sort_order: 3 },
+  { name: 'Compact Sedan',  icon: '🚗', price_multiplier: 0.85, is_active: true, sort_order: 4 },
+  { name: 'Sedan',          icon: '🚙', price_multiplier: 1.0,  is_active: true, sort_order: 5 },
+  { name: 'Compact SUV',    icon: '🚐', price_multiplier: 1.2,  is_active: true, sort_order: 6 },
+  { name: 'Mid-size SUV',   icon: '🚐', price_multiplier: 1.4,  is_active: true, sort_order: 7 },
+  { name: 'Full-size SUV',  icon: '🚐', price_multiplier: 1.6,  is_active: true, sort_order: 8 },
+  { name: 'MUV / MPV',      icon: '🚐', price_multiplier: 1.5,  is_active: true, sort_order: 9 },
+  { name: 'Luxury Car',     icon: '🏎️', price_multiplier: 2.2,  is_active: true, sort_order: 10 },
+  // ── Commercial ──
+  { name: 'Van / Tempo',    icon: '🚌', price_multiplier: 1.8,  is_active: true, sort_order: 11 },
+  { name: 'Mini Truck',     icon: '🚚', price_multiplier: 2.0,  is_active: true, sort_order: 12 },
+  { name: 'Heavy Truck',    icon: '🚛', price_multiplier: 3.0,  is_active: true, sort_order: 13 },
+  { name: 'Bus',            icon: '🚌', price_multiplier: 2.8,  is_active: true, sort_order: 14 },
+  { name: 'Tractor',        icon: '🚜', price_multiplier: 2.5,  is_active: true, sort_order: 15 },
 ];
 
 export async function listVehicleTypes(tenantId: string): Promise<CarwashVehicleTypeRecord[]> {
@@ -846,6 +997,42 @@ export async function updateVehicleType(tenantId: string, id: string, data: Part
 export async function deleteVehicleType(tenantId: string, id: string): Promise<void> {
   const db = await getDb();
   await db.execute(`UPDATE carwash_vehicle_types SET deleted_at=?, updated_at=? WHERE id=? AND tenant_id=?`, [now(), now(), id, tenantId]);
+}
+
+// ── Service Prices (per vehicle type) ────────────────────────────────────────
+// [carwash] [all tenants] — dynamic manual pricing: service × vehicle type → price
+
+export async function getAllServicePrices(tenantId: string): Promise<Record<string, Record<string, number>>> {
+  const db = await getDb();
+  const rows = await db.select<{ service_id: string; vehicle_type_id: string; price: number }[]>(
+    'SELECT service_id, vehicle_type_id, price FROM carwash_service_prices WHERE tenant_id = ? AND deleted_at IS NULL',
+    [tenantId]
+  );
+  const map: Record<string, Record<string, number>> = {};
+  for (const r of rows) {
+    if (!map[r.service_id]) map[r.service_id] = {};
+    map[r.service_id][r.vehicle_type_id] = r.price;
+  }
+  return map;
+}
+
+export async function upsertServicePrice(tenantId: string, serviceId: string, vehicleTypeId: string, price: number): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `INSERT INTO carwash_service_prices (id, tenant_id, service_id, vehicle_type_id, price, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(tenant_id, service_id, vehicle_type_id) DO UPDATE SET price = excluded.price, updated_at = excluded.updated_at, deleted_at = NULL`,
+    [uuid(), tenantId, serviceId, vehicleTypeId, price, now()]
+  );
+}
+
+export async function getServicePriceForVehicle(tenantId: string, serviceId: string, vehicleTypeId: string): Promise<number> {
+  const db = await getDb();
+  const rows = await db.select<{ price: number }[]>(
+    'SELECT price FROM carwash_service_prices WHERE tenant_id = ? AND service_id = ? AND vehicle_type_id = ? AND deleted_at IS NULL',
+    [tenantId, serviceId, vehicleTypeId]
+  );
+  return rows[0]?.price ?? 0;
 }
 
 // ── Loyalty ───────────────────────────────────────────────────────────────────

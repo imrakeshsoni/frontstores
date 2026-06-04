@@ -1,19 +1,22 @@
 // [carwash] [all tenants]
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { appCacheDir } from '@tauri-apps/api/path';
 import { Car, Plus, Trash2, CheckCircle, Printer, MessageSquare, ArrowLeft, Clock, User, Edit2, X, Star, History } from 'lucide-react';
+import { NumberPlateScanner } from '@/components/ui/NumberPlateScanner';
+import { sendWhatsApp } from '@/lib/whatsapp';
 import { useAppStore } from '@/app/store/app.store';
 import {
   listJobs, createJob, updateJob, updateJobStatus, settleJob, deleteJob,
-  listServices, listCarwashStaff, findVehicleByReg, findActiveMembership,
-  getVehicleServiceHistory, getLoyaltyByPhone, listVehicleTypes,
-  type CarwashJob, type CarwashVehicleTypeRecord, type JobStatus,
+  listServices, listCarwashStaff, findVehicleByReg, findVehiclesByPhone, searchVehicles,
+  findActiveMembership, getVehicleServiceHistory, getLoyaltyByPhone, listVehicleTypes, validateRegNumber,
+  type CarwashJob, type CarwashVehicleTypeRecord, type JobStatus, type CarwashVehicle,
 } from '@/lib/db/carwash';
+import { listCustomers } from '@/lib/db/customers';
 
 // VehicleType is now dynamic — driven by carwash_vehicle_types table
 type VehicleType = string;
@@ -41,15 +44,18 @@ function daysSince(iso: string) {
 
 export function JobCardPage() {
   const { id } = useParams<{ id?: string }>();
+  const [searchParams] = useSearchParams();
   const isNew = !id || id === 'new';
   const tenantId = useAppStore((s) => s.config?.tenant_id ?? '');
   const config = useAppStore((s) => s.config);
   const qc = useQueryClient();
   const navigate = useNavigate();
   const regRef = useRef<HTMLInputElement>(null);
+  const prefillDone = useRef(false);
 
   // Form state for new job
   const [regNumber, setRegNumber]             = useState('');
+  const [regError, setRegError]               = useState('');
   const [vehicleType, setVehicleType]         = useState<VehicleType>('sedan');
   const [make, setMake]                       = useState('');
   const [model, setModel]                     = useState('');
@@ -58,6 +64,8 @@ export function JobCardPage() {
   const [customerPhone, setCustomerPhone]     = useState('');
   const [selectedStaffId, setSelectedStaffId]     = useState('');
   const [selectedStaffName, setSelectedStaffName] = useState('');
+  const [selectedStaffIds, setSelectedStaffIds]   = useState<string[]>([]);
+  const [selectedStaffNames, setSelectedStaffNames] = useState<string[]>([]);
   const [selectedServices, setSelectedServices]   = useState<SelectedService[]>([]);
   const [discount, setDiscount]               = useState('');
   const [notes, setNotes]                     = useState('');
@@ -68,6 +76,16 @@ export function JobCardPage() {
   const [vehicleHistory, setVehicleHistory]       = useState<any>(null);
   const [loyaltyInfo, setLoyaltyInfo]             = useState<any>(null);
   const [showHistory, setShowHistory]             = useState(false);
+  const [phoneVehicles, setPhoneVehicles]         = useState<CarwashVehicle[]>([]);
+  const [phoneSearching, setPhoneSearching]       = useState(false);
+  const phoneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Live search dropdowns
+  const [phoneResults, setPhoneResults]           = useState<any[]>([]);
+  const [phoneResultsIdx, setPhoneResultsIdx]     = useState(-1);
+  const [regResults, setRegResults]               = useState<CarwashVehicle[]>([]);
+  const [regResultsIdx, setRegResultsIdx]         = useState(-1);
+  const regDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const phoneSearchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Edit mode for existing job
   const [editMode, setEditMode]               = useState(false);
@@ -142,6 +160,103 @@ export function JobCardPage() {
     }
   };
 
+  // Phone lookup — debounced, triggers after 10 digits
+  const handlePhoneChange = (phone: string) => {
+    setCustomerPhone(phone);
+    setPhoneVehicles([]);
+    if (phoneTimerRef.current) clearTimeout(phoneTimerRef.current);
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length < 10) return;
+    phoneTimerRef.current = setTimeout(async () => {
+      setPhoneSearching(true);
+      try {
+        const vehicles = await findVehiclesByPhone(tenantId, digits);
+        setPhoneVehicles(vehicles);
+        if (vehicles.length === 1) {
+          const v = vehicles[0];
+          setCustomerName(v.customer_name ?? '');
+          setRegNumber(v.reg_number);
+          await lookupVehicle(v.reg_number);
+          toast.success(`Found: ${v.customer_name ?? 'Customer'} — ${v.reg_number}`);
+        } else if (vehicles.length > 1) {
+          setCustomerName(vehicles[0].customer_name ?? '');
+          toast.success(`${vehicles.length} vehicles found for this number — tap to select`);
+        } else {
+          toast(`No records found for this number — new customer`, { icon: '👤' });
+        }
+      } catch (e: any) {
+        toast.error('Lookup failed: ' + (e?.message ?? 'unknown error'));
+      } finally {
+        setPhoneSearching(false);
+      }
+    }, 400);
+  };
+
+  // Select a vehicle from phone lookup results
+  const selectPhoneVehicle = async (v: CarwashVehicle) => {
+    setPhoneVehicles([]);
+    setRegNumber(v.reg_number);
+    setCustomerName(v.customer_name ?? '');
+    await lookupVehicle(v.reg_number);
+  };
+
+  // ── Live reg search (like appointment page) ───────────────────────────────
+  const handleRegInput = (value: string) => {
+    setRegNumber(value.toUpperCase());
+    setRegResultsIdx(-1);
+    if (regDebounceRef.current) clearTimeout(regDebounceRef.current);
+    if (value.length < 2) { setRegResults([]); return; }
+    regDebounceRef.current = setTimeout(async () => {
+      const results = await searchVehicles(tenantId, value);
+      setRegResults(results);
+    }, 300);
+  };
+
+  const selectVehicleFromReg = async (v: CarwashVehicle) => {
+    setRegResults([]); setRegResultsIdx(-1);
+    setRegNumber(v.reg_number);
+    setCustomerName(v.customer_name ?? '');
+    setCustomerPhone(v.customer_phone ?? '');
+    await lookupVehicle(v.reg_number);
+  };
+
+  const handleRegKeyDown = (e: React.KeyboardEvent) => {
+    if (!regResults.length) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); setRegResultsIdx(i => Math.min(i + 1, regResults.length - 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setRegResultsIdx(i => Math.max(i - 1, 0)); }
+    else if (e.key === 'Enter' && regResultsIdx >= 0) { e.preventDefault(); selectVehicleFromReg(regResults[regResultsIdx]); }
+    else if (e.key === 'Escape') { setRegResults([]); setRegResultsIdx(-1); }
+  };
+
+  // ── Live phone customer search ────────────────────────────────────────────
+  const handlePhoneInput = (value: string) => {
+    setCustomerPhone(value);
+    setPhoneResults([]); setPhoneResultsIdx(-1);
+    if (phoneSearchDebounce.current) clearTimeout(phoneSearchDebounce.current);
+    if (value.length < 2) return;
+    phoneSearchDebounce.current = setTimeout(async () => {
+      const { items } = await listCustomers(tenantId, { search: value, perPage: 8 });
+      setPhoneResults(items);
+    }, 300);
+    // Also trigger existing vehicle phone lookup after 10 digits
+    handlePhoneChange(value);
+  };
+
+  const selectCustomerResult = async (c: any) => {
+    setPhoneResults([]); setPhoneResultsIdx(-1);
+    setCustomerName(c.name ?? '');
+    setCustomerPhone(c.phone ?? '');
+    if (c.phone) handlePhoneChange(c.phone);
+  };
+
+  const handlePhoneInputKeyDown = (e: React.KeyboardEvent) => {
+    if (!phoneResults.length) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); setPhoneResultsIdx(i => Math.min(i + 1, phoneResults.length - 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setPhoneResultsIdx(i => Math.max(i - 1, 0)); }
+    else if (e.key === 'Enter' && phoneResultsIdx >= 0) { e.preventDefault(); selectCustomerResult(phoneResults[phoneResultsIdx]); }
+    else if (e.key === 'Escape') { setPhoneResults([]); setPhoneResultsIdx(-1); }
+  };
+
   const getPriceForType = (svc: any): number => {
     // Legacy fixed-column types
     const legacyKey = `price_${vehicleType.toLowerCase()}` as keyof typeof svc;
@@ -169,6 +284,62 @@ export function JobCardPage() {
     }
   }, [vehicleTypes]);
 
+  // Pre-fill from appointment URL params — fires once when services + staff + vehicleTypes all loaded
+  useEffect(() => {
+    if (!isNew || prefillDone.current) return;
+    if (!searchParams.get('reg') && !searchParams.get('name') && !searchParams.get('phone')) return;
+    if (services.length === 0 || vehicleTypes.length === 0) return; // wait for data
+    prefillDone.current = true;
+
+    const reg      = searchParams.get('reg') ?? '';
+    const name     = searchParams.get('name') ?? '';
+    const phone    = searchParams.get('phone') ?? '';
+    const vtype    = searchParams.get('vtype') ?? '';
+    const make     = searchParams.get('make') ?? '';
+    const model    = searchParams.get('model') ?? '';
+    const staffId  = searchParams.get('staffId') ?? '';
+    const staffName= searchParams.get('staffName') ?? '';
+    const svcNote  = searchParams.get('services') ?? '';
+
+    if (reg)   setRegNumber(reg);
+    if (name)  setCustomerName(name);
+    if (phone) setCustomerPhone(phone);
+    if (make)  setMake(make);
+    if (model) setModel(model);
+    if (staffId)   setSelectedStaffId(staffId);
+    if (staffName) setSelectedStaffName(staffName);
+
+    // Match vehicle type
+    if (vtype) {
+      const match = vehicleTypes.find(vt =>
+        vt.name.toLowerCase() === vtype.toLowerCase() ||
+        vt.name.toLowerCase().includes(vtype.toLowerCase())
+      );
+      if (match) setVehicleType(match.name);
+    }
+
+    // Match and pre-select services by name
+    if (svcNote) {
+      const requestedNames = svcNote.split(',').map(s => s.trim().toLowerCase());
+      const matched: SelectedService[] = [];
+      for (const svc of services) {
+        if (requestedNames.some(r => svc.name.toLowerCase().includes(r) || r.includes(svc.name.toLowerCase()))) {
+          const vt = vehicleTypes.find(v => v.name === (vtype || vehicleTypes[0]?.name));
+          const mul = vt?.price_multiplier ?? 1.0;
+          const legacyKey = `price_${(vtype || 'sedan').toLowerCase()}` as keyof typeof svc;
+          const price = (svc as any)[legacyKey] != null
+            ? Number((svc as any)[legacyKey])
+            : Math.round((svc.price_sedan ?? 0) * mul);
+          matched.push({ service_id: svc.id, service_name: svc.name, price, gst_rate: svc.gst_rate });
+        }
+      }
+      if (matched.length > 0) setSelectedServices(matched);
+    }
+
+    // Also trigger full vehicle lookup for membership + history
+    if (reg) lookupVehicle(reg);
+  }, [isNew, searchParams, services, vehicleTypes, staff]);
+
   // Re-price services when vehicle type changes
   useEffect(() => {
     setSelectedServices(prev =>
@@ -180,18 +351,22 @@ export function JobCardPage() {
     );
   }, [vehicleType, vehicleTypes]);
 
+  const gstEnabled = config?.settings?.enable_gst !== false;
   const subtotal = selectedServices.reduce((s, i) => s + i.price, 0);
   const discountAmt = Number(discount) || 0;
-  // GST on discounted amount (bug fix: was calculated on full price)
-  const gstAmt = selectedServices.reduce((s, i) => {
+  const gstAmt = gstEnabled ? selectedServices.reduce((s, i) => {
     const share = subtotal > 0 ? i.price / subtotal : 1 / Math.max(selectedServices.length, 1);
     return s + (i.price - discountAmt * share) * i.gst_rate / 100;
-  }, 0);
+  }, 0) : 0;
   const total = Math.max(0, subtotal - discountAmt + gstAmt);
 
   const createMutation = useMutation({
     mutationFn: () => {
-      if (!regNumber.trim()) throw new Error('Enter vehicle registration number');
+      const regVal = validateRegNumber(regNumber);
+      if (!regVal.valid) { setRegError(regVal.error!); throw new Error(regVal.error); }
+      setRegError('');
+      if (!customerPhone.trim()) throw new Error('Phone number is required');
+      if (customerPhone.replace(/\D/g, '').length !== 10) throw new Error('Phone number must be exactly 10 digits');
       if (selectedServices.length === 0) throw new Error('Select at least one service');
       return createJob(tenantId, {
         reg_number: regNumber.trim().toUpperCase(),
@@ -201,9 +376,9 @@ export function JobCardPage() {
         color: color || undefined,
         customer_name: customerName || undefined,
         customer_phone: customerPhone || undefined,
-        staff_id: selectedStaffId || undefined,
-        staff_name: selectedStaffName || undefined,
-        items: selectedServices,
+        staff_id: selectedStaffIds[0] || selectedStaffId || undefined,
+        staff_name: selectedStaffNames.length > 0 ? selectedStaffNames.join(', ') : selectedStaffName || undefined,
+        items: gstEnabled ? selectedServices : selectedServices.map(s => ({ ...s, gst_rate: 0 })),
         discount: discountAmt || undefined,
         notes: notes || undefined,
         membership_id: useMembership && activeMembership ? activeMembership.id : undefined,
@@ -273,7 +448,7 @@ export function JobCardPage() {
     const cleanPhone = String(jobPhone).replace(/\D/g, '');
     if (cleanPhone.length < 10) { toast.error('Invalid phone number'); return; }
     const msg = `Hi ${jobName} 👋\n\nYour car *${jobReg}* is ready for pickup! 🚗✨\n\nServices done:\n${jobItems.map((i: any) => `• ${i.service_name}`).join('\n')}\n\nTotal: *${fmt(jobTotal)}*\n\nThank you for visiting ${config?.shop_name ?? 'our car wash'}! 😊`;
-    window.open(`https://wa.me/91${cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+    sendWhatsApp(cleanPhone, msg);
   };
 
   const handlePrint = async (jobData?: CarwashJob) => {
@@ -546,234 +721,379 @@ export function JobCardPage() {
     ?.slice(0, 3) ?? [];
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-6 max-w-2xl mx-auto">
-      <div className="flex items-center gap-3">
-        <button onClick={() => navigate('/carwash/jobs')} className="p-2 rounded-xl hover:bg-slate-100">
+    <div className="flex flex-col h-screen overflow-hidden">
+
+      {/* Top bar */}
+      <div className="flex-shrink-0 flex items-center gap-3 px-5 py-3" style={{ borderBottom: '1px solid var(--surface-border)', background: 'var(--surface)' }}>
+        <button onClick={() => navigate('/carwash/jobs')} className="p-1.5 rounded-xl hover:opacity-70">
           <ArrowLeft className="h-5 w-5" style={{ color: 'var(--text-secondary)' }} />
         </button>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-tertiary)' }}>Car Wash</p>
-          <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>New Job Card</h1>
-        </div>
-      </div>
-
-      {/* Vehicle */}
-      <div className="rounded-2xl p-5 space-y-4" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
-        <div className="flex items-center gap-2">
-          <Car className="h-4 w-4" style={{ color: 'var(--accent)' }} />
-          <h2 className="font-bold" style={{ color: 'var(--text-primary)' }}>Vehicle Details</h2>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Registration Number *</label>
-          <input
-            ref={regRef}
-            value={regNumber}
-            onChange={(e) => setRegNumber(e.target.value.toUpperCase())}
-            onBlur={() => lookupVehicle(regNumber)}
-            placeholder="e.g. MH12AB1234"
-            className="w-full rounded-xl border px-3 py-3 text-base font-bold tracking-widest outline-none focus:ring-2"
-            style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }}
-          />
+        <div className="flex items-center gap-2 flex-1">
+          <Car className="h-5 w-5" style={{ color: 'var(--accent)' }} />
+          <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>New Job Card</h1>
+          {vehicleHistory && vehicleHistory.visitCount > 0 && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: '#dcfce7', color: '#16a34a' }}>
+              ↩ Return · {vehicleHistory.visitCount} visits
+            </span>
+          )}
           {activeMembership && (
-            <div className="mt-2 rounded-xl px-3 py-2 flex items-center justify-between" style={{ background: '#f3e8ff', border: '1px solid #e9d5ff' }}>
-              <p className="text-sm font-semibold" style={{ color: '#7c3aed' }}>
-                ⭐ Membership: {activeMembership.package_name} — {activeMembership.total_washes - activeMembership.used_washes} washes left
-              </p>
-              <label className="flex items-center gap-1.5 text-xs font-medium cursor-pointer" style={{ color: '#7c3aed' }}>
-                <input type="checkbox" checked={useMembership} onChange={(e) => setUseMembership(e.target.checked)} />
-                Apply
-              </label>
-            </div>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: '#f3e8ff', color: '#7c3aed' }}>
+              ⭐ {activeMembership.package_name} · {activeMembership.total_washes - activeMembership.used_washes} left
+            </span>
           )}
-          {loyaltyInfo && loyaltyInfo.available_points > 0 && (
-            <div className="mt-2 rounded-xl px-3 py-2 flex items-center gap-2" style={{ background: '#fef3c7', border: '1px solid #fde68a' }}>
-              <Star className="h-4 w-4" style={{ color: '#d97706' }} />
-              <p className="text-sm font-semibold" style={{ color: '#92400e' }}>
-                {loyaltyInfo.available_points} loyalty points available (= {fmt(loyaltyInfo.available_points)})
-              </p>
-            </div>
+          {loyaltyInfo?.available_points > 0 && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: '#fef3c7', color: '#92400e' }}>
+              ★ {loyaltyInfo.available_points} pts
+            </span>
           )}
         </div>
+      </div>
 
-        {/* Vehicle history panel */}
-        {showHistory && vehicleHistory && (
-          <div className="rounded-xl p-3 space-y-2" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-            <div className="flex items-center gap-2">
-              <History className="h-4 w-4" style={{ color: '#16a34a' }} />
-              <p className="text-sm font-bold" style={{ color: '#15803d' }}>
-                Return customer · {vehicleHistory.visitCount} visits · {fmt(vehicleHistory.totalSpent)} total spent
-              </p>
-              <span className="text-xs" style={{ color: '#16a34a' }}>
-                Last: {daysSince(vehicleHistory.lastVisit)}d ago
-              </span>
-            </div>
-            {vehicleHistory.serviceHistory.slice(0, 4).map((h: any) => (
-              <div key={h.service_name} className="flex justify-between text-xs" style={{ color: '#15803d' }}>
-                <span>• {h.service_name} ({h.count}×)</span>
-                <span>last {daysSince(h.last_used)}d ago</span>
+      {/* 3-column body — fills remaining height, no scroll on outer */}
+      <div className="flex flex-1 overflow-hidden" style={{ gap: 0 }}>
+
+        {/* ── LEFT PANEL: Customer → Vehicle → Staff ── */}
+        <div className="flex flex-col overflow-y-auto" style={{ width: '30%', borderRight: '1px solid var(--surface-border)', background: 'var(--bg)' }}>
+
+          {/* ── CUSTOMER ── */}
+          <div className="px-5 pt-5 pb-4 space-y-3" style={{ borderBottom: '1px solid var(--surface-border)' }}>
+            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--accent)' }}>👤 Customer</p>
+
+            {/* Phone */}
+            <div>
+              <label className="block text-sm font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Mobile Number *</label>
+              <div className="relative">
+                <input value={customerPhone}
+                  onChange={e => handlePhoneInput(e.target.value)}
+                  onKeyDown={handlePhoneInputKeyDown}
+                  onBlur={() => setTimeout(() => setPhoneResults([]), 150)}
+                  placeholder="Type to search or enter number" type="tel"
+                  className="w-full rounded-xl border px-4 py-3 text-base font-bold outline-none"
+                  style={{ borderColor: customerPhone.replace(/\D/g,'').length===10 ? 'var(--accent)' : 'var(--surface-border)', background: 'var(--surface)', color: 'var(--text-primary)' }} />
+                {phoneSearching && (
+                  <svg className="animate-spin absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'var(--accent)' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </svg>
+                )}
+                {phoneResults.length > 0 && (
+                  <div className="absolute z-50 left-0 right-0 top-full mt-1 rounded-xl overflow-hidden shadow-xl"
+                    style={{ background: 'var(--surface)', border: '1px solid var(--accent)' }}>
+                    {phoneResults.map((c, i) => (
+                      <button key={c.id} type="button" onMouseDown={() => selectCustomerResult(c)}
+                        className="w-full text-left px-4 py-3 flex items-center gap-3 transition-colors"
+                        style={{ background: i === phoneResultsIdx ? 'var(--accent)' : 'transparent',
+                                 color: i === phoneResultsIdx ? '#111' : 'var(--text-primary)',
+                                 borderBottom: '1px solid var(--surface-border)' }}>
+                        <div className="h-8 w-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                          style={{ background: i === phoneResultsIdx ? '#111' : 'var(--accent)', color: i === phoneResultsIdx ? 'var(--accent)' : '#111' }}>
+                          {c.name?.[0]?.toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold">{c.name}</p>
+                          <p className="text-xs opacity-60">{c.phone}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
-        )}
+            </div>
 
-        {/* Vehicle type — dynamic from DB */}
-        <div>
-          <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>Vehicle Type</label>
-          <div className="grid grid-cols-4 gap-2">
-            {vehicleTypes.map(vt => (
-              <button key={vt.id} onClick={() => setVehicleType(vt.name)}
-                className={`py-2.5 rounded-xl text-sm font-semibold flex flex-col items-center gap-1 transition-all ${vehicleType === vt.name ? 'text-white shadow-md' : 'btn-secondary'}`}
-                style={vehicleType === vt.name ? { background: 'var(--accent)' } : {}}>
-                <span className="text-xl">{vt.icon}</span>
-                <span className="text-xs text-center leading-tight">{vt.name}</span>
-              </button>
-            ))}
+            {/* Name */}
+            <div>
+              <label className="block text-sm font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Customer Name</label>
+              <input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Auto-filled or enter name"
+                className="w-full rounded-xl border px-4 py-3 text-base outline-none"
+                style={{ borderColor: 'var(--surface-border)', background: 'var(--surface)', color: 'var(--text-primary)' }} />
+            </div>
+
+            {/* Multi-vehicle picker */}
+            {phoneVehicles.length > 1 && (
+              <div>
+                <p className="text-sm font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>
+                  {phoneVehicles.length} vehicles found — select one:
+                </p>
+                <div className="space-y-1.5">
+                  {phoneVehicles.map(v => (
+                    <button key={v.id} onClick={() => selectPhoneVehicle(v)}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-all"
+                      style={{ borderColor: regNumber === v.reg_number ? 'var(--accent)' : 'var(--surface-border)', background: 'var(--surface)', color: 'var(--text-primary)' }}>
+                      <span className="text-lg">🚗</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-sm tracking-wider">{v.reg_number}</p>
+                        {(v.make || v.model) && <p className="text-xs truncate" style={{ color: 'var(--text-tertiary)' }}>{[v.make, v.model].filter(Boolean).join(' ')}</p>}
+                      </div>
+                      {regNumber === v.reg_number && <CheckCircle className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--accent)' }} />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── VEHICLE ── */}
+          <div className="px-5 pt-4 pb-4 space-y-3" style={{ borderBottom: '1px solid var(--surface-border)' }}>
+            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--accent)' }}>🚗 Vehicle</p>
+
+            {/* Reg number */}
+            <div>
+              <label className="block text-sm font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Registration Number *</label>
+              <div className="flex gap-2 items-start">
+                <div className="relative flex-1">
+                  <input ref={regRef} value={regNumber}
+                    onChange={e => { handleRegInput(e.target.value); setRegError(''); }}
+                    onKeyDown={handleRegKeyDown}
+                    onBlur={() => {
+                      setTimeout(() => setRegResults([]), 150);
+                      if (regNumber) { const v = validateRegNumber(regNumber); setRegError(v.valid ? '' : v.error!); }
+                    }}
+                    placeholder="MH12AB1234 or 22BH0001AA"
+                    className="w-full rounded-xl border px-4 py-3 text-base font-bold tracking-widest outline-none"
+                    style={{ borderColor: regError ? '#f87171' : regNumber && !regError ? 'var(--accent)' : 'var(--surface-border)', background: 'var(--surface)', color: 'var(--text-primary)' }} />
+                  {regError && <p className="text-xs mt-1 font-medium" style={{ color: '#f87171' }}>{regError}</p>}
+                  {regResults.length > 0 && (
+                    <div className="absolute z-50 left-0 right-0 top-full mt-1 rounded-xl overflow-hidden shadow-xl"
+                      style={{ background: 'var(--surface)', border: '1px solid var(--accent)' }}>
+                      {regResults.map((v, i) => (
+                        <button key={v.id} type="button" onMouseDown={() => selectVehicleFromReg(v)}
+                          className="w-full text-left px-4 py-3 flex items-center gap-3 transition-colors"
+                          style={{ background: i === regResultsIdx ? 'var(--accent)' : 'transparent',
+                                   color: i === regResultsIdx ? '#111' : 'var(--text-primary)',
+                                   borderBottom: '1px solid var(--surface-border)' }}>
+                          <span className="text-lg">🚗</span>
+                          <div>
+                            <p className="text-sm font-bold tracking-wider">{v.reg_number}</p>
+                            <p className="text-xs opacity-60">{v.customer_name}{v.make ? ` · ${v.make}` : ''}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <NumberPlateScanner onDetected={plate => { handleRegInput(plate); lookupVehicle(plate); }} />
+              </div>
+            </div>
+
+            {/* Vehicle type pills */}
+            <div>
+              <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>Vehicle Type</label>
+              <div className="flex flex-wrap gap-2">
+                {vehicleTypes.map(vt => (
+                  <button key={vt.id} onClick={() => setVehicleType(vt.name)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all"
+                    style={vehicleType === vt.name
+                      ? { background: 'var(--accent)', color: 'var(--on-accent, #111)' }
+                      : { background: 'var(--surface)', border: '1px solid var(--surface-border)', color: 'var(--text-secondary)' }}>
+                    <span className="text-base">{vt.icon}</span> {vt.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Make / Model / Color */}
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: 'Make', val: make, set: setMake, ph: 'Maruti' },
+                { label: 'Model', val: model, set: setModel, ph: 'Swift' },
+                { label: 'Color', val: color, set: setColor, ph: 'White' },
+              ].map(f => (
+                <div key={f.label}>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: 'var(--text-secondary)' }}>{f.label}</label>
+                  <input value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph}
+                    className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
+                    style={{ borderColor: 'var(--surface-border)', background: 'var(--surface)', color: 'var(--text-primary)' }} />
+                </div>
+              ))}
+            </div>
+
+            {/* Return customer history */}
+            {showHistory && vehicleHistory && (
+              <div className="rounded-xl p-3" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                <p className="text-sm font-bold" style={{ color: '#15803d' }}>
+                  ↩ Return customer · {vehicleHistory.visitCount} visits · {fmt(vehicleHistory.totalSpent)}
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: '#16a34a' }}>Last visit {daysSince(vehicleHistory.lastVisit)} days ago</p>
+                {vehicleHistory.serviceHistory.slice(0, 3).map((h: any) => (
+                  <p key={h.service_name} className="text-xs mt-0.5" style={{ color: '#16a34a' }}>• {h.service_name} ({h.count}×)</p>
+                ))}
+              </div>
+            )}
+
+            {/* Membership */}
+            {activeMembership && (
+              <div className="rounded-xl px-4 py-3 flex items-center justify-between" style={{ background: '#f3e8ff', border: '1px solid #e9d5ff' }}>
+                <div>
+                  <p className="text-sm font-bold" style={{ color: '#7c3aed' }}>⭐ {activeMembership.package_name}</p>
+                  <p className="text-xs" style={{ color: '#9333ea' }}>{activeMembership.total_washes - activeMembership.used_washes} washes remaining</p>
+                </div>
+                <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer" style={{ color: '#7c3aed' }}>
+                  <input type="checkbox" checked={useMembership} onChange={(e) => setUseMembership(e.target.checked)} />
+                  Apply
+                </label>
+              </div>
+            )}
+          </div>
+
+          {/* ── STAFF & JOB DETAILS ── */}
+          <div className="px-5 pt-4 pb-5 space-y-3">
+            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--accent)' }}>⚙️ Job Details</p>
+
+            {/* Staff */}
+            <div>
+              <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>
+                Assign Staff <span className="font-normal text-xs" style={{ color: 'var(--text-tertiary)' }}>(select multiple)</span>
+              </label>
+              {staff.length === 0
+                ? <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No staff added yet — add in Staff page.</p>
+                : <div className="flex flex-wrap gap-2">
+                    {staff.map(s => {
+                      const sel = selectedStaffIds.includes(s.id);
+                      return (
+                        <button key={s.id} type="button"
+                          onClick={() => {
+                            const ids = sel ? selectedStaffIds.filter(id => id !== s.id) : [...selectedStaffIds, s.id];
+                            const names = sel ? selectedStaffNames.filter(n => n !== s.name) : [...selectedStaffNames, s.name];
+                            setSelectedStaffIds(ids); setSelectedStaffNames(names);
+                            setSelectedStaffId(ids[0] ?? ''); setSelectedStaffName(names[0] ?? '');
+                          }}
+                          className="px-3 py-2 rounded-xl text-sm font-semibold transition-all"
+                          style={sel
+                            ? { background: 'var(--accent)', color: 'var(--on-accent, #111)' }
+                            : { background: 'var(--surface)', color: 'var(--text-secondary)', border: '1px solid var(--surface-border)' }}>
+                          {sel ? '✓ ' : ''}{s.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+              }
+            </div>
+
+            {/* Discount + Notes */}
+            <div>
+              <label className="block text-sm font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Discount (₹)</label>
+              <input type="number" value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="0"
+                className="w-full rounded-xl border px-4 py-3 text-base outline-none"
+                style={{ borderColor: 'var(--surface-border)', background: 'var(--surface)', color: 'var(--text-primary)' }} />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Notes</label>
+              <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Special instructions…"
+                className="w-full rounded-xl border px-4 py-3 text-sm outline-none"
+                style={{ borderColor: 'var(--surface-border)', background: 'var(--surface)', color: 'var(--text-primary)' }} />
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
-          <div>
-            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Make</label>
-            <input value={make} onChange={(e) => setMake(e.target.value)} placeholder="Maruti"
-              className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-              style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }} />
+        {/* ── CENTER: Services ── */}
+        <div className="flex-1 flex flex-col overflow-hidden p-4" style={{ background: 'var(--bg)' }}>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--accent)' }}>
+              Services — {vehicleType} pricing
+            </p>
+            {selectedServices.length > 0 && (
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: 'var(--accent)', color: '#111' }}>
+                {selectedServices.length} selected
+              </span>
+            )}
           </div>
-          <div>
-            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Model</label>
-            <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="Swift"
-              className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-              style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }} />
-          </div>
-          <div>
-            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Color</label>
-            <input value={color} onChange={(e) => setColor(e.target.value)} placeholder="White"
-              className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-              style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }} />
-          </div>
-        </div>
-      </div>
 
-      {/* Customer */}
-      <div className="rounded-2xl p-5 space-y-3" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
-        <div className="flex items-center gap-2">
-          <User className="h-4 w-4" style={{ color: 'var(--accent)' }} />
-          <h2 className="font-bold" style={{ color: 'var(--text-primary)' }}>Customer (optional)</h2>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Customer name"
-            className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-            style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }} />
-          <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="Phone (for WhatsApp)"
-            className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-            style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }} />
-        </div>
-      </div>
-
-      {/* Services */}
-      <div className="rounded-2xl p-5 space-y-3" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
-        <h2 className="font-bold" style={{ color: 'var(--text-primary)' }}>
-          Services — {vehicleType.charAt(0).toUpperCase() + vehicleType.slice(1)} pricing
-        </h2>
-
-        {/* Upsell prompt */}
-        {upsellServices.length > 0 && (
-          <div className="rounded-xl p-3" style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
-            <p className="text-xs font-bold mb-2" style={{ color: '#92400e' }}>⚡ Previously used — add again?</p>
-            <div className="flex flex-wrap gap-2">
+          {/* Upsell bar */}
+          {upsellServices.length > 0 && (
+            <div className="mb-3 rounded-xl p-2.5 flex flex-wrap gap-1.5" style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
+              <span className="text-xs font-bold self-center" style={{ color: '#92400e' }}>⚡ Used before:</span>
               {upsellServices.map((h: any) => {
                 const svc = services.find(s => s.name === h.service_name);
                 if (!svc) return null;
-                const price = getPriceForType(svc);
                 return (
                   <button key={h.service_name} onClick={() => toggleService(svc)}
-                    className="px-3 py-1.5 rounded-full text-xs font-semibold"
+                    className="px-2.5 py-1 rounded-full text-xs font-semibold"
                     style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fcd34d' }}>
-                    + {h.service_name} — {fmt(price)}
+                    + {h.service_name} {fmt(getPriceForType(svc))}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Services grid — scrolls if needed */}
+          <div className="flex-1 overflow-y-auto">
+            {services.length === 0 && (
+              <p className="text-sm text-center pt-8" style={{ color: 'var(--text-tertiary)' }}>No services yet — add them in Services page.</p>
+            )}
+            <div className="grid grid-cols-2 gap-2">
+              {services.map(svc => {
+                const price = getPriceForType(svc);
+                const selected = !!selectedServices.find(s => s.service_id === svc.id);
+                return (
+                  <button key={svc.id} onClick={() => toggleService(svc)}
+                    className="text-left px-4 py-3 rounded-xl text-sm font-medium transition-all flex items-center justify-between"
+                    style={selected
+                      ? { background: 'var(--accent)', color: 'var(--on-accent, #111)' }
+                      : { background: 'var(--surface)', border: '1px solid var(--surface-border)', color: 'var(--text-primary)' }}>
+                    <div>
+                      <p className="font-semibold text-sm">{svc.name}</p>
+                      <p className="text-xs opacity-60">{svc.duration_minutes} min</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold">{fmt(price)}</p>
+                      {selected && <CheckCircle className="h-3.5 w-3.5 ml-auto mt-0.5" />}
+                    </div>
                   </button>
                 );
               })}
             </div>
           </div>
-        )}
+        </div>
 
-        {services.length === 0 && (
-          <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No services yet. Add them in Services page.</p>
-        )}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          {services.map(svc => {
-            const price = getPriceForType(svc);
-            const selected = !!selectedServices.find(s => s.service_id === svc.id);
-            return (
-              <button key={svc.id} onClick={() => toggleService(svc)}
-                className={`text-left px-4 py-3 rounded-xl text-sm font-medium transition-all flex items-center justify-between ${selected ? 'text-white shadow-md' : ''}`}
-                style={selected ? { background: 'var(--accent)' } : { background: 'var(--surface-2)', border: '1px solid var(--surface-border)', color: 'var(--text-primary)' }}>
+      </div>
+
+      {/* ── Bottom bar — total + create ── */}
+      <div className="flex-shrink-0 flex items-center justify-between px-6 py-3"
+        style={{ borderTop: '1px solid var(--surface-border)', background: 'var(--surface)' }}>
+
+        {/* Left — breakdown */}
+        <div className="flex items-center gap-6">
+          {selectedServices.length === 0
+            ? <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Select services from the center to start</p>
+            : <>
                 <div>
-                  <p className="font-semibold">{svc.name}</p>
-                  <p className="text-xs opacity-70">{svc.duration_minutes} min</p>
+                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Services</p>
+                  <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{selectedServices.length} selected</p>
                 </div>
-                <div className="text-right">
-                  <p className="font-bold">{fmt(price)}</p>
-                  {selected && <CheckCircle className="h-4 w-4 ml-auto mt-0.5" />}
+                <div>
+                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Subtotal</p>
+                  <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{fmt(subtotal)}</p>
                 </div>
-              </button>
-            );
-          })}
+                {discountAmt > 0 && (
+                  <div>
+                    <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Discount</p>
+                    <p className="text-sm font-bold" style={{ color: '#16a34a' }}>− {fmt(discountAmt)}</p>
+                  </div>
+                )}
+                {gstEnabled && gstAmt > 0 && (
+                  <div>
+                    <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>GST</p>
+                    <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{fmt(gstAmt)}</p>
+                  </div>
+                )}
+                <div style={{ borderLeft: '2px solid var(--surface-border)', paddingLeft: '1.5rem' }}>
+                  <p className="text-xs font-semibold" style={{ color: 'var(--text-tertiary)' }}>TOTAL</p>
+                  <p className="text-2xl font-bold" style={{ color: 'var(--accent)' }}>{fmt(total)}</p>
+                </div>
+              </>
+          }
         </div>
+
+        {/* Right — create button */}
+        <button
+          onClick={() => createMutation.mutate()}
+          disabled={createMutation.isPending || selectedServices.length === 0}
+          className="px-8 py-3 rounded-2xl font-bold text-base disabled:opacity-40 transition-all"
+          style={{ background: 'var(--accent)', color: 'var(--on-accent, #111)', minWidth: '180px' }}>
+          {createMutation.isPending ? 'Creating…' : '✓ Create Job Card'}
+        </button>
       </div>
 
-      {/* Staff + notes + discount */}
-      <div className="rounded-2xl p-5 space-y-4" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Assign Staff</label>
-            <select value={selectedStaffId}
-              onChange={(e) => {
-                setSelectedStaffId(e.target.value);
-                setSelectedStaffName(staff.find(s => s.id === e.target.value)?.name ?? '');
-              }}
-              className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-              style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }}>
-              <option value="">— No staff —</option>
-              {staff.map(s => <option key={s.id} value={s.id}>{s.name} ({s.role})</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Discount (₹)</label>
-            <input type="number" value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="0"
-              className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-              style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }} />
-          </div>
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Notes</label>
-          <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Any special instructions…"
-            className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-            style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }} />
-        </div>
-      </div>
-
-      {/* Total + Create */}
-      {selectedServices.length > 0 && (
-        <div className="rounded-2xl p-5 space-y-3" style={{ background: 'var(--surface)', border: '2px solid var(--accent)' }}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{selectedServices.length} service{selectedServices.length !== 1 ? 's' : ''}</p>
-              <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                Subtotal {fmt(subtotal)}{discountAmt > 0 ? ` − Disc ${fmt(discountAmt)}` : ''} + GST {fmt(gstAmt)}
-              </p>
-              <p className="text-2xl font-bold" style={{ color: 'var(--accent)' }}>{fmt(total)}</p>
-            </div>
-            <button
-              onClick={() => createMutation.mutate()}
-              disabled={createMutation.isPending}
-              className="px-6 py-3 rounded-xl font-bold text-sm text-white disabled:opacity-60 shadow-lg"
-              style={{ background: 'var(--accent)' }}>
-              {createMutation.isPending ? 'Creating…' : '✓ Create Job Card'}
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

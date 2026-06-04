@@ -196,20 +196,39 @@ export function CarwashServicesPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Duration (min)</label>
-                <input type="number" value={form.duration_minutes} onChange={(e) => setForm(c => ({ ...c, duration_minutes: e.target.value }))}
-                  className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-                  style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }} />
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>Duration (minutes)</label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {[15, 20, 30, 45, 60, 90, 120].map(d => (
+                  <button key={d} type="button" onClick={() => setForm(c => ({ ...c, duration_minutes: String(d) }))}
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+                    style={form.duration_minutes === String(d)
+                      ? { background: 'var(--accent)', color: '#111' }
+                      : { background: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--surface-border)' }}>
+                    {d} min
+                  </button>
+                ))}
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>GST Rate (%)</label>
-                <select value={form.gst_rate} onChange={(e) => setForm(c => ({ ...c, gst_rate: e.target.value }))}
-                  className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-                  style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }}>
-                  {[0, 5, 12, 18, 28].map(r => <option key={r} value={r}>{r}%</option>)}
-                </select>
+              <input type="number" min="1" max="480"
+                value={form.duration_minutes}
+                onChange={(e) => setForm(c => ({ ...c, duration_minutes: e.target.value }))}
+                placeholder="Or type custom minutes"
+                className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
+                style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }} />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>GST Rate (%)</label>
+              <div className="flex gap-2 flex-wrap">
+                {[0, 5, 12, 18, 28].map(r => (
+                  <button key={r} type="button" onClick={() => setForm(c => ({ ...c, gst_rate: String(r) }))}
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+                    style={form.gst_rate === String(r)
+                      ? { background: 'var(--accent)', color: '#111' }
+                      : { background: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--surface-border)' }}>
+                    {r}%
+                  </button>
+                ))}
               </div>
             </div>
 

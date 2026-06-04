@@ -329,14 +329,51 @@ export function SettingsPage() {
         </div>
       </div>
 
-      {/* Appearance — slate tint */}
-      <div className="card p-4 border-l-4 border-l-slate-400">
-        <p className="section-label mb-3 text-slate-300">🎨 Appearance</p>
-        <div className="flex items-center gap-4">
-          <p className="text-sm font-medium text-slate-300">Theme</p>
-          <button onClick={toggleTheme} className="btn-secondary flex items-center gap-2">
+      {/* Appearance */}
+      <div className="card p-5" style={{ borderLeft: '4px solid var(--accent)' }}>
+        <p className="section-label mb-4">🎨 Appearance</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+              {theme === 'dark' ? '🌙 Dark Mode' : '☀️ Light Mode'}
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+              {theme === 'dark' ? 'Switch to light for bright environments' : 'Switch to dark for low-light environments'}
+            </p>
+          </div>
+          <button onClick={toggleTheme}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all"
+            style={{ background: 'var(--accent)', color: '#111' }}>
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+            {theme === 'dark' ? 'Switch to Light' : 'Switch to Dark'}
+          </button>
+        </div>
+      </div>
+
+      {/* GST Toggle */}
+      <div className="card p-5" style={{ borderLeft: '4px solid var(--accent)' }}>
+        <p className="section-label mb-4">🧾 Tax / GST Settings</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+              {config?.settings?.enable_gst !== false ? '✅ GST Enabled' : '❌ GST Disabled'}
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+              {config?.settings?.enable_gst !== false
+                ? 'GST is applied to all services and shown on bills'
+                : 'All GST calculations are hidden from bills and totals'}
+            </p>
+          </div>
+          <button
+            onClick={async () => {
+              const currentlyEnabled = config?.settings?.enable_gst !== false;
+              const newSettings = { ...(config?.settings ?? {}), enable_gst: !currentlyEnabled };
+              await updateAppConfig({ settings: newSettings });
+              await loadConfig();
+            }}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all"
+            style={{ background: 'var(--accent)', color: 'var(--on-accent, #fff)' }}>
+            {config?.settings?.enable_gst !== false ? 'Disable GST' : 'Enable GST'}
           </button>
         </div>
       </div>

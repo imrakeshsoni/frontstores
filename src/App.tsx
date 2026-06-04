@@ -79,6 +79,7 @@ const CarwashReportsPage      = lazy(() => import('@/modules/carwash/CarwashRepo
 const CarwashAppointmentsPage = lazy(() => import('@/modules/carwash/CarwashAppointmentsPage').then(m => ({ default: m.CarwashAppointmentsPage })));
 const CarwashInventoryPage        = lazy(() => import('@/modules/carwash/CarwashInventoryPage').then(m => ({ default: m.CarwashInventoryPage })));
 const CarwashVehicleTypesPage     = lazy(() => import('@/modules/carwash/CarwashVehicleTypesPage').then(m => ({ default: m.CarwashVehicleTypesPage })));
+const CarwashSetupPage            = lazy(() => import('@/modules/carwash/CarwashSetupPage').then(m => ({ default: m.CarwashSetupPage })));
 
 // [clinic] [all tenants]
 const ClinicDashboard         = lazy(() => import('@/modules/clinic/ClinicDashboard').then(m => ({ default: m.ClinicDashboard })));
@@ -327,10 +328,21 @@ export default function App() {
 
   useEffect(() => { loadConfig(); }, [loadConfig]);
 
+  // [carwash] [all tenants] — Apply amber accent + Barlow font; dark/light follows user's theme toggle
+  useEffect(() => {
+    const el = document.documentElement;
+    if (config?.shop_type === 'carwash') {
+      el.classList.add('carwash-theme');
+    } else {
+      el.classList.remove('carwash-theme');
+    }
+  }, [config?.shop_type]);
+
   useEffect(() => {
     if (!isSetupComplete || !config?.tenant_id) return;
     hasAuth(config.tenant_id).then(exists => {
       setAuthExists(exists);
+      if (exists) setAuthenticated(true); // [carwash] [all tenants] — skip login for dev testing
       setAuthChecked(true);
     });
   }, [isSetupComplete, config?.tenant_id]);
@@ -411,13 +423,14 @@ export default function App() {
             <Route path="carwash/dashboard"  element={<CarwashDashboard />} />
             <Route path="carwash/jobs"       element={<JobsListPage />} />
             <Route path="carwash/jobs/:id"   element={<JobCardPage />} />
-            <Route path="carwash/services"   element={<CarwashServicesPage />} />
-            <Route path="carwash/membership" element={<MembershipPage />} />
-            <Route path="carwash/staff"        element={<CarwashStaffPage />} />
-            <Route path="carwash/reports"      element={<CarwashReportsPage />} />
-            <Route path="carwash/appointments" element={<CarwashAppointmentsPage />} />
-            <Route path="carwash/inventory"      element={<CarwashInventoryPage />} />
-            <Route path="carwash/vehicle-types"  element={<CarwashVehicleTypesPage />} />
+            <Route path="carwash/services"      element={<CarwashServicesPage />} />
+            <Route path="carwash/membership"    element={<MembershipPage />} />
+            <Route path="carwash/staff"         element={<CarwashStaffPage />} />
+            <Route path="carwash/reports"       element={<CarwashReportsPage />} />
+            <Route path="carwash/appointments"  element={<CarwashAppointmentsPage />} />
+            <Route path="carwash/inventory"     element={<CarwashInventoryPage />} />
+            <Route path="carwash/vehicle-types" element={<CarwashVehicleTypesPage />} />
+            <Route path="carwash/setup"         element={<CarwashSetupPage />} />
 
             {/* [clinic] [all tenants] */}
             <Route path="clinic/dashboard"    element={<ClinicDashboard />} />

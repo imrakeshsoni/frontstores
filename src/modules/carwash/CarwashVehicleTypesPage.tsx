@@ -1,5 +1,5 @@
 // [carwash] [all tenants]
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Plus, Edit2, Trash2, X, GripVertical } from 'lucide-react';
@@ -66,13 +66,56 @@ export function CarwashVehicleTypesPage() {
   const [form, setForm] = useState<VTypeForm>(emptyForm);
   const [showIconPicker, setShowIconPicker] = useState(false);
 
+  // Drag-and-drop state
+  const [items, setItems] = useState<CarwashVehicleTypeRecord[]>([]);
+  const dragIdx = useRef<number | null>(null);
+  const dragOverIdx = useRef<number | null>(null);
+  const [dragging, setDragging] = useState(false);
+
   const { data: vehicleTypes = [], isLoading } = useQuery({
     queryKey: ['carwash-vtypes', tenantId],
     queryFn: () => listAllVehicleTypes(tenantId),
     enabled: !!tenantId,
   });
 
+  // Sync server data into local items (preserves drag order until server confirms)
+  useEffect(() => { setItems(vehicleTypes); }, [vehicleTypes]);
+
   const invalidate = () => qc.invalidateQueries({ queryKey: ['carwash-vtypes', tenantId] });
+
+  const reorderMutation = useMutation({
+    mutationFn: async (reordered: CarwashVehicleTypeRecord[]) => {
+      for (let i = 0; i < reordered.length; i++) {
+        await updateVehicleType(tenantId, reordered[i].id, { sort_order: i });
+      }
+    },
+    onSuccess: () => invalidate(),
+    onError: () => toast.error('Failed to save order'),
+  });
+
+  const handleDragStart = (idx: number) => {
+    dragIdx.current = idx;
+    setDragging(true);
+  };
+
+  const handleDragEnter = (idx: number) => {
+    dragOverIdx.current = idx;
+    if (dragIdx.current === null || dragIdx.current === idx) return;
+    setItems(prev => {
+      const next = [...prev];
+      const [moved] = next.splice(dragIdx.current!, 1);
+      next.splice(idx, 0, moved);
+      dragIdx.current = idx;
+      return next;
+    });
+  };
+
+  const handleDragEnd = () => {
+    setDragging(false);
+    dragIdx.current = null;
+    dragOverIdx.current = null;
+    reorderMutation.mutate(items);
+  };
 
   const createMutation = useMutation({
     mutationFn: () => {
@@ -152,11 +195,11 @@ export function CarwashVehicleTypesPage() {
       </div>
 
       {/* How it works banner */}
-      <div className="rounded-2xl p-4 flex items-start gap-3" style={{ background: '#f0f9ff', border: '1px solid #bae6fd' }}>
+      <div className="rounded-2xl p-4 flex items-start gap-3" style={{ background: 'rgba(14,165,233,0.10)', border: '1px solid rgba(14,165,233,0.25)' }}>
         <span className="text-xl">💡</span>
-        <div className="text-sm" style={{ color: '#0369a1' }}>
-          <p className="font-semibold">How pricing works</p>
-          <p className="mt-0.5">Each vehicle type has a multiplier vs. Sedan (1×). Example: if Foam Wash costs ₹200 for Sedan, a Truck at 2.5× costs ₹500 automatically.</p>
+        <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+          <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>Drag to reorder · most-used types on top</p>
+          <p className="mt-0.5">Each type has a multiplier vs. Sedan (1×). Example: if Foam Wash costs ₹200 for Sedan, a Truck at 2.5× costs ₹500 automatically.</p>
         </div>
       </div>
 
@@ -165,10 +208,26 @@ export function CarwashVehicleTypesPage() {
         <div key={i} className="h-16 rounded-2xl animate-pulse" style={{ background: 'var(--surface-2)' }} />
       ))}
 
-      <div className="space-y-2">
-        {vehicleTypes.map((vt) => (
-          <div key={vt.id} className={`rounded-2xl p-4 flex items-center gap-4 transition-opacity ${!vt.is_active ? 'opacity-50' : ''}`}
-            style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
+      <div className="space-y-2" onDragOver={e => e.preventDefault()}>
+        {items.map((vt, idx) => (
+          <div
+            key={vt.id}
+            draggable
+            onDragStart={() => handleDragStart(idx)}
+            onDragEnter={() => handleDragEnter(idx)}
+            onDragEnd={handleDragEnd}
+            onDragOver={e => e.preventDefault()}
+            className={`rounded-2xl p-4 flex items-center gap-4 transition-all select-none ${!vt.is_active ? 'opacity-50' : ''} ${dragging && dragIdx.current === idx ? 'opacity-40 scale-95' : ''}`}
+            style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)', cursor: 'grab' }}>
+
+            {/* Drag handle */}
+            <GripVertical className="h-5 w-5 flex-shrink-0" style={{ color: 'var(--text-tertiary)' }} />
+
+            {/* Position badge */}
+            <div className="h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+              style={{ background: 'var(--accent)', color: '#111' }}>
+              {idx + 1}
+            </div>
 
             {/* Icon */}
             <div className="h-12 w-12 rounded-2xl flex items-center justify-center flex-shrink-0 text-2xl"
@@ -181,42 +240,40 @@ export function CarwashVehicleTypesPage() {
               <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>{vt.name}</p>
               <div className="flex items-center gap-3 mt-0.5">
                 <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                  style={{ background: '#dbeafe', color: '#2563eb' }}>
+                  style={{ background: 'rgba(59,130,246,0.18)', color: '#93c5fd' }}>
                   {vt.price_multiplier}× sedan
                 </span>
                 <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                  Example: ₹200 service → ₹{examplePrice(vt.price_multiplier)}
+                  ₹200 service → ₹{examplePrice(vt.price_multiplier)}
                 </span>
               </div>
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-2 flex-shrink-0" onClick={e => e.stopPropagation()}>
               <button onClick={() => toggleMutation.mutate(vt)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all`}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
                 style={vt.is_active
-                  ? { background: '#dcfce7', color: '#16a34a' }
-                  : { background: '#f3f4f6', color: '#6b7280' }}>
+                  ? { background: 'rgba(16,185,129,0.18)', color: '#6ee7b7' }
+                  : { background: 'rgba(156,163,175,0.14)', color: 'var(--text-tertiary)' }}>
                 {vt.is_active ? 'Active' : 'Hidden'}
               </button>
-              <button onClick={() => openEdit(vt)}
-                className="p-2 rounded-xl btn-secondary">
+              <button onClick={() => openEdit(vt)} className="p-2 rounded-xl btn-secondary">
                 <Edit2 className="h-3.5 w-3.5" />
               </button>
-              <button onClick={() => {
-                if (confirm(`Delete "${vt.name}"?`)) deleteMutation.mutate(vt.id);
-              }} className="p-2 rounded-xl" style={{ color: '#dc2626' }}>
+              <button onClick={() => { if (confirm(`Delete "${vt.name}"?`)) deleteMutation.mutate(vt.id); }}
+                className="p-2 rounded-xl" style={{ color: '#f87171' }}>
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
             </div>
           </div>
         ))}
 
-        {vehicleTypes.length === 0 && !isLoading && (
+        {items.length === 0 && !isLoading && (
           <div className="rounded-2xl p-10 text-center" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
             <p className="text-3xl mb-3">🚗</p>
             <p className="font-medium" style={{ color: 'var(--text-secondary)' }}>No vehicle types yet</p>
-            <button onClick={openAdd} className="mt-3 px-4 py-2 rounded-xl text-sm font-semibold text-white" style={{ background: 'var(--accent)' }}>
+            <button onClick={openAdd} className="mt-3 px-4 py-2 rounded-xl text-sm font-semibold" style={{ background: 'var(--accent)', color: 'var(--on-accent, #111)' }}>
               Add First Type
             </button>
           </div>

@@ -480,20 +480,17 @@ const BEAUTY_NAV_ITEMS = [
   { to: '/settings',             icon: Settings,        label: 'Settings',       iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
 
-// [carwash] [all tenants]
+// [carwash] [all tenants] — amber-tinted nav icons for BarberKraft dark theme
 const CARWASH_NAV_ITEMS = [
-  { to: '/carwash/dashboard',     icon: LayoutDashboard, label: 'Dashboard',     iconBg: '#dbeafe', iconColor: '#2563eb' },
-  { to: '/carwash/jobs',          icon: ClipboardCheck,  label: 'Job Cards',     iconBg: '#dcfce7', iconColor: '#16a34a' },
-  { to: '/carwash/appointments',  icon: Calendar,        label: 'Appointments',  iconBg: '#fef3c7', iconColor: '#d97706' },
-  { to: '/carwash/services',      icon: Droplets,        label: 'Services',      iconBg: '#cffafe', iconColor: '#0891b2' },
-  { to: '/carwash/vehicle-types', icon: Car,             label: 'Vehicle Types', iconBg: '#fef3c7', iconColor: '#b45309' },
-  { to: '/carwash/membership',    icon: CreditCard,      label: 'Memberships',   iconBg: '#f3e8ff', iconColor: '#9333ea' },
-  { to: '/carwash/inventory',     icon: Package,         label: 'Inventory',     iconBg: '#ffedd5', iconColor: '#ea580c' },
-  { to: '/customers',             icon: Users,           label: 'Customers',     iconBg: '#fce7f3', iconColor: '#db2777' },
-  { to: '/expenses',              icon: Wallet,          label: 'Expenses',      iconBg: '#fee2e2', iconColor: '#dc2626' },
-  { to: '/carwash/staff',         icon: Wrench,          label: 'Staff',         iconBg: '#d1fae5', iconColor: '#059669' },
-  { to: '/carwash/reports',       icon: BarChart3,       label: 'Reports',       iconBg: '#e0f2fe', iconColor: '#0284c7' },
-  { to: '/settings',              icon: Settings,        label: 'Settings',      iconBg: '#f1f5f9', iconColor: '#64748b' },
+  { to: '/carwash/dashboard',     icon: LayoutDashboard, label: 'Dashboard',     iconBg: 'rgba(245,158,11,0.15)', iconColor: '#f59e0b' },
+  { to: '/carwash/jobs',          icon: ClipboardCheck,  label: 'Job Cards',     iconBg: 'rgba(245,158,11,0.15)', iconColor: '#f59e0b' },
+  { to: '/carwash/appointments',  icon: Calendar,        label: 'Appointments',  iconBg: 'rgba(245,158,11,0.15)', iconColor: '#f59e0b' },
+  { to: '/carwash/membership',    icon: CreditCard,      label: 'Memberships',   iconBg: 'rgba(245,158,11,0.15)', iconColor: '#f59e0b' },
+  { to: '/carwash/inventory',     icon: Package,         label: 'Inventory',     iconBg: 'rgba(245,158,11,0.15)', iconColor: '#f59e0b' },
+  { to: '/customers',             icon: Users,           label: 'Customers',     iconBg: 'rgba(245,158,11,0.15)', iconColor: '#f59e0b' },
+  { to: '/expenses',              icon: Wallet,          label: 'Expenses',      iconBg: 'rgba(245,158,11,0.15)', iconColor: '#f59e0b' },
+  { to: '/carwash/reports',       icon: BarChart3,       label: 'Reports',       iconBg: 'rgba(245,158,11,0.15)', iconColor: '#f59e0b' },
+  { to: '/carwash/setup',         icon: Wrench,          label: 'Setup',         iconBg: 'rgba(245,158,11,0.15)', iconColor: '#f59e0b' },
 ];
 
 export function AppLayout() {
@@ -650,8 +647,8 @@ export function AppLayout() {
           {/* Switch App button — clearly visible */}
           <button
             onClick={() => setShowSwitchModal(true)}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-90"
-            style={{ background: 'var(--accent)', color: 'white' }}
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
+            style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--surface-border)' }}
           >
             <ArrowLeftRight className="h-4 w-4 flex-shrink-0" />
             Switch App
@@ -748,9 +745,8 @@ export function AppLayout() {
         </main>
       </div>
 
-      {/* Voice assistants — shop apps get VoiceAssistant, StudyMate gets StudyVoiceAssistant */}
-      {config?.shop_type !== 'study' && <VoiceAssistant />}
-      {config?.shop_type === 'study'  && <StudyVoiceAssistant />}
+      {/* Voice assistants — only StudyMate; removed from other shop apps [carwash] [all tenants] */}
+      {config?.shop_type === 'study' && <StudyVoiceAssistant />}
       {/* [core] [all tenants] — Mobile bottom nav (shown only on small screens) */}
       <div className="lg:hidden">
         <MobileNav />

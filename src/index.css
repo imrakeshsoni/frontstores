@@ -1,3 +1,12 @@
+/* [carwash] [all tenants] — Barlow font bundled locally for offline use */
+@font-face { font-family: 'Barlow'; font-style: normal; font-weight: 400; font-display: swap; src: url('/fonts/barlow-400.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow'; font-style: normal; font-weight: 500; font-display: swap; src: url('/fonts/barlow-500.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow'; font-style: normal; font-weight: 600; font-display: swap; src: url('/fonts/barlow-600.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow'; font-style: normal; font-weight: 700; font-display: swap; src: url('/fonts/barlow-700.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow'; font-style: normal; font-weight: 800; font-display: swap; src: url('/fonts/barlow-800.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow'; font-style: italic; font-weight: 700; font-display: swap; src: url('/fonts/barlow-700-italic.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow'; font-style: italic; font-weight: 800; font-display: swap; src: url('/fonts/barlow-800-italic.woff2') format('woff2'); }
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5,20 +14,22 @@
 @layer base {
   :root {
     color-scheme: light;
-    --bg:              #F5F5F7;
-    --surface:         #FFFFFF;
-    --surface-2:       #F5F5F7;
-    --surface-border:  rgba(0, 0, 0, 0.08);
-    --text-primary:    #1D1D1F;
-    --text-secondary:  #6E6E73;
-    --text-tertiary:   #86868B;
-    --accent:          #0071E3;
+    /* Apple.com exact design tokens */
+    --bg:              #F5F5F7;   /* Apple signature off-white */
+    --surface:         #FFFFFF;   /* Pure white cards */
+    --surface-2:       #F5F5F7;   /* Nested / secondary surfaces */
+    --surface-border:  #E8E8ED;   /* Apple's hairline divider */
+    --text-primary:    #1D1D1F;   /* Apple near-black */
+    --text-secondary:  #6E6E73;   /* Apple secondary */
+    --text-tertiary:   #86868B;   /* Apple tertiary */
+    --accent:          #0071E3;   /* Apple blue */
     --accent-hover:    #0077ED;
     --accent-soft:     rgba(0, 113, 227, 0.10);
     --accent-ring:     rgba(0, 113, 227, 0.25);
-    --shadow-sm:       0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-    --shadow-md:       0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
-    --shadow-lg:       0 8px 32px rgba(0, 0, 0, 0.10), 0 2px 8px rgba(0, 0, 0, 0.06);
+    /* Apple uses almost no shadow — surfaces are differentiated by bg color alone */
+    --shadow-sm:       0 1px 4px rgba(0, 0, 0, 0.05);
+    --shadow-md:       0 4px 20px rgba(0, 0, 0, 0.07);
+    --shadow-lg:       0 8px 40px rgba(0, 0, 0, 0.10);
     --radius-sm:       10px;
     --radius-md:       14px;
     --radius-lg:       18px;
@@ -45,6 +56,172 @@
     --shadow-md:       0 4px 16px rgba(0, 0, 0, 0.55), 0 1px 4px rgba(0, 0, 0, 0.30);
     --shadow-lg:       0 8px 32px rgba(0, 0, 0, 0.65), 0 2px 8px rgba(0, 0, 0, 0.40);
   }
+
+  /* [carwash] [all tenants] — BarberKraft-inspired dark amber theme */
+  /* carwash-theme: amber accent + Barlow font. Dark/light backgrounds from html.dark / :root */
+  html.carwash-theme {
+    --accent:          #f59e0b;
+    --accent-hover:    #d97706;
+    --accent-soft:     rgba(245, 158, 11, 0.14);
+    --accent-ring:     rgba(245, 158, 11, 0.28);
+    font-family: 'Barlow', -apple-system, BlinkMacSystemFont, 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  }
+
+  /* Light mode carwash — full Apple.com color scheme
+     Dark mode = BarberKraft amber. Light mode = Apple blue + Apple grays. */
+  html.carwash-theme:not(.dark) {
+    --on-accent:       #ffffff;   /* White text on Apple blue */
+    --accent:          #0071E3;   /* Apple blue — exact */
+    --accent-hover:    #0077ED;
+    --accent-soft:     rgba(0, 113, 227, 0.10);
+    --accent-ring:     rgba(0, 113, 227, 0.25);
+    --bg:              #F5F5F7;
+    --surface:         #FFFFFF;
+    --surface-2:       #F5F5F7;
+    --surface-border:  #E8E8ED;
+    --text-primary:    #1D1D1F;
+    --text-secondary:  #6E6E73;
+    --text-tertiary:   #86868B;
+    --shadow-sm:       0 1px 4px rgba(0,0,0,0.05);
+    --shadow-md:       0 4px 20px rgba(0,0,0,0.07);
+    --shadow-lg:       0 8px 40px rgba(0,0,0,0.10);
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif;
+  }
+
+  /* Amber text contrast fix only applies in dark mode */
+
+  /* Dark mode for carwash — deep near-black surfaces */
+  html.carwash-theme.dark {
+    --on-accent:       #111111;   /* Dark text on amber */
+    color-scheme: dark;
+    --bg:              #0f1011;
+    --surface:         #1a1d21;
+    --surface-2:       #22262c;
+    --surface-border:  rgba(255, 255, 255, 0.08);
+    --text-primary:    #ffffff;
+    --text-secondary:  #9ca3af;
+    --text-tertiary:   #6b7280;
+    --shadow-sm:       0 1px 3px rgba(0, 0, 0, 0.50), 0 1px 2px rgba(0, 0, 0, 0.35);
+    --shadow-md:       0 4px 16px rgba(0, 0, 0, 0.65), 0 1px 4px rgba(0, 0, 0, 0.40);
+    --shadow-lg:       0 8px 32px rgba(0, 0, 0, 0.75), 0 2px 8px rgba(0, 0, 0, 0.50);
+  }
+
+  /* Barlow font — dark mode only (light mode uses SF Pro like Apple) */
+  html.carwash-theme.dark body,
+  html.carwash-theme.dark h1,
+  html.carwash-theme.dark h2,
+  html.carwash-theme.dark h3 {
+    font-family: 'Barlow', -apple-system, BlinkMacSystemFont, 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  }
+  html.carwash-theme.dark h1,
+  html.carwash-theme.dark h2,
+  html.carwash-theme.dark h3 {
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  /* DARK MODE ONLY — amber bg needs dark text (#f59e0b: 2.6:1 with white, 8.5:1 with #111)
+     NOTE: hex colors normalize to rgb() in DOM so hex selectors are unreliable.
+     Only selector that works reliably is var(--accent) since it's preserved literally. */
+  html.carwash-theme.dark [style*="background: var(--accent)"],
+  html.carwash-theme.dark [style*="background:var(--accent)"] {
+    color: #111111 !important;
+  }
+  html.carwash-theme.dark [style*="background: var(--accent)"] .text-white,
+  html.carwash-theme.dark [style*="background:var(--accent)"] .text-white,
+  html.carwash-theme.dark [style*="background: var(--accent)"] svg,
+  html.carwash-theme.dark [style*="background:var(--accent)"] svg {
+    color: #111111 !important;
+  }
+  html.carwash-theme.dark .btn-primary,
+  html.carwash-theme.dark .btn-primary:hover:not(:disabled) {
+    color: #111111 !important;
+  }
+
+  /* LIGHT MODE — Apple blue accent, white text on buttons (standard) */
+  html.carwash-theme:not(.dark) .btn-primary {
+    color: #ffffff !important;
+    box-shadow: none;
+  }
+
+  /* Dark-only overrides — only apply when both carwash-theme AND dark are active */
+  html.carwash-theme.dark input,
+  html.carwash-theme.dark textarea,
+  html.carwash-theme.dark select {
+    color: var(--text-primary) !important;
+    background: var(--surface-2) !important;
+  }
+  html.carwash-theme.dark input::placeholder,
+  html.carwash-theme.dark textarea::placeholder {
+    color: var(--text-tertiary) !important;
+    opacity: 1 !important;
+  }
+  html.carwash-theme.dark select option {
+    background: var(--surface) !important;
+    color: var(--text-primary) !important;
+  }
+
+  /* Focus ring — applies in both modes */
+  html.carwash-theme input:focus,
+  html.carwash-theme textarea:focus,
+  html.carwash-theme select:focus {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 3px var(--accent-ring) !important;
+    outline: none !important;
+  }
+  html.carwash-theme input[type="checkbox"],
+  html.carwash-theme input[type="radio"] {
+    accent-color: var(--accent);
+  }
+
+  /* Tailwind text overrides — dark only */
+  html.carwash-theme.dark .text-slate-900,
+  html.carwash-theme.dark .text-slate-800,
+  html.carwash-theme.dark .text-slate-700 { color: var(--text-primary) !important; }
+  html.carwash-theme.dark .text-slate-600,
+  html.carwash-theme.dark .text-slate-500 { color: var(--text-secondary) !important; }
+  html.carwash-theme.dark .text-slate-400,
+  html.carwash-theme.dark .text-slate-300 { color: var(--text-tertiary) !important; }
+
+  /* Hardcoded light backgrounds → dark surfaces — dark only */
+  html.carwash-theme.dark .bg-white,
+  html.carwash-theme.dark .bg-slate-50,
+  html.carwash-theme.dark .bg-slate-100 { background: var(--surface) !important; }
+  html.carwash-theme.dark .bg-slate-200  { background: var(--surface-2) !important; }
+  html.carwash-theme.dark .hover\:bg-slate-50:hover,
+  html.carwash-theme.dark .hover\:bg-slate-100:hover { background: var(--surface-2) !important; }
+  html.carwash-theme.dark .hover\:bg-slate-900:hover  { background: var(--surface-2) !important; }
+  html.carwash-theme.dark .border-slate-200,
+  html.carwash-theme.dark .border-slate-100 { border-color: var(--surface-border) !important; }
+
+  /* Badge colours — dark only */
+  html.carwash-theme.dark .badge-green  { background: rgba(16, 185, 129, 0.18) !important; color: #6ee7b7 !important; }
+  html.carwash-theme.dark .badge-yellow { background: rgba(245, 158, 11, 0.20) !important; color: #fcd34d !important; }
+  html.carwash-theme.dark .badge-red    { background: rgba(239, 68, 68, 0.18) !important;  color: #fca5a5 !important; }
+  html.carwash-theme.dark .badge-blue   { background: rgba(59, 130, 246, 0.18) !important; color: #93c5fd !important; }
+  html.carwash-theme.dark .badge-gray   { background: rgba(156, 163, 175, 0.14) !important; color: var(--text-secondary) !important; }
+  html.carwash-theme.dark .hover\:bg-red-50:hover   { background: rgba(239, 68, 68, 0.15) !important; }
+  html.carwash-theme.dark .hover\:bg-blue-50:hover  { background: rgba(59, 130, 246, 0.15) !important; }
+  html.carwash-theme.dark .hover\:text-red-600:hover,
+  html.carwash-theme.dark .hover\:text-red-500:hover  { color: #f87171 !important; }
+  html.carwash-theme.dark .hover\:text-blue-600:hover { color: #93c5fd !important; }
+  html.carwash-theme.dark .hover\:text-green-600:hover { color: #6ee7b7 !important; }
+
+  /* Skeleton — dark only */
+  html.carwash-theme.dark .skeleton,
+  html.carwash-theme.dark .animate-pulse {
+    background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface) 50%, var(--surface-2) 75%) !important;
+    background-size: 200% 100% !important;
+  }
+
+  /* Inline status bg colours — dark only: convert light pastels to dark-friendly translucent versions */
+  html.carwash-theme.dark [style*="background: #d1fae5"], html.carwash-theme.dark [style*="background:#d1fae5"] { background: rgba(16,185,129,0.18) !important; }
+  html.carwash-theme.dark [style*="background: #dcfce7"], html.carwash-theme.dark [style*="background:#dcfce7"] { background: rgba(16,185,129,0.18) !important; }
+  html.carwash-theme.dark [style*="background: #fef3c7"], html.carwash-theme.dark [style*="background:#fef3c7"] { background: rgba(245,158,11,0.20) !important; }
+  html.carwash-theme.dark [style*="background: #dbeafe"], html.carwash-theme.dark [style*="background:#dbeafe"] { background: rgba(59,130,246,0.18) !important; }
+  html.carwash-theme.dark [style*="background: #eff6ff"], html.carwash-theme.dark [style*="background:#eff6ff"] { background: rgba(59,130,246,0.12) !important; }
+  html.carwash-theme.dark [style*="background: #ede9fe"], html.carwash-theme.dark [style*="background:#ede9fe"] { background: rgba(124,58,237,0.18) !important; }
+  html.carwash-theme.dark [style*="background: #f3f4f6"], html.carwash-theme.dark [style*="background:#f3f4f6"] { background: rgba(156,163,175,0.14) !important; }
 
   /* [study] [all tenants] — Night-friendly midnight purple theme for StudyMate */
   /* [study] [all tenants] — Dynamic theme shell. Colors injected via JS studyThemes.ts */
@@ -168,7 +345,11 @@
 
   body {
     @apply min-h-screen antialiased;
-    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+    /* SF Pro stack — exactly what Apple.com uses */
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 17px;
+    line-height: 1.47059;
+    letter-spacing: -0.022em;
     background-color: var(--bg);
     color: var(--text-primary);
     -webkit-font-smoothing: antialiased;
@@ -179,21 +360,22 @@
 
   h1 {
     font-size: clamp(1.75rem, 3vw, 2.5rem);
-    font-weight: 600;
-    letter-spacing: -0.025em;
-    line-height: 1.1;
+    font-weight: 700;
+    letter-spacing: -0.030em;   /* Apple display headline tracking */
+    line-height: 1.08;
     color: var(--text-primary);
   }
   h2 {
     font-size: 1.375rem;
     font-weight: 600;
-    letter-spacing: -0.018em;
+    letter-spacing: -0.022em;
+    line-height: 1.18;
     color: var(--text-primary);
   }
   h3 {
     font-size: 1.0625rem;
     font-weight: 600;
-    letter-spacing: -0.012em;
+    letter-spacing: -0.016em;
     color: var(--text-primary);
   }
   p { color: var(--text-primary); }
@@ -216,12 +398,12 @@
     background: var(--surface);
     border: 1px solid var(--surface-border);
     border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-sm);
+    box-shadow: none;   /* Apple differentiates surfaces via bg color, not shadow */
   }
 
   .card-strong {
     @apply card;
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-sm);  /* Only strong-card gets a subtle shadow */
   }
 
   .card-inset {
@@ -254,7 +436,7 @@
   .btn-primary {
     @apply btn text-white disabled:cursor-not-allowed disabled:opacity-50;
     background-color: var(--accent);
-    box-shadow: 0 1px 2px rgba(0, 113, 227, 0.3);
+    box-shadow: none;   /* Apple buttons use no shadow — solid fill only */
   }
   .btn-primary:hover:not(:disabled) {
     background-color: var(--accent-hover);

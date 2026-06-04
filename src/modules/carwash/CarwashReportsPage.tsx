@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { TrendingUp, Users, PhoneCall, Star } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
+import { sendWhatsApp } from '@/lib/whatsapp';
 import { getMonthlyRevenue, getPopularServices, getLapsedCustomers, getStaffPerformance, getStaffWeeklyPerformance, getTodayStats, listTopLoyaltyCustomers } from '@/lib/db/carwash';
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
@@ -75,7 +76,7 @@ export function CarwashReportsPage() {
     const msg = `Hi ${name} 👋\n\nWe miss your car! 🚗 It's been a while since your last wash.\n\nVisit ${config?.shop_name ?? 'us'} for a fresh clean today. Special offer for loyal customers!\n\nCall us or just drive in 😊`;
     const cleaned = phone.replace(/\D/g, '');
     if (cleaned.length < 10) return;
-    window.open(`https://wa.me/91${cleaned}?text=${encodeURIComponent(msg)}`, '_blank');
+    sendWhatsApp(cleaned, msg);
   };
 
   return (

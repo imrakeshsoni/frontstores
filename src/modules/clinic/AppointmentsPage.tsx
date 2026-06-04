@@ -8,6 +8,7 @@ import {
 } from '@/lib/db/clinic';
 import { toast } from 'sonner';
 import { Plus, MessageCircle, CheckCircle } from 'lucide-react';
+import { sendWhatsApp } from '@/lib/whatsapp';
 
 const STATUS_COLOR: Record<string, { bg: string; color: string }> = {
   scheduled:  { bg: '#dbeafe', color: '#2563eb' },
@@ -77,10 +78,10 @@ export function AppointmentsPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['clinic-appointments', tid, date] }),
   });
 
-  function sendWhatsApp(a: any) {
+  function sendApptReminder(a: any) {
     if (!a.patient_phone) { toast.error('No phone number'); return; }
     const text = `Hello ${a.patient_name ?? 'Patient'},\n\nThis is a reminder for your appointment at ${config?.shop_name ?? 'Clinic'} on ${a.appointment_date}${a.appointment_time ? ` at ${a.appointment_time}` : ''}.\n\nPlease carry your previous prescriptions and reports.\n\nThank you!`;
-    window.open(`https://wa.me/91${a.patient_phone}?text=${encodeURIComponent(text)}`);
+    sendWhatsApp(a.patient_phone, text);
   }
 
   return (
@@ -138,7 +139,7 @@ export function AppointmentsPage() {
               <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ background: sc.bg, color: sc.color }}>{a.status}</span>
               <div className="flex gap-2">
                 {a.patient_phone && (
-                  <button onClick={() => sendWhatsApp(a)} title="Send WhatsApp reminder"
+                  <button onClick={() => sendApptReminder(a)} title="Send WhatsApp reminder"
                     className="p-2 rounded-xl" style={{ background: '#dcfce7', color: '#16a34a' }}>
                     <MessageCircle className="h-3.5 w-3.5" />
                   </button>
