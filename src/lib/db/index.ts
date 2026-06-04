@@ -74,6 +74,14 @@ export function uuid(): string {
   return crypto.randomUUID();
 }
 
+function _pad(n: number) { return String(n).padStart(2, '0'); }
+
 export function now(): string {
-  return new Date().toISOString().replace('T', ' ').substring(0, 19);
+  const d = new Date();
+  return `${d.getFullYear()}-${_pad(d.getMonth()+1)}-${_pad(d.getDate())} ${_pad(d.getHours())}:${_pad(d.getMinutes())}:${_pad(d.getSeconds())}`;
+}
+
+export function localDateISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${_pad(d.getMonth()+1)}-${_pad(d.getDate())}`;
 }

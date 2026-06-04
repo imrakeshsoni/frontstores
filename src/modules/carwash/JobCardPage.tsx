@@ -31,7 +31,7 @@ const STATUS_FLOW: Record<JobStatus, { next: JobStatus | null; label: string; co
 
 type SelectedService = { service_id: string; service_name: string; price: number; gst_rate: number };
 
-function todayISO() { return new Date().toISOString().slice(0, 10); }
+function todayISO() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function fmt(n: number) { return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`; }
 function timeSince(iso: string) {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);

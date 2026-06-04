@@ -1,5 +1,5 @@
 // [carwash] [all tenants]
-import { getDb, uuid, now } from './index';
+import { getDb, uuid, now, localDateISO } from './index';
 import { getCustomerByPhone, createCustomer } from './customers';
 
 export type VehicleType = 'hatchback' | 'sedan' | 'suv' | 'luxury';
@@ -433,7 +433,7 @@ export async function searchVehicles(tenantId: string, search: string): Promise<
 
 async function nextJobNumber(tenantId: string): Promise<string> {
   const db = await getDb();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateISO();
   const rows = await db.select<{ count: number }[]>(
     `SELECT COUNT(*) as count FROM carwash_jobs WHERE tenant_id = ? AND created_at LIKE ?`,
     [tenantId, `${today}%`]
@@ -532,14 +532,14 @@ export async function createJob(tenantId: string, data: {
 
   await db.execute(
     `INSERT INTO carwash_jobs (id, tenant_id, job_number, vehicle_id, reg_number, vehicle_type, make, model, color,
-      customer_name, customer_phone, customer_id, staff_id, staff_name, status, subtotal, discount, gst_amount, total, membership_id, notes)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      customer_name, customer_phone, customer_id, staff_id, staff_name, status, subtotal, discount, gst_amount, total, membership_id, notes, created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [jobId, tenantId, jobNumber, vehicle.id, data.reg_number, data.vehicle_type,
      data.make ?? null, data.model ?? null, data.color ?? null,
      data.customer_name ?? null, data.customer_phone ?? null, customerId,
      data.staff_id ?? null, data.staff_name ?? null,
      'waiting', subtotal, discount, gstAmount, total,
-     data.membership_id ?? null, data.notes ?? null]
+     data.membership_id ?? null, data.notes ?? null, now()]
   );
 
   for (const item of data.items) {
@@ -700,7 +700,7 @@ export async function getTodayStats(tenantId: string): Promise<{
   totalJobs: number; revenue: number; pending: number; inProgress: number; ready: number; delivered: number;
 }> {
   const db = await getDb();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateISO();
   const rows = await db.select<any[]>(
     `SELECT status, COUNT(*) as count, COALESCE(SUM(total),0) as revenue
      FROM carwash_jobs WHERE tenant_id = ? AND created_at LIKE ? AND deleted_at IS NULL GROUP BY status`,
@@ -830,7 +830,8 @@ export async function getDailyRevenueLast30(tenantId: string): Promise<Array<{ d
 
 export async function getLapsedCustomers(tenantId: string, daysSince = 30): Promise<Array<{ customer_name: string; customer_phone: string; reg_number: string; last_visit: string }>> {
   const db = await getDb();
-  const cutoff = new Date(Date.now() - daysSince * 86400000).toISOString().slice(0, 10);
+  const _lc = new Date(Date.now() - daysSince * 86400000);
+  const cutoff = `${_lc.getFullYear()}-${String(_lc.getMonth()+1).padStart(2,'0')}-${String(_lc.getDate()).padStart(2,'0')}`;
   return db.select<any[]>(
     `SELECT customer_name, customer_phone, reg_number, MAX(created_at) as last_visit
      FROM carwash_jobs WHERE tenant_id = ? AND customer_phone IS NOT NULL AND deleted_at IS NULL
