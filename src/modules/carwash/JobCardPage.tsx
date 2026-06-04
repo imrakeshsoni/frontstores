@@ -380,6 +380,7 @@ export function JobCardPage() {
       if (!customerPhone.trim()) throw new Error('Phone number is required');
       if (customerPhone.replace(/\D/g, '').length !== 10) throw new Error('Phone number must be exactly 10 digits');
       if (selectedServices.length === 0) throw new Error('Select at least one service');
+      if ((selectedStaffIds.length === 0) && !selectedStaffId) throw new Error('Assign at least one staff member');
       if (discountAmt < 0) throw new Error('Discount cannot be negative');
       if (discountAmt > subtotal) throw new Error(`Discount (₹${discountAmt}) cannot exceed subtotal (₹${subtotal})`);
       return createJob(tenantId, {
