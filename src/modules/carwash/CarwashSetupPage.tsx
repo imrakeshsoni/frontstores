@@ -67,8 +67,9 @@ function VehiclesTab({ tenantId }: { tenantId: string }) {
   const saveMutation = useMutation({
     mutationFn: () => {
       if (!name.trim()) throw new Error('Name required');
-      if (editing) return updateVehicleType(tenantId, editing.id, { name: name.trim(), icon, price_multiplier: 1, is_active: editing.is_active, sort_order: editing.sort_order });
-      return createVehicleType(tenantId, { name: name.trim(), icon, price_multiplier: 1 });
+      if (name.trim().length > 30) throw new Error('Name too long (max 30 characters)');
+      if (editing) return updateVehicleType(tenantId, editing.id, { name: name.trim(), icon, price_multiplier: 1.0, is_active: editing.is_active, sort_order: editing.sort_order });
+      return createVehicleType(tenantId, { name: name.trim(), icon, price_multiplier: 1.0 });
     },
     onSuccess: () => { toast.success(editing ? 'Updated' : 'Vehicle type added'); setShowForm(false); inv(); },
     onError: (e: any) => toast.error(e?.message ?? 'Failed'),
@@ -200,7 +201,7 @@ function ServicesTab({ tenantId }: { tenantId: string }) {
   const saveSvcMutation = useMutation({
     mutationFn: async () => {
       if (!svcName.trim()) throw new Error('Service name required');
-      const basePrice = Number(svcBasePrice) || 0;
+      const basePrice = Math.max(0, Number(svcBasePrice) || 0);
       const data = {
         name: svcName.trim(), description: null,
         duration_minutes: Number(svcDuration) || 30, is_active: svcActive,
@@ -431,7 +432,10 @@ function StaffTab({ tenantId }: { tenantId: string }) {
   const saveMutation = useMutation({
     mutationFn: () => {
       if (!form.name.trim()) throw new Error('Name required');
-      const data = { name: form.name.trim(), phone: form.phone || undefined, role: form.role, monthly_salary: Number(form.monthly_salary) || 0, joining_date: form.joining_date || undefined, deduct_half_day: form.deduct_half_day, deduct_full_day_leave: form.deduct_full_day_leave };
+      const salary = Number(form.monthly_salary) || 0;
+      if (salary < 0 || salary > 999999) throw new Error('Salary must be between ₹0 and ₹9,99,999');
+      if (form.phone && !/^\d{10}$/.test(form.phone.replace(/\D/g, ''))) throw new Error('Phone must be 10 digits');
+      const data = { name: form.name.trim(), phone: form.phone || undefined, role: form.role, monthly_salary: salary, joining_date: form.joining_date || undefined, deduct_half_day: form.deduct_half_day, deduct_full_day_leave: form.deduct_full_day_leave };
       return editing ? updateCarwashStaff(tenantId, editing.id, data) : createCarwashStaff(tenantId, data);
     },
     onSuccess: () => { toast.success(editing ? 'Staff updated' : 'Staff added'); setShowForm(false); setEditing(null); inv(); },
@@ -579,6 +583,12 @@ function AttendanceTab({ tenantId }: { tenantId: string }) {
       if (!advanceModal) throw new Error('No staff selected');
       const amt = Number(advanceAmount);
       if (!amt || amt <= 0) throw new Error('Enter a valid amount');
+      if (amt > 999999) throw new Error('Amount too large');
+      // Find the net salary to cap advance
+      const summary = summaries.find(sm => sm.staff.id === advanceModal!.id);
+      const alreadyAdvanced = advances.filter(a => a.staff_id === advanceModal!.id).reduce((t, a) => t + a.amount, 0);
+      if (summary && alreadyAdvanced + amt > summary.net_salary) throw new Error(`Total advance (₹${alreadyAdvanced + amt}) cannot exceed net salary (₹${summary.net_salary})`);
+
       return addSalaryAdvance(tenantId, advanceModal.id, monthStr, amt, advanceNote || undefined);
     },
     onSuccess: () => {

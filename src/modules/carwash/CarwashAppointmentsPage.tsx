@@ -107,10 +107,12 @@ export function CarwashAppointmentsPage() {
         if (!regVal.valid) throw new Error(regVal.error);
       }
       if (!form.appointment_time) throw new Error('Select a time slot');
+      const dur = Number(form.duration_minutes) || 60;
+      if (dur < 5 || dur > 480) throw new Error('Duration must be between 5 and 480 minutes');
       return createAppointment(tenantId, {
         appointment_date: date,
         appointment_time: form.appointment_time,
-        duration_minutes: Number(form.duration_minutes) || 60,
+        duration_minutes: dur,
         reg_number: form.reg_number.toUpperCase() || undefined,
         vehicle_type: form.vehicle_type,
         make: form.make || undefined,
@@ -266,6 +268,7 @@ export function CarwashAppointmentsPage() {
     if (appt.staff_id)      params.set('staffId',  appt.staff_id);
     if (appt.staff_name)    params.set('staffName',appt.staff_name);
     if (appt.services_note) params.set('services', appt.services_note);
+    params.set('apptId', appt.id);
     navigate(`/carwash/jobs/new?${params.toString()}`);
     statusMutation.mutate({ id: appt.id, status: 'arrived' });
   };

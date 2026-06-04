@@ -53,6 +53,7 @@ import migration0052 from '../../../src-tauri/migrations/0052_carwash_vehicle_ty
 import migration0053 from '../../../src-tauri/migrations/0053_carwash_service_prices.sql?raw';
 import migration0054 from '../../../src-tauri/migrations/0054_carwash_attendance.sql?raw';
 import migration0055 from '../../../src-tauri/migrations/0055_carwash_advance_salary.sql?raw';
+import migration0056 from '../../../src-tauri/migrations/0056_carwash_indexes.sql?raw';
 
 export interface Migration {
   name: string;
@@ -116,5 +117,6 @@ export async function readMigrations(): Promise<Migration[]> {
     { name: '0053_carwash_service_prices', sql: migration0053 },
     { name: '0054_carwash_attendance', sql: migration0054 },
     { name: '0055_carwash_advance_salary', sql: migration0055 },
+    { name: '0056_carwash_indexes', sql: migration0056 },
   ];
 }

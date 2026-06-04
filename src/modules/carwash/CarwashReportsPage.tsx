@@ -409,6 +409,9 @@ function ExportTab({ tenantId, section, setSection, jobFrom, setJobFrom, jobTo, 
   ];
 
   const handleDownload = () => {
+    if (section === 'jobs' && jobFrom > jobTo) {
+      alert('"From" date must be before "To" date'); return;
+    }
     if (section === 'jobs') {
       const rows = [['Job #','Date','Reg Number','Vehicle Type','Make','Model','Color','Customer','Phone','Staff','Services','Subtotal','Discount','GST','Total','Payment','Status']];
       for (const j of exportJobs) {

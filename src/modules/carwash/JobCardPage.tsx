@@ -14,7 +14,7 @@ import {
   listJobs, createJob, updateJob, updateJobStatus, settleJob, deleteJob,
   listServices, listCarwashStaff, findVehicleByReg, findVehiclesByPhone, searchVehicles,
   findActiveMembership, getVehicleServiceHistory, getLoyaltyByPhone, listVehicleTypes, validateRegNumber,
-  getAllServicePrices,
+  getAllServicePrices, updateAppointmentStatus,
   type CarwashJob, type CarwashVehicleTypeRecord, type JobStatus, type CarwashVehicle,
 } from '@/lib/db/carwash';
 import { listCustomers } from '@/lib/db/customers';
@@ -302,15 +302,16 @@ export function JobCardPage() {
     if (services.length === 0 || vehicleTypes.length === 0) return; // wait for data
     prefillDone.current = true;
 
-    const reg      = searchParams.get('reg') ?? '';
-    const name     = searchParams.get('name') ?? '';
-    const phone    = searchParams.get('phone') ?? '';
-    const vtype    = searchParams.get('vtype') ?? '';
-    const make     = searchParams.get('make') ?? '';
-    const model    = searchParams.get('model') ?? '';
-    const staffId  = searchParams.get('staffId') ?? '';
-    const staffName= searchParams.get('staffName') ?? '';
-    const svcNote  = searchParams.get('services') ?? '';
+    const reg        = searchParams.get('reg') ?? '';
+    const name       = searchParams.get('name') ?? '';
+    const phone      = searchParams.get('phone') ?? '';
+    const vtype      = searchParams.get('vtype') ?? '';
+    const make       = searchParams.get('make') ?? '';
+    const model      = searchParams.get('model') ?? '';
+    const staffId    = searchParams.get('staffId') ?? '';
+    const staffName  = searchParams.get('staffName') ?? '';
+    const svcNote    = searchParams.get('services') ?? '';
+    const apptId     = searchParams.get('apptId') ?? '';
 
     if (reg)   setRegNumber(reg);
     if (name)  setCustomerName(name);
@@ -363,11 +364,12 @@ export function JobCardPage() {
 
   const gstEnabled = config?.settings?.enable_gst !== false;
   const subtotal = selectedServices.reduce((s, i) => s + i.price, 0);
-  const discountAmt = Number(discount) || 0;
-  const gstAmt = gstEnabled ? selectedServices.reduce((s, i) => {
-    const share = subtotal > 0 ? i.price / subtotal : 1 / Math.max(selectedServices.length, 1);
+  const discountAmt = Math.max(0, Number(discount) || 0);
+  const itemCount = Math.max(selectedServices.length, 1);
+  const gstAmt = gstEnabled ? Math.round(selectedServices.reduce((s, i) => {
+    const share = subtotal > 0 ? i.price / subtotal : 1 / itemCount;
     return s + (i.price - discountAmt * share) * i.gst_rate / 100;
-  }, 0) : 0;
+  }, 0) * 100) / 100 : 0;
   const total = Math.max(0, subtotal - discountAmt + gstAmt);
 
   const createMutation = useMutation({
@@ -378,9 +380,11 @@ export function JobCardPage() {
       if (!customerPhone.trim()) throw new Error('Phone number is required');
       if (customerPhone.replace(/\D/g, '').length !== 10) throw new Error('Phone number must be exactly 10 digits');
       if (selectedServices.length === 0) throw new Error('Select at least one service');
+      if (discountAmt < 0) throw new Error('Discount cannot be negative');
+      if (discountAmt > subtotal) throw new Error(`Discount (₹${discountAmt}) cannot exceed subtotal (₹${subtotal})`);
       return createJob(tenantId, {
         reg_number: regNumber.trim().toUpperCase(),
-        vehicle_type: vehicleType.toLowerCase().replace(/\s+/g, '_') as any,
+        vehicle_type: vehicleType as any,
         make: make || undefined,
         model: model || undefined,
         color: color || undefined,
@@ -394,10 +398,16 @@ export function JobCardPage() {
         membership_id: useMembership && activeMembership ? activeMembership.id : undefined,
       });
     },
-    onSuccess: (newJob) => {
-      toast.success(`Job ${newJob?.job_number ?? ''} created!`);
+    onSuccess: async (newJob) => {
+      toast.success(`Job Card ${newJob?.job_number ?? ''} created!`);
       qc.invalidateQueries({ queryKey: ['carwash-active-jobs'] });
       qc.invalidateQueries({ queryKey: ['carwash-stats'] });
+      // Mark source appointment as arrived/done
+      const apptId = searchParams.get('apptId') ?? '';
+      if (apptId) {
+        try { await updateAppointmentStatus(tenantId, apptId, 'arrived', newJob?.id); } catch { /* non-critical */ }
+        qc.invalidateQueries({ queryKey: ['carwash-appointments'] });
+      }
       navigate('/carwash/jobs');
     },
     onError: (e: any) => toast.error(e?.message ?? 'Failed to create job'),
@@ -1004,7 +1014,7 @@ export function JobCardPage() {
             {/* Discount + Notes */}
             <div>
               <label className="block text-sm font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Discount (₹)</label>
-              <input type="number" value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="0"
+              <input type="number" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="0"
                 className="w-full rounded-xl border px-4 py-3 text-base outline-none"
                 style={{ borderColor: 'var(--surface-border)', background: 'var(--surface)', color: 'var(--text-primary)' }} />
             </div>

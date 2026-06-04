@@ -514,49 +514,61 @@ export async function createJob(tenantId: string, data: {
   const jobId = uuid();
   const jobNumber = await nextJobNumber(tenantId);
   const subtotal = data.items.reduce((s, i) => s + i.price, 0);
-  const discount = data.discount ?? 0;
-  const gstAmount = data.items.reduce((s, i) => {
-    const itemShare = subtotal > 0 ? i.price / subtotal : 1 / data.items.length;
+  const discount = Math.max(0, data.discount ?? 0); // never negative
+  const itemCount = Math.max(data.items.length, 1);
+  const gstAmount = Math.round(data.items.reduce((s, i) => {
+    const itemShare = subtotal > 0 ? i.price / subtotal : 1 / itemCount;
     const itemDiscount = discount * itemShare;
     return s + (i.price - itemDiscount) * i.gst_rate / 100;
-  }, 0);
-  const total = subtotal - discount + gstAmount;
+  }, 0) * 100) / 100;
+  const total = Math.max(0, subtotal - discount + gstAmount);
 
-  await db.execute(
-    `INSERT INTO carwash_jobs (id, tenant_id, job_number, vehicle_id, reg_number, vehicle_type, make, model, color,
-      customer_name, customer_phone, customer_id, staff_id, staff_name, status, subtotal, discount, gst_amount, total, membership_id, notes)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [jobId, tenantId, jobNumber, vehicle.id, data.reg_number, data.vehicle_type,
-     data.make ?? null, data.model ?? null, data.color ?? null,
-     data.customer_name ?? null, data.customer_phone ?? null, customerId,
-     data.staff_id ?? null, data.staff_name ?? null,
-     'waiting', subtotal, discount, gstAmount, total,
-     data.membership_id ?? null, data.notes ?? null]
-  );
-
-  for (const item of data.items) {
+  // Wrap all writes in a transaction for atomicity
+  await db.execute('BEGIN');
+  try {
     await db.execute(
-      `INSERT INTO carwash_job_items (id, tenant_id, job_id, service_id, service_name, price, gst_rate) VALUES (?,?,?,?,?,?,?)`,
-      [uuid(), tenantId, jobId, item.service_id ?? null, item.service_name, item.price, item.gst_rate]
+      `INSERT INTO carwash_jobs (id, tenant_id, job_number, vehicle_id, reg_number, vehicle_type, make, model, color,
+        customer_name, customer_phone, customer_id, staff_id, staff_name, status, subtotal, discount, gst_amount, total, membership_id, notes)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [jobId, tenantId, jobNumber, vehicle.id, data.reg_number, data.vehicle_type,
+       data.make ?? null, data.model ?? null, data.color ?? null,
+       data.customer_name ?? null, data.customer_phone ?? null, customerId,
+       data.staff_id ?? null, data.staff_name ?? null,
+       'waiting', subtotal, discount, gstAmount, total,
+       data.membership_id ?? null, data.notes ?? null]
     );
+
+    for (const item of data.items) {
+      await db.execute(
+        `INSERT INTO carwash_job_items (id, tenant_id, job_id, service_id, service_name, price, gst_rate) VALUES (?,?,?,?,?,?,?)`,
+        [uuid(), tenantId, jobId, item.service_id ?? null, item.service_name, item.price, item.gst_rate]
+      );
+    }
+
+    if (data.membership_id) {
+      await db.execute(
+        `UPDATE carwash_memberships SET used_washes = used_washes + 1, updated_at = ? WHERE id = ? AND tenant_id = ?`,
+        [now(), data.membership_id, tenantId]
+      );
+    }
+
+    await db.execute('COMMIT');
+  } catch (e) {
+    await db.execute('ROLLBACK');
+    throw e;
   }
 
-  if (data.membership_id) {
-    await db.execute(
-      `UPDATE carwash_memberships SET used_washes = used_washes + 1, updated_at = ? WHERE id = ?`,
-      [now(), data.membership_id]
-    );
-  }
-
-  // Award loyalty points: 1 point per ₹10 spent
+  // Award loyalty points outside transaction (non-critical, best-effort)
   if (data.customer_phone && data.customer_phone.replace(/\D/g, '').length >= 10) {
-    await awardLoyaltyPoints(tenantId, {
-      customer_phone: data.customer_phone,
-      customer_name: data.customer_name ?? 'Customer',
-      reg_number: data.reg_number,
-      job_id: jobId,
-      amount: total,
-    });
+    try {
+      await awardLoyaltyPoints(tenantId, {
+        customer_phone: data.customer_phone,
+        customer_name: data.customer_name ?? 'Customer',
+        reg_number: data.reg_number,
+        job_id: jobId,
+        amount: total,
+      });
+    } catch { /* non-critical */ }
   }
 
   const rows = await db.select<any[]>(`SELECT * FROM carwash_jobs WHERE id = ?`, [jobId]);
@@ -594,26 +606,40 @@ export async function deleteJob(tenantId: string, jobId: string): Promise<void> 
   if (jobs.length === 0) return;
   const job = jobs[0];
 
-  // Restore membership wash if it was used
-  if (job.membership_id) {
-    await db.execute(
-      `UPDATE carwash_memberships SET used_washes = MAX(0, used_washes - 1), updated_at = ? WHERE id = ?`,
-      [now(), job.membership_id]
-    );
-  }
-
-  // Reverse loyalty points
-  if (job.customer_phone) {
-    const points = Math.floor((job.total ?? 0) / 10);
-    if (points > 0) {
+  await db.execute('BEGIN');
+  try {
+    // Restore membership wash — use CASE to prevent going below 0
+    if (job.membership_id) {
       await db.execute(
-        `UPDATE carwash_loyalty SET total_points = MAX(0, total_points - ?), updated_at = ? WHERE tenant_id = ? AND customer_phone = ?`,
-        [points, now(), tenantId, job.customer_phone]
+        `UPDATE carwash_memberships
+         SET used_washes = CASE WHEN used_washes > 0 THEN used_washes - 1 ELSE 0 END, updated_at = ?
+         WHERE id = ? AND tenant_id = ?`,
+        [now(), job.membership_id, tenantId]
       );
     }
+
+    await db.execute(`UPDATE carwash_jobs SET deleted_at = ? WHERE id = ? AND tenant_id = ?`, [now(), jobId, tenantId]);
+    await db.execute('COMMIT');
+  } catch (e) {
+    await db.execute('ROLLBACK');
+    throw e;
   }
 
-  await db.execute(`UPDATE carwash_jobs SET deleted_at = ? WHERE id = ? AND tenant_id = ?`, [now(), jobId, tenantId]);
+  // Reverse loyalty points (best-effort, outside transaction)
+  if (job.customer_phone) {
+    const cleanPhone = String(job.customer_phone).replace(/\D/g, '');
+    const points = Math.floor((job.total ?? 0) / 10);
+    if (points > 0 && cleanPhone.length >= 10) {
+      try {
+        await db.execute(
+          `UPDATE carwash_loyalty
+           SET total_points = CASE WHEN total_points >= ? THEN total_points - ? ELSE 0 END, updated_at = ?
+           WHERE tenant_id = ? AND REPLACE(REPLACE(customer_phone,'+',''),' ','') LIKE ?`,
+          [points, points, now(), tenantId, `%${cleanPhone.slice(-10)}`]
+        );
+      } catch { /* non-critical */ }
+    }
+  }
 }
 
 export async function settleJob(tenantId: string, jobId: string, paymentMethod: string): Promise<void> {
@@ -640,8 +666,8 @@ export async function listJobs(tenantId: string, opts: { date?: string; status?:
   const jobIds = jobs.map(j => j.id);
   const placeholders = jobIds.map(() => '?').join(',');
   const items = await db.select<any[]>(
-    `SELECT * FROM carwash_job_items WHERE job_id IN (${placeholders})`,
-    jobIds
+    `SELECT * FROM carwash_job_items WHERE tenant_id = ? AND job_id IN (${placeholders})`,
+    [tenantId, ...jobIds]
   );
   const itemMap: Record<string, CarwashJobItem[]> = {};
   for (const it of items) {
@@ -664,7 +690,7 @@ export async function getJobsByCustomerPhone(tenantId: string, phone: string): P
   if (jobs.length === 0) return [];
   const jobIds = jobs.map(j => j.id);
   const placeholders = jobIds.map(() => '?').join(',');
-  const items = await db.select<any[]>(`SELECT * FROM carwash_job_items WHERE job_id IN (${placeholders})`, jobIds);
+  const items = await db.select<any[]>(`SELECT * FROM carwash_job_items WHERE tenant_id = ? AND job_id IN (${placeholders})`, [tenantId, ...jobIds]);
   const itemMap: Record<string, CarwashJobItem[]> = {};
   for (const it of items) { if (!itemMap[it.job_id]) itemMap[it.job_id] = []; itemMap[it.job_id].push(it); }
   return jobs.map(j => ({ ...j, items: itemMap[j.id] ?? [] }));
@@ -847,7 +873,7 @@ export async function getAllJobsForExport(tenantId: string, opts: {
   if (jobs.length === 0) return [];
   const jobIds = jobs.map(j => j.id);
   const placeholders = jobIds.map(() => '?').join(',');
-  const items = await db.select<any[]>(`SELECT * FROM carwash_job_items WHERE job_id IN (${placeholders})`, jobIds);
+  const items = await db.select<any[]>(`SELECT * FROM carwash_job_items WHERE tenant_id = ? AND job_id IN (${placeholders})`, [tenantId, ...jobIds]);
   const itemMap: Record<string, CarwashJobItem[]> = {};
   for (const it of items) { if (!itemMap[it.job_id]) itemMap[it.job_id] = []; itemMap[it.job_id].push(it); }
   return jobs.map(j => ({ ...j, items: itemMap[j.id] ?? [] }));
@@ -961,13 +987,16 @@ export function computeSalary(staff: CarwashStaff, attendance: CarwashAttendance
   let startDay = 1;
   if (staff.joining_date) {
     const jd = new Date(staff.joining_date);
-    if (jd.getFullYear() === year && jd.getMonth() + 1 === month) {
-      startDay = jd.getDate();
-    } else if (jd > new Date(year, month - 1, daysInMonth)) {
-      // Joined after this month — 0 salary
-      return { staff, present: 0, half_day: 0, absent: 0, leave: 0, holiday: 0, working_days: 0, per_day_rate: 0, payable_days: 0, net_salary: 0, deductions: 0, advance: 0, payable_amount: 0 };
+    // Validate date parsed correctly (guard against "Feb 30" overflow, etc.)
+    if (!isNaN(jd.getTime())) {
+      if (jd.getFullYear() === year && jd.getMonth() + 1 === month) {
+        startDay = Math.min(Math.max(jd.getDate(), 1), daysInMonth);
+      } else if (jd > new Date(year, month - 1, daysInMonth)) {
+        // Joined after this month — 0 salary
+        return { staff, present: 0, half_day: 0, absent: 0, leave: 0, holiday: 0, working_days: 0, per_day_rate: 0, payable_days: 0, net_salary: 0, deductions: 0, advance: 0, payable_amount: 0 };
+      }
+      // If joined before this month, startDay stays 1
     }
-    // If joined before this month, startDay stays 1
   }
 
   const working_days = daysInMonth - startDay + 1;
@@ -1010,7 +1039,10 @@ export async function getAttendanceSummaryForMonth(tenantId: string, year: numbe
   return staffList.map(staff => {
     const att = allAttendance.filter(a => a.staff_id === staff.id);
     const summary = computeSalary(staff, att, year, month);
-    const advance = advances.filter(a => a.staff_id === staff.id).reduce((s, a) => s + a.amount, 0);
+    const advance = Math.min(
+      advances.filter(a => a.staff_id === staff.id).reduce((s, a) => s + a.amount, 0),
+      summary.net_salary  // advance can never exceed net salary
+    );
     return { ...summary, advance, payable_amount: Math.max(0, summary.net_salary - advance) };
   });
 }

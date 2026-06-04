@@ -40,6 +40,7 @@ export function MembershipPage() {
   const createMutation = useMutation({
     mutationFn: () => {
       if (!customerName.trim()) throw new Error('Customer name required');
+      if (customerPhone && !/^\d{10}$/.test(customerPhone.replace(/\D/g, ''))) throw new Error('Phone must be exactly 10 digits');
       const washes = customWashes ? Number(customWashes) : selectedPkg.washes;
       const price = customPrice ? Number(customPrice) : selectedPkg.price;
       return createMembership(tenantId, {
