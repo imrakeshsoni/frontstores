@@ -226,10 +226,10 @@ export function CustomersPage() {
 
       {/* ── Customer Detail Popup ── */}
       {selectedCustomer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6"
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
           onClick={e => { if (e.target === e.currentTarget) setSelectedCustomer(null); }}>
           <div className="rounded-2xl w-full shadow-2xl flex flex-col overflow-hidden"
-            style={{ maxWidth: '860px', maxHeight: '88vh', background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
+            style={{ width: '88vw', maxWidth: '1200px', height: '85vh', background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
 
             {/* Header */}
             <div className="flex items-center justify-between px-7 py-5 flex-shrink-0"
@@ -259,7 +259,7 @@ export function CustomersPage() {
             </div>
 
             {/* Two-column body */}
-            <div className="grid grid-cols-2 flex-1 overflow-hidden">
+            <div className="grid flex-1 overflow-hidden" style={{ gridTemplateColumns: '300px 1fr' }}>
 
               {/* Left — Customer Details */}
               <div className="px-7 py-6 space-y-5 overflow-y-auto" style={{ borderRight: '1px solid var(--surface-border)' }}>
@@ -559,9 +559,58 @@ export function CustomersPage() {
                                   style={{ background: j.status === 'delivered' ? '#dcfce7' : '#fef3c7', color: j.status === 'delivered' ? '#16a34a' : '#d97706' }}>
                                   {j.status}
                                 </span>
+                                <button title="Print invoice" onClick={async () => {
+                                  const logo = (config?.settings as any)?.logo_base64;
+                                  const shopName = config?.shop_name ?? 'Car Wash';
+                                  const fmt = (n: number) => `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+                                  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+                                  <style>body{font-family:'Courier New',monospace;max-width:300px;margin:0 auto;padding:12px;font-size:12px}
+                                  .center{text-align:center}.bold{font-weight:700}.line{border-top:1px dashed #000;margin:6px 0}
+                                  .row{display:flex;justify-content:space-between;margin:2px 0}.big{font-size:16px;font-weight:700}
+                                  .logo{max-height:50px;max-width:120px;object-fit:contain}</style></head><body>
+                                  <div class="center">${logo?`<img src="${logo}" class="logo"/><br/>`:''}
+                                  <span class="bold" style="font-size:15px">${shopName}</span></div>
+                                  ${config?.address_line1?`<div class="center" style="font-size:10px">${[config.address_line1,config.city].filter(Boolean).join(', ')}</div>`:''}
+                                  ${config?.phone?`<div class="center" style="font-size:10px">📞 ${config.phone}</div>`:''}
+                                  <div class="line"></div><div class="center bold big">INVOICE</div>
+                                  <div class="row"><span>Invoice #</span><span class="bold">${j.job_number}</span></div>
+                                  <div class="row"><span>Date</span><span>${new Date(j.created_at).toLocaleDateString('en-IN')}</span></div>
+                                  <div class="row"><span>Reg Number</span><span class="bold">${j.reg_number}</span></div>
+                                  <div class="row"><span>Vehicle Type</span><span>${j.vehicle_type}</span></div>
+                                  ${j.make||j.model?`<div class="row"><span>Make / Model</span><span>${[j.make,j.model].filter(Boolean).join(' ')}</span></div>`:''}
+                                  ${j.color?`<div class="row"><span>Color</span><span>${j.color}</span></div>`:''}
+                                  ${j.customer_name?`<div class="row"><span>Customer</span><span>${j.customer_name}</span></div>`:''}
+                                  ${j.customer_phone?`<div class="row"><span>Phone</span><span>${j.customer_phone}</span></div>`:''}
+                                  ${j.staff_name?`<div class="row"><span>Staff</span><span>${j.staff_name}</span></div>`:''}
+                                  <div class="line"></div><div class="bold" style="margin-bottom:4px">Services</div>
+                                  ${(j.items??[]).map((i:any)=>`<div class="row"><span>${i.service_name}</span><span>${fmt(i.price)}</span></div>`).join('')}
+                                  <div class="line"></div>
+                                  ${j.discount>0?`<div class="row"><span>Discount</span><span>-${fmt(j.discount)}</span></div>`:''}
+                                  ${j.gst_amount>0?`<div class="row"><span>GST</span><span>${fmt(j.gst_amount)}</span></div>`:''}
+                                  <div class="row bold big"><span>TOTAL</span><span>${fmt(j.total)}</span></div>
+                                  ${j.payment_method?`<div class="row" style="font-size:10px"><span>Payment</span><span>${j.payment_method.toUpperCase()}</span></div>`:''}
+                                  <div class="line"></div><div class="center" style="font-size:10px;margin-top:6px">Thank you! Come again 🚗</div>
+                                  </body></html>`;
+                                  const fh = html.replace('</body>',`<script>window.addEventListener('load',()=>setTimeout(window.print,400))<\/script></body>`);
+                                  try {
+                                    const cd = await appCacheDir();
+                                    const sep = cd.endsWith('/')||cd.endsWith('\\')?'':'/';
+                                    const p = `${cd}${sep}invoice-${j.id}.html`;
+                                    await writeTextFile(p, fh);
+                                    await shellOpen(p);
+                                  } catch(e:any) { toast.error('Print failed: '+(e?.message??e)); }
+                                }}
+                                  className="p-1 rounded-lg btn-secondary hover:text-amber-500 transition-colors">
+                                  <Printer className="h-3.5 w-3.5" />
+                                </button>
                               </div>
                             </div>
-                            <p className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>🚗 {j.reg_number} · {j.vehicle_type}</p>
+                            <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                              <p className="text-xs font-bold" style={{ color: 'var(--text-secondary)' }}>🚗 {j.reg_number}</p>
+                              <p className="text-xs capitalize" style={{ color: 'var(--text-tertiary)' }}>{j.vehicle_type}</p>
+                              {(j.make || j.model) && <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{[j.make, j.model].filter(Boolean).join(' ')}</p>}
+                              {j.color && <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>· {j.color}</p>}
+                            </div>
                             <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
                               {(j.items ?? []).map((i: any) => i.service_name).join(' · ')}
                             </p>

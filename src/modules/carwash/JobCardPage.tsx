@@ -495,8 +495,10 @@ export function JobCardPage() {
     <div class="center bold big">INVOICE</div>
     <div class="row"><span>Invoice #</span><span class="bold">${j.job_number}</span></div>
     <div class="row"><span>Date</span><span>${new Date(j.created_at).toLocaleDateString('en-IN')}</span></div>
-    <div class="row"><span>Vehicle</span><span class="bold">${j.reg_number}</span></div>
-    ${j.make || j.model ? `<div class="row"><span>Model</span><span>${[j.make, j.model].filter(Boolean).join(' ')}</span></div>` : ''}
+    <div class="row"><span>Reg Number</span><span class="bold">${j.reg_number}</span></div>
+    <div class="row"><span>Vehicle Type</span><span>${j.vehicle_type}</span></div>
+    ${j.make || j.model ? `<div class="row"><span>Make / Model</span><span>${[j.make, j.model].filter(Boolean).join(' ')}</span></div>` : ''}
+    ${j.color ? `<div class="row"><span>Color</span><span>${j.color}</span></div>` : ''}
     ${j.customer_name ? `<div class="row"><span>Customer</span><span>${j.customer_name}</span></div>` : ''}
     ${j.customer_phone ? `<div class="row"><span>Phone</span><span>${j.customer_phone}</span></div>` : ''}
     ${j.staff_name ? `<div class="row"><span>Staff</span><span>${j.staff_name}</span></div>` : ''}

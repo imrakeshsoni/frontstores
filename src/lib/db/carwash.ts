@@ -824,6 +824,60 @@ export async function getLapsedCustomers(tenantId: string, daysSince = 30): Prom
   );
 }
 
+// ── Export / Reports ─────────────────────────────────────────────────────────
+
+export async function getAllJobsForExport(tenantId: string, opts: {
+  from?: string; to?: string; customerPhone?: string; status?: string;
+} = {}): Promise<CarwashJob[]> {
+  const db = await getDb();
+  const conds = [`j.tenant_id = ?`, `j.deleted_at IS NULL`];
+  const params: any[] = [tenantId];
+  if (opts.from) { conds.push(`j.created_at >= ?`); params.push(`${opts.from}T00:00:00`); }
+  if (opts.to)   { conds.push(`j.created_at <= ?`); params.push(`${opts.to}T23:59:59`); }
+  if (opts.status) { conds.push(`j.status = ?`); params.push(opts.status); }
+  if (opts.customerPhone) {
+    const clean = opts.customerPhone.replace(/\D/g, '');
+    conds.push(`REPLACE(REPLACE(REPLACE(j.customer_phone,'+',''),' ',''),'-','') LIKE ?`);
+    params.push(`%${clean}`);
+  }
+  const jobs = await db.select<any[]>(
+    `SELECT j.* FROM carwash_jobs j WHERE ${conds.join(' AND ')} ORDER BY j.created_at DESC LIMIT 2000`,
+    params
+  );
+  if (jobs.length === 0) return [];
+  const jobIds = jobs.map(j => j.id);
+  const placeholders = jobIds.map(() => '?').join(',');
+  const items = await db.select<any[]>(`SELECT * FROM carwash_job_items WHERE job_id IN (${placeholders})`, jobIds);
+  const itemMap: Record<string, CarwashJobItem[]> = {};
+  for (const it of items) { if (!itemMap[it.job_id]) itemMap[it.job_id] = []; itemMap[it.job_id].push(it); }
+  return jobs.map(j => ({ ...j, items: itemMap[j.id] ?? [] }));
+}
+
+export async function getCustomersWithJobStats(tenantId: string): Promise<Array<{
+  customer_name: string; customer_phone: string; total_jobs: number; total_spent: number; last_visit: string;
+}>> {
+  const db = await getDb();
+  return db.select<any[]>(
+    `SELECT customer_name, customer_phone,
+            COUNT(*) as total_jobs,
+            SUM(total) as total_spent,
+            MAX(created_at) as last_visit
+     FROM carwash_jobs
+     WHERE tenant_id = ? AND deleted_at IS NULL AND customer_phone IS NOT NULL
+     GROUP BY customer_phone
+     ORDER BY total_spent DESC`,
+    [tenantId]
+  );
+}
+
+export async function listInventoryForExport(tenantId: string): Promise<CarwashInventoryItem[]> {
+  const db = await getDb();
+  return db.select<CarwashInventoryItem[]>(
+    `SELECT * FROM carwash_inventory WHERE tenant_id = ? AND deleted_at IS NULL ORDER BY category, name`,
+    [tenantId]
+  );
+}
+
 // ── Staff ─────────────────────────────────────────────────────────────────────
 
 export async function listCarwashStaff(tenantId: string): Promise<CarwashStaff[]> {
