@@ -9,6 +9,23 @@ export interface CloudSyncStatus {
   last_synced_at: string | null;
   sync_code: string | null;
   dashboard_url: string | null;
+  mobile_pin_set: boolean;
+}
+
+async function hashPin(pin: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode('frontstores-mobile-' + pin);
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+export function getDeviceId(): string {
+  let id = localStorage.getItem('fs_device_id');
+  if (!id) {
+    id = 'dev-' + Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2,'0')).join('');
+    localStorage.setItem('fs_device_id', id);
+  }
+  return id;
 }
 
 export async function getCloudSyncStatus(): Promise<CloudSyncStatus> {
@@ -19,7 +36,63 @@ export async function getCloudSyncStatus(): Promise<CloudSyncStatus> {
     last_synced_at: s.cloud_sync_last_at ?? null,
     sync_code: s.cloud_sync_code ?? null,
     dashboard_url: s.cloud_sync_dashboard_url ?? null,
+    mobile_pin_set: !!s.cloud_sync_pin_set,
   };
+}
+
+export async function setMobilePin(tenantId: string, pin: string): Promise<{ ok: boolean; error?: string }> {
+  const config = await getAppConfig();
+  const s = config?.settings as any ?? {};
+  if (!s.cloud_sync_enabled || !s.cloud_sync_code) return { ok: false, error: 'Enable Cloud Sync first' };
+  if (pin.length < 4 || pin.length > 8 || !/^\d+$/.test(pin)) return { ok: false, error: 'PIN must be 4–8 digits' };
+  const pin_hash = await hashPin(pin);
+  const res = await fetch(`${SERVER}/sync/set-pin`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tenant_id: tenantId, sync_code: s.cloud_sync_code, pin_hash }),
+  });
+  const data = await res.json();
+  if (!data.ok) return { ok: false, error: data.error ?? 'Failed to set PIN' };
+  await updateAppConfig({ settings: { ...s, cloud_sync_pin_set: true } });
+  return { ok: true };
+}
+
+// Used by Android: register device + pull data after approval
+export async function registerDevice(phone: string, pin: string, deviceName: string): Promise<{
+  ok: boolean; status?: string; tenant_id?: string; shop_name?: string; shop_type?: string;
+  session_token?: string; error?: string;
+}> {
+  const device_id = getDeviceId();
+  const res = await fetch(`${SERVER}/device/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone, pin, device_id, device_name: deviceName, platform: 'android', app_version: '1.0' }),
+  });
+  const data = await res.json();
+  if (!data.ok) return { ok: false, error: data.error ?? 'Registration failed' };
+  // Store session token locally if approved
+  if (data.session_token) localStorage.setItem('fs_session_token', data.session_token);
+  if (data.tenant_id) localStorage.setItem('fs_remote_tenant_id', data.tenant_id);
+  return { ok: true, ...data };
+}
+
+export async function checkDeviceStatus(): Promise<{ status: string; tenant_id?: string; shop_name?: string; shop_type?: string; session_token?: string }> {
+  const device_id = getDeviceId();
+  const res = await fetch(`${SERVER}/device/status/${device_id}`);
+  return res.json();
+}
+
+export async function pullDeviceSyncData(): Promise<{ ok: boolean; data?: any; error?: string }> {
+  const device_id = getDeviceId();
+  const session_token = localStorage.getItem('fs_session_token');
+  if (!session_token) return { ok: false, error: 'No session token' };
+  const res = await fetch(`${SERVER}/device/sync`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ device_id, session_token }),
+  });
+  const result = await res.json();
+  return result;
 }
 
 export async function activateCloudSync(tenantId: string, syncCode: string): Promise<{ ok: boolean; error?: string; dashboard_url?: string }> {

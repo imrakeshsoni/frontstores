@@ -82,10 +82,21 @@ const ACTIVITY_FILE  = path.join(DATA_DIR, 'activity.json');
 const BROADCAST_FILE = path.join(DATA_DIR, 'broadcast.json');
 const NOTES_FILE     = path.join(DATA_DIR, 'notes.json');
 const SYNC_DIR      = path.join(DATA_DIR, 'sync');
+const DEVICES_FILE  = path.join(DATA_DIR, 'devices.json');
 
 // Ensure data dirs exist
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 if (!fs.existsSync(SYNC_DIR)) fs.mkdirSync(SYNC_DIR, { recursive: true });
+
+// ── Device helpers ────────────────────────────────────────────────────────────
+function loadDevices() { try { return JSON.parse(fs.readFileSync(DEVICES_FILE, 'utf8')); } catch { return {}; } }
+function saveDevices(d) { fs.writeFileSync(DEVICES_FILE, JSON.stringify(d, null, 2)); }
+async function hashPin(pin) {
+  const encoder = new TextEncoder ? new TextEncoder() : { encode: s => Buffer.from(s, 'utf8') };
+  const data = encoder.encode('frontstores-mobile-' + pin);
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return Buffer.from(buf).toString('hex');
+}
 
 // ── Sync helpers ─────────────────────────────────────────────────────────────
 function syncFile(tenantId) { return path.join(SYNC_DIR, `${tenantId}.json`); }
@@ -882,6 +893,102 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
 
   // ── CLOUD SYNC ENDPOINTS ──────────────────────────────────────────────────
 
+  // POST /sync/set-pin — desktop sets mobile access PIN for tenant
+  if (req.method === 'POST' && pathname === '/sync/set-pin') {
+    if (rateLimit(req, res, 'set-pin', 10, 60 * 60 * 1000)) return;
+    const body = JSON.parse(await readBody(req));
+    const { tenant_id, sync_code, pin_hash } = body;
+    if (!tenant_id || !sync_code || !pin_hash) { json(res, { ok: false, error: 'Missing fields' }, 400); return; }
+    const subs = loadSubs();
+    const sub = subs[tenant_id];
+    if (!sub || !sub.sync_enabled || sub.sync_code !== sync_code.trim().toUpperCase()) {
+      json(res, { ok: false, error: 'Unauthorized' }, 401); return;
+    }
+    sub.mobile_pin_hash = pin_hash;
+    saveSubs(subs);
+    json(res, { ok: true });
+    return;
+  }
+
+  // POST /device/register — Android device registers, pending admin approval
+  if (req.method === 'POST' && pathname === '/device/register') {
+    if (rateLimit(req, res, 'device-register', 10, 60 * 60 * 1000)) return;
+    const body = JSON.parse(await readBody(req));
+    const { phone, pin, device_id, device_name, platform, app_version } = body;
+    if (!phone || !pin || !device_id) { json(res, { ok: false, error: 'Missing fields' }, 400); return; }
+    // Find tenant by phone
+    const subs = loadSubs();
+    const entry = Object.entries(subs).find(([, s]) => {
+      const p = String(s.phone || '').replace(/\D/g, '');
+      return p.length >= 10 && phone.replace(/\D/g, '').endsWith(p.slice(-10));
+    });
+    if (!entry) { json(res, { ok: false, error: 'No shop found for this phone number' }, 404); return; }
+    const [tenantId, sub] = entry;
+    if (!sub.sync_enabled) { json(res, { ok: false, error: 'Cloud sync not enabled for this shop. Contact shop owner.' }, 403); return; }
+    if (!sub.mobile_pin_hash) { json(res, { ok: false, error: 'Mobile PIN not set. Ask owner to set it from desktop app Settings → Cloud Sync.' }, 403); return; }
+    // Validate PIN
+    const pinHash = await hashPin(pin);
+    if (pinHash !== sub.mobile_pin_hash) { json(res, { ok: false, error: 'Incorrect PIN' }, 401); return; }
+    // Register device
+    const devices = loadDevices();
+    const existing = devices[device_id];
+    if (existing && existing.status === 'approved' && existing.tenant_id === tenantId) {
+      // Already approved — return session token
+      json(res, { ok: true, status: 'approved', tenant_id: tenantId, shop_name: sub.shop_name, shop_type: sub.shop_type, session_token: existing.session_token });
+      return;
+    }
+    if (existing && existing.status === 'revoked') {
+      json(res, { ok: false, error: 'This device has been revoked. Contact your administrator.' }, 403); return;
+    }
+    // New device or re-registering pending device
+    const sessionToken = crypto.randomBytes(32).toString('hex');
+    devices[device_id] = {
+      tenant_id: tenantId, shop_name: sub.shop_name, shop_type: sub.shop_type,
+      device_name: device_name || 'Unknown Device', platform: platform || 'android',
+      app_version: app_version || '', status: 'pending', session_token: sessionToken,
+      registered_at: new Date().toISOString(), approved_at: null,
+    };
+    saveDevices(devices);
+    logActivity(tenantId, sub.shop_name, 'device_registered', `New device: ${device_name||'Unknown'} (${platform||'android'}) — awaiting approval`);
+    console.log(`📱 New device registered for ${sub.shop_name}: ${device_name} — PENDING APPROVAL`);
+    json(res, { ok: true, status: 'pending', tenant_id: tenantId, shop_name: sub.shop_name, shop_type: sub.shop_type });
+    return;
+  }
+
+  // GET /device/status/:device_id — polling for approval
+  const deviceStatus = pathname.match(/^\/device\/status\/([a-zA-Z0-9_-]{10,})$/);
+  if (req.method === 'GET' && deviceStatus) {
+    const device_id = deviceStatus[1];
+    const devices = loadDevices();
+    const device = devices[device_id];
+    if (!device) { json(res, { status: 'not_found' }); return; }
+    if (device.status === 'approved') {
+      const subs = loadSubs();
+      const sub = subs[device.tenant_id];
+      json(res, { status: 'approved', tenant_id: device.tenant_id, shop_name: device.shop_name, shop_type: device.shop_type, session_token: device.session_token, sync_enabled: sub?.sync_enabled });
+    } else {
+      json(res, { status: device.status });
+    }
+    return;
+  }
+
+  // POST /device/sync — approved device pulls sync data
+  if (req.method === 'POST' && pathname === '/device/sync') {
+    const body = JSON.parse(await readBody(req));
+    const { device_id, session_token } = body;
+    if (!device_id || !session_token) { json(res, { ok: false, error: 'Missing auth' }, 400); return; }
+    const devices = loadDevices();
+    const device = devices[device_id];
+    if (!device || device.status !== 'approved' || device.session_token !== session_token) {
+      json(res, { ok: false, error: 'Unauthorized' }, 401); return;
+    }
+    const syncData = loadSync(device.tenant_id);
+    if (!syncData) { json(res, { ok: false, error: 'No sync data yet. Ask owner to sync from desktop Settings → Cloud Sync.' }, 404); return; }
+    device.last_accessed_at = new Date().toISOString();
+    saveDevices(devices);
+    json(res, { ok: true, data: syncData }); return;
+  }
+
   // POST /sync/activate — validate sync code, enable cloud sync for tenant
   if (req.method === 'POST' && pathname === '/sync/activate') {
     if (rateLimit(req, res, 'sync-activate', 5, 60 * 60 * 1000)) return;
@@ -1091,6 +1198,31 @@ const adminServer = http.createServer(async (req, res) => {
     subs[tenantId].reset_token_expires = expires || null;
     saveSubs(subs);
     if (code) console.log(`🔑 Reset code set for ${subs[tenantId].shop_name}`);
+    json(res, { ok: true }); return;
+  }
+
+  // GET /admin/api/devices — all devices
+  if (req.method === 'GET' && pathname === '/admin/api/devices') {
+    if (!checkAuth(req)) { res.writeHead(401); res.end(); return; }
+    const devices = loadDevices();
+    const list = Object.entries(devices).map(([id, d]) => ({ device_id: id, ...d }));
+    list.sort((a, b) => new Date(b.registered_at||0) - new Date(a.registered_at||0));
+    json(res, list); return;
+  }
+
+  // POST /admin/api/devices/:device_id/approve
+  const deviceApprove = pathname.match(/^\/admin\/api\/devices\/([^/]+)\/(approve|revoke)$/);
+  if (req.method === 'POST' && deviceApprove) {
+    if (!checkAuth(req)) { res.writeHead(401); res.end(); return; }
+    const [, deviceId, action] = deviceApprove;
+    const devices = loadDevices();
+    if (!devices[deviceId]) { json(res, { ok: false, error: 'Device not found' }, 404); return; }
+    devices[deviceId].status = action === 'approve' ? 'approved' : 'revoked';
+    if (action === 'approve') devices[deviceId].approved_at = new Date().toISOString();
+    saveDevices(devices);
+    const d = devices[deviceId];
+    logActivity(d.tenant_id, d.shop_name, `device_${action}d`, `${d.device_name} (${d.platform})`);
+    console.log(`📱 Device ${action}d: ${d.device_name} for ${d.shop_name}`);
     json(res, { ok: true }); return;
   }
 

@@ -521,6 +521,9 @@
       <div class="nav-item" id="tab-broadcast" onclick="switchTab('broadcast')">
         <span class="nav-icon">📢</span> Broadcast
       </div>
+      <div class="nav-item" id="tab-devices" onclick="switchTab('devices')">
+        <span class="nav-icon">📱</span> Devices <span id="devices-badge" style="display:none;background:#f59e0b;color:#111;border-radius:20px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px">0</span>
+      </div>
     </nav>
     <div class="sb-footer">
       <div class="sb-time" id="clock"></div>
@@ -751,6 +754,16 @@
         <div id="broadcast-list"></div>
       </div>
 
+      <!-- Devices tab -->
+      <div class="tab-page" id="page-devices">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <h2 style="font-size:18px;font-weight:700">📱 Device Approvals</h2>
+          <button onclick="loadDevices()" style="padding:6px 14px;background:var(--accent);color:#111;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer">Refresh</button>
+        </div>
+        <div id="devices-pending" style="margin-bottom:20px"></div>
+        <div id="devices-approved"></div>
+      </div>
+
       <!-- Customer detail full page -->
       <div id="customer-detail">
         <div class="cd-page-header">
@@ -822,9 +835,9 @@ const PAGE_META = {
 };
 
 function switchTab(t) {
-  ['customers','contacts','errors','analytics','health','activity','broadcast'].forEach(x => {
-    document.getElementById('tab-'+x).classList.toggle('active', x===t);
-    document.getElementById('page-'+x).classList.toggle('active', x===t);
+  ['customers','contacts','errors','analytics','health','activity','broadcast','devices'].forEach(x => {
+    document.getElementById('tab-'+x)?.classList.toggle('active', x===t);
+    document.getElementById('page-'+x)?.classList.toggle('active', x===t);
   });
   const m = PAGE_META[t] || {};
   document.getElementById('page-title').textContent = m.title || t;
@@ -834,6 +847,7 @@ function switchTab(t) {
   else                   { if (healthInterval) { clearInterval(healthInterval); healthInterval = null; } }
   if (t === 'activity')  loadActivity();
   if (t === 'broadcast') loadBroadcast();
+  if (t === 'devices')   loadDevices();
 }
 
 function login() {
@@ -879,6 +893,7 @@ async function loadAll(isLogin=false, silent=false) {
     updateStats(); renderCustomers(); renderErrors(); renderContacts(); updateBadge(); updateBulkCounts();
     if (openId) { const c = allCustomers.find(x=>x.tenant_id===openId); if (c) renderPanel(c); }
     if (!isLogin && !silent) showToast('✓ Data refreshed');
+    loadDevices(true); // silently refresh device badge
   } catch(e) {
     if (isLogin) document.getElementById('login-error').textContent = 'Cannot connect. Is server running?';
     else showToast('⚠ Could not connect to server', true);
@@ -1503,6 +1518,60 @@ async function disableSync(id) {
     if (r.ok) { showToast('Cloud sync disabled'); await loadAll(); }
     else showToast('Failed', true);
   });
+}
+
+// DEVICES
+async function loadDevices(silentBadge = false) {
+  const r = await api('/admin/api/devices');
+  if (!r.ok) return;
+  const devices = await r.json();
+  const pending  = devices.filter(d => d.status === 'pending');
+  const approved = devices.filter(d => d.status === 'approved');
+  const revoked  = devices.filter(d => d.status === 'revoked');
+
+  // Update badge
+  const badge = document.getElementById('devices-badge');
+  if (badge) { badge.textContent = pending.length; badge.style.display = pending.length > 0 ? '' : 'none'; }
+
+  if (silentBadge) return;
+
+  const fmtDt = iso => iso ? new Date(iso).toLocaleString('en-IN') : '—';
+  const platformIcon = p => p === 'android' ? '🤖' : p === 'ios' ? '🍎' : '💻';
+
+  function deviceCard(d, showActions) {
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div>
+          <div style="font-size:14px;font-weight:700">${platformIcon(d.platform)} ${escHtml(d.device_name||'Unknown Device')}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">Shop: <b>${escHtml(d.shop_name||'—')}</b></div>
+          <div style="font-size:11px;color:var(--muted)">Platform: ${d.platform||'—'} · App: ${d.app_version||'—'}</div>
+          <div style="font-size:11px;color:var(--muted)">Registered: ${fmtDt(d.registered_at)}</div>
+          ${d.approved_at ? `<div style="font-size:11px;color:#34d399">Approved: ${fmtDt(d.approved_at)}</div>` : ''}
+          ${d.last_accessed_at ? `<div style="font-size:11px;color:var(--muted)">Last access: ${fmtDt(d.last_accessed_at)}</div>` : ''}
+        </div>
+        <span style="padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;${d.status==='approved'?'background:rgba(52,211,153,.15);color:#34d399':d.status==='pending'?'background:rgba(245,158,11,.15);color:#f59e0b':'background:rgba(239,68,68,.15);color:#f87171'}">${d.status.toUpperCase()}</span>
+      </div>
+      ${showActions ? `<div style="display:flex;gap:8px;margin-top:8px">
+        ${d.status==='pending' ? `<button onclick="deviceAction('${d.device_id}','approve')" style="flex:1;padding:8px;background:rgba(52,211,153,.15);border:1px solid rgba(52,211,153,.3);border-radius:10px;color:#34d399;font-size:12px;font-weight:700;cursor:pointer">✓ Approve</button>` : ''}
+        ${d.status!=='revoked' ? `<button onclick="deviceAction('${d.device_id}','revoke')" style="flex:1;padding:8px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:10px;color:#f87171;font-size:12px;font-weight:700;cursor:pointer">✕ Revoke</button>` : ''}
+      </div>` : ''}
+    </div>`;
+  }
+
+  const pendingEl = document.getElementById('devices-pending');
+  const approvedEl = document.getElementById('devices-approved');
+  if (pendingEl) pendingEl.innerHTML = pending.length === 0
+    ? '<div style="color:var(--muted);font-size:13px;padding:12px 0">No pending device requests</div>'
+    : `<h3 style="font-size:14px;font-weight:700;color:#f59e0b;margin-bottom:10px">⏳ Pending Approval (${pending.length})</h3>` + pending.map(d => deviceCard(d, true)).join('');
+  if (approvedEl) approvedEl.innerHTML = approved.length === 0 ? '' :
+    `<h3 style="font-size:14px;font-weight:700;margin-bottom:10px">✓ Approved Devices (${approved.length})</h3>` + approved.map(d => deviceCard(d, true)).join('')
+    + (revoked.length > 0 ? `<h3 style="font-size:14px;font-weight:700;color:#f87171;margin:16px 0 10px">✕ Revoked (${revoked.length})</h3>` + revoked.map(d => deviceCard(d, false)).join('') : '');
+}
+
+async function deviceAction(deviceId, action) {
+  const r = await api(`/admin/api/devices/${deviceId}/${action}`, { method:'POST' });
+  if (r.ok) { showToast(action === 'approve' ? '✓ Device approved — user can now log in' : 'Device revoked'); loadDevices(); }
+  else showToast('Failed', true);
 }
 
 // CONTACTS

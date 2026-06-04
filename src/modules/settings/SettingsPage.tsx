@@ -11,7 +11,7 @@ import { exportBackup } from '@/lib/db/backup';
 import { PageIntro } from '@/components/ui/PageIntro';
 import { useTheme } from '@/lib/theme/useTheme';
 import { reportError } from '@/lib/errorReporter';
-import { getCloudSyncStatus, activateCloudSync, pushSyncData } from '@/lib/db/cloudSync';
+import { getCloudSyncStatus, activateCloudSync, pushSyncData, setMobilePin } from '@/lib/db/cloudSync';
 
 type SettingsForm = {
   shop_name: string;
@@ -777,6 +777,9 @@ function CloudSyncSection() {
   const [codeInput, setCodeInput] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [activating, setActivating] = useState(false);
+  const [pinInput, setPinInput] = useState('');
+  const [settingPin, setSettingPin] = useState(false);
+  const [showPinForm, setShowPinForm] = useState(false);
 
   const { data: syncStatus, refetch: refetchStatus } = useQuery({
     queryKey: ['cloud-sync-status'],
@@ -877,6 +880,51 @@ function CloudSyncSection() {
               <RefreshCw className={`h-3.5 w-3.5 ${syncing ? 'animate-spin' : ''}`} />
               {syncing ? 'Syncing…' : 'Sync Now'}
             </button>
+          </div>
+
+          {/* Mobile PIN setup */}
+          <div className="rounded-xl p-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-border)' }}>
+            <div className="flex items-center justify-between mb-1">
+              <div>
+                <p className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                  <Smartphone className="h-3.5 w-3.5 text-sky-400" /> Mobile Login PIN
+                </p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {syncStatus.mobile_pin_set ? '✓ PIN set — staff can log in from Android app' : 'Set a PIN so you can log in on the Android app'}
+                </p>
+              </div>
+              <button onClick={() => setShowPinForm(v => !v)}
+                className="text-xs px-3 py-1.5 rounded-lg font-semibold btn-secondary flex-shrink-0">
+                {syncStatus.mobile_pin_set ? 'Change PIN' : 'Set PIN'}
+              </button>
+            </div>
+            {showPinForm && (
+              <div className="mt-3 flex gap-2">
+                <input
+                  type="password" inputMode="numeric" maxLength={8}
+                  value={pinInput} onChange={e => setPinInput(e.target.value.replace(/\D/g, ''))}
+                  placeholder="4–8 digit PIN"
+                  className="flex-1 rounded-xl border px-3 py-2 text-sm font-mono outline-none"
+                  style={{ borderColor: 'var(--surface-border)', background: 'var(--surface)', color: 'var(--text-primary)' }}
+                />
+                <button
+                  onClick={async () => {
+                    if (!tenantId) return;
+                    setSettingPin(true);
+                    try {
+                      const r = await setMobilePin(tenantId, pinInput);
+                      if (!r.ok) { toast.error(r.error ?? 'Failed'); return; }
+                      toast.success('Mobile PIN set! Android app users can now log in.');
+                      setPinInput(''); setShowPinForm(false); refetchStatus();
+                    } finally { setSettingPin(false); }
+                  }}
+                  disabled={settingPin || pinInput.length < 4}
+                  className="px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-50"
+                  style={{ background: '#0ea5e9', color: '#fff' }}>
+                  {settingPin ? '…' : 'Save'}
+                </button>
+              </div>
+            )}
           </div>
 
           {syncStatus.dashboard_url && (

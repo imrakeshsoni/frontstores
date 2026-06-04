@@ -1,10 +1,11 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useAppStore } from '@/app/store/app.store';
-import { createAppConfig, recreateConfigWithTenantId } from '@/lib/db/config';
+import { createAppConfig, recreateConfigWithTenantId, updateAppConfig } from '@/lib/db/config';
 import { createAuth } from '@/lib/db/auth';
 import { importBackup } from '@/lib/db/backup';
 import { enqueue, flushQueue } from '@/lib/syncQueue';
 import { toast } from 'sonner';
+import { registerDevice, checkDeviceStatus, pullDeviceSyncData, getDeviceId } from '@/lib/db/cloudSync';
 
 const SERVER = 'https://update.frontstores.com';
 
@@ -70,6 +71,15 @@ export function SetupWizard() {
   // step 0 = choose: new setup vs restore from backup
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
+
+  // Mobile cloud login state
+  const [mobileLogin, setMobileLogin] = useState(false);
+  const [mlPhone, setMlPhone] = useState('');
+  const [mlPin, setMlPin] = useState('');
+  const [mlLoading, setMlLoading] = useState(false);
+  const [mlStatus, setMlStatus] = useState<'idle' | 'pending' | 'pulling' | 'done'>('idle');
+  const [mlTenantInfo, setMlTenantInfo] = useState<{ tenant_id: string; shop_name: string; shop_type: string; session_token: string } | null>(null);
+  const [mlError, setMlError] = useState('');
   const [tcAgreed, setTcAgreed] = useState(false);
   const [form, setForm] = useState<FormData>({
     shop_type: '', shop_name: '', owner_name: '', phone: '',
@@ -111,6 +121,110 @@ export function SetupWizard() {
       toast.error('Restore failed: ' + String(e));
     } finally {
       setRestoring(false);
+    }
+  }
+
+  // Mobile login — poll for approval every 5s after registration
+  useEffect(() => {
+    if (mlStatus !== 'pending') return;
+    const interval = setInterval(async () => {
+      const status = await checkDeviceStatus();
+      if (status.status === 'approved' && status.tenant_id && status.session_token) {
+        clearInterval(interval);
+        setMlTenantInfo({ tenant_id: status.tenant_id, shop_name: status.shop_name ?? '', shop_type: status.shop_type ?? '', session_token: status.session_token });
+        setMlStatus('pulling');
+        await handleMobilePullData(status.tenant_id, status.shop_name ?? '', status.shop_type ?? '');
+      } else if (status.status === 'revoked') {
+        clearInterval(interval);
+        setMlError('Your device has been revoked. Contact FrontStores support.');
+        setMlStatus('idle');
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [mlStatus]);
+
+  async function handleMobileRegister() {
+    if (!mlPhone.trim() || !mlPin.trim()) { setMlError('Enter your shop phone number and PIN'); return; }
+    if (mlPhone.replace(/\D/g,'').length !== 10) { setMlError('Enter a valid 10-digit phone number'); return; }
+    if (mlPin.length < 4) { setMlError('PIN must be at least 4 digits'); return; }
+    setMlLoading(true); setMlError('');
+    try {
+      const deviceName = `Android · ${navigator.userAgent.match(/Android\s([0-9.]+)/)?.[0] ?? 'Phone'}`;
+      const result = await registerDevice(mlPhone.trim(), mlPin.trim(), deviceName);
+      if (!result.ok) { setMlError(result.error ?? 'Login failed'); return; }
+      if (result.status === 'approved' && result.tenant_id && result.session_token) {
+        // Already approved — pull data immediately
+        setMlTenantInfo({ tenant_id: result.tenant_id, shop_name: result.shop_name ?? '', shop_type: result.shop_type ?? '', session_token: result.session_token });
+        setMlStatus('pulling');
+        await handleMobilePullData(result.tenant_id, result.shop_name ?? '', result.shop_type ?? '');
+      } else {
+        setMlStatus('pending'); // waiting for admin approval
+      }
+    } catch (e: any) {
+      setMlError(e?.message ?? 'Network error. Check your internet connection.');
+    } finally {
+      setMlLoading(false);
+    }
+  }
+
+  async function handleMobilePullData(tenantId: string, shopName: string, shopType: string) {
+    try {
+      const result = await pullDeviceSyncData();
+      if (!result.ok || !result.data) {
+        setMlError(result.error ?? 'Could not pull data. Ask owner to sync from desktop first.');
+        setMlStatus('idle'); return;
+      }
+      const db = (await import('@/lib/db/index')).getDb;
+      const { getDb } = await import('@/lib/db/index');
+      const sqliteDb = await getDb();
+      const data = result.data;
+
+      // Set up app_config from sync data
+      const uuid = crypto.randomUUID().replace(/-/g, '');
+      await sqliteDb.execute(
+        `INSERT OR REPLACE INTO app_config (id, tenant_id, shop_type, shop_name, owner_name, phone, email, address_line1, city, is_setup_complete, settings)
+         VALUES (?,?,?,?,?,?,?,?,?,1,'{}')`,
+        [uuid, tenantId, shopType, shopName, data.staff?.[0]?.name ?? shopName, data.phone ?? '', data.email ?? '', data.address_line1 ?? '', data.city ?? '']
+      );
+
+      // Import each table
+      const tables: Array<[string, string, string[]]> = [
+        ['carwash_jobs',       'id,tenant_id,job_number,vehicle_id,reg_number,vehicle_type,make,model,color,customer_name,customer_phone,customer_id,staff_id,staff_name,status,payment_method,payment_status,subtotal,discount,gst_amount,total,membership_id,notes,started_at,completed_at,delivered_at,created_at,updated_at,deleted_at', ['id','tenant_id','job_number','vehicle_id','reg_number','vehicle_type','make','model','color','customer_name','customer_phone','customer_id','staff_id','staff_name','status','payment_method','payment_status','subtotal','discount','gst_amount','total','membership_id','notes','started_at','completed_at','delivered_at','created_at','updated_at','deleted_at']],
+        ['customers',          'id,tenant_id,name,phone,email,address,city,tags,credit_limit,notes,created_at,updated_at,deleted_at', ['id','tenant_id','name','phone','email','address','city','tags','credit_limit','notes','created_at','updated_at','deleted_at']],
+        ['carwash_vehicles',   'id,tenant_id,customer_id,customer_name,customer_phone,reg_number,vehicle_type,make,model,color,notes,created_at,updated_at,deleted_at', ['id','tenant_id','customer_id','customer_name','customer_phone','reg_number','vehicle_type','make','model','color','notes','created_at','updated_at','deleted_at']],
+        ['carwash_staff',      'id,tenant_id,name,phone,role,monthly_salary,joining_date,deduct_half_day,deduct_full_day_leave,is_active,created_at,updated_at,deleted_at', ['id','tenant_id','name','phone','role','monthly_salary','joining_date','deduct_half_day','deduct_full_day_leave','is_active','created_at','updated_at','deleted_at']],
+        ['carwash_attendance', 'id,tenant_id,staff_id,date,status,note,updated_at,deleted_at', ['id','tenant_id','staff_id','date','status','note','updated_at','deleted_at']],
+        ['carwash_services',   'id,tenant_id,name,description,price_hatchback,price_sedan,price_suv,price_luxury,duration_minutes,gst_rate,is_active,sort_order,created_at,updated_at,deleted_at', ['id','tenant_id','name','description','price_hatchback','price_sedan','price_suv','price_luxury','duration_minutes','gst_rate','is_active','sort_order','created_at','updated_at','deleted_at']],
+        ['carwash_memberships','id,tenant_id,customer_name,customer_phone,customer_id,vehicle_id,reg_number,package_name,total_washes,used_washes,amount_paid,valid_until,is_active,created_at,updated_at,deleted_at', ['id','tenant_id','customer_name','customer_phone','customer_id','vehicle_id','reg_number','package_name','total_washes','used_washes','amount_paid','valid_until','is_active','created_at','updated_at','deleted_at']],
+      ];
+
+      const tableData: Record<string, any[]> = {
+        carwash_jobs: data.jobs ?? [], customers: data.customers ?? [],
+        carwash_vehicles: data.vehicles ?? [], carwash_staff: data.staff ?? [],
+        carwash_attendance: data.attendance ?? [], carwash_services: data.services ?? [],
+        carwash_memberships: data.memberships ?? [],
+      };
+
+      for (const [table, , cols] of tables) {
+        const rows = tableData[table] ?? [];
+        for (const row of rows) {
+          const vals = cols.map(c => row[c] ?? null);
+          const placeholders = cols.map(() => '?').join(',');
+          try {
+            await sqliteDb.execute(`INSERT OR REPLACE INTO ${table} (${cols.join(',')}) VALUES (${placeholders})`, vals);
+          } catch { /* skip incompatible rows */ }
+        }
+      }
+
+      // Save cloud sync credentials locally
+      await updateAppConfig({ settings: { cloud_sync_enabled: true, cloud_sync_session_token: result.data.synced_at, cloud_device_id: getDeviceId(), cloud_sync_last_at: result.data.synced_at } });
+
+      toast.success(`Welcome! ${shopName} data loaded. 🎉`);
+      await loadConfig();
+      setMlStatus('done');
+    } catch (e: any) {
+      setMlError('Failed to load data: ' + (e?.message ?? e));
+      setMlStatus('idle');
     }
   }
 
@@ -248,7 +362,64 @@ export function SetupWizard() {
         <div className="bg-white rounded-3xl p-8 shadow-2xl">
 
           {/* Step 0: New setup vs Restore */}
-          {step === 0 && (
+          {/* Mobile Cloud Login Screen */}
+          {mobileLogin && (
+            <div>
+              <button onClick={() => { setMobileLogin(false); setMlStatus('idle'); setMlError(''); }} className="text-sm text-slate-500 mb-4 flex items-center gap-1">← Back</button>
+              <h2 className="text-xl font-semibold text-slate-800 mb-1">📱 Log in with Cloud Sync</h2>
+              <p className="text-slate-500 text-sm mb-6">Enter the phone number registered with your FrontStores shop and your Mobile PIN.</p>
+
+              {mlStatus === 'idle' && (
+                <div className="space-y-4">
+                  {mlError && <div className="rounded-xl p-3 text-sm font-medium" style={{ background: '#fee2e2', color: '#dc2626' }}>{mlError}</div>}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Shop Phone Number</label>
+                    <input type="tel" value={mlPhone} onChange={e => setMlPhone(e.target.value)} placeholder="10-digit mobile number"
+                      className="w-full rounded-xl border-2 px-4 py-3 text-base outline-none focus:border-indigo-500"
+                      style={{ borderColor: '#e2e8f0' }} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Mobile PIN</label>
+                    <input type="password" inputMode="numeric" value={mlPin} onChange={e => setMlPin(e.target.value.replace(/\D/g,''))} placeholder="4–8 digit PIN"
+                      className="w-full rounded-xl border-2 px-4 py-3 text-base outline-none focus:border-indigo-500 font-mono tracking-widest"
+                      style={{ borderColor: '#e2e8f0' }} />
+                    <p className="text-xs text-slate-400 mt-1">PIN was set from desktop app Settings → Cloud Sync</p>
+                  </div>
+                  <button onClick={handleMobileRegister} disabled={mlLoading}
+                    className="w-full py-3 rounded-xl font-bold text-white text-sm disabled:opacity-60"
+                    style={{ background: '#4f46e5' }}>
+                    {mlLoading ? 'Connecting…' : 'Log In'}
+                  </button>
+                </div>
+              )}
+
+              {mlStatus === 'pending' && (
+                <div className="text-center py-8">
+                  <div className="text-4xl mb-4 animate-bounce">⏳</div>
+                  <h3 className="font-bold text-slate-800 mb-2">Waiting for Admin Approval</h3>
+                  <p className="text-sm text-slate-500 mb-4">Your device registration request has been sent. The FrontStores admin needs to approve your device.</p>
+                  <p className="text-xs text-slate-400">This page will update automatically. Do not close the app.</p>
+                  <div className="mt-4 flex justify-center">
+                    <div className="flex gap-1">
+                      <div className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <div className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <div className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {mlStatus === 'pulling' && (
+                <div className="text-center py-8">
+                  <div className="text-4xl mb-4">☁️</div>
+                  <h3 className="font-bold text-slate-800 mb-2">Loading Your Shop Data…</h3>
+                  <p className="text-sm text-slate-500">Downloading all your data from the cloud. This may take a moment.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!mobileLogin && step === 0 && (
             <div>
               <h2 className="text-xl font-semibold text-slate-800 mb-1">Is this a new setup?</h2>
               <p className="text-slate-500 text-sm mb-6">If you're moving from another computer, restore your backup file instead.</p>
@@ -276,6 +447,14 @@ export function SetupWizard() {
                   <div className="text-2xl mb-1">🔑</div>
                   <div className="font-medium text-slate-800 text-sm">I already have an account</div>
                   <div className="text-slate-500 text-xs mt-0.5">App was deleted or reinstalled — recover your account</div>
+                </button>
+                <button
+                  onClick={() => setMobileLogin(true)}
+                  className="text-left p-4 rounded-2xl border-2 border-slate-200 hover:border-sky-400 hover:bg-sky-50 transition-all"
+                >
+                  <div className="text-2xl mb-1">📱</div>
+                  <div className="font-medium text-slate-800 text-sm">Log in with Cloud Sync</div>
+                  <div className="text-slate-500 text-xs mt-0.5">Access your shop data on this device — phone number + PIN</div>
                 </button>
               </div>
 
