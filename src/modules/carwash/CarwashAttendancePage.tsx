@@ -108,7 +108,8 @@ export function CarwashAttendancePage() {
     <div class="header">
       ${logo ? `<div><img src="${logo}" class="logo" /></div>` : ''}
       <div class="shop">${shopName}</div>
-      ${config?.address_line1 ? `<div style="font-size:11px;color:#6b7280">${config.address_line1}${config.city ? ', ' + config.city : ''}</div>` : ''}
+      ${config?.address_line1 ? `<div style="font-size:11px;color:#6b7280">${[config.address_line1, config.city].filter(Boolean).join(', ')}</div>` : ''}
+      ${config?.phone ? `<div style="font-size:11px;color:#6b7280">📞 ${config.phone}</div>` : ''}
     </div>
     <div class="slip-title">SALARY SLIP — ${monthName}</div>
     <div class="section-title">Employee Details</div>

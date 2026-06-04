@@ -489,7 +489,8 @@ export function JobCardPage() {
       ${logo ? `<img src="${logo}" class="logo" /><br/>` : ''}
       <span class="bold" style="font-size:15px">${shopName}</span>
     </div>
-    <div class="center" style="font-size:10px">${config?.address_line1 ?? ''} ${config?.city ?? ''}</div>
+    <div class="center" style="font-size:10px">${[config?.address_line1, config?.city].filter(Boolean).join(', ')}</div>
+    ${config?.phone ? `<div class="center" style="font-size:10px">📞 ${config.phone}</div>` : ''}
     <div class="line"></div>
     <div class="center bold big">INVOICE</div>
     <div class="row"><span>Invoice #</span><span class="bold">${j.job_number}</span></div>
