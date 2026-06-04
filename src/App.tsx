@@ -8,6 +8,7 @@ import { CreatePasswordScreen } from '@/modules/auth/CreatePasswordScreen';
 import { hasAuth } from '@/lib/db/auth';
 import { SubscriptionGate } from '@/modules/subscription/SubscriptionGate';
 import { useIdleTimer } from '@/lib/hooks/useIdleTimer';
+import { PinLockGate } from '@/components/ui/PinLockGate';
 
 function IdleTimerProvider() { useIdleTimer(); return null; }
 
@@ -415,9 +416,9 @@ export default function App() {
             <Route path="products"   element={<ProductsPage />} />
             <Route path="inventory"  element={<InventoryPage />} />
             <Route path="orders"     element={<OrdersPage />} />
-            <Route path="customers"  element={<CustomersPage />} />
+            <Route path="customers"  element={config?.shop_type === 'carwash' ? <PinLockGate settingKey="pin_lock_customers" label="Customers"><CustomersPage /></PinLockGate> : <CustomersPage />} />
             <Route path="khata"      element={<KhataPage />} />
-            <Route path="expenses"   element={<ExpensesPage />} />
+            <Route path="expenses"   element={config?.shop_type === 'carwash' ? <PinLockGate settingKey="pin_lock_expenses" label="Expenses"><ExpensesPage /></PinLockGate> : <ExpensesPage />} />
             <Route path="suppliers"        element={<SuppliersPage />} />
             <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
             <Route path="reports"    element={<ReportsPage />} />
@@ -437,16 +438,16 @@ export default function App() {
             <Route path="grocery/purchase"  element={<PurchasePage />} />
 
             {/* [carwash] [all tenants] */}
-            <Route path="carwash/dashboard"  element={<CarwashDashboard />} />
-            <Route path="carwash/jobs"       element={<JobsListPage />} />
+            <Route path="carwash/dashboard"  element={<PinLockGate settingKey="pin_lock_dashboard"    label="Dashboard">    <CarwashDashboard /></PinLockGate>} />
+            <Route path="carwash/jobs"       element={<PinLockGate settingKey="pin_lock_jobs"         label="Job Cards">    <JobsListPage /></PinLockGate>} />
             <Route path="carwash/jobs/:id"   element={<JobCardPage />} />
-            <Route path="carwash/services"      element={<CarwashServicesPage />} />
-            <Route path="carwash/reports"       element={<CarwashReportsPage />} />
-            <Route path="carwash/broadcast"     element={<BroadcastPage />} />
-            <Route path="carwash/appointments"  element={<CarwashAppointmentsPage />} />
-            <Route path="carwash/inventory"     element={<CarwashInventoryPage />} />
-            <Route path="carwash/vehicle-types" element={<CarwashVehicleTypesPage />} />
-            <Route path="carwash/setup"         element={<CarwashSetupPage />} />
+            <Route path="carwash/services"      element={<PinLockGate settingKey="pin_lock_services"     label="Services">     <CarwashServicesPage /></PinLockGate>} />
+            <Route path="carwash/reports"       element={<PinLockGate settingKey="pin_lock_reports"      label="Reports">      <CarwashReportsPage /></PinLockGate>} />
+            <Route path="carwash/broadcast"     element={<PinLockGate settingKey="pin_lock_broadcast"    label="Broadcast">    <BroadcastPage /></PinLockGate>} />
+            <Route path="carwash/appointments"  element={<PinLockGate settingKey="pin_lock_appointments" label="Appointments"> <CarwashAppointmentsPage /></PinLockGate>} />
+            <Route path="carwash/inventory"     element={<PinLockGate settingKey="pin_lock_inventory"    label="Inventory">    <CarwashInventoryPage /></PinLockGate>} />
+            <Route path="carwash/vehicle-types" element={<PinLockGate settingKey="pin_lock_vehicle_types" label="Vehicle Types"><CarwashVehicleTypesPage /></PinLockGate>} />
+            <Route path="carwash/setup"         element={<PinLockGate settingKey="pin_lock_setup"        label="Setup">        <CarwashSetupPage /></PinLockGate>} />
 
             {/* [clinic] [all tenants] */}
             <Route path="clinic/dashboard"    element={<ClinicDashboard />} />

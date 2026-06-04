@@ -429,6 +429,9 @@ export function SettingsPage() {
       {/* WhatsApp Business API */}
       <WhatsAppBusinessSection />
 
+      {/* Section PIN Lock — carwash only */}
+      {config?.shop_type === 'carwash' && <SectionPinLockSection />}
+
       {/* Cloud Sync */}
       <CloudSyncSection />
 
@@ -766,6 +769,153 @@ function WhatsAppBusinessSection() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Section PIN Lock ─────────────────────────────────────────────────────────
+// [carwash] [all tenants] — lock individual sections behind a 6-digit PIN
+const PIN_SECTIONS = [
+  { key: 'pin_lock_dashboard',     label: 'Dashboard' },
+  { key: 'pin_lock_jobs',          label: 'Job Cards' },
+  { key: 'pin_lock_appointments',  label: 'Appointments' },
+  { key: 'pin_lock_inventory',     label: 'Inventory' },
+  { key: 'pin_lock_customers',     label: 'Customers' },
+  { key: 'pin_lock_expenses',      label: 'Expenses' },
+  { key: 'pin_lock_reports',       label: 'Reports' },
+  { key: 'pin_lock_broadcast',     label: 'Broadcast' },
+  { key: 'pin_lock_vehicle_types', label: 'Vehicle Types' },
+  { key: 'pin_lock_setup',         label: 'Setup' },
+];
+
+function SectionPinLockSection() {
+  const { config, loadConfig } = useAppStore();
+  const settings = config?.settings ?? {};
+  const savedPin = (settings['pin_lock_code'] as string) ?? '';
+  const hasPin = savedPin.length === 6;
+
+  const [pinInput, setPinInput]       = useState('');
+  const [pinConfirm, setPinConfirm]   = useState('');
+  const [showSet, setShowSet]         = useState(false);
+  const [pinError, setPinError]       = useState('');
+
+  const anyLocked = PIN_SECTIONS.some(s => !!(settings[s.key] as boolean));
+
+  const saveSettings = async (updates: Record<string, unknown>) => {
+    await updateAppConfig({ settings: { ...settings, ...updates } });
+    await loadConfig();
+  };
+
+  const handleToggle = async (key: string, value: boolean) => {
+    if (value && !hasPin) { toast.error('Set a PIN first before locking a section'); return; }
+    await saveSettings({ [key]: value });
+  };
+
+  const handleSavePin = async () => {
+    if (!/^\d{6}$/.test(pinInput)) { setPinError('PIN must be exactly 6 digits'); return; }
+    if (pinInput !== pinConfirm) { setPinError('PINs do not match'); return; }
+    await saveSettings({ pin_lock_code: pinInput });
+    setPinInput(''); setPinConfirm(''); setPinError(''); setShowSet(false);
+    toast.success('PIN saved');
+  };
+
+  const handleRemovePin = async () => {
+    if (!confirm('Remove PIN? All section locks will be disabled.')) return;
+    const updated: Record<string, unknown> = { pin_lock_code: '' };
+    PIN_SECTIONS.forEach(s => { updated[s.key] = false; });
+    await saveSettings(updated);
+    toast.success('PIN removed');
+  };
+
+  return (
+    <div className="card p-5" style={{ borderLeft: '4px solid #6366f1' }}>
+      <div className="flex items-center justify-between mb-1">
+        <p className="section-label">🔒 Section PIN Lock</p>
+        {hasPin && <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: '#ede9fe', color: '#6d28d9' }}>PIN Set</span>}
+      </div>
+      <p className="text-xs mb-4" style={{ color: 'var(--text-tertiary)' }}>
+        Set a 6-digit PIN and choose which sections require it to open.
+      </p>
+
+      {/* PIN setup */}
+      <div className="rounded-xl p-4 mb-4 space-y-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-border)' }}>
+        {!showSet ? (
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+              {hasPin ? '●●●●●● (PIN is set)' : 'No PIN configured'}
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setShowSet(true)}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
+                style={{ background: '#6366f1' }}>
+                {hasPin ? 'Change PIN' : 'Set PIN'}
+              </button>
+              {hasPin && (
+                <button onClick={handleRemovePin}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                  style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)', color: '#dc2626' }}>
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>New PIN (6 digits)</label>
+                <input type="password" inputMode="numeric" maxLength={6} value={pinInput}
+                  onChange={e => { setPinInput(e.target.value.replace(/\D/g,'')); setPinError(''); }}
+                  placeholder="······" className="w-full rounded-lg border px-3 py-2 text-sm outline-none tracking-widest"
+                  style={{ borderColor: 'var(--surface-border)', background: 'var(--surface)', color: 'var(--text-primary)' }} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Confirm PIN</label>
+                <input type="password" inputMode="numeric" maxLength={6} value={pinConfirm}
+                  onChange={e => { setPinConfirm(e.target.value.replace(/\D/g,'')); setPinError(''); }}
+                  placeholder="······" className="w-full rounded-lg border px-3 py-2 text-sm outline-none tracking-widest"
+                  style={{ borderColor: 'var(--surface-border)', background: 'var(--surface)', color: 'var(--text-primary)' }} />
+              </div>
+            </div>
+            {pinError && <p className="text-xs" style={{ color: '#dc2626' }}>{pinError}</p>}
+            <div className="flex gap-2">
+              <button onClick={handleSavePin}
+                className="px-4 py-1.5 rounded-lg text-xs font-bold text-white"
+                style={{ background: '#6366f1' }}>Save PIN</button>
+              <button onClick={() => { setShowSet(false); setPinInput(''); setPinConfirm(''); setPinError(''); }}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)', color: 'var(--text-secondary)' }}>Cancel</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Section toggles */}
+      <div className="space-y-1">
+        <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-tertiary)' }}>Lock Sections</p>
+        {PIN_SECTIONS.map(({ key, label }) => {
+          const on = !!(settings[key] as boolean);
+          return (
+            <div key={key} className="flex items-center justify-between px-3 py-2.5 rounded-xl"
+              style={{ background: on ? 'rgba(99,102,241,0.07)' : 'var(--surface-2)' }}>
+              <div className="flex items-center gap-2">
+                <span className="text-sm" style={{ color: on ? '#6d28d9' : 'var(--text-secondary)' }}>🔒</span>
+                <span className="text-sm font-medium" style={{ color: on ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{label}</span>
+              </div>
+              <button onClick={() => handleToggle(key, !on)}
+                className="relative w-11 h-6 rounded-full transition-colors"
+                style={{ background: on ? '#6366f1' : 'var(--surface-border)' }}>
+                <span className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform"
+                  style={{ transform: on ? 'translateX(20px)' : 'translateX(0)' }} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {!hasPin && anyLocked && (
+        <p className="text-xs mt-3" style={{ color: '#dc2626' }}>⚠️ Set a PIN above to activate the locks</p>
+      )}
     </div>
   );
 }
