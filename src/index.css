@@ -138,10 +138,76 @@
     color: #111111 !important;
   }
 
-  /* LIGHT MODE — Apple blue accent, white text on buttons (standard) */
+  /* ── LIGHT MODE — full readability fix ─────────────────────────────────── */
+
+  /* 1. Accent buttons: blue bg needs white text (not #111 which looks off on blue) */
+  html.carwash-theme:not(.dark) [style*="background: var(--accent)"],
+  html.carwash-theme:not(.dark) [style*="background:var(--accent)"] {
+    color: #ffffff !important;
+  }
+  html.carwash-theme:not(.dark) [style*="background: var(--accent)"] svg,
+  html.carwash-theme:not(.dark) [style*="background:var(--accent)"] svg,
+  html.carwash-theme:not(.dark) [style*="background: var(--accent)"] .text-white,
+  html.carwash-theme:not(.dark) [style*="background:var(--accent)"] .text-white {
+    color: #ffffff !important;
+  }
   html.carwash-theme:not(.dark) .btn-primary {
     color: #ffffff !important;
     box-shadow: none;
+  }
+
+  /* 2. Amber text on light backgrounds — darken for WCAG AA contrast
+        #f59e0b on white = 2.1:1 (fails) → #b45309 = 4.7:1 (passes)
+        #d97706 on white = 3.0:1 (fails) → #92400e = 6.6:1 (passes)   */
+  html.carwash-theme:not(.dark) [style*="color: #f59e0b"],
+  html.carwash-theme:not(.dark) [style*="color:#f59e0b"] {
+    color: #b45309 !important;
+  }
+  html.carwash-theme:not(.dark) [style*="color: #d97706"],
+  html.carwash-theme:not(.dark) [style*="color:#d97706"] {
+    color: #92400e !important;
+  }
+
+  /* 3. Amber backgrounds (#d97706, #f59e0b) with white text —
+        amber bg + white text is only 2.1:1. Use a darker shade so white is readable. */
+  html.carwash-theme:not(.dark) [style*="background: #d97706"],
+  html.carwash-theme:not(.dark) [style*="background:#d97706"] {
+    background: #b45309 !important;
+    color: #ffffff !important;
+  }
+  html.carwash-theme:not(.dark) [style*="background: #f59e0b"],
+  html.carwash-theme:not(.dark) [style*="background:#f59e0b"] {
+    background: #b45309 !important;
+    color: #ffffff !important;
+  }
+
+  /* 4. Amber-tinted light backgrounds (#fef3c7) with amber text — fix text only */
+  html.carwash-theme:not(.dark) [style*="background: #fef3c7"] [style*="color: #d97706"],
+  html.carwash-theme:not(.dark) [style*="background: #fef3c7"] [style*="color:#d97706"],
+  html.carwash-theme:not(.dark) [style*="background:#fef3c7"] [style*="color: #d97706"],
+  html.carwash-theme:not(.dark) [style*="background:#fef3c7"] [style*="color:#d97706"] {
+    color: #78350f !important;
+  }
+
+  /* 5. rgba amber backgrounds — keep bg, ensure text contrast */
+  html.carwash-theme:not(.dark) [style*="background: rgba(245,158,11"] [style*="color"],
+  html.carwash-theme:not(.dark) [style*="background:rgba(245,158,11"] [style*="color"] {
+    color: #78350f !important;
+  }
+
+  /* 6. WhatsApp green brand (#25d366) — readable on both modes, no change needed */
+
+  /* 7. Input/select: explicit text color in light mode to prevent any theme bleed */
+  html.carwash-theme:not(.dark) input,
+  html.carwash-theme:not(.dark) textarea,
+  html.carwash-theme:not(.dark) select {
+    color: var(--text-primary) !important;
+    background: var(--surface) !important;
+  }
+  html.carwash-theme:not(.dark) input::placeholder,
+  html.carwash-theme:not(.dark) textarea::placeholder {
+    color: var(--text-tertiary) !important;
+    opacity: 1 !important;
   }
 
   /* Dark-only overrides — only apply when both carwash-theme AND dark are active */

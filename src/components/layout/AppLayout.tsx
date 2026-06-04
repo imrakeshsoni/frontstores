@@ -481,17 +481,17 @@ const BEAUTY_NAV_ITEMS = [
   { to: '/settings',             icon: Settings,        label: 'Settings',       iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
 
-// [carwash] [all tenants] — amber-tinted nav icons for BarberKraft dark theme
+// [carwash] [all tenants] — use CSS vars so icons are amber in dark mode, blue in light mode
 const CARWASH_NAV_ITEMS = [
-  { to: '/carwash/dashboard',     icon: LayoutDashboard, label: 'Dashboard',     iconBg: 'rgba(245,158,11,0.15)', iconColor: '#f59e0b' },
-  { to: '/carwash/jobs',          icon: ClipboardCheck,  label: 'Job Cards',     iconBg: 'rgba(245,158,11,0.15)', iconColor: '#f59e0b' },
-  { to: '/carwash/appointments',  icon: Calendar,        label: 'Appointments',  iconBg: 'rgba(245,158,11,0.15)', iconColor: '#f59e0b' },
-  { to: '/carwash/inventory',     icon: Package,         label: 'Inventory',     iconBg: 'rgba(245,158,11,0.15)', iconColor: '#f59e0b' },
-  { to: '/customers',             icon: Users,           label: 'Customers',     iconBg: 'rgba(245,158,11,0.15)', iconColor: '#f59e0b' },
-  { to: '/expenses',              icon: Wallet,          label: 'Expenses',      iconBg: 'rgba(245,158,11,0.15)', iconColor: '#f59e0b' },
-  { to: '/carwash/reports',       icon: BarChart3,       label: 'Reports',       iconBg: 'rgba(245,158,11,0.15)', iconColor: '#f59e0b' },
-  { to: '/carwash/broadcast',     icon: Radio,           label: 'Broadcast',     iconBg: 'rgba(245,158,11,0.15)', iconColor: '#f59e0b' },
-  { to: '/carwash/setup',         icon: Wrench,          label: 'Setup',         iconBg: 'rgba(245,158,11,0.15)', iconColor: '#f59e0b' },
+  { to: '/carwash/dashboard',     icon: LayoutDashboard, label: 'Dashboard',     iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
+  { to: '/carwash/jobs',          icon: ClipboardCheck,  label: 'Job Cards',     iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
+  { to: '/carwash/appointments',  icon: Calendar,        label: 'Appointments',  iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
+  { to: '/carwash/inventory',     icon: Package,         label: 'Inventory',     iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
+  { to: '/customers',             icon: Users,           label: 'Customers',     iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
+  { to: '/expenses',              icon: Wallet,          label: 'Expenses',      iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
+  { to: '/carwash/reports',       icon: BarChart3,       label: 'Reports',       iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
+  { to: '/carwash/broadcast',     icon: Radio,           label: 'Broadcast',     iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
+  { to: '/carwash/setup',         icon: Wrench,          label: 'Setup',         iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
 ];
 
 // [tyrescrap] [all tenants]
