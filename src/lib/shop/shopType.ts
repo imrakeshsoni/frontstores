@@ -1,6 +1,6 @@
 import { useAppStore } from '@/app/store/app.store';
 
-export type ShopType = 'medical' | 'restaurant' | 'grocery' | 'carwash' | 'clinic' | 'beauty' | 'study' | 'coaching' | 'gym' | 'jewellery' | 'realestate' | 'hotel' | 'tailor' | 'hardware' | 'repair' | 'drivingschool' | 'laundry' | 'catering' | 'pestcontrol' | 'clothing' | 'bakery' | 'optician' | 'petrolpump' | 'furniture' | 'printing' | 'ca' | 'events' | 'travel' | 'insurance' | 'homeservice';
+export type ShopType = 'medical' | 'restaurant' | 'grocery' | 'carwash' | 'clinic' | 'beauty' | 'study' | 'coaching' | 'gym' | 'jewellery' | 'realestate' | 'hotel' | 'tailor' | 'hardware' | 'repair' | 'drivingschool' | 'laundry' | 'catering' | 'pestcontrol' | 'clothing' | 'bakery' | 'optician' | 'petrolpump' | 'furniture' | 'printing' | 'ca' | 'events' | 'travel' | 'insurance' | 'homeservice' | 'tyrescrap';
 
 const SHOP_TYPE_LABELS: Record<string, string> = {
   medical: 'Medical Store / Pharmacy', // [medical] [all tenants]
@@ -33,6 +33,7 @@ const SHOP_TYPE_LABELS: Record<string, string> = {
   travel: 'Travel Agency',
   insurance: 'Insurance Agent',
   homeservice: 'Home Service / Electrician',
+  tyrescrap: 'TyreMate — Tyre Scrap', // [tyrescrap] [all tenants]
 };
 
 // ── APP_REGISTRY ─────────────────────────────────────────────────────────────
@@ -192,6 +193,7 @@ export const APP_REGISTRY: AppRegistryEntry[] = [
   { type: 'travel',      label: 'Travel Agency',                icon: '✈️', description: 'Trip bookings, itinerary, visa tracking', color: '#0891b2', bgColor: '#cffafe', dashboardRoute: '/travel/dashboard' },
   { type: 'insurance',   label: 'Insurance Agent',              icon: '🛡️', description: 'Policies, renewals, claims, commission tracking', color: '#16a34a', bgColor: '#dcfce7', dashboardRoute: '/insurance/dashboard' },
   { type: 'homeservice', label: 'Home Service / Electrician',   icon: '🔌', description: 'Job cards, technicians, materials, AMC contracts', color: '#d97706', bgColor: '#fef3c7', dashboardRoute: '/homeservice/dashboard' },
+  { type: 'tyrescrap',  label: 'TyreMate — Tyre Scrap Business', icon: '♻️', description: 'Buy scrap tyres, track stock, sell rubber/tyres, reports', color: '#16a34a', bgColor: '#dcfce7', dashboardRoute: '/tyrescrap/dashboard' }, // [tyrescrap] [all tenants]
   // ➕ Add new apps here — they appear automatically in the Switch App modal
 ];
 

@@ -284,6 +284,16 @@ const RenewalsPage       = lazy(() => import('@/modules/insurance/RenewalsPage')
 const ClaimsPage         = lazy(() => import('@/modules/insurance/ClaimsPage').then(m => ({ default: m.InsClaimsPage })));
 const InsReportsPage     = lazy(() => import('@/modules/insurance/InsReportsPage').then(m => ({ default: m.InsReportsPage })));
 
+// [tyrescrap] [all tenants]
+const TyreScrapDashboard = lazy(() => import('@/modules/tyrescrap/TyreScrapDashboard').then(m => ({ default: m.TyreScrapDashboard })));
+const TyrePurchasePage   = lazy(() => import('@/modules/tyrescrap/TyrePurchasePage').then(m => ({ default: m.TyrePurchasePage })));
+const TyreSalesPage      = lazy(() => import('@/modules/tyrescrap/TyreSalesPage').then(m => ({ default: m.TyreSalesPage })));
+const TyreStockPage      = lazy(() => import('@/modules/tyrescrap/TyreStockPage').then(m => ({ default: m.TyreStockPage })));
+const TyreVendorsPage    = lazy(() => import('@/modules/tyrescrap/TyreVendorsPage').then(m => ({ default: m.TyreVendorsPage })));
+const TyreBuyersPage     = lazy(() => import('@/modules/tyrescrap/TyreBuyersPage').then(m => ({ default: m.TyreBuyersPage })));
+const TyreExpensesPage   = lazy(() => import('@/modules/tyrescrap/TyreExpensesPage').then(m => ({ default: m.TyreExpensesPage })));
+const TyreReportsPage    = lazy(() => import('@/modules/tyrescrap/TyreReportsPage').then(m => ({ default: m.TyreReportsPage })));
+
 // [homeservice] [all tenants]
 const ServiceDashboard   = lazy(() => import('@/modules/homeservice/ServiceDashboard').then(m => ({ default: m.ServiceDashboard })));
 const HSJobsPage         = lazy(() => import('@/modules/homeservice/JobsPage').then(m => ({ default: m.JobsPage })));
@@ -397,6 +407,7 @@ export default function App() {
               config?.shop_type === 'travel'       ? '/travel/dashboard' :
               config?.shop_type === 'insurance'    ? '/insurance/dashboard' :
               config?.shop_type === 'homeservice'  ? '/homeservice/dashboard' :
+              config?.shop_type === 'tyrescrap'    ? '/tyrescrap/dashboard' : // [tyrescrap] [all tenants]
               '/dashboard'
             } replace />} />
             <Route path="dashboard"  element={<Dashboard />} />
@@ -662,6 +673,16 @@ export default function App() {
             <Route path="printing/jobs/new"  element={<PrintingNewJobPage />} />
             <Route path="printing/stationery" element={<PrintingStationeryPage />} />
             <Route path="printing/reports"   element={<PrintingReports />} />
+
+            {/* [tyrescrap] [all tenants] */}
+            <Route path="tyrescrap/dashboard" element={<TyreScrapDashboard />} />
+            <Route path="tyrescrap/purchase"  element={<TyrePurchasePage />} />
+            <Route path="tyrescrap/sales"     element={<TyreSalesPage />} />
+            <Route path="tyrescrap/stock"     element={<TyreStockPage />} />
+            <Route path="tyrescrap/vendors"   element={<TyreVendorsPage />} />
+            <Route path="tyrescrap/buyers"    element={<TyreBuyersPage />} />
+            <Route path="tyrescrap/expenses"  element={<TyreExpensesPage />} />
+            <Route path="tyrescrap/reports"   element={<TyreReportsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

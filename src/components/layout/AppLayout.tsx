@@ -494,6 +494,18 @@ const CARWASH_NAV_ITEMS = [
   { to: '/carwash/setup',         icon: Wrench,          label: 'Setup',         iconBg: 'rgba(245,158,11,0.15)', iconColor: '#f59e0b' },
 ];
 
+// [tyrescrap] [all tenants]
+const TYRESCRAP_NAV_ITEMS = [
+  { to: '/tyrescrap/dashboard', icon: LayoutDashboard, label: 'Dashboard',  iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/tyrescrap/purchase',  icon: ShoppingCart,    label: 'Purchase',   iconBg: '#fef9c3', iconColor: '#ca8a04' },
+  { to: '/tyrescrap/sales',     icon: TrendingUp,      label: 'Sales',      iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/tyrescrap/stock',     icon: Boxes,           label: 'Stock',      iconBg: '#f3e8ff', iconColor: '#9333ea' },
+  { to: '/tyrescrap/vendors',   icon: Truck,           label: 'Vendors',    iconBg: '#fef9c3', iconColor: '#ca8a04' },
+  { to: '/tyrescrap/buyers',    icon: Users,           label: 'Buyers',     iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/tyrescrap/expenses',  icon: Wallet,          label: 'Expenses',   iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/tyrescrap/reports',   icon: BarChart3,       label: 'Reports',    iconBg: '#e0f2fe', iconColor: '#0284c7' },
+];
+
 export function AppLayout() {
   const { config, setAuthenticated } = useAppStore();
   const navigate = useNavigate();
@@ -531,6 +543,7 @@ export function AppLayout() {
     config?.shop_type === 'travel'        ? TRAVEL_NAV_ITEMS :
     config?.shop_type === 'insurance'     ? INSURANCE_NAV_ITEMS :
     config?.shop_type === 'homeservice'   ? HOMESERVICE_NAV_ITEMS :
+    config?.shop_type === 'tyrescrap'     ? TYRESCRAP_NAV_ITEMS : // [tyrescrap] [all tenants]
     NAV_ITEMS;
 
   useEffect(() => {

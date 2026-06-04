@@ -270,16 +270,13 @@ export default function SyncPage() {
                 <br />This is a paid add-on. Contact us to activate it for your account.
               </div>
               <a
-                href="https://wa.me/919340419566?text=Hi%2C+I+want+to+activate+Cloud+Sync+for+FrontStores"
+                href="https://frontstores.com/#contact"
                 target="_blank"
                 rel="noreferrer"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#25d366', color: '#fff', borderRadius: 12, padding: '12px 24px', fontWeight: 700, fontSize: 14, textDecoration: 'none' }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#7c3aed', color: '#fff', borderRadius: 12, padding: '12px 24px', fontWeight: 700, fontSize: 14, textDecoration: 'none' }}
               >
-                💬 Contact on WhatsApp
+                💬 Contact Support
               </a>
-              <div style={{ marginTop: 10, fontSize: 12, color: 'var(--muted)' }}>
-                or email <a href="mailto:imrakeshsoni@gmail.com" style={{ color: '#7c3aed' }}>imrakeshsoni@gmail.com</a>
-              </div>
             </div>
           </div>
         )}
