@@ -11,7 +11,7 @@ import { exportBackup } from '@/lib/db/backup';
 import { PageIntro } from '@/components/ui/PageIntro';
 import { useTheme } from '@/lib/theme/useTheme';
 import { reportError } from '@/lib/errorReporter';
-import { getCloudSyncStatus, activateCloudSync, pushSyncData, setMobilePin } from '@/lib/db/cloudSync';
+import { getCloudSyncStatus, activateCloudSync, pushSyncData, setMobilePin, pushDelta, pullDelta } from '@/lib/db/cloudSync';
 
 type SettingsForm = {
   shop_name: string;
@@ -806,9 +806,15 @@ function CloudSyncSection() {
     if (syncing) return;
     setSyncing(true);
     try {
-      const result = await pushSyncData(tenantId);
+      // Full sync first time, then delta
+      const status = await getCloudSyncStatus();
+      const result = status.last_synced_at
+        ? await pushDelta(tenantId)
+        : await pushSyncData(tenantId);
       if (!result.ok) { toast.error(result.error ?? 'Sync failed'); return; }
-      toast.success(`✅ Synced! ${result.counts?.jobs ?? 0} jobs, ${result.counts?.customers ?? 0} customers`);
+      // Also pull any changes from other devices
+      await pullDelta(tenantId);
+      toast.success('✅ Synced!');
       refetchStatus();
     } catch (e: any) {
       toast.error('Sync failed: ' + (e?.message ?? 'Check internet connection'));

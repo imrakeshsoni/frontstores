@@ -402,6 +402,7 @@ export function JobCardPage() {
       toast.success(`Job Card ${newJob?.job_number ?? ''} created!`);
       qc.invalidateQueries({ queryKey: ['carwash-active-jobs'] });
       qc.invalidateQueries({ queryKey: ['carwash-stats'] });
+      import('@/lib/autoSync').then(({ triggerAutoSync }) => triggerAutoSync(true)); // immediate push
       // Mark source appointment as arrived/done
       const apptId = searchParams.get('apptId') ?? '';
       if (apptId) {
@@ -419,6 +420,7 @@ export function JobCardPage() {
       qc.invalidateQueries({ queryKey: ['carwash-active-jobs'] });
       qc.invalidateQueries({ queryKey: ['carwash-stats'] });
       qc.invalidateQueries({ queryKey: ['carwash-job', id] });
+      import('@/lib/autoSync').then(({ triggerAutoSync }) => triggerAutoSync());
     },
   });
 
@@ -430,6 +432,7 @@ export function JobCardPage() {
       qc.invalidateQueries({ queryKey: ['carwash-active-jobs'] });
       qc.invalidateQueries({ queryKey: ['carwash-stats'] });
       qc.invalidateQueries({ queryKey: ['carwash-job', id] });
+      import('@/lib/autoSync').then(({ triggerAutoSync }) => triggerAutoSync(true)); // immediate push
       // Auto-send bill on WhatsApp if customer has a phone number
       if (job?.customer_phone) {
         try {

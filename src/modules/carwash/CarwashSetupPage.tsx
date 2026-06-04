@@ -622,7 +622,10 @@ function AttendanceTab({ tenantId }: { tenantId: string }) {
       const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       return upsertAttendance(tenantId, staffId, date, status);
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['carwash-attendance', tenantId, year, month] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['carwash-attendance', tenantId, year, month] });
+      import('@/lib/autoSync').then(({ triggerAutoSync }) => triggerAutoSync());
+    },
     onError: () => toast.error('Failed to save'),
   });
 

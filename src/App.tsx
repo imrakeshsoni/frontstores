@@ -327,6 +327,13 @@ export default function App() {
 
   useEffect(() => { loadConfig(); }, [loadConfig]);
 
+  // [all apps] [all tenants] — start auto-sync once authenticated
+  useEffect(() => {
+    if (!isAuthenticated || !config?.tenant_id) return;
+    import('@/lib/autoSync').then(({ initAutoSync }) => initAutoSync(config.tenant_id));
+    return () => { import('@/lib/autoSync').then(({ stopAutoSync }) => stopAutoSync()); };
+  }, [isAuthenticated, config?.tenant_id]);
+
   // [carwash] [all tenants] — Apply amber accent + Barlow font; dark/light follows user's theme toggle
   useEffect(() => {
     const el = document.documentElement;

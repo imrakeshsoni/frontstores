@@ -121,7 +121,7 @@ function saveBroadcast(d)   { fs.writeFileSync(BROADCAST_FILE, JSON.stringify(d,
 function loadNotes()        { try { return JSON.parse(fs.readFileSync(NOTES_FILE,     'utf8')); } catch { return {}; } }
 function saveNotes(d)       { fs.writeFileSync(NOTES_FILE,     JSON.stringify(d, null, 2)); }
 
-// Merge incoming sync data — update existing records by id, append new ones
+// Merge incoming sync data — update existing records by id using last-write-wins on updated_at
 function mergeSyncData(existing, incoming) {
   const tables = ['jobs', 'job_items', 'customers', 'vehicles', 'staff', 'attendance', 'services', 'memberships', 'inventory', 'appointments'];
   const result = {};
@@ -129,7 +129,14 @@ function mergeSyncData(existing, incoming) {
     if (!incoming[table]) { result[table] = existing[table] || []; continue; }
     const existingMap = {};
     for (const r of (existing[table] || [])) if (r.id) existingMap[r.id] = r;
-    for (const r of incoming[table]) if (r.id) existingMap[r.id] = r;
+    for (const r of incoming[table]) {
+      if (!r.id) continue;
+      const ex = existingMap[r.id];
+      // Last-write-wins: keep whichever has newer updated_at
+      if (!ex || !ex.updated_at || !r.updated_at || r.updated_at >= ex.updated_at) {
+        existingMap[r.id] = r;
+      }
+    }
     result[table] = Object.values(existingMap);
   }
   return result;
@@ -989,6 +996,35 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
     json(res, { ok: true, data: syncData }); return;
   }
 
+  // GET /sync/pull/:tenant_id?since=ISO&sync_code=CODE — delta pull: records newer than `since`
+  const syncPullMatch = pathname.match(/^\/sync\/pull\/([a-f0-9-]{36})$/);
+  if (req.method === 'GET' && syncPullMatch) {
+    if (rateLimit(req, res, 'sync-pull', 120, 60 * 60 * 1000)) return;
+    const tenantId = syncPullMatch[1];
+    const syncCode = url.searchParams.get('sync_code') ?? '';
+    const since    = url.searchParams.get('since') ?? '';
+    const subs = loadSubs();
+    const sub = subs[tenantId];
+    if (!sub || !sub.sync_enabled || sub.sync_code !== syncCode.trim().toUpperCase()) {
+      json(res, { ok: false, error: 'Unauthorized' }, 401); return;
+    }
+    const stored = loadSync(tenantId);
+    if (!stored) { json(res, { ok: true, delta: {}, server_time: new Date().toISOString() }); return; }
+    if (!since) {
+      // No since → return everything (first sync)
+      json(res, { ok: true, delta: stored, server_time: new Date().toISOString(), full: true }); return;
+    }
+    // Return only records updated after `since`
+    const tables = ['jobs', 'job_items', 'customers', 'vehicles', 'staff', 'attendance', 'services', 'memberships', 'inventory', 'appointments'];
+    const delta = {};
+    let hasChanges = false;
+    for (const table of tables) {
+      const changed = (stored[table] || []).filter(r => r.updated_at && r.updated_at > since);
+      if (changed.length > 0) { delta[table] = changed; hasChanges = true; }
+    }
+    json(res, { ok: true, delta, server_time: new Date().toISOString(), has_changes: hasChanges }); return;
+  }
+
   // POST /sync/activate — validate sync code, enable cloud sync for tenant
   if (req.method === 'POST' && pathname === '/sync/activate') {
     if (rateLimit(req, res, 'sync-activate', 5, 60 * 60 * 1000)) return;
@@ -1023,19 +1059,21 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
       json(res, { ok: false, error: 'Unauthorized' }, 401); return;
     }
     const existing = loadSync(tenant_id) || {};
+    const isDelta = !!body.is_delta; // delta push = only changed records
     const merged = {
       ...existing,
       tenant_id,
       shop_name: sub.shop_name,
       shop_type: sub.shop_type,
       synced_at: new Date().toISOString(),
-      // Merge each table — keep all records, update by id
       ...mergeSyncData(existing, body),
     };
     saveSync(tenant_id, merged);
     sub.last_synced_at = new Date().toISOString();
     saveSubs(subs);
-    console.log(`☁️  Sync push from ${sub.shop_name} — ${JSON.stringify({jobs: body.jobs?.length, customers: body.customers?.length})}`);
+    const counts = {jobs: body.jobs?.length||0, customers: body.customers?.length||0, attendance: body.attendance?.length||0};
+    if (!isDelta || Object.values(counts).some(c => c > 0))
+      console.log(`☁️  ${isDelta?'Delta':'Full'} sync from ${sub.shop_name} — ${JSON.stringify(counts)}`);
     json(res, { ok: true, synced_at: merged.synced_at });
     return;
   }

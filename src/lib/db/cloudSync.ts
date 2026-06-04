@@ -116,6 +116,100 @@ export async function activateCloudSync(tenantId: string, syncCode: string): Pro
   return { ok: true, dashboard_url: data.dashboard_url };
 }
 
+// Delta push — only sends records changed since last sync (fast, small payload)
+export async function pushDelta(tenantId: string): Promise<{ ok: boolean; error?: string; synced_at?: string }> {
+  const config = await getAppConfig();
+  const s = config?.settings as any ?? {};
+  if (!s.cloud_sync_enabled || !s.cloud_sync_code) return { ok: false, error: 'Not activated' };
+
+  const db = await getDb();
+  const since = s.cloud_sync_last_at ?? '2000-01-01T00:00:00Z';
+
+  // Only fetch records changed after last sync
+  const [jobs, jobItems, customers, vehicles, staff, attendance, services, memberships, inventory, appointments] = await Promise.all([
+    db.select<any[]>(`SELECT * FROM carwash_jobs WHERE tenant_id = ? AND updated_at > ? ORDER BY updated_at DESC LIMIT 500`, [tenantId, since]).catch(() => []),
+    db.select<any[]>(`SELECT * FROM carwash_job_items WHERE tenant_id = ? AND job_id IN (SELECT id FROM carwash_jobs WHERE tenant_id = ? AND updated_at > ?)`, [tenantId, tenantId, since]).catch(() => []),
+    db.select<any[]>(`SELECT * FROM customers WHERE tenant_id = ? AND updated_at > ? LIMIT 500`, [tenantId, since]).catch(() => []),
+    db.select<any[]>(`SELECT * FROM carwash_vehicles WHERE tenant_id = ? AND updated_at > ? LIMIT 200`, [tenantId, since]).catch(() => []),
+    db.select<any[]>(`SELECT id,tenant_id,name,phone,role,monthly_salary,joining_date,is_active,deduct_half_day,deduct_full_day_leave FROM carwash_staff WHERE tenant_id = ? AND updated_at > ?`, [tenantId, since]).catch(() => []),
+    db.select<any[]>(`SELECT * FROM carwash_attendance WHERE tenant_id = ? AND updated_at > ? LIMIT 500`, [tenantId, since]).catch(() => []),
+    db.select<any[]>(`SELECT * FROM carwash_services WHERE tenant_id = ? AND updated_at > ?`, [tenantId, since]).catch(() => []),
+    db.select<any[]>(`SELECT * FROM carwash_memberships WHERE tenant_id = ? AND updated_at > ?`, [tenantId, since]).catch(() => []),
+    db.select<any[]>(`SELECT * FROM carwash_inventory WHERE tenant_id = ? AND updated_at > ?`, [tenantId, since]).catch(() => []),
+    db.select<any[]>(`SELECT * FROM carwash_appointments WHERE tenant_id = ? AND updated_at > ? LIMIT 200`, [tenantId, since]).catch(() => []),
+  ]);
+
+  const totalChanged = jobs.length + customers.length + attendance.length + staff.length + services.length + memberships.length + inventory.length + appointments.length;
+  if (totalChanged === 0 && jobItems.length === 0) return { ok: true, synced_at: since }; // nothing to push
+
+  const payload = {
+    tenant_id: tenantId, sync_code: s.cloud_sync_code, is_delta: true,
+    jobs, job_items: jobItems, customers, vehicles, staff, attendance,
+    services, memberships, inventory, appointments,
+  };
+
+  const res = await fetch(`${SERVER}/sync/push`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) return { ok: false, error: `Server error ${res.status}` };
+  const result = await res.json();
+  await updateAppConfig({ settings: { ...s, cloud_sync_last_at: result.synced_at ?? now() } });
+  return { ok: true, synced_at: result.synced_at };
+}
+
+// Pull delta from server — get records changed on other devices since last pull
+export async function pullDelta(tenantId: string): Promise<{ ok: boolean; changes: number; error?: string }> {
+  const config = await getAppConfig();
+  const s = config?.settings as any ?? {};
+  if (!s.cloud_sync_enabled || !s.cloud_sync_code) return { ok: false, changes: 0, error: 'Not activated' };
+
+  const since = s.cloud_sync_last_pull_at ?? s.cloud_sync_last_at ?? '2000-01-01T00:00:00Z';
+  const res = await fetch(`${SERVER}/sync/pull/${tenantId}?since=${encodeURIComponent(since)}&sync_code=${s.cloud_sync_code}`);
+  if (!res.ok) return { ok: false, changes: 0, error: `Server error ${res.status}` };
+  const result = await res.json();
+  if (!result.ok) return { ok: false, changes: 0, error: result.error };
+  if (!result.has_changes && !result.full) {
+    await updateAppConfig({ settings: { ...s, cloud_sync_last_pull_at: result.server_time } });
+    return { ok: true, changes: 0 };
+  }
+
+  // Apply pulled records to local SQLite
+  const db = await getDb();
+  const delta = result.delta;
+  let changes = 0;
+
+  const tableMap: Array<[string, string[]]> = [
+    ['carwash_jobs', ['id','tenant_id','job_number','vehicle_id','reg_number','vehicle_type','make','model','color','customer_name','customer_phone','customer_id','staff_id','staff_name','status','payment_method','payment_status','subtotal','discount','gst_amount','total','membership_id','notes','started_at','completed_at','delivered_at','created_at','updated_at','deleted_at']],
+    ['carwash_job_items', ['id','tenant_id','job_id','service_id','service_name','price','gst_rate','created_at']],
+    ['customers', ['id','tenant_id','name','phone','email','address','city','tags','credit_limit','notes','created_at','updated_at','deleted_at']],
+    ['carwash_vehicles', ['id','tenant_id','customer_id','customer_name','customer_phone','reg_number','vehicle_type','make','model','color','notes','created_at','updated_at','deleted_at']],
+    ['carwash_staff', ['id','tenant_id','name','phone','role','monthly_salary','joining_date','is_active','deduct_half_day','deduct_full_day_leave','created_at','updated_at','deleted_at']],
+    ['carwash_attendance', ['id','tenant_id','staff_id','date','status','note','updated_at','deleted_at']],
+    ['carwash_services', ['id','tenant_id','name','description','price_hatchback','price_sedan','price_suv','price_luxury','duration_minutes','gst_rate','is_active','sort_order','created_at','updated_at','deleted_at']],
+    ['carwash_memberships', ['id','tenant_id','customer_name','customer_phone','customer_id','vehicle_id','reg_number','package_name','total_washes','used_washes','amount_paid','valid_until','is_active','created_at','updated_at','deleted_at']],
+    ['carwash_inventory', ['id','tenant_id','name','category','unit','quantity','min_quantity','cost_per_unit','notes','created_at','updated_at','deleted_at']],
+    ['carwash_appointments', ['id','tenant_id','appointment_date','appointment_time','duration_minutes','reg_number','vehicle_type','make','model','customer_name','customer_phone','staff_id','staff_name','services_note','status','notes','job_id','created_at','updated_at','deleted_at']],
+  ];
+
+  const tableKey: Record<string, string> = { carwash_jobs: 'jobs', carwash_job_items: 'job_items', customers: 'customers', carwash_vehicles: 'vehicles', carwash_staff: 'staff', carwash_attendance: 'attendance', carwash_services: 'services', carwash_memberships: 'memberships', carwash_inventory: 'inventory', carwash_appointments: 'appointments' };
+
+  for (const [table, cols] of tableMap) {
+    const rows: any[] = delta[tableKey[table]] ?? [];
+    for (const row of rows) {
+      const vals = cols.map(c => row[c] ?? null);
+      try {
+        await db.execute(`INSERT OR REPLACE INTO ${table} (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`, vals);
+        changes++;
+      } catch { /* incompatible schema — skip */ }
+    }
+  }
+
+  await updateAppConfig({ settings: { ...s, cloud_sync_last_pull_at: result.server_time } });
+  return { ok: true, changes };
+}
+
 export async function pushSyncData(tenantId: string): Promise<{ ok: boolean; error?: string; synced_at?: string; counts?: Record<string, number> }> {
   const config = await getAppConfig();
   const s = config?.settings as any ?? {};
