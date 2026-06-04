@@ -524,39 +524,30 @@ export async function createJob(tenantId: string, data: {
   }, 0) * 100) / 100;
   const total = Math.max(0, subtotal - discount + gstAmount);
 
-  // Wrap all writes in a transaction for atomicity
-  await db.execute('BEGIN');
-  try {
+  await db.execute(
+    `INSERT INTO carwash_jobs (id, tenant_id, job_number, vehicle_id, reg_number, vehicle_type, make, model, color,
+      customer_name, customer_phone, customer_id, staff_id, staff_name, status, subtotal, discount, gst_amount, total, membership_id, notes)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [jobId, tenantId, jobNumber, vehicle.id, data.reg_number, data.vehicle_type,
+     data.make ?? null, data.model ?? null, data.color ?? null,
+     data.customer_name ?? null, data.customer_phone ?? null, customerId,
+     data.staff_id ?? null, data.staff_name ?? null,
+     'waiting', subtotal, discount, gstAmount, total,
+     data.membership_id ?? null, data.notes ?? null]
+  );
+
+  for (const item of data.items) {
     await db.execute(
-      `INSERT INTO carwash_jobs (id, tenant_id, job_number, vehicle_id, reg_number, vehicle_type, make, model, color,
-        customer_name, customer_phone, customer_id, staff_id, staff_name, status, subtotal, discount, gst_amount, total, membership_id, notes)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [jobId, tenantId, jobNumber, vehicle.id, data.reg_number, data.vehicle_type,
-       data.make ?? null, data.model ?? null, data.color ?? null,
-       data.customer_name ?? null, data.customer_phone ?? null, customerId,
-       data.staff_id ?? null, data.staff_name ?? null,
-       'waiting', subtotal, discount, gstAmount, total,
-       data.membership_id ?? null, data.notes ?? null]
+      `INSERT INTO carwash_job_items (id, tenant_id, job_id, service_id, service_name, price, gst_rate) VALUES (?,?,?,?,?,?,?)`,
+      [uuid(), tenantId, jobId, item.service_id ?? null, item.service_name, item.price, item.gst_rate]
     );
+  }
 
-    for (const item of data.items) {
-      await db.execute(
-        `INSERT INTO carwash_job_items (id, tenant_id, job_id, service_id, service_name, price, gst_rate) VALUES (?,?,?,?,?,?,?)`,
-        [uuid(), tenantId, jobId, item.service_id ?? null, item.service_name, item.price, item.gst_rate]
-      );
-    }
-
-    if (data.membership_id) {
-      await db.execute(
-        `UPDATE carwash_memberships SET used_washes = used_washes + 1, updated_at = ? WHERE id = ? AND tenant_id = ?`,
-        [now(), data.membership_id, tenantId]
-      );
-    }
-
-    await db.execute('COMMIT');
-  } catch (e) {
-    await db.execute('ROLLBACK');
-    throw e;
+  if (data.membership_id) {
+    await db.execute(
+      `UPDATE carwash_memberships SET used_washes = used_washes + 1, updated_at = ? WHERE id = ? AND tenant_id = ?`,
+      [now(), data.membership_id, tenantId]
+    );
   }
 
   // Award loyalty points outside transaction (non-critical, best-effort)
@@ -607,24 +598,16 @@ export async function deleteJob(tenantId: string, jobId: string): Promise<void> 
   if (jobs.length === 0) return;
   const job = jobs[0];
 
-  await db.execute('BEGIN');
-  try {
-    // Restore membership wash — use CASE to prevent going below 0
-    if (job.membership_id) {
-      await db.execute(
-        `UPDATE carwash_memberships
-         SET used_washes = CASE WHEN used_washes > 0 THEN used_washes - 1 ELSE 0 END, updated_at = ?
-         WHERE id = ? AND tenant_id = ?`,
-        [now(), job.membership_id, tenantId]
-      );
-    }
-
-    await db.execute(`UPDATE carwash_jobs SET deleted_at = ? WHERE id = ? AND tenant_id = ?`, [now(), jobId, tenantId]);
-    await db.execute('COMMIT');
-  } catch (e) {
-    await db.execute('ROLLBACK');
-    throw e;
+  // Restore membership wash — use CASE to prevent going below 0
+  if (job.membership_id) {
+    await db.execute(
+      `UPDATE carwash_memberships
+       SET used_washes = CASE WHEN used_washes > 0 THEN used_washes - 1 ELSE 0 END, updated_at = ?
+       WHERE id = ? AND tenant_id = ?`,
+      [now(), job.membership_id, tenantId]
+    );
   }
+  await db.execute(`UPDATE carwash_jobs SET deleted_at = ? WHERE id = ? AND tenant_id = ?`, [now(), jobId, tenantId]);
 
   // Reverse loyalty points (best-effort, outside transaction)
   if (job.customer_phone) {

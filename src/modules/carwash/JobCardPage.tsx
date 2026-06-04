@@ -411,7 +411,7 @@ export function JobCardPage() {
       }
       navigate('/carwash/jobs');
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Failed to create job'),
+    onError: (e: any) => toast.error(String(e?.message ?? e ?? 'Failed to create job')),
   });
 
   const statusMutation = useMutation({
