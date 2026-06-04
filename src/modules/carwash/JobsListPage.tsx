@@ -135,6 +135,9 @@ export function JobsListPage() {
                   style={{ background: sc.bg, color: sc.color }}>
                   {STATUS_LABELS[j.status]}
                 </span>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
+                  {new Date(j.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                </p>
               </div>
             </div>
           );
