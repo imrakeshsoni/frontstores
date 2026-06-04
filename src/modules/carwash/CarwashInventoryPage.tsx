@@ -1,333 +1,634 @@
 // [carwash] [all tenants]
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef, useState, useMemo } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Plus, Package, AlertTriangle, Edit2, Trash2, X, Minus } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, AlertTriangle, Package, RotateCcw, X } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import {
-  listInventory, createInventoryItem, updateInventoryItem, adjustInventoryQuantity, deleteInventoryItem,
+  listInventory, createInventoryItem, updateInventoryItem,
+  adjustInventoryQuantity, deleteInventoryItem, getLowStockInventory,
   type CarwashInventoryItem,
 } from '@/lib/db/carwash';
 
-const CATEGORIES = ['chemical', 'equipment', 'consumable', 'other'];
-const UNITS = ['litre', 'ml', 'kg', 'gram', 'piece', 'packet', 'bottle', 'can', 'bag'];
+// ── Constants ──────────────────────────────────────────────────────────────────
 
-const CATEGORY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  chemical:    { label: 'Chemical',    color: '#2563eb', bg: '#dbeafe' },
-  equipment:   { label: 'Equipment',   color: '#7c3aed', bg: '#ede9fe' },
-  consumable:  { label: 'Consumable',  color: '#16a34a', bg: '#dcfce7' },
-  other:       { label: 'Other',       color: '#6b7280', bg: '#f3f4f6' },
+const CATEGORIES = ['All', 'Chemicals', 'Tools & Applicators', 'Equipment', 'Consumables', 'Accessories', 'Other'];
+const UNITS = ['litre', 'ml', 'piece', 'bottle', 'can', 'kg', 'gram', 'roll', 'pack', 'box', 'set', 'pair'];
+const GST_RATES = [0, 5, 12, 18, 28];
+
+const CATEGORY_SUGGESTIONS: Record<string, string[]> = {
+  'Chemicals': [
+    'Car Shampoo', 'Snow Foam', 'Pre-Wash Spray', 'All Purpose Cleaner', 'Wax Polish',
+    'Dashboard Polish', 'Tyre Dressing', 'Glass Cleaner', 'Iron Remover', 'Tar Remover',
+    'Engine Degreaser', 'Leather Conditioner', 'Fabric Protector', 'Quick Detailer',
+    'Wheel Cleaner', 'Rim Cleaner', 'Odour Eliminator',
+  ],
+  'Tools & Applicators': [
+    'Microfiber Cloth', 'Wash Mitt', 'Clay Bar', 'Foam Applicator Pad',
+    'Detailing Brush Set', 'Wheel Brush', 'Soft Bristle Brush',
+    'Drying Towel', 'Interior Detailing Brush', 'Upholstery Brush',
+  ],
+  'Equipment': [
+    'Pressure Washer Nozzle', 'Foam Lance', 'Vacuum Filter Bag',
+    'Spray Bottle', 'Trigger Sprayer', 'Water Blade', 'Squeegee',
+    'Polishing Pad', 'Backing Plate',
+  ],
+  'Consumables': [
+    'Air Freshener', 'Disposable Floor Mat', 'Seat Cover (Disposable)',
+    'Steering Wheel Cover (Disposable)', 'Key Tag', 'Invoice Book',
+    'Rubber Gloves', 'Dust Mask',
+  ],
+  'Accessories': [
+    'Tyre Shine Spray', 'Number Plate Frame', 'Car Duster',
+    'Windshield Sunshade', 'Car Wax Kit',
+  ],
 };
 
+type Tab = 'products' | 'inventory';
+
 type ItemForm = {
-  name: string; category: string; unit: string;
-  quantity: string; min_quantity: string; cost_per_unit: string; notes: string;
+  name: string; category: string; brand: string; sku: string; unit: string;
+  cost_per_unit: string; selling_price: string; gst_rate: string;
+  min_quantity: string; notes: string;
 };
 
 const emptyForm: ItemForm = {
-  name: '', category: 'chemical', unit: 'litre',
-  quantity: '', min_quantity: '', cost_per_unit: '', notes: '',
+  name: '', category: 'Chemicals', brand: '', sku: '', unit: 'litre',
+  cost_per_unit: '', selling_price: '', gst_rate: '18', min_quantity: '', notes: '',
+};
+
+type AdjustForm = {
+  itemId: string; direction: 'add' | 'remove'; qty: string;
+  reason: string; supplier: string; invoice: string; notes: string;
 };
 
 function fmt(n: number) { return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`; }
 
+// ── Component ──────────────────────────────────────────────────────────────────
+
 export function CarwashInventoryPage() {
   const tenantId = useAppStore((s) => s.config?.tenant_id ?? '');
   const qc = useQueryClient();
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<CarwashInventoryItem | null>(null);
-  const [form, setForm] = useState<ItemForm>(emptyForm);
-  const [adjustId, setAdjustId] = useState<string | null>(null);
-  const [adjustDelta, setAdjustDelta] = useState('');
-  const [filterCat, setFilterCat] = useState('all');
 
-  const { data: inventory = [], isLoading } = useQuery({
+  const [tab, setTab]             = useState<Tab>('products');
+  const [search, setSearch]       = useState('');
+  const [catFilter, setCatFilter] = useState('All');
+
+  const [showForm, setShowForm]   = useState(false);
+  const [editing, setEditing]     = useState<CarwashInventoryItem | null>(null);
+  const [form, setForm]           = useState<ItemForm>(emptyForm);
+  const [showSugg, setShowSugg]   = useState(false);
+  const suggRef                   = useRef<HTMLDivElement>(null);
+
+  const [showAdjust, setShowAdjust]   = useState(false);
+  const [adjForm, setAdjForm]         = useState<AdjustForm>({ itemId: '', direction: 'add', qty: '', reason: 'purchase', supplier: '', invoice: '', notes: '' });
+  const [adjSearch, setAdjSearch]     = useState('');
+  const [showAdjDrop, setShowAdjDrop] = useState(false);
+  const adjDropRef                    = useRef<HTMLDivElement>(null);
+
+  const { data: items = [], isLoading } = useQuery({
     queryKey: ['carwash-inventory', tenantId],
     queryFn: () => listInventory(tenantId),
     enabled: !!tenantId,
+    staleTime: 0,
   });
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['carwash-inventory', tenantId] });
+  const { data: lowStock = [] } = useQuery({
+    queryKey: ['carwash-low-stock', tenantId],
+    queryFn: () => getLowStockInventory(tenantId),
+    enabled: !!tenantId,
+  });
 
-  const createMutation = useMutation({
-    mutationFn: () => {
-      if (!form.name.trim()) throw new Error('Name is required');
-      if (!form.quantity) throw new Error('Quantity is required');
-      return createInventoryItem(tenantId, {
-        name: form.name.trim(),
-        category: form.category,
-        unit: form.unit,
-        quantity: Number(form.quantity),
-        min_quantity: Number(form.min_quantity) || 0,
-        cost_per_unit: Number(form.cost_per_unit) || 0,
-        notes: form.notes || undefined,
+  const filtered = useMemo(() => {
+    let r = items;
+    if (catFilter !== 'All') r = r.filter(i => i.category === catFilter);
+    if (search) {
+      const q = search.toLowerCase();
+      r = r.filter(i => i.name.toLowerCase().includes(q) || (i.sku ?? '').toLowerCase().includes(q) || (i.brand ?? '').toLowerCase().includes(q));
+    }
+    return r;
+  }, [items, search, catFilter]);
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (suggRef.current && !suggRef.current.contains(e.target as Node)) setShowSugg(false);
+      if (adjDropRef.current && !adjDropRef.current.contains(e.target as Node)) setShowAdjDrop(false);
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
+
+  useEffect(() => {
+    if (editing) {
+      setForm({
+        name: editing.name, category: editing.category, brand: editing.brand ?? '',
+        sku: editing.sku ?? '', unit: editing.unit,
+        cost_per_unit: editing.cost_per_unit > 0 ? String(editing.cost_per_unit) : '',
+        selling_price: (editing.selling_price ?? 0) > 0 ? String(editing.selling_price) : '',
+        gst_rate: String(editing.gst_rate ?? 18),
+        min_quantity: editing.min_quantity > 0 ? String(editing.min_quantity) : '',
+        notes: editing.notes ?? '',
       });
-    },
-    onSuccess: () => { toast.success('Item added'); setShowForm(false); setForm(emptyForm); invalidate(); },
-    onError: (e: any) => toast.error(e?.message ?? 'Failed to add'),
-  });
+    } else {
+      setForm(emptyForm);
+    }
+  }, [editing]);
 
-  const updateMutation = useMutation({
-    mutationFn: () => {
-      if (!editing) return Promise.resolve();
-      return updateInventoryItem(tenantId, editing.id, {
-        name: form.name.trim(),
-        category: form.category,
-        unit: form.unit,
-        quantity: Number(form.quantity),
-        min_quantity: Number(form.min_quantity) || 0,
-        cost_per_unit: Number(form.cost_per_unit) || 0,
-        notes: form.notes || null,
-      });
-    },
-    onSuccess: () => { toast.success('Updated'); setEditing(null); setForm(emptyForm); invalidate(); },
-    onError: (e: any) => toast.error(e?.message ?? 'Failed'),
-  });
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['carwash-inventory', tenantId] });
+    qc.invalidateQueries({ queryKey: ['carwash-low-stock', tenantId] });
+  };
 
-  const adjustMutation = useMutation({
-    mutationFn: ({ id, delta }: { id: string; delta: number }) => adjustInventoryQuantity(tenantId, id, delta),
-    onSuccess: () => { toast.success('Stock updated'); setAdjustId(null); setAdjustDelta(''); invalidate(); },
+  const saveMutation = useMutation({
+    mutationFn: async (andNew: boolean) => {
+      if (!form.name.trim()) throw new Error('Product name is required');
+      const data = {
+        name: form.name.trim(), category: form.category,
+        brand: form.brand.trim() || undefined, sku: form.sku.trim() || undefined,
+        unit: form.unit, quantity: editing ? editing.quantity : 0,
+        min_quantity: form.min_quantity ? Number(form.min_quantity) : 0,
+        cost_per_unit: form.cost_per_unit ? Number(form.cost_per_unit) : 0,
+        selling_price: form.selling_price ? Number(form.selling_price) : 0,
+        gst_rate: Number(form.gst_rate || 18),
+        notes: form.notes.trim() || undefined,
+      };
+      if (editing) await updateInventoryItem(tenantId, editing.id, { ...editing, ...data });
+      else await createInventoryItem(tenantId, data);
+      return andNew;
+    },
+    onSuccess: (andNew) => {
+      toast.success(editing ? 'Product updated' : 'Product added');
+      invalidate();
+      if (andNew && !editing) { setEditing(null); setForm(emptyForm); }
+      else { setShowForm(false); setEditing(null); setForm(emptyForm); }
+    },
+    onError: (e: any) => toast.error(String(e?.message ?? e ?? 'Failed to save')),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteInventoryItem(tenantId, id),
-    onSuccess: () => { toast.success('Removed'); invalidate(); },
+    onSuccess: () => { toast.success('Product removed'); invalidate(); },
+    onError: (e: any) => toast.error(String(e?.message ?? e ?? 'Failed to delete')),
   });
 
-  const startEdit = (item: CarwashInventoryItem) => {
-    setEditing(item);
-    setForm({
-      name: item.name, category: item.category, unit: item.unit,
-      quantity: String(item.quantity), min_quantity: String(item.min_quantity),
-      cost_per_unit: String(item.cost_per_unit), notes: item.notes ?? '',
-    });
+  const adjustMutation = useMutation({
+    mutationFn: async () => {
+      if (!adjForm.itemId) throw new Error('Select a product');
+      const qty = Number(adjForm.qty);
+      if (!qty || qty <= 0) throw new Error('Enter a valid quantity');
+      await adjustInventoryQuantity(tenantId, adjForm.itemId, adjForm.direction === 'add' ? qty : -qty);
+    },
+    onSuccess: () => {
+      toast.success('Stock updated');
+      setShowAdjust(false);
+      setAdjForm({ itemId: '', direction: 'add', qty: '', reason: 'purchase', supplier: '', invoice: '', notes: '' });
+      setAdjSearch('');
+      invalidate();
+    },
+    onError: (e: any) => toast.error(String(e?.message ?? e ?? 'Failed to adjust')),
+  });
+
+  const adjItems = useMemo(() => {
+    if (!adjSearch) return items;
+    const q = adjSearch.toLowerCase();
+    return items.filter(i => i.name.toLowerCase().includes(q) || (i.sku ?? '').toLowerCase().includes(q));
+  }, [items, adjSearch]);
+
+  const selectedAdj = items.find(i => i.id === adjForm.itemId);
+
+  const openAdjust = (item?: CarwashInventoryItem) => {
+    setAdjForm({ itemId: item?.id ?? '', direction: 'add', qty: '', reason: 'purchase', supplier: '', invoice: '', notes: '' });
+    setAdjSearch(item?.name ?? '');
+    setShowAdjDrop(false);
+    setShowAdjust(true);
   };
 
-  const filtered = filterCat === 'all' ? inventory : inventory.filter(i => i.category === filterCat);
-  const lowStock = inventory.filter(i => i.min_quantity > 0 && i.quantity <= i.min_quantity);
-  const totalValue = inventory.reduce((s, i) => s + i.quantity * i.cost_per_unit, 0);
+  const nameSuggestions = useMemo(() => {
+    const pool = CATEGORY_SUGGESTIONS[form.category] ?? [];
+    if (!form.name) return pool;
+    return pool.filter(s => s.toLowerCase().includes(form.name.toLowerCase()));
+  }, [form.name, form.category]);
+
+  const inp = 'w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none';
+  const inpStyle = { borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' };
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-5">
+
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-tertiary)' }}>Car Wash</p>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Supply Inventory</h1>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Inventory</h1>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+            {items.length} product{items.length !== 1 ? 's' : ''}
+            {lowStock.length > 0 && <span className="ml-2 font-bold" style={{ color: '#dc2626' }}>· {lowStock.length} low stock</span>}
+          </p>
         </div>
-        <button onClick={() => { setShowForm(true); setEditing(null); setForm(emptyForm); }}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm text-white"
-          style={{ background: 'var(--accent)' }}>
-          <Plus className="h-4 w-4" /> Add Item
-        </button>
-      </div>
-
-      {/* Stats row */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
-          <p className="text-xs mb-1" style={{ color: 'var(--text-tertiary)' }}>Total Items</p>
-          <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{inventory.length}</p>
-        </div>
-        <div className="rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
-          <p className="text-xs mb-1" style={{ color: 'var(--text-tertiary)' }}>Low Stock</p>
-          <p className="text-2xl font-bold" style={{ color: lowStock.length > 0 ? '#dc2626' : '#16a34a' }}>{lowStock.length}</p>
-        </div>
-        <div className="rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
-          <p className="text-xs mb-1" style={{ color: 'var(--text-tertiary)' }}>Stock Value</p>
-          <p className="text-xl font-bold" style={{ color: 'var(--accent)' }}>{fmt(totalValue)}</p>
+        <div className="flex gap-2">
+          <button onClick={() => openAdjust()}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm"
+            style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-border)', color: 'var(--text-primary)' }}>
+            <RotateCcw className="h-4 w-4" /> Adjust Stock
+          </button>
+          <button onClick={() => { setEditing(null); setShowForm(true); }}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm text-white"
+            style={{ background: 'var(--accent)', color: '#111' }}>
+            <Plus className="h-4 w-4" /> Add Product
+          </button>
         </div>
       </div>
 
-      {/* Low stock alert */}
+      {/* Low stock banner */}
       {lowStock.length > 0 && (
-        <div className="rounded-2xl p-4 flex items-start gap-3" style={{ background: '#fef2f2', border: '1px solid #fca5a5' }}>
+        <div className="rounded-2xl p-4 flex items-start gap-3" style={{ background: '#fef2f2', border: '1px solid #fecaca' }}>
           <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5" style={{ color: '#dc2626' }} />
           <div>
-            <p className="font-semibold text-sm" style={{ color: '#dc2626' }}>Low stock alert</p>
-            <p className="text-xs mt-0.5" style={{ color: '#991b1b' }}>
-              {lowStock.map(i => `${i.name} (${i.quantity} ${i.unit})`).join(' · ')}
+            <p className="text-sm font-bold" style={{ color: '#dc2626' }}>Low Stock — {lowStock.length} item{lowStock.length !== 1 ? 's' : ''} need restocking</p>
+            <p className="text-xs mt-0.5" style={{ color: '#b91c1c' }}>
+              {lowStock.map(i => `${i.name} (${i.quantity} ${i.unit} left)`).join(' · ')}
             </p>
           </div>
         </div>
       )}
 
-      {/* Category filter */}
-      <div className="flex flex-wrap gap-2">
-        {(['all', ...CATEGORIES] as const).map(cat => {
-          const cc = CATEGORY_CONFIG[cat] ?? { color: '#6b7280', bg: '#f3f4f6' };
-          const count = cat === 'all' ? inventory.length : inventory.filter(i => i.category === cat).length;
-          return (
-            <button key={cat} onClick={() => setFilterCat(cat)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold capitalize transition-all`}
-              style={filterCat === cat
-                ? { background: cat === 'all' ? 'var(--accent)' : cc.color, color: '#fff' }
-                : { background: cat === 'all' ? 'var(--surface-2)' : cc.bg, color: cat === 'all' ? 'var(--text-secondary)' : cc.color }}>
-              {cat === 'all' ? 'All' : cc.label} ({count})
-            </button>
-          );
-        })}
+      {/* Tabs */}
+      <div className="flex gap-1 p-1 rounded-2xl" style={{ background: 'var(--surface-2)', width: 'fit-content' }}>
+        {(['products', 'inventory'] as Tab[]).map(t => (
+          <button key={t} onClick={() => setTab(t)}
+            className="px-5 py-2 rounded-xl text-sm font-semibold transition-all"
+            style={tab === t ? { background: 'var(--accent)', color: '#111' } : { color: 'var(--text-secondary)' }}>
+            {t === 'products' ? '📦 Products' : '📊 Stock Levels'}
+          </button>
+        ))}
       </div>
 
-      {/* Inventory list */}
-      {isLoading && Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="h-16 rounded-2xl animate-pulse" style={{ background: 'var(--surface-2)' }} />
-      ))}
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'var(--text-tertiary)' }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search products…"
+            className="rounded-xl border pl-9 pr-4 py-2 text-sm outline-none w-56"
+            style={{ borderColor: 'var(--surface-border)', background: 'var(--surface)', color: 'var(--text-primary)' }} />
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {CATEGORIES.map(c => (
+            <button key={c} onClick={() => setCatFilter(c)}
+              className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
+              style={catFilter === c
+                ? { background: 'var(--accent)', color: '#111' }
+                : { background: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--surface-border)' }}>
+              {c}
+            </button>
+          ))}
+        </div>
+      </div>
 
-      {!isLoading && filtered.length === 0 && (
-        <div className="rounded-2xl p-10 flex flex-col items-center gap-3" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
-          <Package className="h-10 w-10 opacity-30" />
-          <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No items yet</p>
+      {/* Products tab */}
+      {tab === 'products' && (
+        <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--surface-border)' }}>
+          <table className="w-full text-sm">
+            <thead style={{ background: 'var(--surface-2)' }}>
+              <tr>
+                <th className="text-left px-4 py-3 font-semibold" style={{ color: 'var(--text-secondary)' }}>Product</th>
+                <th className="text-left px-3 py-3 font-semibold" style={{ color: 'var(--text-secondary)' }}>Category</th>
+                <th className="text-left px-3 py-3 font-semibold" style={{ color: 'var(--text-secondary)' }}>Unit</th>
+                <th className="text-right px-3 py-3 font-semibold" style={{ color: 'var(--text-secondary)' }}>Cost</th>
+                <th className="text-right px-3 py-3 font-semibold" style={{ color: 'var(--text-secondary)' }}>Selling</th>
+                <th className="text-right px-3 py-3 font-semibold" style={{ color: 'var(--text-secondary)' }}>GST</th>
+                <th className="text-right px-3 py-3 font-semibold" style={{ color: 'var(--text-secondary)' }}>Stock</th>
+                <th className="w-20" />
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading && Array.from({ length: 4 }).map((_, i) => (
+                <tr key={i} style={{ borderTop: '1px solid var(--surface-border)' }}>
+                  {Array.from({ length: 8 }).map((_, j) => <td key={j} className="px-4 py-3"><div className="h-4 rounded animate-pulse" style={{ background: 'var(--surface-2)' }} /></td>)}
+                </tr>
+              ))}
+              {!isLoading && filtered.length === 0 && (
+                <tr><td colSpan={8} className="px-4 py-14 text-center">
+                  <Package className="h-10 w-10 mx-auto mb-3 opacity-20" />
+                  <p className="text-sm font-medium" style={{ color: 'var(--text-tertiary)' }}>
+                    {items.length === 0 ? 'No products yet — click "Add Product" to get started' : 'No products match this filter'}
+                  </p>
+                </td></tr>
+              )}
+              {filtered.map(item => {
+                const isLow = item.min_quantity > 0 && item.quantity <= item.min_quantity;
+                return (
+                  <tr key={item.id} style={{ borderTop: '1px solid var(--surface-border)' }}>
+                    <td className="px-4 py-3">
+                      <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>{item.name}</p>
+                      {(item.brand || item.sku) && (
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+                          {[item.brand, item.sku ? `SKU: ${item.sku}` : ''].filter(Boolean).join(' · ')}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+                        {item.category}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>{item.unit}</td>
+                    <td className="px-3 py-3 text-right text-sm" style={{ color: 'var(--text-secondary)' }}>{item.cost_per_unit > 0 ? fmt(item.cost_per_unit) : '—'}</td>
+                    <td className="px-3 py-3 text-right text-sm font-semibold" style={{ color: 'var(--accent)' }}>{(item.selling_price ?? 0) > 0 ? fmt(item.selling_price) : '—'}</td>
+                    <td className="px-3 py-3 text-right text-sm" style={{ color: 'var(--text-secondary)' }}>{item.gst_rate ?? 18}%</td>
+                    <td className="px-3 py-3 text-right">
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                        style={{ background: isLow ? '#fef2f2' : '#d1fae5', color: isLow ? '#dc2626' : '#16a34a' }}>
+                        {isLow && '⚠ '}{item.quantity} {item.unit}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button onClick={() => { setEditing(item); setShowForm(true); }}
+                          className="p-1.5 rounded-lg" style={{ background: 'rgba(245,158,11,0.1)', color: 'var(--accent)' }}>
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </button>
+                        <button onClick={() => { if (confirm(`Delete "${item.name}"?`)) deleteMutation.mutate(item.id); }}
+                          className="p-1.5 rounded-lg" style={{ background: '#fef2f2', color: '#dc2626' }}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
-      <div className="space-y-2">
-        {filtered.map(item => {
-          const cc = CATEGORY_CONFIG[item.category] ?? CATEGORY_CONFIG.other;
-          const isLow = item.min_quantity > 0 && item.quantity <= item.min_quantity;
-          return (
-            <div key={item.id} className="rounded-2xl p-4" style={{ background: 'var(--surface)', border: `1px solid ${isLow ? '#fca5a5' : 'var(--surface-border)'}` }}>
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: cc.bg }}>
-                  <Package className="h-5 w-5" style={{ color: cc.color }} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{item.name}</p>
-                    <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: cc.bg, color: cc.color }}>{cc.label}</span>
-                    {isLow && <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: '#fee2e2', color: '#dc2626' }}>⚠ Low</span>}
-                  </div>
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
-                    Min: {item.min_quantity} {item.unit} · {fmt(item.cost_per_unit)}/{item.unit}
-                    {item.notes ? ` · ${item.notes}` : ''}
-                  </p>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="text-lg font-bold" style={{ color: isLow ? '#dc2626' : 'var(--text-primary)' }}>
-                    {item.quantity}
-                  </p>
-                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{item.unit}</p>
-                </div>
-              </div>
+      {/* Stock Levels tab */}
+      {tab === 'inventory' && (
+        <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--surface-border)' }}>
+          <table className="w-full text-sm">
+            <thead style={{ background: 'var(--surface-2)' }}>
+              <tr>
+                <th className="text-left px-4 py-3 font-semibold" style={{ color: 'var(--text-secondary)' }}>Product</th>
+                <th className="text-left px-3 py-3 font-semibold" style={{ color: 'var(--text-secondary)' }}>Category</th>
+                <th className="text-right px-3 py-3 font-semibold" style={{ color: 'var(--text-secondary)' }}>Stock</th>
+                <th className="text-right px-3 py-3 font-semibold" style={{ color: 'var(--text-secondary)' }}>Min Stock</th>
+                <th className="text-right px-3 py-3 font-semibold" style={{ color: 'var(--text-secondary)' }}>Status</th>
+                <th className="text-right px-3 py-3 font-semibold" style={{ color: 'var(--text-secondary)' }}>Updated</th>
+                <th className="w-16" />
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading && Array.from({ length: 4 }).map((_, i) => (
+                <tr key={i} style={{ borderTop: '1px solid var(--surface-border)' }}>
+                  {Array.from({ length: 7 }).map((_, j) => <td key={j} className="px-4 py-3"><div className="h-4 rounded animate-pulse" style={{ background: 'var(--surface-2)' }} /></td>)}
+                </tr>
+              ))}
+              {!isLoading && filtered.length === 0 && (
+                <tr><td colSpan={7} className="px-4 py-12 text-center">
+                  <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No products found</p>
+                </td></tr>
+              )}
+              {filtered.map(item => {
+                const isLow = item.min_quantity > 0 && item.quantity <= item.min_quantity;
+                return (
+                  <tr key={item.id} style={{ borderTop: '1px solid var(--surface-border)' }}>
+                    <td className="px-4 py-3">
+                      <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>{item.name}</p>
+                      {item.brand && <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{item.brand}</p>}
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+                        {item.category}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-right font-bold" style={{ color: isLow ? '#dc2626' : 'var(--text-primary)' }}>
+                      {item.quantity} <span className="font-normal text-xs" style={{ color: 'var(--text-tertiary)' }}>{item.unit}</span>
+                    </td>
+                    <td className="px-3 py-3 text-right text-sm" style={{ color: 'var(--text-tertiary)' }}>
+                      {item.min_quantity > 0 ? `${item.min_quantity} ${item.unit}` : '—'}
+                    </td>
+                    <td className="px-3 py-3 text-right">
+                      {isLow
+                        ? <span className="inline-flex items-center gap-1 text-xs font-bold" style={{ color: '#dc2626' }}><AlertTriangle className="h-3 w-3" /> Low</span>
+                        : <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: '#d1fae5', color: '#16a34a' }}>OK</span>}
+                    </td>
+                    <td className="px-3 py-3 text-right text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                      {item.updated_at ? new Date(item.updated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—'}
+                    </td>
+                    <td className="px-3 py-3">
+                      <button onClick={() => openAdjust(item)}
+                        className="p-1.5 rounded-lg" style={{ background: 'rgba(245,158,11,0.1)', color: 'var(--accent)' }} title="Adjust stock">
+                        <RotateCcw className="h-3.5 w-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-              {/* Adjust + actions row */}
-              <div className="flex items-center gap-2 mt-3">
-                {adjustId === item.id ? (
-                  <>
-                    <input type="number" value={adjustDelta} onChange={e => setAdjustDelta(e.target.value)}
-                      placeholder="+5 or -2" className="w-24 rounded-xl border px-3 py-1.5 text-sm outline-none"
-                      style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }} />
-                    <button onClick={() => adjustMutation.mutate({ id: item.id, delta: Number(adjustDelta) })}
-                      disabled={!adjustDelta || isNaN(Number(adjustDelta))}
-                      className="px-3 py-1.5 rounded-xl text-xs font-semibold text-white disabled:opacity-50"
-                      style={{ background: 'var(--accent)' }}>Apply</button>
-                    <button onClick={() => { setAdjustId(null); setAdjustDelta(''); }}
-                      className="px-3 py-1.5 rounded-xl text-xs btn-secondary">Cancel</button>
-                  </>
-                ) : (
-                  <>
-                    <button onClick={() => setAdjustId(item.id)}
-                      className="px-3 py-1.5 rounded-xl text-xs font-semibold btn-secondary">
-                      ± Adjust Stock
-                    </button>
-                    <button onClick={() => startEdit(item)}
-                      className="px-2 py-1.5 rounded-xl btn-secondary">
-                      <Edit2 className="h-3.5 w-3.5" />
-                    </button>
-                    <button onClick={() => { if (confirm('Remove this item?')) deleteMutation.mutate(item.id); }}
-                      className="px-2 py-1.5 rounded-xl" style={{ color: '#dc2626' }}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </>
+      {/* Add / Edit Product modal */}
+      {showForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <div className="rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] flex flex-col" style={{ background: 'var(--surface)' }}>
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-tertiary)' }}>Inventory</p>
+                <h2 className="text-xl font-bold mt-0.5" style={{ color: 'var(--text-primary)' }}>{editing ? 'Edit Product' : 'Add Product'}</h2>
+              </div>
+              <button onClick={() => { setShowForm(false); setEditing(null); }}><X className="h-5 w-5" style={{ color: 'var(--text-tertiary)' }} /></button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 space-y-4 pr-1">
+              {/* Name + suggestions */}
+              <div ref={suggRef} className="relative">
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Product Name *</label>
+                <input value={form.name}
+                  onChange={e => { setForm(f => ({ ...f, name: e.target.value })); setShowSugg(true); }}
+                  onFocus={() => setShowSugg(true)}
+                  placeholder="e.g. Car Shampoo, Microfiber Cloth…"
+                  className={inp} style={inpStyle} />
+                {showSugg && nameSuggestions.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 z-10 mt-1 rounded-xl shadow-lg overflow-hidden max-h-48 overflow-y-auto"
+                    style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
+                    {nameSuggestions.slice(0, 8).map(s => (
+                      <button key={s} onClick={() => { setForm(f => ({ ...f, name: s })); setShowSugg(false); }}
+                        className="w-full text-left px-4 py-2.5 text-sm transition-colors"
+                        style={{ color: 'var(--text-primary)', borderBottom: '1px solid var(--surface-border)' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(245,158,11,0.08)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
-            </div>
-          );
-        })}
-      </div>
 
-      {/* Add / Edit modal */}
-      {(showForm || editing) && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/50 p-4">
-          <div className="rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto" style={{ background: 'var(--surface)' }}>
-            <div className="p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="font-bold text-lg" style={{ color: 'var(--text-primary)' }}>
-                  {editing ? 'Edit Item' : 'Add Supply Item'}
-                </h2>
-                <button onClick={() => { setShowForm(false); setEditing(null); setForm(emptyForm); }}>
-                  <X className="h-5 w-5" style={{ color: 'var(--text-tertiary)' }} />
-                </button>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Category</label>
+                  <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className={inp} style={inpStyle}>
+                    {CATEGORIES.filter(c => c !== 'All').map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Unit</label>
+                  <select value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))} className={inp} style={inpStyle}>
+                    {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Brand (optional)</label>
+                  <input value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} placeholder="e.g. Meguiar's, 3M, Turtle Wax" className={inp} style={inpStyle} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>SKU (optional)</label>
+                  <input value={form.sku} onChange={e => setForm(f => ({ ...f, sku: e.target.value }))} placeholder="e.g. CW-001" className={inp} style={inpStyle} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Purchase / Cost Price (₹)</label>
+                  <input type="number" min="0" value={form.cost_per_unit} onChange={e => setForm(f => ({ ...f, cost_per_unit: e.target.value }))} placeholder="0.00" className={inp} style={inpStyle} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Selling Price (₹)</label>
+                  <input type="number" min="0" value={form.selling_price} onChange={e => setForm(f => ({ ...f, selling_price: e.target.value }))} placeholder="0.00" className={inp} style={inpStyle} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>GST Rate</label>
+                  <select value={form.gst_rate} onChange={e => setForm(f => ({ ...f, gst_rate: e.target.value }))} className={inp} style={inpStyle}>
+                    {GST_RATES.map(r => <option key={r} value={r}>{r}%</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Low Stock Alert Qty</label>
+                  <input type="number" min="0" value={form.min_quantity} onChange={e => setForm(f => ({ ...f, min_quantity: e.target.value }))} placeholder="e.g. 2" className={inp} style={inpStyle} />
+                </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Name *</label>
-                <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                  placeholder="e.g. Car Shampoo"
-                  className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-                  style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }} />
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Notes (optional)</label>
+                <input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Any notes…" className={inp} style={inpStyle} />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 mt-5 pt-4" style={{ borderTop: '1px solid var(--surface-border)' }}>
+              <button onClick={() => { setShowForm(false); setEditing(null); }}
+                className="px-4 py-2.5 rounded-xl text-sm font-medium" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+                Cancel
+              </button>
+              {!editing && (
+                <button onClick={() => saveMutation.mutate(true)} disabled={saveMutation.isPending}
+                  className="px-4 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-60"
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-border)', color: 'var(--text-primary)' }}>
+                  {saveMutation.isPending ? 'Saving…' : 'Save & Add Another'}
+                </button>
+              )}
+              <button onClick={() => saveMutation.mutate(false)} disabled={saveMutation.isPending}
+                className="px-5 py-2.5 rounded-xl text-sm font-bold disabled:opacity-60"
+                style={{ background: 'var(--accent)', color: '#111' }}>
+                {saveMutation.isPending ? 'Saving…' : editing ? 'Update Product' : 'Add Product'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Adjust Stock modal */}
+      {showAdjust && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <div className="rounded-2xl p-6 w-full max-w-md" style={{ background: 'var(--surface)' }}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Adjust Stock</h2>
+              <button onClick={() => setShowAdjust(false)}><X className="h-5 w-5" style={{ color: 'var(--text-tertiary)' }} /></button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Product search dropdown */}
+              <div ref={adjDropRef} className="relative">
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Product *</label>
+                <input value={adjSearch}
+                  onChange={e => { setAdjSearch(e.target.value); setShowAdjDrop(true); setAdjForm(f => ({ ...f, itemId: '' })); }}
+                  onFocus={() => setShowAdjDrop(true)}
+                  placeholder="Search product…" className={inp} style={inpStyle} />
+                {showAdjDrop && adjItems.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 z-10 mt-1 max-h-48 overflow-y-auto rounded-xl shadow-lg"
+                    style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
+                    {adjItems.slice(0, 15).map(i => (
+                      <button key={i.id}
+                        onClick={() => { setAdjForm(f => ({ ...f, itemId: i.id })); setAdjSearch(i.name); setShowAdjDrop(false); }}
+                        className="w-full text-left px-4 py-2.5 text-sm transition-colors"
+                        style={{ color: 'var(--text-primary)', borderBottom: '1px solid var(--surface-border)' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(245,158,11,0.08)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                        <span className="font-medium">{i.name}</span>
+                        <span className="ml-2 text-xs" style={{ color: 'var(--text-tertiary)' }}>({i.quantity} {i.unit} in stock)</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {selectedAdj && (
+                  <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
+                    Current stock: <b>{selectedAdj.quantity} {selectedAdj.unit}</b>
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Category</label>
-                  <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
-                    className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-                    style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }}>
-                    {CATEGORIES.map(c => <option key={c} value={c}>{CATEGORY_CONFIG[c]?.label ?? c}</option>)}
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Action</label>
+                  <select value={adjForm.direction}
+                    onChange={e => setAdjForm(f => ({ ...f, direction: e.target.value as 'add' | 'remove', reason: e.target.value === 'add' ? 'purchase' : 'used' }))}
+                    className={inp} style={inpStyle}>
+                    <option value="add">Add Stock</option>
+                    <option value="remove">Remove Stock</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Unit</label>
-                  <select value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value }))}
-                    className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-                    style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }}>
-                    {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Reason</label>
+                  <select value={adjForm.reason} onChange={e => setAdjForm(f => ({ ...f, reason: e.target.value }))} className={inp} style={inpStyle}>
+                    {adjForm.direction === 'add'
+                      ? <><option value="purchase">Purchase / Restock</option><option value="return">Customer Return</option><option value="adjustment">Manual Adjustment</option></>
+                      : <><option value="used">Used in Service</option><option value="adjustment">Manual Adjustment</option><option value="write-off">Write-off / Damage</option><option value="return">Return to Supplier</option></>
+                    }
                   </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Qty *</label>
-                  <input type="number" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
-                    placeholder="0"
-                    className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-                    style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }} />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Min Qty</label>
-                  <input type="number" value={form.min_quantity} onChange={e => setForm(f => ({ ...f, min_quantity: e.target.value }))}
-                    placeholder="0"
-                    className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-                    style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }} />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Cost/Unit ₹</label>
-                  <input type="number" value={form.cost_per_unit} onChange={e => setForm(f => ({ ...f, cost_per_unit: e.target.value }))}
-                    placeholder="0"
-                    className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-                    style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }} />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Notes</label>
-                <input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                  placeholder="Brand, supplier, etc."
-                  className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-                  style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }} />
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Quantity *</label>
+                <input type="number" min="0.01" step="any" value={adjForm.qty}
+                  onChange={e => setAdjForm(f => ({ ...f, qty: e.target.value }))}
+                  placeholder="e.g. 5" className={inp} style={inpStyle} />
               </div>
 
-              <div className="flex gap-3 pt-2">
-                <button onClick={() => { setShowForm(false); setEditing(null); setForm(emptyForm); }}
-                  className="flex-1 btn-secondary py-2.5 rounded-xl text-sm">Cancel</button>
-                <button onClick={() => editing ? updateMutation.mutate() : createMutation.mutate()}
-                  disabled={createMutation.isPending || updateMutation.isPending}
-                  className="flex-1 py-2.5 rounded-xl font-semibold text-sm text-white disabled:opacity-60"
-                  style={{ background: 'var(--accent)' }}>
-                  {editing ? 'Save Changes' : 'Add Item'}
-                </button>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Supplier (optional)</label>
+                  <input value={adjForm.supplier} onChange={e => setAdjForm(f => ({ ...f, supplier: e.target.value }))} placeholder="Supplier name" className={inp} style={inpStyle} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Invoice No. (optional)</label>
+                  <input value={adjForm.invoice} onChange={e => setAdjForm(f => ({ ...f, invoice: e.target.value }))} placeholder="INV-001" className={inp} style={inpStyle} />
+                </div>
               </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Notes (optional)</label>
+                <input value={adjForm.notes} onChange={e => setAdjForm(f => ({ ...f, notes: e.target.value }))} placeholder="Any notes…" className={inp} style={inpStyle} />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-5 pt-4" style={{ borderTop: '1px solid var(--surface-border)' }}>
+              <button onClick={() => setShowAdjust(false)}
+                className="px-4 py-2.5 rounded-xl text-sm font-medium" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+                Cancel
+              </button>
+              <button onClick={() => adjustMutation.mutate()} disabled={adjustMutation.isPending || !adjForm.itemId}
+                className="px-5 py-2.5 rounded-xl text-sm font-bold disabled:opacity-60"
+                style={{ background: adjForm.direction === 'add' ? '#16a34a' : '#dc2626', color: '#fff' }}>
+                {adjustMutation.isPending ? 'Saving…' : adjForm.direction === 'add' ? '+ Add Stock' : '− Remove Stock'}
+              </button>
             </div>
           </div>
         </div>

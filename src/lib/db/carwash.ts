@@ -190,6 +190,10 @@ export interface CarwashInventoryItem {
   quantity: number;
   min_quantity: number;
   cost_per_unit: number;
+  selling_price: number;
+  gst_rate: number;
+  sku: string | null;
+  brand: string | null;
   notes: string | null;
   updated_at: string;
 }
@@ -1166,20 +1170,27 @@ export async function listInventory(tenantId: string): Promise<CarwashInventoryI
 }
 
 export async function createInventoryItem(tenantId: string, data: {
-  name: string; category: string; unit: string; quantity: number; min_quantity: number; cost_per_unit: number; notes?: string;
-}): Promise<void> {
+  name: string; category: string; unit: string; quantity: number; min_quantity: number;
+  cost_per_unit: number; selling_price?: number; gst_rate?: number; sku?: string; brand?: string; notes?: string;
+}): Promise<string> {
   const db = await getDb();
+  const id = uuid();
   await db.execute(
-    `INSERT INTO carwash_inventory (id, tenant_id, name, category, unit, quantity, min_quantity, cost_per_unit, notes) VALUES (?,?,?,?,?,?,?,?,?)`,
-    [uuid(), tenantId, data.name, data.category, data.unit, data.quantity, data.min_quantity, data.cost_per_unit, data.notes ?? null]
+    `INSERT INTO carwash_inventory (id, tenant_id, name, category, unit, quantity, min_quantity, cost_per_unit, selling_price, gst_rate, sku, brand, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [id, tenantId, data.name, data.category, data.unit, data.quantity, data.min_quantity,
+     data.cost_per_unit, data.selling_price ?? 0, data.gst_rate ?? 18,
+     data.sku ?? null, data.brand ?? null, data.notes ?? null]
   );
+  return id;
 }
 
 export async function updateInventoryItem(tenantId: string, id: string, data: Partial<CarwashInventoryItem>): Promise<void> {
   const db = await getDb();
   await db.execute(
-    `UPDATE carwash_inventory SET name=?, category=?, unit=?, quantity=?, min_quantity=?, cost_per_unit=?, notes=?, updated_at=? WHERE id=? AND tenant_id=?`,
-    [data.name, data.category, data.unit, data.quantity, data.min_quantity, data.cost_per_unit, data.notes ?? null, now(), id, tenantId]
+    `UPDATE carwash_inventory SET name=?, category=?, unit=?, quantity=?, min_quantity=?, cost_per_unit=?, selling_price=?, gst_rate=?, sku=?, brand=?, notes=?, updated_at=? WHERE id=? AND tenant_id=?`,
+    [data.name, data.category, data.unit, data.quantity, data.min_quantity,
+     data.cost_per_unit, data.selling_price ?? 0, data.gst_rate ?? 18,
+     data.sku ?? null, data.brand ?? null, data.notes ?? null, now(), id, tenantId]
   );
 }
 
