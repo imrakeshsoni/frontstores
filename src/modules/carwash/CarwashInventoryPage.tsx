@@ -2,12 +2,13 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Plus, Search, Edit2, Trash2, AlertTriangle, Package, RotateCcw, X } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, AlertTriangle, Package, RotateCcw, X, History } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import {
   listInventory, createInventoryItem, updateInventoryItem,
   adjustInventoryQuantity, deleteInventoryItem, getLowStockInventory,
-  type CarwashInventoryItem,
+  listInventoryLogs,
+  type CarwashInventoryItem, type CarwashInventoryLog,
 } from '@/lib/db/carwash';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -59,7 +60,7 @@ const emptyForm: ItemForm = {
 
 type AdjustForm = {
   itemId: string; direction: 'add' | 'remove'; qty: string;
-  reason: string; supplier: string; invoice: string; notes: string;
+  reason: string; supplier: string; invoice: string; date: string; notes: string;
 };
 
 function fmt(n: number) { return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`; }
@@ -81,7 +82,9 @@ export function CarwashInventoryPage() {
   const suggRef                   = useRef<HTMLDivElement>(null);
 
   const [showAdjust, setShowAdjust]   = useState(false);
-  const [adjForm, setAdjForm]         = useState<AdjustForm>({ itemId: '', direction: 'add', qty: '', reason: 'purchase', supplier: '', invoice: '', notes: '' });
+  const [adjForm, setAdjForm]         = useState<AdjustForm>({ itemId: '', direction: 'add', qty: '', reason: 'purchase', supplier: '', invoice: '', date: new Date().toISOString().slice(0, 10), notes: '' });
+  const [showLog, setShowLog]         = useState(false);
+  const [logItemId, setLogItemId]     = useState<string | undefined>(undefined);
   const [adjSearch, setAdjSearch]     = useState('');
   const [showAdjDrop, setShowAdjDrop] = useState(false);
   const adjDropRef                    = useRef<HTMLDivElement>(null);
@@ -97,6 +100,13 @@ export function CarwashInventoryPage() {
     queryKey: ['carwash-low-stock', tenantId],
     queryFn: () => getLowStockInventory(tenantId),
     enabled: !!tenantId,
+  });
+
+  const { data: logs = [] } = useQuery({
+    queryKey: ['carwash-inv-log', tenantId, logItemId],
+    queryFn: () => listInventoryLogs(tenantId, logItemId, 200),
+    enabled: !!tenantId && showLog,
+    staleTime: 0,
   });
 
   const filtered = useMemo(() => {
@@ -176,12 +186,18 @@ export function CarwashInventoryPage() {
       if (!adjForm.itemId) throw new Error('Select a product');
       const qty = Number(adjForm.qty);
       if (!qty || qty <= 0) throw new Error('Enter a valid quantity');
-      await adjustInventoryQuantity(tenantId, adjForm.itemId, adjForm.direction === 'add' ? qty : -qty);
+      await adjustInventoryQuantity(tenantId, adjForm.itemId, adjForm.direction === 'add' ? qty : -qty, {
+        reason: adjForm.reason || undefined,
+        supplier: adjForm.supplier || undefined,
+        invoice: adjForm.invoice || undefined,
+        date: adjForm.date || new Date().toISOString().slice(0, 10),
+        notes: adjForm.notes || undefined,
+      });
     },
     onSuccess: () => {
       toast.success('Stock updated');
       setShowAdjust(false);
-      setAdjForm({ itemId: '', direction: 'add', qty: '', reason: 'purchase', supplier: '', invoice: '', notes: '' });
+      setAdjForm({ itemId: '', direction: 'add', qty: '', reason: 'purchase', supplier: '', invoice: '', date: new Date().toISOString().slice(0, 10), notes: '' });
       setAdjSearch('');
       invalidate();
     },
@@ -197,7 +213,7 @@ export function CarwashInventoryPage() {
   const selectedAdj = items.find(i => i.id === adjForm.itemId);
 
   const openAdjust = (item?: CarwashInventoryItem) => {
-    setAdjForm({ itemId: item?.id ?? '', direction: 'add', qty: '', reason: 'purchase', supplier: '', invoice: '', notes: '' });
+    setAdjForm({ itemId: item?.id ?? '', direction: 'add', qty: '', reason: 'purchase', supplier: '', invoice: '', date: new Date().toISOString().slice(0, 10), notes: '' });
     setAdjSearch(item?.name ?? '');
     setShowAdjDrop(false);
     setShowAdjust(true);
@@ -226,6 +242,11 @@ export function CarwashInventoryPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <button onClick={() => { setLogItemId(undefined); setShowLog(true); }}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm"
+            style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-border)', color: 'var(--text-primary)' }}>
+            <History className="h-4 w-4" /> History
+          </button>
           <button onClick={() => openAdjust()}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm"
             style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-border)', color: 'var(--text-primary)' }}>
@@ -409,6 +430,10 @@ export function CarwashInventoryPage() {
                       {item.updated_at ? new Date(item.updated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—'}
                     </td>
                     <td className="px-3 py-3">
+                      <button onClick={() => { setLogItemId(item.id); setShowLog(true); }}
+                        className="p-1.5 rounded-lg mr-1" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }} title="View history">
+                        <History className="h-3.5 w-3.5" />
+                      </button>
                       <button onClick={() => openAdjust(item)}
                         className="p-1.5 rounded-lg" style={{ background: 'rgba(245,158,11,0.1)', color: 'var(--accent)' }} title="Adjust stock">
                         <RotateCcw className="h-3.5 w-3.5" />
@@ -577,6 +602,11 @@ export function CarwashInventoryPage() {
                   placeholder="e.g. 5" className={inp} style={inpStyle} />
               </div>
 
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Date *</label>
+                <input type="date" value={adjForm.date} onChange={e => setAdjForm(f => ({ ...f, date: e.target.value }))} className={inp} style={inpStyle} />
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Supplier (optional)</label>
@@ -603,6 +633,82 @@ export function CarwashInventoryPage() {
                 className="px-5 py-2.5 rounded-xl text-sm font-bold disabled:opacity-60"
                 style={{ background: adjForm.direction === 'add' ? '#16a34a' : '#dc2626', color: '#fff' }}>
                 {adjustMutation.isPending ? 'Saving…' : adjForm.direction === 'add' ? '+ Add Stock' : '− Remove Stock'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Transaction History modal */}
+      {showLog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <div className="rounded-2xl p-6 w-full max-w-2xl max-h-[85vh] flex flex-col" style={{ background: 'var(--surface)' }}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-tertiary)' }}>Inventory</p>
+                <h2 className="text-xl font-bold mt-0.5" style={{ color: 'var(--text-primary)' }}>
+                  {logItemId ? (items.find(i => i.id === logItemId)?.name ?? 'Transaction History') : 'All Transactions'}
+                </h2>
+              </div>
+              <button onClick={() => setShowLog(false)}><X className="h-5 w-5" style={{ color: 'var(--text-tertiary)' }} /></button>
+            </div>
+
+            <div className="overflow-y-auto flex-1">
+              {logs.length === 0 ? (
+                <div className="py-12 text-center">
+                  <History className="h-10 w-10 mx-auto mb-2 opacity-20" />
+                  <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No transactions recorded yet</p>
+                </div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead style={{ background: 'var(--surface-2)' }}>
+                    <tr>
+                      <th className="text-left px-3 py-2.5 font-semibold" style={{ color: 'var(--text-secondary)' }}>Date</th>
+                      {!logItemId && <th className="text-left px-3 py-2.5 font-semibold" style={{ color: 'var(--text-secondary)' }}>Product</th>}
+                      <th className="text-left px-3 py-2.5 font-semibold" style={{ color: 'var(--text-secondary)' }}>Action</th>
+                      <th className="text-right px-3 py-2.5 font-semibold" style={{ color: 'var(--text-secondary)' }}>Qty</th>
+                      <th className="text-left px-3 py-2.5 font-semibold" style={{ color: 'var(--text-secondary)' }}>Reason</th>
+                      <th className="text-left px-3 py-2.5 font-semibold" style={{ color: 'var(--text-secondary)' }}>Supplier / Invoice</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {logs.map(log => (
+                      <tr key={log.id} style={{ borderTop: '1px solid var(--surface-border)' }}>
+                        <td className="px-3 py-2.5 text-sm" style={{ color: 'var(--text-primary)' }}>
+                          {new Date(log.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </td>
+                        {!logItemId && <td className="px-3 py-2.5 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{log.item_name}</td>}
+                        <td className="px-3 py-2.5">
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                            style={{ background: log.direction === 'add' ? '#d1fae5' : '#fef2f2', color: log.direction === 'add' ? '#16a34a' : '#dc2626' }}>
+                            {log.direction === 'add' ? '+ Added' : '− Removed'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-semibold" style={{ color: log.direction === 'add' ? '#16a34a' : '#dc2626' }}>
+                          {log.quantity}
+                        </td>
+                        <td className="px-3 py-2.5 text-sm capitalize" style={{ color: 'var(--text-secondary)' }}>
+                          {log.reason?.replace(/-/g, ' ') ?? '—'}
+                        </td>
+                        <td className="px-3 py-2.5 text-sm" style={{ color: 'var(--text-tertiary)' }}>
+                          {[log.supplier, log.invoice_no].filter(Boolean).join(' / ') || '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div className="flex justify-between items-center mt-4 pt-4" style={{ borderTop: '1px solid var(--surface-border)' }}>
+              {logItemId && (
+                <button onClick={() => { setLogItemId(undefined); }}
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+                  View All Products
+                </button>
+              )}
+              <button onClick={() => setShowLog(false)}
+                className="ml-auto px-4 py-2 rounded-xl text-sm font-medium" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+                Close
               </button>
             </div>
           </div>

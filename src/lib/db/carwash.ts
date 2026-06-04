@@ -1194,11 +1194,53 @@ export async function updateInventoryItem(tenantId: string, id: string, data: Pa
   );
 }
 
-export async function adjustInventoryQuantity(tenantId: string, id: string, delta: number): Promise<void> {
+export interface CarwashInventoryLog {
+  id: string;
+  tenant_id: string;
+  item_id: string;
+  item_name: string;
+  category: string | null;
+  direction: 'add' | 'remove';
+  quantity: number;
+  reason: string | null;
+  supplier: string | null;
+  invoice_no: string | null;
+  date: string;
+  notes: string | null;
+  created_at: string;
+}
+
+export async function adjustInventoryQuantity(
+  tenantId: string, id: string, delta: number,
+  meta?: { reason?: string; supplier?: string; invoice?: string; notes?: string; date?: string }
+): Promise<void> {
   const db = await getDb();
   await db.execute(
     `UPDATE carwash_inventory SET quantity = MAX(0, quantity + ?), updated_at = ? WHERE id = ? AND tenant_id = ?`,
     [delta, now(), id, tenantId]
+  );
+  // Write log entry
+  const rows = await db.select<any[]>(`SELECT name, category FROM carwash_inventory WHERE id = ? AND tenant_id = ?`, [id, tenantId]);
+  if (rows.length > 0) {
+    await db.execute(
+      `INSERT INTO carwash_inventory_log (id, tenant_id, item_id, item_name, category, direction, quantity, reason, supplier, invoice_no, date, notes)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [uuid(), tenantId, id, rows[0].name, rows[0].category ?? null,
+       delta >= 0 ? 'add' : 'remove', Math.abs(delta),
+       meta?.reason ?? null, meta?.supplier ?? null, meta?.invoice ?? null,
+       meta?.date ?? now().slice(0, 10), meta?.notes ?? null]
+    );
+  }
+}
+
+export async function listInventoryLogs(tenantId: string, itemId?: string, limit = 100): Promise<CarwashInventoryLog[]> {
+  const db = await getDb();
+  const conds = [`tenant_id = ?`, `deleted_at IS NULL`];
+  const params: any[] = [tenantId];
+  if (itemId) { conds.push(`item_id = ?`); params.push(itemId); }
+  return db.select<CarwashInventoryLog[]>(
+    `SELECT * FROM carwash_inventory_log WHERE ${conds.join(' AND ')} ORDER BY date DESC, created_at DESC LIMIT ${limit}`,
+    params
   );
 }
 
