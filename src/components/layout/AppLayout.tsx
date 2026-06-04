@@ -488,7 +488,6 @@ const CARWASH_NAV_ITEMS = [
   { to: '/carwash/appointments',  icon: Calendar,        label: 'Appointments',  iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
   { to: '/carwash/inventory',     icon: Package,         label: 'Inventory',     iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
   { to: '/customers',             icon: Users,           label: 'Customers',     iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
-  { to: '/expenses',              icon: Wallet,          label: 'Expenses',      iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
   { to: '/carwash/reports',       icon: BarChart3,       label: 'Reports',       iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
   { to: '/carwash/broadcast',     icon: Radio,           label: 'Broadcast',     iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
   { to: '/carwash/setup',         icon: Wrench,          label: 'Setup',         iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },

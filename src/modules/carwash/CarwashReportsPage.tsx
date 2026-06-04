@@ -1,12 +1,12 @@
 // [carwash] [all tenants]
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { TrendingUp, Users, PhoneCall, Star, Download, FileSpreadsheet, Filter } from 'lucide-react';
+import { TrendingUp, Users, PhoneCall, Download, FileSpreadsheet, Filter } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { sendWhatsApp } from '@/lib/whatsapp';
 import {
   getMonthlyRevenue, getPopularServices, getLapsedCustomers, getStaffPerformance,
-  getStaffWeeklyPerformance, getTodayStats, listTopLoyaltyCustomers, getAttendanceSummaryForMonth,
+  getStaffWeeklyPerformance, getTodayStats, getAttendanceSummaryForMonth,
   getAllJobsForExport, getCustomersWithJobStats, listInventoryForExport,
   listAllServices, listAllCarwashStaff,
 } from '@/lib/db/carwash';
@@ -79,12 +79,6 @@ export function CarwashReportsPage() {
   const { data: todayStats } = useQuery({
     queryKey: ['carwash-stats-report', tenantId, today],
     queryFn: () => getTodayStats(tenantId),
-    enabled: !!tenantId,
-  });
-
-  const { data: topLoyalty = [] } = useQuery({
-    queryKey: ['carwash-loyalty-top', tenantId],
-    queryFn: () => listTopLoyaltyCustomers(tenantId),
     enabled: !!tenantId,
   });
 
@@ -281,36 +275,6 @@ export function CarwashReportsPage() {
           </div>
         )}
       </div>
-
-      {/* Loyalty top customers */}
-      {topLoyalty.length > 0 && (
-        <div className="rounded-2xl p-5" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
-          <div className="flex items-center gap-2 mb-4">
-            <Star className="h-4 w-4" style={{ color: '#f59e0b' }} />
-            <h2 className="font-bold" style={{ color: 'var(--text-primary)' }}>Top Loyalty Customers</h2>
-            <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: '#fef3c7', color: '#92400e' }}>
-              1 pt = ₹1 (earn 1pt per ₹10)
-            </span>
-          </div>
-          <div className="space-y-2">
-            {topLoyalty.slice(0, 10).map((c, i) => (
-              <div key={c.id} className="flex items-center justify-between py-2" style={{ borderBottom: '1px solid var(--surface-border)' }}>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold w-5" style={{ color: 'var(--text-tertiary)' }}>#{i + 1}</span>
-                  <div>
-                    <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{c.customer_name}</p>
-                    <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{c.reg_number ?? c.customer_phone}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold" style={{ color: '#d97706' }}>⭐ {c.available_points} pts</p>
-                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{c.total_points} earned total</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Lapsed customers — win-back */}
       {lapsedCustomers.length > 0 && (
