@@ -402,6 +402,8 @@ export function JobCardPage() {
     onSuccess: async (newJob) => {
       toast.success(`Job Card ${newJob?.job_number ?? ''} created!`);
       qc.invalidateQueries({ queryKey: ['carwash-active-jobs'] });
+      qc.invalidateQueries({ queryKey: ['carwash-jobs-list'] });
+      qc.invalidateQueries({ queryKey: ['carwash-jobs-count'] });
       qc.invalidateQueries({ queryKey: ['carwash-stats'] });
       import('@/lib/autoSync').then(({ triggerAutoSync }) => triggerAutoSync(true)); // immediate push
       // Mark source appointment as arrived/done
