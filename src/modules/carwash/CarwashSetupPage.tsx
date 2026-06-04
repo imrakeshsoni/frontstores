@@ -166,6 +166,7 @@ function ServicesTab({ tenantId }: { tenantId: string }) {
   const [svcName, setSvcName] = useState('');
   const [svcDuration, setSvcDuration] = useState('30');
   const [svcActive, setSvcActive] = useState(true);
+  const [svcBasePrice, setSvcBasePrice] = useState('');
   const [priceEdits, setPriceEdits] = useState<Record<string, string>>({});
   const savingRef = useRef<Set<string>>(new Set());
 
@@ -191,16 +192,41 @@ function ServicesTab({ tenantId }: { tenantId: string }) {
     qc.invalidateQueries({ queryKey: ['carwash-services'] });
   };
 
-  const openAddSvc = () => { setEditingSvc(null); setSvcName(''); setSvcDuration('30'); setSvcActive(true); setShowServiceForm(true); };
-  const openEditSvc = (s: CarwashService) => { setEditingSvc(s); setSvcName(s.name); setSvcDuration(String(s.duration_minutes)); setSvcActive(s.is_active); setShowServiceForm(true); };
+  const openAddSvc = () => { setEditingSvc(null); setSvcName(''); setSvcDuration('30'); setSvcActive(true); setSvcBasePrice(''); setShowServiceForm(true); };
+  const openEditSvc = (s: CarwashService) => { setEditingSvc(s); setSvcName(s.name); setSvcDuration(String(s.duration_minutes)); setSvcActive(s.is_active); setSvcBasePrice(''); setShowServiceForm(true); };
 
   const saveSvcMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       if (!svcName.trim()) throw new Error('Service name required');
-      const data = { name: svcName.trim(), description: null, duration_minutes: Number(svcDuration) || 30, is_active: svcActive, price_hatchback: 0, price_sedan: 0, price_suv: 0, price_luxury: 0, gst_rate: 0, sort_order: editingSvc?.sort_order ?? 99 };
-      return editingSvc ? updateService(tenantId, editingSvc.id, data) : createService(tenantId, data);
+      const basePrice = Number(svcBasePrice) || 0;
+      const data = {
+        name: svcName.trim(), description: null,
+        duration_minutes: Number(svcDuration) || 30, is_active: svcActive,
+        price_hatchback: 0, price_sedan: basePrice, price_suv: 0, price_luxury: 0,
+        gst_rate: 0, sort_order: editingSvc?.sort_order ?? 99,
+      };
+      if (editingSvc) {
+        await updateService(tenantId, editingSvc.id, data);
+        return editingSvc.id;
+      }
+      // For new service: create it then get its ID to pre-populate prices
+      await createService(tenantId, data);
+      const all = await listAllServices(tenantId);
+      const created = all.find(s => s.name === svcName.trim());
+      if (created && basePrice > 0) {
+        const activeVtypes = vtypes.filter(v => v.is_active);
+        await Promise.all(activeVtypes.map(vt =>
+          upsertServicePrice(tenantId, created.id, vt.id, Math.round(basePrice * vt.price_multiplier))
+        ));
+      }
     },
-    onSuccess: () => { toast.success(editingSvc ? 'Service updated' : 'Service added'); setShowServiceForm(false); invSvc(); },
+    onSuccess: () => {
+      toast.success(editingSvc ? 'Service updated' : 'Service added');
+      setShowServiceForm(false);
+      invSvc();
+      qc.invalidateQueries({ queryKey: ['cw-service-prices'] });
+      qc.invalidateQueries({ queryKey: ['carwash-service-prices'] });
+    },
     onError: (e: any) => toast.error(e?.message ?? 'Failed'),
   });
 
@@ -336,6 +362,14 @@ function ServicesTab({ tenantId }: { tenantId: string }) {
               <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Service Name *</label>
               <input value={svcName} onChange={e => setSvcName(e.target.value)} placeholder="e.g. Basic Wash, Full Detail" className={inp()} style={inpStyle} autoFocus />
             </div>
+            {!editingSvc && (
+              <div>
+                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Base Price (₹) *</label>
+                <p className="text-xs mb-1.5" style={{ color: 'var(--text-tertiary)' }}>Prices for all vehicle types are auto-calculated from this</p>
+                <input type="number" value={svcBasePrice} onChange={e => setSvcBasePrice(e.target.value)} placeholder="e.g. 200"
+                  className={inp()} style={inpStyle} />
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Duration (minutes)</label>
               <input type="number" value={svcDuration} onChange={e => setSvcDuration(e.target.value)} placeholder="30" className={inp()} style={inpStyle} />
