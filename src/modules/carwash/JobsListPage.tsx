@@ -49,7 +49,7 @@ export function JobsListPage() {
   });
 
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
-  const filtered = jobs;
+  const filtered = [...jobs].sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''));
 
   const counts = jobs.reduce<Record<string, number>>((acc, j) => {
     acc[j.status] = (acc[j.status] ?? 0) + 1;
@@ -78,6 +78,8 @@ export function JobsListPage() {
         <input type="date" value={date} onChange={(e) => handleDateChange(e.target.value)}
           className="rounded-xl border px-3 py-2 text-sm outline-none"
           style={{ borderColor: 'var(--surface-border)', background: 'var(--surface)', color: 'var(--text-primary)' }} />
+        {date && <button onClick={() => handleDateChange('')} className="text-xs px-2.5 py-1.5 rounded-lg font-medium" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>All Dates</button>}
+        {!date && <button onClick={() => handleDateChange(todayISO())} className="text-xs px-2.5 py-1.5 rounded-lg font-medium" style={{ background: 'var(--accent)', color: '#111' }}>Today</button>}
         {(['all', 'waiting', 'in_progress', 'ready', 'delivered'] as const).map(s => {
           const cnt = s === 'all' ? jobs.length : (counts[s] ?? 0);
           const sc = STATUS_COLORS[s] ?? { color: '#6b7280', bg: '#f3f4f6' };

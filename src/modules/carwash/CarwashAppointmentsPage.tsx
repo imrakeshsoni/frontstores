@@ -143,7 +143,7 @@ export function CarwashAppointmentsPage() {
       setForm(emptyForm);
       invalidate();
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Failed to book'),
+    onError: (e: any) => toast.error(String(e?.message ?? e ?? 'Failed to book appointment')),
   });
 
   const statusMutation = useMutation({
