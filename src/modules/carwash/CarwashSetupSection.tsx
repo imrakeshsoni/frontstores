@@ -45,7 +45,7 @@ function VehiclesTab({ tenantId }: { tenantId: string }) {
   const saveMutation = useMutation({
     mutationFn: () => {
       if (!name.trim()) throw new Error('Name required');
-      if (editing) return updateVehicleType(tenantId, editing.id, { name: name.trim(), icon, price_multiplier: 1, is_active: editing.is_active, sort_order: editing.sort_order });
+      if (editing) return updateVehicleType(tenantId, editing.id, { name: name.trim(), icon, price_multiplier: editing.price_multiplier, is_active: editing.is_active, sort_order: editing.sort_order });
       return createVehicleType(tenantId, { name: name.trim(), icon, price_multiplier: 1 });
     },
     onSuccess: () => { toast.success(editing ? 'Updated' : 'Vehicle type added'); setShowForm(false); inv(); },
@@ -145,7 +145,9 @@ function ServicesTab({ tenantId }: { tenantId: string }) {
   const [editingSvc, setEditingSvc] = useState<CarwashService | null>(null);
   const [svcName, setSvcName] = useState('');
   const [svcDuration, setSvcDuration] = useState('30');
+  const [svcGst, setSvcGst] = useState('18');
   const [svcActive, setSvcActive] = useState(true);
+  const [modalPrices, setModalPrices] = useState<Record<string, string>>({}); // vtypeId → price string
   const [priceEdits, setPriceEdits] = useState<Record<string, string>>({});
   const [durationEdits, setDurationEdits] = useState<Record<string, string>>({});
   const savingRef = useRef<Set<string>>(new Set());
@@ -156,16 +158,55 @@ function ServicesTab({ tenantId }: { tenantId: string }) {
 
   const invSvc = () => { qc.invalidateQueries({ queryKey: ['cw-services-all'] }); qc.invalidateQueries({ queryKey: ['carwash-services-all'] }); qc.invalidateQueries({ queryKey: ['carwash-services'] }); };
 
-  const openAdd = () => { setEditingSvc(null); setSvcName(''); setSvcDuration('30'); setSvcActive(true); setShowForm(true); };
-  const openEdit = (s: CarwashService) => { setEditingSvc(s); setSvcName(s.name); setSvcDuration(String(s.duration_minutes)); setSvcActive(s.is_active); setShowForm(true); };
+  const openAdd = () => {
+    setEditingSvc(null); setSvcName(''); setSvcDuration('30'); setSvcGst('18'); setSvcActive(true); setModalPrices({});
+    setShowForm(true);
+  };
+  const openEdit = (s: CarwashService) => {
+    setEditingSvc(s);
+    setSvcName(s.name);
+    setSvcDuration(String(s.duration_minutes));
+    setSvcGst(String(s.gst_rate ?? 18));
+    setSvcActive(s.is_active);
+    // Pre-fill prices for each vehicle type from the prices map
+    const fills: Record<string, string> = {};
+    Object.entries(pricesMap[s.id] ?? {}).forEach(([vtId, price]) => {
+      if ((price as number) > 0) fills[vtId] = String(price);
+    });
+    setModalPrices(fills);
+    setShowForm(true);
+  };
 
   const saveMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       if (!svcName.trim()) throw new Error('Service name required');
-      const data = { name: svcName.trim(), description: null, duration_minutes: Number(svcDuration) || 30, is_active: svcActive, price_hatchback: 0, price_sedan: 0, price_suv: 0, price_luxury: 0, gst_rate: 0, sort_order: editingSvc?.sort_order ?? 99 };
-      return editingSvc ? updateService(tenantId, editingSvc.id, data) : createService(tenantId, data);
+      const data = {
+        name: svcName.trim(), description: null,
+        duration_minutes: Number(svcDuration) || 30,
+        gst_rate: Number(svcGst) || 0,
+        is_active: svcActive,
+        price_hatchback: 0, price_sedan: 0, price_suv: 0, price_luxury: 0,
+        sort_order: editingSvc?.sort_order ?? 99,
+      };
+      let svcId = editingSvc?.id;
+      if (editingSvc) {
+        await updateService(tenantId, editingSvc.id, data);
+      } else {
+        const created = await createService(tenantId, data);
+        svcId = created.id;
+      }
+      // Save all vehicle type prices
+      if (svcId) {
+        for (const [vtId, priceStr] of Object.entries(modalPrices)) {
+          const price = Number(priceStr) || 0;
+          await upsertServicePrice(tenantId, svcId, vtId, price);
+        }
+      }
     },
-    onSuccess: () => { toast.success(editingSvc ? 'Updated' : 'Service added'); setShowForm(false); invSvc(); },
+    onSuccess: () => {
+      toast.success(editingSvc ? 'Service updated' : 'Service added');
+      setShowForm(false); invSvc(); refetchPrices();
+    },
     onError: (e: any) => toast.error(e?.message ?? 'Failed'),
   });
 
@@ -310,28 +351,60 @@ function ServicesTab({ tenantId }: { tenantId: string }) {
 
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-          <div className="rounded-2xl p-6 w-full max-w-sm space-y-4" style={{ background: 'var(--surface)' }}>
-            <div className="flex items-center justify-between">
+          <div className="rounded-2xl p-6 w-full max-w-md max-h-[90vh] flex flex-col" style={{ background: 'var(--surface)' }}>
+            <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold text-lg" style={{ color: 'var(--text-primary)' }}>{editingSvc ? 'Edit Service' : 'Add Service'}</h2>
               <button onClick={() => setShowForm(false)}><X className="h-5 w-5" style={{ color: 'var(--text-tertiary)' }} /></button>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Service Name *</label>
-              <input value={svcName} onChange={e => setSvcName(e.target.value)} placeholder="e.g. Basic Wash"
-                className={inp} style={inpStyle} autoFocus />
+
+            <div className="overflow-y-auto flex-1 space-y-4 pr-1">
+              <div>
+                <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Service Name *</label>
+                <input value={svcName} onChange={e => setSvcName(e.target.value)} placeholder="e.g. Basic Wash"
+                  className={inp} style={inpStyle} autoFocus />
+              </div>
+
+              {/* Price per vehicle type */}
+              {activeVtypes.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>Price per Vehicle Type (₹)</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {activeVtypes.map(vt => (
+                      <div key={vt.id}>
+                        <label className="block text-xs mb-1" style={{ color: 'var(--text-tertiary)' }}>{vt.icon} {vt.name}</label>
+                        <input type="number" min="0" placeholder="0"
+                          value={modalPrices[vt.id] ?? ''}
+                          onChange={e => setModalPrices(p => ({ ...p, [vt.id]: e.target.value }))}
+                          className={inp} style={inpStyle} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Duration (min)</label>
+                  <input type="number" min="1" value={svcDuration} onChange={e => setSvcDuration(e.target.value)} className={inp} style={inpStyle} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>GST Rate (%)</label>
+                  <select value={svcGst} onChange={e => setSvcGst(e.target.value)} className={inp} style={inpStyle}>
+                    {[0, 5, 12, 18, 28].map(r => <option key={r} value={r}>{r}%</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={svcActive} onChange={e => setSvcActive(e.target.checked)} />
+                <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Active (show in job card)</span>
+              </label>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Duration (minutes)</label>
-              <input type="number" value={svcDuration} onChange={e => setSvcDuration(e.target.value)} className={inp} style={inpStyle} />
-            </div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={svcActive} onChange={e => setSvcActive(e.target.checked)} />
-              <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Active (show in job card)</span>
-            </label>
+
             <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}
-              className="w-full py-2.5 rounded-xl font-bold text-sm text-white disabled:opacity-60"
+              className="w-full py-2.5 rounded-xl font-bold text-sm text-white disabled:opacity-60 mt-4"
               style={{ background: 'var(--accent)' }}>
-              {saveMutation.isPending ? 'Saving…' : editingSvc ? 'Update' : 'Add Service'}
+              {saveMutation.isPending ? 'Saving…' : editingSvc ? 'Update Service' : 'Add Service'}
             </button>
           </div>
         </div>

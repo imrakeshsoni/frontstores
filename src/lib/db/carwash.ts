@@ -255,14 +255,16 @@ export async function listAllServices(tenantId: string): Promise<CarwashService[
   return rows.map(mapService);
 }
 
-export async function createService(tenantId: string, data: Omit<CarwashService, 'id' | 'tenant_id'>): Promise<void> {
+export async function createService(tenantId: string, data: Omit<CarwashService, 'id' | 'tenant_id'>): Promise<{ id: string }> {
   const db = await getDb();
+  const id = uuid();
   await db.execute(
     `INSERT INTO carwash_services (id, tenant_id, name, description, price_hatchback, price_sedan, price_suv, price_luxury, duration_minutes, gst_rate, is_active, sort_order)
      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [uuid(), tenantId, data.name, data.description ?? null, data.price_hatchback, data.price_sedan,
+    [id, tenantId, data.name, data.description ?? null, data.price_hatchback, data.price_sedan,
      data.price_suv, data.price_luxury, data.duration_minutes, data.gst_rate, data.is_active ? 1 : 0, data.sort_order]
   );
+  return { id };
 }
 
 export async function updateService(tenantId: string, id: string, data: Partial<CarwashService>): Promise<void> {
@@ -1082,12 +1084,13 @@ export async function findActiveMembership(tenantId: string, regNumber: string):
 
 export async function getExpiringMemberships(tenantId: string, withinDays = 7): Promise<CarwashMembership[]> {
   const db = await getDb();
+  const cutoff = new Date(Date.now() + withinDays * 86400000).toISOString().slice(0, 10);
   const rows = await db.select<any[]>(
     `SELECT * FROM carwash_memberships WHERE tenant_id = ? AND deleted_at IS NULL AND is_active = 1
      AND valid_until IS NOT NULL AND date(valid_until) >= date('now')
-     AND date(valid_until) <= date('now', '+${withinDays} days')
+     AND date(valid_until) <= ?
      AND used_washes < total_washes`,
-    [tenantId]
+    [tenantId, cutoff]
   );
   return rows.map(mapMembership);
 }
