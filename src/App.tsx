@@ -73,7 +73,6 @@ const CarwashDashboard        = lazy(() => import('@/modules/carwash/CarwashDash
 const JobsListPage            = lazy(() => import('@/modules/carwash/JobsListPage').then(m => ({ default: m.JobsListPage })));
 const JobCardPage             = lazy(() => import('@/modules/carwash/JobCardPage').then(m => ({ default: m.JobCardPage })));
 const CarwashServicesPage     = lazy(() => import('@/modules/carwash/CarwashServicesPage').then(m => ({ default: m.CarwashServicesPage })));
-const MembershipPage          = lazy(() => import('@/modules/carwash/MembershipPage').then(m => ({ default: m.MembershipPage })));
 const CarwashStaffPage        = lazy(() => import('@/modules/carwash/CarwashStaffPage').then(m => ({ default: m.CarwashStaffPage })));
 const CarwashReportsPage      = lazy(() => import('@/modules/carwash/CarwashReportsPage').then(m => ({ default: m.CarwashReportsPage })));
 const BroadcastPage           = lazy(() => import('@/modules/carwash/BroadcastPage').then(m => ({ default: m.BroadcastPage })));
@@ -425,7 +424,6 @@ export default function App() {
             <Route path="carwash/jobs"       element={<JobsListPage />} />
             <Route path="carwash/jobs/:id"   element={<JobCardPage />} />
             <Route path="carwash/services"      element={<CarwashServicesPage />} />
-            <Route path="carwash/membership"    element={<MembershipPage />} />
             <Route path="carwash/staff"         element={<CarwashStaffPage />} />
             <Route path="carwash/reports"       element={<CarwashReportsPage />} />
             <Route path="carwash/broadcast"     element={<BroadcastPage />} />
