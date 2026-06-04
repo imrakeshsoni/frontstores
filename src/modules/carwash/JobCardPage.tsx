@@ -404,12 +404,23 @@ export function JobCardPage() {
 
   const settleMutation = useMutation({
     mutationFn: () => settleJob(tenantId, id!, settlePayment),
-    onSuccess: () => {
-      toast.success('Payment collected — car delivered!');
+    onSuccess: async () => {
+      toast.success('Payment collected — car delivered! 🚗');
       setShowSettle(false);
       qc.invalidateQueries({ queryKey: ['carwash-active-jobs'] });
       qc.invalidateQueries({ queryKey: ['carwash-stats'] });
       qc.invalidateQueries({ queryKey: ['carwash-job', id] });
+      // Auto-send bill on WhatsApp if customer has a phone number
+      if (job?.customer_phone) {
+        try {
+          const phone = job.customer_phone.replace(/\D/g, '');
+          if (phone.length >= 10) {
+            const items = job.items ?? [];
+            const msg = `Hi ${job.customer_name ?? 'there'} 👋\n\nThank you for visiting *${config?.shop_name ?? 'our car wash'}*! 🚗✨\n\n*Invoice — ${job.job_number}*\nVehicle: ${job.reg_number}\n\n${items.map((i: any) => `• ${i.service_name} — ₹${i.price}`).join('\n')}\n${job.discount > 0 ? `\nDiscount: -₹${job.discount}` : ''}${job.gst_amount > 0 ? `\nGST: ₹${Math.round(job.gst_amount)}` : ''}\n\n*Total Paid: ₹${Math.round(job.total)}*\nPayment: ${settlePayment}\n\nSee you again! 😊`;
+            await sendWhatsApp(phone, msg);
+          }
+        } catch { /* non-fatal — don't block payment */ }
+      }
     },
   });
 

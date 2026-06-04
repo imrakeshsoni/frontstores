@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Sun, Moon } from 'lucide-react';
-import { shareWhatsApp } from '@/lib/whatsapp';
+import { shareWhatsApp, testWaCredentials } from '@/lib/whatsapp';
 import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { useAppStore } from '@/app/store/app.store';
 import { updateAppConfig } from '@/lib/db/config';
@@ -378,6 +378,9 @@ export function SettingsPage() {
         </div>
       </div>
 
+      {/* WhatsApp Business API */}
+      <WhatsAppBusinessSection />
+
       {/* Data Backup — amber tint */}
       <div className="card p-4 border-l-4 border-l-amber-500">
         <p className="section-label mb-1 text-amber-300">💾 Data Backup</p>
@@ -616,6 +619,102 @@ export function SettingsPage() {
         )}
       </div>
 
+    </div>
+  );
+}
+
+// [all apps] [all tenants] — WhatsApp Business API settings section
+function WhatsAppBusinessSection() {
+  const { config, loadConfig } = useAppStore();
+  const [phoneId, setPhoneId] = useState((config?.settings?.wa_phone_id as string) ?? '');
+  const [token, setToken]     = useState((config?.settings?.wa_token as string) ?? '');
+  const [testing, setTesting] = useState(false);
+  const [status, setStatus]   = useState<'idle' | 'ok' | 'error'>('idle');
+  const [errMsg, setErrMsg]   = useState('');
+  const hasCredentials = !!(config?.settings?.wa_phone_id && config?.settings?.wa_token);
+
+  const handleSave = async () => {
+    if (!phoneId.trim() || !token.trim()) { toast.error('Both fields are required'); return; }
+    await updateAppConfig({ settings: { ...(config?.settings ?? {}), wa_phone_id: phoneId.trim(), wa_token: token.trim() } });
+    await loadConfig();
+    toast.success('WhatsApp Business API credentials saved');
+    setStatus('idle');
+  };
+
+  const handleTest = async () => {
+    if (!phoneId.trim() || !token.trim()) { toast.error('Enter credentials first'); return; }
+    setTesting(true); setStatus('idle');
+    const result = await testWaCredentials(phoneId.trim(), token.trim());
+    setTesting(false);
+    if (result.ok) { setStatus('ok'); toast.success('✅ Connected! WhatsApp Business API is working'); }
+    else { setStatus('error'); setErrMsg(result.error ?? 'Unknown error'); toast.error(`Connection failed: ${result.error}`); }
+  };
+
+  const handleRemove = async () => {
+    if (!confirm('Remove WhatsApp Business API credentials? The app will fall back to WhatsApp Desktop.')) return;
+    const s = { ...(config?.settings ?? {}) };
+    delete s.wa_phone_id; delete s.wa_token;
+    await updateAppConfig({ settings: s });
+    await loadConfig();
+    setPhoneId(''); setToken(''); setStatus('idle');
+    toast.success('Credentials removed');
+  };
+
+  return (
+    <div className="card p-5" style={{ borderLeft: '4px solid #25d366' }}>
+      <div className="flex items-center justify-between mb-1">
+        <p className="section-label">💬 WhatsApp Business API</p>
+        {hasCredentials && (
+          <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: '#dcfce7', color: '#16a34a' }}>
+            ✓ Connected
+          </span>
+        )}
+      </div>
+      <p className="text-xs mb-4" style={{ color: 'var(--text-tertiary)' }}>
+        When configured, bills are sent automatically after payment and broadcast messages work with one click.
+        Get credentials from <strong>Meta Business → WhatsApp → API Setup</strong>.
+      </p>
+
+      <div className="space-y-3">
+        <div>
+          <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Phone Number ID</label>
+          <input value={phoneId} onChange={e => { setPhoneId(e.target.value); setStatus('idle'); }}
+            placeholder="e.g. 123456789012345"
+            className="input font-mono text-sm" />
+          <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>Found in Meta Business → WhatsApp → Getting Started</p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Permanent Access Token</label>
+          <input value={token} onChange={e => { setToken(e.target.value); setStatus('idle'); }}
+            placeholder="EAAxxxxxxxxxxxxxxx…"
+            type="password"
+            className="input font-mono text-sm" />
+          <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>Generate a permanent token in Meta Business → System Users</p>
+        </div>
+
+        {status === 'error' && (
+          <p className="text-xs font-medium" style={{ color: '#f87171' }}>❌ {errMsg}</p>
+        )}
+        {status === 'ok' && (
+          <p className="text-xs font-medium" style={{ color: '#4ade80' }}>✅ API connection verified</p>
+        )}
+
+        <div className="flex gap-3 flex-wrap pt-1">
+          <button onClick={handleTest} disabled={testing}
+            className="btn-secondary flex items-center gap-2 disabled:opacity-50">
+            {testing ? 'Testing…' : '🔌 Test Connection'}
+          </button>
+          <button onClick={handleSave} className="btn-primary">
+            Save Credentials
+          </button>
+          {hasCredentials && (
+            <button onClick={handleRemove}
+              className="btn text-sm font-medium" style={{ color: '#f87171' }}>
+              Remove
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

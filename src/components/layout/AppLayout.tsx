@@ -17,6 +17,8 @@ import {
   BookOpen,
   Wallet,
   LogOut,
+  ChevronUp,
+  Radio,
   ClipboardList,
   UtensilsCrossed,
   ChefHat,
@@ -490,6 +492,7 @@ const CARWASH_NAV_ITEMS = [
   { to: '/customers',             icon: Users,           label: 'Customers',     iconBg: 'rgba(245,158,11,0.15)', iconColor: '#f59e0b' },
   { to: '/expenses',              icon: Wallet,          label: 'Expenses',      iconBg: 'rgba(245,158,11,0.15)', iconColor: '#f59e0b' },
   { to: '/carwash/reports',       icon: BarChart3,       label: 'Reports',       iconBg: 'rgba(245,158,11,0.15)', iconColor: '#f59e0b' },
+  { to: '/carwash/broadcast',     icon: Radio,           label: 'Broadcast',     iconBg: 'rgba(245,158,11,0.15)', iconColor: '#f59e0b' },
   { to: '/carwash/setup',         icon: Wrench,          label: 'Setup',         iconBg: 'rgba(245,158,11,0.15)', iconColor: '#f59e0b' },
 ];
 
@@ -497,6 +500,7 @@ export function AppLayout() {
   const { config, setAuthenticated } = useAppStore();
   const navigate = useNavigate();
   const [showSwitchModal, setShowSwitchModal] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   // pick correct nav based on shop type
   const reRole = (config?.settings as any)?.re_role ?? 'resale';
   const activeNavItems =
@@ -621,66 +625,65 @@ export function AppLayout() {
         </nav>
 
         {/* Switch App + Owner info — [core] [all tenants] */}
-        <div className="px-3 pb-4 space-y-2" style={{ borderTop: '1px solid var(--surface-border)', paddingTop: '0.75rem' }}>
-          {/* Settings — always visible regardless of nav scroll [core] [all tenants] */}
-          {/* Sync — [core] [all tenants] */}
-          <NavLink to="/sync"
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-all"
-            style={({ isActive }) => isActive
-              ? { background: 'var(--accent-soft)', color: 'var(--accent)' }
-              : { color: 'var(--text-secondary)' }}>
-            <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg" style={{ background: 'var(--surface-2)' }}>
-              <RefreshCw className="h-3.5 w-3.5" style={{ color: 'var(--text-tertiary)' }} />
-            </span>
-            Sync
-          </NavLink>
-          <NavLink to="/settings"
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-all"
-            style={({ isActive }) => isActive
-              ? { background: 'var(--accent-soft)', color: 'var(--accent)' }
-              : { color: 'var(--text-secondary)' }}>
-            <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg" style={{ background: 'var(--surface-2)' }}>
-              <Settings className="h-3.5 w-3.5" style={{ color: 'var(--text-tertiary)' }} />
-            </span>
-            Settings &amp; Updates
-          </NavLink>
-          {/* Switch App button — clearly visible */}
-          <button
-            onClick={() => setShowSwitchModal(true)}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
-            style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--surface-border)' }}
-          >
-            <ArrowLeftRight className="h-4 w-4 flex-shrink-0" />
-            Switch App
-          </button>
+        {/* Owner row — click to open user menu [core] [all tenants] */}
+        <div className="px-3 pb-4 pt-3 relative" style={{ borderTop: '1px solid var(--surface-border)' }}>
 
-          {/* Owner info row */}
-          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ background: 'var(--surface-2)' }}>
-            <div
-              className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
-              style={{ background: 'var(--accent)' }}
-            >
+          {/* User menu popup */}
+          {showUserMenu && (
+            <>
+              {/* Backdrop */}
+              <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)} />
+              {/* Menu */}
+              <div className="absolute bottom-full left-0 right-0 mb-2 mx-0 rounded-2xl overflow-hidden shadow-xl z-50"
+                style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
+                <NavLink to="/sync" onClick={() => setShowUserMenu(false)}
+                  className="flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors hover:opacity-80"
+                  style={{ color: 'var(--text-primary)', borderBottom: '1px solid var(--surface-border)' }}>
+                  <RefreshCw className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--text-tertiary)' }} />
+                  Sync
+                </NavLink>
+                <NavLink to="/settings" onClick={() => setShowUserMenu(false)}
+                  className="flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors hover:opacity-80"
+                  style={{ color: 'var(--text-primary)', borderBottom: '1px solid var(--surface-border)' }}>
+                  <Settings className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--text-tertiary)' }} />
+                  Settings &amp; Updates
+                </NavLink>
+                <button onClick={() => { setShowUserMenu(false); setShowSwitchModal(true); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors hover:opacity-80"
+                  style={{ color: 'var(--text-primary)', borderBottom: '1px solid var(--surface-border)' }}>
+                  <ArrowLeftRight className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--text-tertiary)' }} />
+                  Switch App
+                </button>
+                <button onClick={() => { setShowUserMenu(false); setAuthenticated(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors hover:opacity-80"
+                  style={{ color: '#f87171' }}>
+                  <LogOut className="h-4 w-4 flex-shrink-0" />
+                  Logout
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* Clickable owner row */}
+          <button
+            onClick={() => setShowUserMenu(v => !v)}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all"
+            style={{ background: showUserMenu ? 'var(--accent-soft)' : 'var(--surface-2)' }}>
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold"
+              style={{ background: 'var(--accent)', color: 'var(--on-accent, #111)' }}>
               {(config?.owner_name ?? 'O')[0].toUpperCase()}
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <div className="min-w-0 flex-1 text-left">
+              <p className="truncate text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                 {config?.owner_name ?? 'Store Owner'}
               </p>
               <p className="truncate text-xs" style={{ color: 'var(--text-tertiary)' }}>
                 {config?.shop_name ?? 'FrontStores'}
               </p>
             </div>
-            <button
-              onClick={() => setAuthenticated(false)}
-              title="Lock / Sign out"
-              className="flex-shrink-0 p-1.5 rounded-lg transition-colors"
-              style={{ color: 'var(--text-tertiary)' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#f87171'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-tertiary)'; }}
-            >
-              <LogOut className="h-3.5 w-3.5" />
-            </button>
-          </div>
+            <ChevronUp className="h-4 w-4 flex-shrink-0 transition-transform"
+              style={{ color: 'var(--text-tertiary)', transform: showUserMenu ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+          </button>
         </div>
       </aside>
 
