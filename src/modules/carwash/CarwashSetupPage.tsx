@@ -723,8 +723,13 @@ function AttendanceTab({ tenantId }: { tenantId: string }) {
                   {days.map(d => {
                     const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
                     const isToday = dateStr === todayISO();
+                    const dayName = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short' });
+                    const isSunday = new Date(dateStr + 'T00:00:00').getDay() === 0;
                     return (
-                      <th key={d} className="text-center py-2 font-semibold" style={{ minWidth: '32px', width: '32px', borderBottom: '2px solid var(--surface-border)', color: isToday ? 'var(--accent)' : 'var(--text-tertiary)', opacity: dateStr > todayISO() ? 0.4 : 1 }}>{d}</th>
+                      <th key={d} className="text-center py-1.5 font-semibold" style={{ minWidth: '36px', width: '36px', borderBottom: '2px solid var(--surface-border)', opacity: dateStr > todayISO() ? 0.4 : 1 }}>
+                        <div style={{ color: isToday ? 'var(--accent)' : isSunday ? '#dc2626' : 'var(--text-secondary)', fontSize: '12px', fontWeight: 700, lineHeight: 1.2 }}>{d}</div>
+                        <div style={{ color: isToday ? 'var(--accent)' : isSunday ? '#dc2626' : 'var(--text-tertiary)', fontSize: '9px', fontWeight: 500, lineHeight: 1.2 }}>{dayName}</div>
+                      </th>
                     );
                   })}
                   <th className="text-center px-3 py-3 font-semibold" style={{ color: '#16a34a', borderBottom: '2px solid var(--surface-border)', minWidth: '36px' }}>P</th>

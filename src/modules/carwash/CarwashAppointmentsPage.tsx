@@ -55,6 +55,7 @@ const emptyForm: ApptForm = {
 
 export function CarwashAppointmentsPage() {
   const tenantId = useAppStore((s) => s.config?.tenant_id ?? '');
+  const shopName = useAppStore((s) => s.config?.shop_name ?? 'Car Wash');
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [date, setDate] = useState(todayISO());
@@ -129,6 +130,15 @@ export function CarwashAppointmentsPage() {
     },
     onSuccess: () => {
       toast.success('Appointment booked!');
+      // [carwash] [all tenants] — auto-send booking confirmation via WhatsApp
+      const phone = form.customer_phone.replace(/\D/g, '');
+      if (phone.length >= 10) {
+        const time = TIME_SLOTS.find(t => t.value === form.appointment_time)?.label ?? form.appointment_time;
+        const dateLabel = new Date(date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
+        const services = form.selected_services.length > 0 ? form.selected_services.join(', ') : form.services_note;
+        const msg = `Hi ${form.customer_name} 👋\n\nYour car wash appointment has been *confirmed*! ✅\n\n📅 Date: *${dateLabel}*\n🕐 Time: *${time}*\n🚗 Vehicle: ${form.reg_number ? form.reg_number.toUpperCase() : 'Your car'}${services ? `\n📋 Services: ${services}` : ''}\n\nSee you then at *${shopName}*! 😊`;
+        sendWhatsApp(phone, msg).catch(() => {});
+      }
       setShowForm(false);
       setForm(emptyForm);
       invalidate();
@@ -304,6 +314,9 @@ export function CarwashAppointmentsPage() {
         <input type="date" value={date} onChange={e => setDate(e.target.value)}
           className="rounded-xl border px-3 py-2 text-sm outline-none"
           style={{ borderColor: 'var(--surface-border)', background: 'var(--surface)', color: 'var(--text-primary)' }} />
+        <span className="text-sm font-bold px-2.5 py-1 rounded-lg" style={{ background: 'var(--surface-2)', color: 'var(--accent)' }}>
+          {new Date(date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long' })}
+        </span>
         <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
           {pending.length} appointment{pending.length !== 1 ? 's' : ''} scheduled
         </span>

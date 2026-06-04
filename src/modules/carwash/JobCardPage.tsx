@@ -416,11 +416,19 @@ export function JobCardPage() {
 
   const statusMutation = useMutation({
     mutationFn: ({ jobId, status }: { jobId: string; status: JobStatus }) => updateJobStatus(tenantId, jobId, status),
-    onSuccess: () => {
+    onSuccess: (_, { status }) => {
       qc.invalidateQueries({ queryKey: ['carwash-active-jobs'] });
       qc.invalidateQueries({ queryKey: ['carwash-stats'] });
       qc.invalidateQueries({ queryKey: ['carwash-job', id] });
       import('@/lib/autoSync').then(({ triggerAutoSync }) => triggerAutoSync());
+      // [carwash] [all tenants] — auto-send "car is ready" when status becomes ready
+      if (status === 'ready' && job?.customer_phone) {
+        const phone = job.customer_phone.replace(/\D/g, '');
+        if (phone.length >= 10) {
+          const msg = `Hi ${job.customer_name ?? 'there'} 👋\n\nYour car *${job.reg_number}* is ready for pickup! 🚗✨\n\nServices done:\n${(job.items ?? []).map((i: any) => `• ${i.service_name}`).join('\n')}\n\nTotal: *${fmt(job.total ?? 0)}*\n\nSee you at *${config?.shop_name ?? 'our car wash'}*! 😊`;
+          sendWhatsApp(phone, msg).catch(() => {});
+        }
+      }
     },
   });
 
