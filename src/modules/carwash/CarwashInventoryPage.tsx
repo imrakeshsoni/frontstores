@@ -294,8 +294,6 @@ export function CarwashInventoryPage() {
                 <th className="text-left px-3 py-3 font-semibold" style={{ color: 'var(--text-secondary)' }}>Category</th>
                 <th className="text-left px-3 py-3 font-semibold" style={{ color: 'var(--text-secondary)' }}>Unit</th>
                 <th className="text-right px-3 py-3 font-semibold" style={{ color: 'var(--text-secondary)' }}>Cost</th>
-                <th className="text-right px-3 py-3 font-semibold" style={{ color: 'var(--text-secondary)' }}>Selling</th>
-                <th className="text-right px-3 py-3 font-semibold" style={{ color: 'var(--text-secondary)' }}>GST</th>
                 <th className="text-right px-3 py-3 font-semibold" style={{ color: 'var(--text-secondary)' }}>Stock</th>
                 <th className="w-20" />
               </tr>
@@ -320,10 +318,8 @@ export function CarwashInventoryPage() {
                   <tr key={item.id} style={{ borderTop: '1px solid var(--surface-border)' }}>
                     <td className="px-4 py-3">
                       <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>{item.name}</p>
-                      {(item.brand || item.sku) && (
-                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
-                          {[item.brand, item.sku ? `SKU: ${item.sku}` : ''].filter(Boolean).join(' · ')}
-                        </p>
+                      {item.brand && (
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{item.brand}</p>
                       )}
                     </td>
                     <td className="px-3 py-3">
@@ -333,8 +329,6 @@ export function CarwashInventoryPage() {
                     </td>
                     <td className="px-3 py-3 text-sm" style={{ color: 'var(--text-secondary)' }}>{item.unit}</td>
                     <td className="px-3 py-3 text-right text-sm" style={{ color: 'var(--text-secondary)' }}>{item.cost_per_unit > 0 ? fmt(item.cost_per_unit) : '—'}</td>
-                    <td className="px-3 py-3 text-right text-sm font-semibold" style={{ color: 'var(--accent)' }}>{(item.selling_price ?? 0) > 0 ? fmt(item.selling_price) : '—'}</td>
-                    <td className="px-3 py-3 text-right text-sm" style={{ color: 'var(--text-secondary)' }}>{item.gst_rate ?? 18}%</td>
                     <td className="px-3 py-3 text-right">
                       <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
                         style={{ background: isLow ? '#fef2f2' : '#d1fae5', color: isLow ? '#dc2626' : '#16a34a' }}>
@@ -483,32 +477,13 @@ export function CarwashInventoryPage() {
                   <input value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} placeholder="e.g. Meguiar's, 3M, Turtle Wax" className={inp} style={inpStyle} />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>SKU (optional)</label>
-                  <input value={form.sku} onChange={e => setForm(f => ({ ...f, sku: e.target.value }))} placeholder="e.g. CW-001" className={inp} style={inpStyle} />
-                </div>
-                <div>
                   <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Purchase / Cost Price (₹)</label>
                   <input type="number" min="0" value={form.cost_per_unit} onChange={e => setForm(f => ({ ...f, cost_per_unit: e.target.value }))} placeholder="0.00" className={inp} style={inpStyle} />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Selling Price (₹)</label>
-                  <input type="number" min="0" value={form.selling_price} onChange={e => setForm(f => ({ ...f, selling_price: e.target.value }))} placeholder="0.00" className={inp} style={inpStyle} />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>GST Rate</label>
-                  <select value={form.gst_rate} onChange={e => setForm(f => ({ ...f, gst_rate: e.target.value }))} className={inp} style={inpStyle}>
-                    {GST_RATES.map(r => <option key={r} value={r}>{r}%</option>)}
-                  </select>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Low Stock Alert Qty</label>
                   <input type="number" min="0" value={form.min_quantity} onChange={e => setForm(f => ({ ...f, min_quantity: e.target.value }))} placeholder="e.g. 2" className={inp} style={inpStyle} />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Notes (optional)</label>
-                <input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Any notes…" className={inp} style={inpStyle} />
               </div>
             </div>
 
