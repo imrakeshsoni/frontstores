@@ -4,7 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { TrendingUp, Users, PhoneCall, Star } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { sendWhatsApp } from '@/lib/whatsapp';
-import { getMonthlyRevenue, getPopularServices, getLapsedCustomers, getStaffPerformance, getStaffWeeklyPerformance, getTodayStats, listTopLoyaltyCustomers } from '@/lib/db/carwash';
+import { getMonthlyRevenue, getPopularServices, getLapsedCustomers, getStaffPerformance, getStaffWeeklyPerformance, getTodayStats, listTopLoyaltyCustomers, getAttendanceSummaryForMonth } from '@/lib/db/carwash';
+import { useNavigate } from 'react-router-dom';
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 function thisMonthISO() { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`; }
@@ -13,7 +14,9 @@ function fmt(n: number) { return `₹${n.toLocaleString('en-IN', { maximumFracti
 export function CarwashReportsPage() {
   const tenantId = useAppStore((s) => s.config?.tenant_id ?? '');
   const config = useAppStore((s) => s.config);
+  const navigate = useNavigate();
   const today = todayISO();
+  const now = new Date();
   const [staffView, setStaffView] = useState<'today' | 'week'>('today');
 
   const { data: monthlyRevenue = [] } = useQuery({
@@ -55,6 +58,12 @@ export function CarwashReportsPage() {
   const { data: topLoyalty = [] } = useQuery({
     queryKey: ['carwash-loyalty-top', tenantId],
     queryFn: () => listTopLoyaltyCustomers(tenantId),
+    enabled: !!tenantId,
+  });
+
+  const { data: salarySummaries = [] } = useQuery({
+    queryKey: ['carwash-salary-report', tenantId, now.getFullYear(), now.getMonth() + 1],
+    queryFn: () => getAttendanceSummaryForMonth(tenantId, now.getFullYear(), now.getMonth() + 1),
     enabled: !!tenantId,
   });
 
@@ -245,6 +254,53 @@ export function CarwashReportsPage() {
                 )}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Payroll Summary — current month */}
+      {salarySummaries.length > 0 && (
+        <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
+          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--surface-border)' }}>
+            <h2 className="font-bold" style={{ color: 'var(--text-primary)' }}>
+              Payroll — {new Date(now.getFullYear(), now.getMonth()).toLocaleString('en-IN', { month: 'long', year: 'numeric' })}
+            </h2>
+            <button onClick={() => navigate('/carwash/attendance')}
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg btn-secondary">
+              Manage Attendance
+            </button>
+          </div>
+          <div className="divide-y" style={{ borderColor: 'var(--surface-border)' }}>
+            {salarySummaries.map(sm => (
+              <div key={sm.staff.id} className="flex items-center justify-between px-5 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                    style={{ background: 'var(--accent)' }}>{sm.staff.name[0].toUpperCase()}</div>
+                  <div>
+                    <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{sm.staff.name}</p>
+                    <p className="text-xs capitalize" style={{ color: 'var(--text-tertiary)' }}>
+                      P:{sm.present} H:{sm.half_day} A:{sm.absent} L:{sm.leave}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  {sm.staff.monthly_salary > 0 ? (
+                    <>
+                      <p className="font-bold text-sm" style={{ color: 'var(--accent)' }}>{fmt(sm.net_salary)}</p>
+                      {sm.deductions > 0 && <p className="text-xs" style={{ color: '#dc2626' }}>−{fmt(sm.deductions)} deducted</p>}
+                    </>
+                  ) : (
+                    <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Salary not set</p>
+                  )}
+                </div>
+              </div>
+            ))}
+            <div className="flex items-center justify-between px-5 py-3" style={{ background: 'var(--surface-2)' }}>
+              <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>Total Payroll</p>
+              <p className="font-bold text-base" style={{ color: 'var(--accent)' }}>
+                {fmt(salarySummaries.reduce((s, sm) => s + sm.net_salary, 0))}
+              </p>
+            </div>
           </div>
         </div>
       )}

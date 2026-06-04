@@ -14,6 +14,7 @@ import {
   listJobs, createJob, updateJob, updateJobStatus, settleJob, deleteJob,
   listServices, listCarwashStaff, findVehicleByReg, findVehiclesByPhone, searchVehicles,
   findActiveMembership, getVehicleServiceHistory, getLoyaltyByPhone, listVehicleTypes, validateRegNumber,
+  getAllServicePrices,
   type CarwashJob, type CarwashVehicleTypeRecord, type JobStatus, type CarwashVehicle,
 } from '@/lib/db/carwash';
 import { listCustomers } from '@/lib/db/customers';
@@ -104,6 +105,13 @@ export function JobCardPage() {
   const { data: vehicleTypes = [] } = useQuery({
     queryKey: ['carwash-vtypes', tenantId],
     queryFn: () => listVehicleTypes(tenantId),
+    enabled: !!tenantId,
+  });
+
+  // service_id → vehicle_type_id → price (manual overrides from carwash_service_prices)
+  const { data: servicePrices = {} } = useQuery({
+    queryKey: ['carwash-service-prices', tenantId],
+    queryFn: () => getAllServicePrices(tenantId),
     enabled: !!tenantId,
   });
 
@@ -258,13 +266,18 @@ export function JobCardPage() {
   };
 
   const getPriceForType = (svc: any): number => {
-    // Legacy fixed-column types
-    const legacyKey = `price_${vehicleType.toLowerCase()}` as keyof typeof svc;
-    if (svc[legacyKey] != null) return Number(svc[legacyKey]);
-    // Dynamic types: multiply sedan price by the vehicle type multiplier
+    // 1. Check manual per-vehicle-type price from carwash_service_prices table
     const vt = vehicleTypes.find(v => v.name === vehicleType);
+    if (vt && servicePrices[svc.id]?.[vt.id] != null) {
+      return Number(servicePrices[svc.id][vt.id]);
+    }
+    // 2. Legacy fixed-column fallback (hatchback / sedan / suv / luxury)
+    const legacyKey = `price_${vehicleType.toLowerCase()}` as keyof typeof svc;
+    if (svc[legacyKey] != null && Number(svc[legacyKey]) > 0) return Number(svc[legacyKey]);
+    // 3. Base price × vehicle type multiplier
     const mul = vt?.price_multiplier ?? 1.0;
-    return Math.round((svc.price_sedan ?? 0) * mul);
+    const base = Math.max(Number(svc.price_sedan ?? 0), Number(svc.price_hatchback ?? 0));
+    return Math.round(base * mul);
   };
 
   const toggleService = (svc: any) => {
@@ -466,36 +479,45 @@ export function JobCardPage() {
     const j = jobData ?? job;
     if (!j) return;
     const shopName = config?.shop_name ?? 'Car Wash';
+    const logo = (config?.settings as any)?.logo_base64;
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
     <style>
       body{font-family:'Courier New',monospace;max-width:300px;margin:0 auto;padding:12px;font-size:12px}
       .center{text-align:center} .bold{font-weight:700} .line{border-top:1px dashed #000;margin:6px 0}
       .row{display:flex;justify-content:space-between;margin:2px 0}
       .big{font-size:16px;font-weight:700}
+      .logo{max-height:50px;max-width:120px;object-fit:contain;margin-bottom:4px}
     </style></head><body>
-    <div class="center bold" style="font-size:15px">${shopName}</div>
+    <div class="center">
+      ${logo ? `<img src="${logo}" class="logo" /><br/>` : ''}
+      <span class="bold" style="font-size:15px">${shopName}</span>
+    </div>
     <div class="center" style="font-size:10px">${config?.address_line1 ?? ''} ${config?.city ?? ''}</div>
     <div class="line"></div>
-    <div class="center bold big">JOB CARD</div>
-    <div class="row"><span>Job #</span><span class="bold">${j.job_number}</span></div>
+    <div class="center bold big">INVOICE</div>
+    <div class="row"><span>Invoice #</span><span class="bold">${j.job_number}</span></div>
     <div class="row"><span>Date</span><span>${new Date(j.created_at).toLocaleDateString('en-IN')}</span></div>
     <div class="row"><span>Vehicle</span><span class="bold">${j.reg_number}</span></div>
     ${j.make || j.model ? `<div class="row"><span>Model</span><span>${[j.make, j.model].filter(Boolean).join(' ')}</span></div>` : ''}
     ${j.customer_name ? `<div class="row"><span>Customer</span><span>${j.customer_name}</span></div>` : ''}
+    ${j.customer_phone ? `<div class="row"><span>Phone</span><span>${j.customer_phone}</span></div>` : ''}
     ${j.staff_name ? `<div class="row"><span>Staff</span><span>${j.staff_name}</span></div>` : ''}
     <div class="line"></div>
     <div class="bold" style="margin-bottom:4px">Services</div>
     ${(j.items ?? []).map(i => `<div class="row"><span>${i.service_name}</span><span>${fmt(i.price)}</span></div>`).join('')}
     <div class="line"></div>
     ${j.discount > 0 ? `<div class="row"><span>Discount</span><span>-${fmt(j.discount)}</span></div>` : ''}
+    ${j.gst_amount > 0 ? `<div class="row"><span>GST</span><span>${fmt(j.gst_amount)}</span></div>` : ''}
     <div class="row bold big"><span>TOTAL</span><span>${fmt(j.total)}</span></div>
+    ${j.payment_method ? `<div class="row" style="font-size:10px"><span>Payment</span><span>${j.payment_method.toUpperCase()}</span></div>` : ''}
     <div class="line"></div>
     <div class="center" style="font-size:10px;margin-top:6px">Thank you! Come again 🚗</div>
     </body></html>`;
     const finalHtml = html.replace('</body>', `<script>window.addEventListener('load',function(){setTimeout(window.print,400);})<\/script></body>`);
     try {
       const cacheDir = await appCacheDir();
-      const filePath = `${cacheDir}carwash-job-${Date.now()}.html`;
+      const sep = cacheDir.endsWith('/') || cacheDir.endsWith('\\') ? '' : '/';
+      const filePath = `${cacheDir}${sep}carwash-job-${Date.now()}.html`;
       await writeTextFile(filePath, finalHtml);
       await shellOpen(filePath);
     } catch (e: any) {

@@ -284,6 +284,53 @@ export function SettingsPage() {
         </div>
       </div>
 
+      {/* Business Logo */}
+      <div className="card p-4 border-l-4 border-l-amber-500">
+        <p className="section-label mb-3 text-amber-300">🖼️ Business Logo</p>
+        <p className="text-xs text-slate-400 mb-3">Logo appears on invoices, salary slips, and printed documents.</p>
+        <div className="flex items-center gap-4">
+          {(config?.settings as any)?.logo_base64 ? (
+            <div className="flex items-center gap-3">
+              <img
+                src={(config?.settings as any)?.logo_base64}
+                alt="Logo"
+                className="h-16 w-auto max-w-32 object-contain rounded-lg"
+                style={{ background: 'var(--surface-2)', padding: '4px' }}
+              />
+              <button
+                onClick={async () => {
+                  const newSettings = { ...(config?.settings ?? {}), logo_base64: undefined };
+                  delete (newSettings as any).logo_base64;
+                  await updateAppConfig({ settings: newSettings });
+                  window.location.reload();
+                }}
+                className="text-xs px-3 py-1.5 rounded-lg font-medium"
+                style={{ background: '#fee2e2', color: '#dc2626' }}>
+                Remove Logo
+              </button>
+            </div>
+          ) : (
+            <label className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm cursor-pointer btn-secondary">
+              📁 Upload Logo (PNG, JPG — max 200KB)
+              <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (file.size > 200 * 1024) { toast.error('Image too large — max 200KB'); return; }
+                  const reader = new FileReader();
+                  reader.onload = async (ev) => {
+                    const base64 = ev.target?.result as string;
+                    await updateAppConfig({ settings: { ...(config?.settings ?? {}), logo_base64: base64 } });
+                    toast.success('Logo saved!');
+                    window.location.reload();
+                  };
+                  reader.readAsDataURL(file);
+                }} />
+            </label>
+          )}
+        </div>
+      </div>
+
       {/* Invoice Template — emerald tint */}
       <div className="card p-4 border-l-4 border-l-emerald-500">
         <p className="section-label mb-3 text-emerald-300">🧾 Invoice Template</p>

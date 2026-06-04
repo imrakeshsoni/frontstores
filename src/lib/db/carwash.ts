@@ -99,6 +99,48 @@ export interface CarwashStaff {
   phone: string | null;
   role: string;
   is_active: boolean;
+  monthly_salary: number;
+  joining_date: string | null;
+  deduct_half_day: boolean;
+  deduct_full_day_leave: boolean;
+}
+
+export type AttendanceStatus = 'present' | 'half_day' | 'absent' | 'leave' | 'holiday';
+
+export interface CarwashAttendance {
+  id: string;
+  tenant_id: string;
+  staff_id: string;
+  date: string;
+  status: AttendanceStatus;
+  note: string | null;
+  updated_at: string;
+}
+
+export interface CarwashSalaryAdvance {
+  id: string;
+  tenant_id: string;
+  staff_id: string;
+  month: string;
+  amount: number;
+  note: string | null;
+  created_at: string;
+}
+
+export interface StaffSalarySummary {
+  staff: CarwashStaff;
+  present: number;
+  half_day: number;
+  absent: number;
+  leave: number;
+  holiday: number;
+  working_days: number;
+  per_day_rate: number;
+  payable_days: number;
+  net_salary: number;
+  deductions: number;
+  advance: number;
+  payable_amount: number;
 }
 
 export interface CarwashMembership {
@@ -176,7 +218,13 @@ function mapService(r: any): CarwashService {
   return { ...r, is_active: r.is_active === 1 };
 }
 function mapStaff(r: any): CarwashStaff {
-  return { ...r, is_active: r.is_active === 1 };
+  return {
+    ...r,
+    is_active: r.is_active === 1,
+    deduct_half_day: r.deduct_half_day === 1,
+    deduct_full_day_leave: r.deduct_full_day_leave === 1,
+    monthly_salary: r.monthly_salary ?? 0,
+  };
 }
 function mapMembership(r: any): CarwashMembership {
   return { ...r, is_active: r.is_active === 1 };
@@ -758,17 +806,156 @@ export async function listCarwashStaff(tenantId: string): Promise<CarwashStaff[]
   return rows.map(mapStaff);
 }
 
-export async function createCarwashStaff(tenantId: string, data: { name: string; phone?: string; role?: string }): Promise<void> {
+export async function listAllCarwashStaff(tenantId: string): Promise<CarwashStaff[]> {
+  const db = await getDb();
+  const rows = await db.select<any[]>(`SELECT * FROM carwash_staff WHERE tenant_id = ? AND deleted_at IS NULL ORDER BY name`, [tenantId]);
+  return rows.map(mapStaff);
+}
+
+export async function createCarwashStaff(tenantId: string, data: {
+  name: string; phone?: string; role?: string;
+  monthly_salary?: number; joining_date?: string;
+  deduct_half_day?: boolean; deduct_full_day_leave?: boolean;
+}): Promise<void> {
   const db = await getDb();
   await db.execute(
-    `INSERT INTO carwash_staff (id, tenant_id, name, phone, role) VALUES (?,?,?,?,?)`,
-    [uuid(), tenantId, data.name, data.phone ?? null, data.role ?? 'washer']
+    `INSERT INTO carwash_staff (id, tenant_id, name, phone, role, monthly_salary, joining_date, deduct_half_day, deduct_full_day_leave) VALUES (?,?,?,?,?,?,?,?,?)`,
+    [uuid(), tenantId, data.name, data.phone ?? null, data.role ?? 'washer',
+     data.monthly_salary ?? 0, data.joining_date ?? null,
+     data.deduct_half_day !== false ? 1 : 0, data.deduct_full_day_leave ? 1 : 0]
+  );
+}
+
+export async function updateCarwashStaff(tenantId: string, id: string, data: {
+  name?: string; phone?: string; role?: string;
+  monthly_salary?: number; joining_date?: string;
+  deduct_half_day?: boolean; deduct_full_day_leave?: boolean;
+}): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `UPDATE carwash_staff SET name=?, phone=?, role=?, monthly_salary=?, joining_date=?, deduct_half_day=?, deduct_full_day_leave=?, updated_at=? WHERE id=? AND tenant_id=?`,
+    [data.name, data.phone ?? null, data.role, data.monthly_salary ?? 0, data.joining_date ?? null,
+     data.deduct_half_day !== false ? 1 : 0, data.deduct_full_day_leave ? 1 : 0, now(), id, tenantId]
   );
 }
 
 export async function deleteCarwashStaff(tenantId: string, id: string): Promise<void> {
   const db = await getDb();
   await db.execute(`UPDATE carwash_staff SET deleted_at = ? WHERE id = ? AND tenant_id = ?`, [now(), id, tenantId]);
+}
+
+// ── Attendance ────────────────────────────────────────────────────────────────
+
+export async function upsertAttendance(tenantId: string, staffId: string, date: string, status: AttendanceStatus, note?: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `INSERT INTO carwash_attendance (id, tenant_id, staff_id, date, status, note, updated_at)
+     VALUES (?,?,?,?,?,?,?)
+     ON CONFLICT(tenant_id, staff_id, date) DO UPDATE SET status=excluded.status, note=excluded.note, updated_at=excluded.updated_at, deleted_at=NULL`,
+    [uuid(), tenantId, staffId, date, status, note ?? null, now()]
+  );
+}
+
+export async function getAttendanceForMonth(tenantId: string, year: number, month: number): Promise<CarwashAttendance[]> {
+  const db = await getDb();
+  const prefix = `${year}-${String(month).padStart(2, '0')}`;
+  return db.select<CarwashAttendance[]>(
+    `SELECT * FROM carwash_attendance WHERE tenant_id = ? AND date LIKE ? AND deleted_at IS NULL`,
+    [tenantId, `${prefix}-%`]
+  );
+}
+
+export async function getAttendanceForStaffMonth(tenantId: string, staffId: string, year: number, month: number): Promise<CarwashAttendance[]> {
+  const db = await getDb();
+  const prefix = `${year}-${String(month).padStart(2, '0')}`;
+  return db.select<CarwashAttendance[]>(
+    `SELECT * FROM carwash_attendance WHERE tenant_id = ? AND staff_id = ? AND date LIKE ? AND deleted_at IS NULL`,
+    [tenantId, staffId, `${prefix}-%`]
+  );
+}
+
+export function computeSalary(staff: CarwashStaff, attendance: CarwashAttendance[], year: number, month: number): StaffSalarySummary {
+  const daysInMonth = new Date(year, month, 0).getDate();
+
+  // Determine first payable day
+  let startDay = 1;
+  if (staff.joining_date) {
+    const jd = new Date(staff.joining_date);
+    if (jd.getFullYear() === year && jd.getMonth() + 1 === month) {
+      startDay = jd.getDate();
+    } else if (jd > new Date(year, month - 1, daysInMonth)) {
+      // Joined after this month — 0 salary
+      return { staff, present: 0, half_day: 0, absent: 0, leave: 0, holiday: 0, working_days: 0, per_day_rate: 0, payable_days: 0, net_salary: 0, deductions: 0, advance: 0, payable_amount: 0 };
+    }
+    // If joined before this month, startDay stays 1
+  }
+
+  const working_days = daysInMonth - startDay + 1;
+  const per_day_rate = staff.monthly_salary > 0 ? staff.monthly_salary / daysInMonth : 0;
+
+  // Only count attendance within the payable period
+  const payableAttendance = attendance.filter(a => {
+    const d = parseInt(a.date.slice(8, 10));
+    return d >= startDay;
+  });
+
+  const present = payableAttendance.filter(a => a.status === 'present').length;
+  const half_day = payableAttendance.filter(a => a.status === 'half_day').length;
+  const absent = payableAttendance.filter(a => a.status === 'absent').length;
+  const leave = payableAttendance.filter(a => a.status === 'leave').length;
+  const holiday = payableAttendance.filter(a => a.status === 'holiday').length;
+
+  // Days not yet marked = treated as present for display (partial month)
+  const marked = present + half_day + absent + leave + holiday;
+  const unmarked = Math.max(0, working_days - marked);
+
+  const payable_present = present + unmarked + holiday; // holiday = always paid
+  const payable_half = staff.deduct_half_day ? half_day * 0.5 : half_day;
+  const payable_leave = staff.deduct_full_day_leave ? 0 : leave;
+  const payable_days = payable_present + payable_half + payable_leave;
+
+  const net_salary = Math.round(per_day_rate * payable_days);
+  const deductions = Math.round(staff.monthly_salary - net_salary);
+
+  return { staff, present, half_day, absent, leave, holiday, working_days, per_day_rate, payable_days, net_salary, deductions, advance: 0, payable_amount: net_salary };
+}
+
+export async function getAttendanceSummaryForMonth(tenantId: string, year: number, month: number): Promise<StaffSalarySummary[]> {
+  const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+  const [staffList, allAttendance, advances] = await Promise.all([
+    listAllCarwashStaff(tenantId),
+    getAttendanceForMonth(tenantId, year, month),
+    getSalaryAdvancesForMonth(tenantId, monthStr),
+  ]);
+  return staffList.map(staff => {
+    const att = allAttendance.filter(a => a.staff_id === staff.id);
+    const summary = computeSalary(staff, att, year, month);
+    const advance = advances.filter(a => a.staff_id === staff.id).reduce((s, a) => s + a.amount, 0);
+    return { ...summary, advance, payable_amount: Math.max(0, summary.net_salary - advance) };
+  });
+}
+
+// ── Salary Advance ────────────────────────────────────────────────────────────
+
+export async function getSalaryAdvancesForMonth(tenantId: string, month: string): Promise<CarwashSalaryAdvance[]> {
+  const db = await getDb();
+  return db.select<CarwashSalaryAdvance[]>(
+    `SELECT * FROM carwash_salary_advance WHERE tenant_id = ? AND month = ? AND deleted_at IS NULL ORDER BY created_at`,
+    [tenantId, month]
+  );
+}
+
+export async function addSalaryAdvance(tenantId: string, staffId: string, month: string, amount: number, note?: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `INSERT INTO carwash_salary_advance (id, tenant_id, staff_id, month, amount, note) VALUES (?,?,?,?,?,?)`,
+    [uuid(), tenantId, staffId, month, amount, note ?? null]
+  );
+}
+
+export async function deleteSalaryAdvance(tenantId: string, id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(`UPDATE carwash_salary_advance SET deleted_at = ? WHERE id = ? AND tenant_id = ?`, [now(), id, tenantId]);
 }
 
 // ── Memberships ───────────────────────────────────────────────────────────────
