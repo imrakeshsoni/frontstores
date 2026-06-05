@@ -45,6 +45,8 @@ export function SettingsPage() {
   const [updateVersion, setUpdateVersion] = useState('');
   const [pendingUpdate, setPendingUpdate] = useState<any>(null);
   const [currentVersion, setCurrentVersion] = useState('');
+  const [dlTotal, setDlTotal] = useState(0);
+  const [dlDone, setDlDone] = useState(0);
 
   // On mount, pick up any update found silently at startup + load current version
   useEffect(() => {
@@ -68,12 +70,14 @@ export function SettingsPage() {
       (window as any).__pendingUpdate = update;
       setUpdateStatus('found');
     } catch (err) {
-      setUpdateStatus('idle');
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('up to date') || msg.includes('UpToDate') || msg.includes('204')) {
+      if (
+        msg.includes('up to date') || msg.includes('UpToDate') || msg.includes('204') ||
+        msg.includes('release JSON') || msg.includes('valid release') || msg.includes('fetch')
+      ) {
         setUpdateStatus('up-to-date');
       } else {
-        toast.error(`Update check failed: ${msg}`);
+        setUpdateStatus('idle');
         reportError(msg, undefined, 'update-check');
       }
     }
@@ -86,12 +90,22 @@ export function SettingsPage() {
     );
     if (!confirmed) return;
     setUpdateStatus('installing');
+    setDlDone(0);
+    setDlTotal(0);
     try {
-      await pendingUpdate.downloadAndInstall();
+      await pendingUpdate.downloadAndInstall((progress: any) => {
+        if (progress.event === 'Started') {
+          setDlTotal(progress.data.contentLength ?? 0);
+        } else if (progress.event === 'Progress') {
+          setDlDone(d => d + (progress.data.chunkLength ?? 0));
+        }
+      });
       const { relaunch } = await import('@tauri-apps/plugin-process');
       await relaunch();
     } catch (err) {
       setUpdateStatus('found');
+      setDlDone(0);
+      setDlTotal(0);
       const msg = err instanceof Error ? err.message : String(err);
       toast.error(`Install failed: ${msg}`);
       reportError(msg, undefined, 'update-install');
@@ -238,22 +252,62 @@ export function SettingsPage() {
           {currentVersion && <span className="text-xs text-slate-500 font-mono">v{currentVersion}</span>}
         </div>
         <p className="text-xs text-slate-400 mb-3">Updates only replace the app — your data, bills, and products are never touched.</p>
+
+        {/* Status messages above button */}
         {updateStatus === 'found' && (
-          <div className="mb-3 bg-indigo-950 border border-indigo-700 rounded-xl p-3 flex items-center justify-between gap-4">
-            <div>
-              <p className="text-indigo-200 font-semibold text-sm">🎉 New version v{updateVersion} available</p>
-              <p className="text-indigo-400 text-xs mt-0.5">⚠️ App will close and relaunch. Do this when not billing.</p>
-            </div>
-            <button onClick={handleInstallUpdate} className="shrink-0 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold px-3 py-1.5 rounded-xl transition-colors">
-              Update & Relaunch
-            </button>
+          <div className="mb-3 bg-indigo-950 border border-indigo-700 rounded-xl p-3">
+            <p className="text-indigo-200 font-semibold text-sm">🎉 New version v{updateVersion} is available!</p>
+            <p className="text-indigo-400 text-xs mt-0.5">⚠️ App will close and relaunch. Do this when not billing a customer.</p>
           </div>
         )}
+        {updateStatus === 'up-to-date' && (
+          <div className="mb-3 bg-emerald-950 border border-emerald-800 rounded-xl p-3 flex items-center gap-2">
+            <span className="text-emerald-400 text-base">✅</span>
+            <p className="text-emerald-300 text-sm font-medium">You're on the latest version. No update needed.</p>
+          </div>
+        )}
+        {updateStatus === 'installing' && (
+          <div className="mb-3 bg-indigo-950 border border-indigo-700 rounded-xl p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-indigo-200 text-sm font-semibold">⬇️ Downloading update v{updateVersion}…</p>
+              {dlTotal > 0 && (
+                <span className="text-indigo-400 text-xs font-mono">
+                  {(dlDone / 1024 / 1024).toFixed(1)} / {(dlTotal / 1024 / 1024).toFixed(1)} MB
+                </span>
+              )}
+            </div>
+            <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'rgba(99,102,241,0.2)' }}>
+              <div
+                className="h-2 rounded-full transition-all duration-300"
+                style={{
+                  background: 'linear-gradient(90deg, #6366f1, #818cf8)',
+                  width: dlTotal > 0 ? `${Math.min(100, (dlDone / dlTotal) * 100).toFixed(1)}%` : '100%',
+                  animation: dlTotal === 0 ? 'pulse 1.5s ease-in-out infinite' : undefined,
+                }}
+              />
+            </div>
+            <p className="text-indigo-400 text-xs">Please wait — app will relaunch automatically when done.</p>
+          </div>
+        )}
+
+        {/* Action button */}
         <div className="flex items-center gap-3 flex-wrap">
-          <button onClick={handleCheckUpdate} disabled={updateStatus === 'checking' || updateStatus === 'installing' || updateStatus === 'found'} className="btn-secondary disabled:opacity-50">
-            {updateStatus === 'checking' ? '⏳ Checking…' : updateStatus === 'installing' ? '⬇️ Installing…' : updateStatus === 'found' ? '✅ Update found' : updateStatus === 'up-to-date' ? '✅ Up to date' : '🔄 Check for Updates'}
-          </button>
-          {updateStatus === 'up-to-date' && <p className="text-sm text-emerald-400">FrontStores is up to date.</p>}
+          {updateStatus === 'found' ? (
+            <button
+              onClick={handleInstallUpdate}
+              className="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+            >
+              ⬇️ Update & Relaunch
+            </button>
+          ) : (
+            <button
+              onClick={handleCheckUpdate}
+              disabled={updateStatus === 'checking' || updateStatus === 'installing'}
+              className="btn-secondary disabled:opacity-50"
+            >
+              {updateStatus === 'checking' ? '⏳ Checking for updates…' : '🔄 Check for Updates'}
+            </button>
+          )}
         </div>
       </div>
 
