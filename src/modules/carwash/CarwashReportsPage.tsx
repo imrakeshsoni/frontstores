@@ -355,8 +355,9 @@ export function CarwashReportsPage() {
                 <div className="text-right">
                   {sm.staff.monthly_salary > 0 ? (
                     <>
-                      <p className="font-bold text-sm" style={{ color: 'var(--accent)' }}>{fmt(sm.net_salary)}</p>
+                      <p className="font-bold text-sm" style={{ color: 'var(--accent)' }}>{fmt(sm.payable_amount)}</p>
                       {sm.deductions > 0 && <p className="text-xs" style={{ color: '#dc2626' }}>−{fmt(sm.deductions)} deducted</p>}
+                      {sm.advance > 0 && <p className="text-xs" style={{ color: '#f59e0b' }}>−{fmt(sm.advance)} advance</p>}
                     </>
                   ) : (
                     <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Salary not set</p>
@@ -365,9 +366,9 @@ export function CarwashReportsPage() {
               </div>
             ))}
             <div className="flex items-center justify-between px-5 py-3" style={{ background: 'var(--surface-2)' }}>
-              <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>Total Payroll</p>
+              <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>Total Payable</p>
               <p className="font-bold text-base" style={{ color: 'var(--accent)' }}>
-                {fmt(salarySummaries.reduce((s, sm) => s + sm.net_salary, 0))}
+                {fmt(salarySummaries.reduce((s, sm) => s + sm.payable_amount, 0))}
               </p>
             </div>
           </div>
@@ -382,7 +383,7 @@ export function CarwashReportsPage() {
 // ── Attendance Report Tab ─────────────────────────────────────────────────────
 
 const ATT_LABELS: Record<string, string> = { present: 'Present', half_day: 'Half Day', absent: 'Absent', leave: 'Leave', holiday: 'Holiday' };
-const ATT_COLORS: Record<string, string> = { present: '#16a34a', half_day: '#d97706', absent: '#dc2626', leave: '#7c3aed', holiday: '#0891b2' };
+const ATT_COLORS: Record<string, string> = { present: '#000000', half_day: '#22c55e', absent: '#b91c1c', leave: '#1d4ed8', holiday: '#b8a000' };
 
 function daysInMonth2(year: number, month: number) { return new Date(year, month, 0).getDate(); }
 function fmtRs(n: number) { return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`; }

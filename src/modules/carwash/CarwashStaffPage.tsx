@@ -1,8 +1,9 @@
 // [carwash] [all tenants]
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Plus, Trash2, Users, Edit2, IndianRupee, Calendar, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Plus, Trash2, Users, IndianRupee, Calendar, ToggleLeft, ToggleRight, ChevronRight } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import {
   listAllCarwashStaff, createCarwashStaff, updateCarwashStaff, deleteCarwashStaff,
@@ -28,6 +29,7 @@ function fmt(n: number) { return `₹${n.toLocaleString('en-IN', { maximumFracti
 export function CarwashStaffPage() {
   const tenantId = useAppStore((s) => s.config?.tenant_id ?? '');
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<CarwashStaff | null>(null);
   const [form, setForm] = useState<StaffForm>(emptyForm);
@@ -39,17 +41,6 @@ export function CarwashStaffPage() {
   });
 
   const openAdd = () => { setEditing(null); setForm(emptyForm); setShowForm(true); };
-  const openEdit = (s: CarwashStaff) => {
-    setEditing(s);
-    setForm({
-      name: s.name, phone: s.phone ?? '', role: s.role,
-      monthly_salary: s.monthly_salary > 0 ? String(s.monthly_salary) : '',
-      joining_date: s.joining_date ?? '',
-      deduct_half_day: s.deduct_half_day,
-      deduct_full_day_leave: s.deduct_full_day_leave,
-    });
-    setShowForm(true);
-  };
 
   const saveMutation = useMutation({
     mutationFn: () => {
@@ -109,7 +100,8 @@ export function CarwashStaffPage() {
         )}
         {staff.map(s => (
           <div key={s.id} className="flex items-center justify-between px-5 py-4"
-            style={{ borderBottom: '1px solid var(--surface-border)' }}>
+            style={{ borderBottom: '1px solid var(--surface-border)', cursor: 'pointer' }}
+            onClick={() => navigate(`/carwash/staff/${s.id}`)}>
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
                 style={{ background: s.is_active ? 'var(--accent)' : 'var(--text-tertiary)' }}>
@@ -138,11 +130,7 @@ export function CarwashStaffPage() {
                   </p>
                 </div>
               )}
-              <div className="flex gap-1">
-                <button onClick={() => openEdit(s)}
-                  className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors">
-                  <Edit2 className="h-4 w-4" />
-                </button>
+              <div className="flex gap-1" onClick={e => e.stopPropagation()}>
                 <button onClick={() => {
                   if (!confirm(`Remove ${s.name}? This cannot be undone.`)) return;
                   deleteMutation.mutate(s.id);
@@ -150,6 +138,7 @@ export function CarwashStaffPage() {
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
+              <ChevronRight className="h-4 w-4 opacity-30 flex-shrink-0" />
             </div>
           </div>
         ))}

@@ -128,6 +128,19 @@ export interface CarwashSalaryAdvance {
   created_at: string;
 }
 
+export interface CarwashSalaryPayment {
+  id: string;
+  tenant_id: string;
+  staff_id: string;
+  month: string;
+  amount_paid: number;
+  payment_method: string;
+  note: string | null;
+  paid_at: string | null;
+  updated_at: string | null;
+  deleted_at: string | null;
+}
+
 export interface StaffSalarySummary {
   staff: CarwashStaff;
   present: number;
@@ -1076,6 +1089,36 @@ export async function getSalaryAdvancesForDateRange(tenantId: string, fromMonth:
   return db.select<CarwashSalaryAdvance[]>(
     `SELECT * FROM carwash_salary_advance WHERE tenant_id = ? AND month >= ? AND month <= ? AND deleted_at IS NULL ORDER BY month, created_at`,
     [tenantId, fromMonth, toMonth]
+  );
+}
+
+// ── Salary Payments ───────────────────────────────────────────────────────────
+
+export async function recordSalaryPayment(
+  tenantId: string, staffId: string, month: string,
+  amountPaid: number, paymentMethod: string, note?: string
+): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `INSERT INTO carwash_salary_payments (id, tenant_id, staff_id, month, amount_paid, payment_method, note, paid_at, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?)`,
+    [uuid(), tenantId, staffId, month, amountPaid, paymentMethod, note ?? null, now(), now()]
+  );
+}
+
+export async function getSalaryPaymentsForMonth(tenantId: string, month: string): Promise<CarwashSalaryPayment[]> {
+  const db = await getDb();
+  return db.select<CarwashSalaryPayment[]>(
+    `SELECT * FROM carwash_salary_payments WHERE tenant_id = ? AND month = ? AND deleted_at IS NULL ORDER BY paid_at DESC`,
+    [tenantId, month]
+  );
+}
+
+export async function getSalaryPaymentsForStaff(tenantId: string, staffId: string): Promise<CarwashSalaryPayment[]> {
+  const db = await getDb();
+  return db.select<CarwashSalaryPayment[]>(
+    `SELECT * FROM carwash_salary_payments WHERE tenant_id = ? AND staff_id = ? AND deleted_at IS NULL ORDER BY month DESC, paid_at DESC`,
+    [tenantId, staffId]
   );
 }
 
