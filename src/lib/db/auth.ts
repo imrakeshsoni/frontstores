@@ -223,6 +223,22 @@ export async function unlockWithCode(
 
 // ── Export audit log ─────────────────────────────────────────────────────────
 
+// Copy auth from one tenant to another — used when switching to a newly linked app
+// so the owner doesn't need to create a separate password
+export async function copyAuth(fromTenantId: string, toTenantId: string): Promise<void> {
+  const db = await getDb();
+  const rows = await db.select<AppAuth[]>(
+    'SELECT * FROM app_auth WHERE tenant_id = ? LIMIT 1', [fromTenantId]
+  );
+  if (!rows[0]) return;
+  const src = rows[0];
+  await db.execute(
+    `INSERT OR REPLACE INTO app_auth (id, tenant_id, username, password_hash, salt, failed_attempts, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, 0, ?, ?)`,
+    [uuid(), toTenantId, src.username, src.password_hash, src.salt, now(), now()]
+  );
+}
+
 export async function logExport(tenantId: string, exportType: string, rowCount: number): Promise<void> {
   try {
     const db = await getDb();

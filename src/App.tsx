@@ -361,9 +361,13 @@ export default function App() {
 
   useEffect(() => {
     if (!isSetupComplete || !config?.tenant_id) return;
+    // [core] [all tenants] — reset stale auth state immediately so we show Loading
+    // instead of the wrong screen while the async check runs (e.g. after app switch)
+    setAuthChecked(false);
+    setAuthExists(false);
     hasAuth(config.tenant_id).then(exists => {
       setAuthExists(exists);
-      if (exists) setAuthenticated(true); // [carwash] [all tenants] — skip login for dev testing
+      if (exists) setAuthenticated(true);
       setAuthChecked(true);
     });
   }, [isSetupComplete, config?.tenant_id]);

@@ -8,6 +8,7 @@ import {
   getLinkedAccounts, upsertLinkedAccount, switchActiveApp, createLinkedAppConfig,
   type LinkedAccount,
 } from '@/lib/db/linkedAccounts';
+import { copyAuth } from '@/lib/db/auth';
 
 const SERVER = 'https://update.frontstores.com';
 
@@ -132,6 +133,8 @@ export function SwitchAppModal({ onClose }: SwitchAppModalProps) {
           email: config?.email ?? null,
           city: config?.city ?? null,
         });
+        // Copy current app's credentials to the new app so owner uses the same password
+        if (config?.tenant_id) await copyAuth(config.tenant_id, account.tenant_id);
       } else {
         await switchActiveApp(account.tenant_id);
       }
@@ -149,7 +152,7 @@ export function SwitchAppModal({ onClose }: SwitchAppModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
-      <div className="w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl" style={{ background: 'var(--bg)', border: '1px solid var(--surface-border)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+      <div className="rounded-2xl overflow-hidden shadow-2xl" style={{ width: '90%', background: 'var(--bg)', border: '1px solid var(--surface-border)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: 'var(--surface-border)' }}>
           <div>
@@ -172,7 +175,7 @@ export function SwitchAppModal({ onClose }: SwitchAppModalProps) {
 
         {/* App grid */}
         <div className="overflow-y-auto p-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {APP_REGISTRY.map(app => {
               const acc = linkedMap.get(app.type);
               const isCurrent = app.type === currentType;
