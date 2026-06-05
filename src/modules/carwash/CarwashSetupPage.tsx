@@ -1,13 +1,9 @@
-// [carwash] [all tenants] — unified setup: vehicle types, services, staff, attendance
-import { useState, useRef, useMemo } from 'react';
+// [carwash] [all tenants] — unified setup: vehicle types, services, staff
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { open as shellOpen } from '@tauri-apps/plugin-shell';
-import { writeTextFile } from '@tauri-apps/plugin-fs';
-import { appCacheDir } from '@tauri-apps/api/path';
 import {
   Plus, Trash2, Edit2, X, Users, Car, Droplets,
-  UserCheck, ChevronLeft, ChevronRight, Printer,
   ToggleLeft, ToggleRight,
 } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
@@ -16,29 +12,17 @@ import {
   listAllServices, createService, updateService, deleteService, isServiceInActiveJobs,
   getAllServicePrices, upsertServicePrice,
   listAllCarwashStaff, createCarwashStaff, updateCarwashStaff, deleteCarwashStaff,
-  getAttendanceForMonth, upsertAttendance, computeSalary,
-  getSalaryAdvancesForMonth, addSalaryAdvance, deleteSalaryAdvance,
-  type CarwashVehicleTypeRecord, type CarwashService, type CarwashStaff, type AttendanceStatus, type CarwashSalaryAdvance,
+  type CarwashVehicleTypeRecord, type CarwashService, type CarwashStaff,
 } from '@/lib/db/carwash';
 
-type Tab = 'vehicles' | 'services' | 'staff' | 'attendance';
+type Tab = 'vehicles' | 'services' | 'staff';
 
 const ROLES = ['washer', 'polisher', 'detailer', 'manager', 'cashier'];
 const ICON_OPTIONS = ['🚗','🚙','🏎️','🚐','🛻','🚌','🚎','🚑','🚒','🚕','🚚','🚛','🚜','🛺','🏍️','🛵','🚲'];
-const STATUS_CONFIG: Record<AttendanceStatus, { label: string; short: string; color: string; bg: string }> = {
-  present:  { label: 'Present',  short: 'P', color: '#16a34a', bg: '#dcfce7' },
-  half_day: { label: 'Half Day', short: 'H', color: '#d97706', bg: '#fef3c7' },
-  absent:   { label: 'Absent',   short: 'A', color: '#dc2626', bg: '#fee2e2' },
-  leave:    { label: 'Leave',    short: 'L', color: '#7c3aed', bg: '#ede9fe' },
-  holiday:  { label: 'Holiday',  short: 'O', color: '#0891b2', bg: '#e0f2fe' },
-};
-const STATUS_CYCLE: AttendanceStatus[] = ['present', 'half_day', 'absent', 'leave', 'holiday'];
 
 const inp = (extra?: string) => `w-full rounded-xl border px-3 py-2 text-sm outline-none focus:ring-2 ${extra ?? ''}`;
 const inpStyle = { borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' } as React.CSSProperties;
 function fmt(n: number) { return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`; }
-function todayISO() { return new Date().toISOString().slice(0, 10); }
-function daysInMonth(y: number, m: number) { return new Date(y, m, 0).getDate(); }
 
 // ── Vehicle Types Tab ─────────────────────────────────────────────────────────
 function VehiclesTab({ tenantId }: { tenantId: string }) {
@@ -529,345 +513,12 @@ function StaffTab({ tenantId }: { tenantId: string }) {
   );
 }
 
-// ── Attendance Tab ────────────────────────────────────────────────────────────
-function AttendanceTab({ tenantId }: { tenantId: string }) {
-  const config = useAppStore((s) => s.config);
-  const qc = useQueryClient();
-  const today = new Date();
-  const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth() + 1);
-  const [advanceModal, setAdvanceModal] = useState<CarwashStaff | null>(null);
-  const [advanceAmount, setAdvanceAmount] = useState('');
-  const [advanceNote, setAdvanceNote] = useState('');
-  const [advanceGivenAt, setAdvanceGivenAt] = useState('');
-
-  const { data: staff = [] } = useQuery({
-    queryKey: ['carwash-staff-list', tenantId],
-    queryFn: () => listAllCarwashStaff(tenantId),
-    enabled: !!tenantId,
-  });
-
-  const monthStr = `${year}-${String(month).padStart(2, '0')}`;
-
-  const { data: attendance = [] } = useQuery({
-    queryKey: ['carwash-attendance', tenantId, year, month],
-    queryFn: () => getAttendanceForMonth(tenantId, year, month),
-    enabled: !!tenantId,
-  });
-
-  const { data: advances = [] } = useQuery({
-    queryKey: ['carwash-advances', tenantId, monthStr],
-    queryFn: () => getSalaryAdvancesForMonth(tenantId, monthStr),
-    enabled: !!tenantId,
-  });
-
-  const addAdvanceMutation = useMutation({
-    mutationFn: () => {
-      if (!advanceModal) throw new Error('No staff selected');
-      const amt = Number(advanceAmount);
-      if (!amt || amt <= 0) throw new Error('Enter a valid amount');
-      if (amt > 999999) throw new Error('Amount too large');
-      // Find the net salary to cap advance
-      const summary = summaries.find(sm => sm.staff.id === advanceModal!.id);
-      const alreadyAdvanced = advances.filter(a => a.staff_id === advanceModal!.id).reduce((t, a) => t + a.amount, 0);
-      if (summary && alreadyAdvanced + amt > summary.net_salary) throw new Error(`Total advance (₹${alreadyAdvanced + amt}) cannot exceed net salary (₹${summary.net_salary})`);
-
-      // convert local datetime-local value to ISO string, fallback to now
-      const givenAt = advanceGivenAt ? new Date(advanceGivenAt).toISOString().replace('T', ' ').slice(0, 19) : undefined;
-      return addSalaryAdvance(tenantId, advanceModal.id, monthStr, amt, advanceNote || undefined, givenAt);
-    },
-    onSuccess: () => {
-      toast.success('Advance recorded');
-      setAdvanceModal(null); setAdvanceAmount(''); setAdvanceNote(''); setAdvanceGivenAt('');
-      qc.invalidateQueries({ queryKey: ['carwash-advances', tenantId, monthStr] });
-    },
-    onError: (e: any) => toast.error(e?.message ?? 'Failed'),
-  });
-
-  const deleteAdvanceMutation = useMutation({
-    mutationFn: (id: string) => deleteSalaryAdvance(tenantId, id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['carwash-advances', tenantId, monthStr] }),
-  });
-
-  const totalDays = daysInMonth(year, month);
-  const days = Array.from({ length: totalDays }, (_, i) => i + 1);
-
-  const attMap = useMemo(() => {
-    const map: Record<string, Record<number, AttendanceStatus>> = {};
-    for (const a of attendance) {
-      const day = parseInt(a.date.slice(8, 10));
-      if (!map[a.staff_id]) map[a.staff_id] = {};
-      map[a.staff_id][day] = a.status as AttendanceStatus;
-    }
-    return map;
-  }, [attendance]);
-
-  const markMutation = useMutation({
-    mutationFn: ({ staffId, day, status }: { staffId: string; day: number; status: AttendanceStatus }) => {
-      const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      return upsertAttendance(tenantId, staffId, date, status);
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['carwash-attendance', tenantId, year, month] });
-      import('@/lib/autoSync').then(({ triggerAutoSync }) => triggerAutoSync());
-    },
-    onError: () => toast.error('Failed to save'),
-  });
-
-  const cycleStatus = (staffId: string, day: number) => {
-    const cur = attMap[staffId]?.[day];
-    const idx = cur ? STATUS_CYCLE.indexOf(cur) : -1;
-    const next = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length];
-    markMutation.mutate({ staffId, day, status: next });
-  };
-
-  const prevMonth = () => { if (month === 1) { setYear(y => y - 1); setMonth(12); } else setMonth(m => m - 1); };
-  const nextMonth = () => { if (month === 12) { setYear(y => y + 1); setMonth(1); } else setMonth(m => m + 1); };
-
-  const summaries = useMemo(() =>
-    staff.map(s => {
-      const summary = computeSalary(s, attendance.filter(a => a.staff_id === s.id), year, month);
-      const advance = advances.filter(a => a.staff_id === s.id).reduce((t, a) => t + a.amount, 0);
-      return { ...summary, advance, payable_amount: Math.max(0, summary.net_salary - advance) };
-    }),
-    [staff, attendance, advances, year, month]
-  );
-
-  const monthName = new Date(year, month - 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' });
-
-  const printSalarySlip = async (s: CarwashStaff) => {
-    const summary = summaries.find(sm => sm.staff.id === s.id);
-    if (!summary) return;
-    const logo = (config?.settings as any)?.logo_base64;
-    const shopName = config?.shop_name ?? 'Car Wash';
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-    <style>body{font-family:Arial,sans-serif;max-width:420px;margin:0 auto;padding:20px;font-size:13px;color:#111}.header{text-align:center;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #f59e0b}.logo{max-height:60px;max-width:150px;object-fit:contain;margin-bottom:8px}.shop{font-size:18px;font-weight:700}.slip-title{background:#f59e0b;color:#111;text-align:center;font-weight:700;font-size:14px;padding:6px;border-radius:6px;margin:12px 0}.row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f3f4f6}.row.bold{font-weight:700;font-size:14px}.section-title{font-weight:700;color:#6b7280;text-transform:uppercase;font-size:11px;letter-spacing:.5px;margin:12px 0 4px}.green{color:#16a34a}.red{color:#dc2626}.big{font-size:16px;font-weight:700}.footer{text-align:center;font-size:11px;color:#9ca3af;margin-top:16px;border-top:1px solid #e5e7eb;padding-top:10px}</style>
-    </head><body>
-    <div class="header">${logo ? `<div><img src="${logo}" class="logo" /></div>` : ''}<div class="shop">${shopName}</div>${config?.address_line1 ? `<div style="font-size:11px;color:#6b7280">${[config.address_line1, config.city].filter(Boolean).join(', ')}</div>` : ''}${config?.phone ? `<div style="font-size:11px;color:#6b7280">📞 ${config.phone}</div>` : ''}</div>
-    <div class="slip-title">SALARY SLIP — ${monthName}</div>
-    <div class="section-title">Employee Details</div>
-    <div class="row"><span>Name</span><span><b>${s.name}</b></span></div>
-    <div class="row"><span>Role</span><span>${s.role.charAt(0).toUpperCase() + s.role.slice(1)}</span></div>
-    ${s.phone ? `<div class="row"><span>Phone</span><span>${s.phone}</span></div>` : ''}
-    ${s.joining_date ? `<div class="row"><span>Joining Date</span><span>${new Date(s.joining_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span></div>` : ''}
-    <div class="section-title">Attendance — ${monthName}</div>
-    <div class="row"><span>Working Days (period)</span><span>${summary.working_days}</span></div>
-    <div class="row"><span class="green">Present Days</span><span class="green">${summary.present}</span></div>
-    <div class="row"><span style="color:#d97706">Half Days</span><span style="color:#d97706">${summary.half_day}</span></div>
-    <div class="row"><span style="color:#7c3aed">Leave Days</span><span style="color:#7c3aed">${summary.leave}</span></div>
-    <div class="row"><span class="red">Absent Days</span><span class="red">${summary.absent}</span></div>
-    <div class="section-title">Salary Calculation</div>
-    <div class="row"><span>Monthly Salary</span><span>${fmt(s.monthly_salary)}</span></div>
-    <div class="row"><span>Per Day Rate</span><span>${fmt(summary.per_day_rate)}</span></div>
-    <div class="row"><span>Payable Days</span><span>${summary.payable_days.toFixed(1)}</span></div>
-    <div class="row"><span style="color:#0891b2">Holidays</span><span style="color:#0891b2">${summary.holiday}</span></div>
-    ${summary.deductions > 0 ? `<div class="row"><span class="red">Deductions</span><span class="red">− ${fmt(summary.deductions)}</span></div>` : ''}
-    <div class="row bold"><span>Net Salary</span><span class="big green">${fmt(summary.net_salary)}</span></div>
-    ${summary.advance > 0 ? (() => {
-      const staffAdvances = advances.filter(a => a.staff_id === s.id);
-      const advanceRows = staffAdvances.map(a => {
-        const dt = new Date(a.given_at ?? a.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-        return `<div class="row" style="font-size:12px"><span style="color:#d97706">Advance — ${dt}</span><span style="color:#d97706">− ${fmt(a.amount)}${a.note ? ` (${a.note})` : ''}</span></div>`;
-      }).join('');
-      return `<div class="section-title" style="color:#d97706">Advance Details</div>${advanceRows}<div class="row bold"><span>Balance Payable</span><span class="big green">${fmt(summary.payable_amount)}</span></div>`;
-    })() : ''}
-    <div class="footer">Generated on ${new Date().toLocaleDateString('en-IN')}</div>
-    </body></html>`;
-    const finalHtml = html.replace('</body>', `<script>window.addEventListener('load',()=>setTimeout(window.print,400))<\/script></body>`);
-    try {
-      const cacheDir = await appCacheDir();
-      const sep = cacheDir.endsWith('/') || cacheDir.endsWith('\\') ? '' : '/';
-      const filePath = `${cacheDir}${sep}salary-slip-${s.id}-${year}-${month}.html`;
-      await writeTextFile(filePath, finalHtml);
-      await shellOpen(filePath);
-    } catch (e: any) { toast.error('Print failed: ' + (e?.message ?? e)); }
-  };
-
-  return (
-    <div className="space-y-4">
-      {/* Month nav + legend */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-2">
-          <button onClick={prevMonth} className="p-2 rounded-xl btn-secondary"><ChevronLeft className="h-4 w-4" /></button>
-          <span className="text-sm font-bold px-2" style={{ color: 'var(--text-primary)', minWidth: '140px', textAlign: 'center' }}>{monthName}</span>
-          <button onClick={nextMonth} className="p-2 rounded-xl btn-secondary"><ChevronRight className="h-4 w-4" /></button>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {Object.entries(STATUS_CONFIG).map(([k, v]) => (
-            <span key={k} className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: v.bg, color: v.color }}>{v.short} = {v.label}</span>
-          ))}
-          <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'var(--surface-2)', color: 'var(--text-tertiary)' }}>· = Unmarked</span>
-        </div>
-      </div>
-
-      {staff.length === 0 ? (
-        <div className="rounded-2xl p-12 text-center" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
-          <Users className="h-10 w-10 opacity-20 mx-auto mb-3" />
-          <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No staff yet — add staff in the Staff tab first</p>
-        </div>
-      ) : (
-        <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
-          <div className="overflow-x-auto">
-            <table className="text-xs" style={{ borderCollapse: 'collapse', minWidth: '100%' }}>
-              <thead>
-                <tr style={{ background: 'var(--surface-2)' }}>
-                  <th className="text-left px-4 py-3 font-semibold text-sm" style={{ color: 'var(--text-secondary)', minWidth: '140px', borderBottom: '2px solid var(--surface-border)', position: 'sticky', left: 0, background: 'var(--surface-2)', zIndex: 5 }}>Staff</th>
-                  {days.map(d => {
-                    const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                    const isToday = dateStr === todayISO();
-                    const dayName = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short' });
-                    const isSunday = new Date(dateStr + 'T00:00:00').getDay() === 0;
-                    return (
-                      <th key={d} className="text-center py-1.5 font-semibold" style={{ minWidth: '36px', width: '36px', borderBottom: '2px solid var(--surface-border)', opacity: dateStr > todayISO() ? 0.4 : 1 }}>
-                        <div style={{ color: isToday ? 'var(--accent)' : isSunday ? '#dc2626' : 'var(--text-secondary)', fontSize: '12px', fontWeight: 700, lineHeight: 1.2 }}>{d}</div>
-                        <div style={{ color: isToday ? 'var(--accent)' : isSunday ? '#dc2626' : 'var(--text-tertiary)', fontSize: '9px', fontWeight: 500, lineHeight: 1.2 }}>{dayName}</div>
-                      </th>
-                    );
-                  })}
-                  <th className="text-center px-3 py-3 font-semibold" style={{ color: '#16a34a', borderBottom: '2px solid var(--surface-border)', minWidth: '36px' }}>P</th>
-                  <th className="text-center px-2 py-3 font-semibold" style={{ color: '#d97706', borderBottom: '2px solid var(--surface-border)', minWidth: '36px' }}>H</th>
-                  <th className="text-center px-2 py-3 font-semibold" style={{ color: '#dc2626', borderBottom: '2px solid var(--surface-border)', minWidth: '36px' }}>A</th>
-                  <th className="text-center px-3 py-3 font-semibold" style={{ color: 'var(--accent)', borderBottom: '2px solid var(--surface-border)', minWidth: '90px' }}>Net Salary</th>
-                  <th className="text-center px-3 py-3 font-semibold" style={{ color: '#d97706', borderBottom: '2px solid var(--surface-border)', minWidth: '80px' }}>Advance</th>
-                  <th className="text-center px-3 py-3 font-semibold" style={{ color: '#16a34a', borderBottom: '2px solid var(--surface-border)', minWidth: '90px' }}>Payable</th>
-                  <th className="text-center px-3 py-3 font-semibold" style={{ color: 'var(--text-secondary)', borderBottom: '2px solid var(--surface-border)', minWidth: '50px' }}>Slip</th>
-                </tr>
-              </thead>
-              <tbody>
-                {staff.map((s, si) => {
-                  const summary = summaries[si];
-                  return (
-                    <tr key={s.id} style={{ borderBottom: '1px solid var(--surface-border)' }}>
-                      <td className="px-4 py-2" style={{ position: 'sticky', left: 0, background: 'var(--surface)', zIndex: 3, borderRight: '1px solid var(--surface-border)' }}>
-                        <div className="flex items-center gap-2">
-                          <div className="h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: 'var(--accent)' }}>{s.name[0].toUpperCase()}</div>
-                          <div>
-                            <p className="font-semibold text-xs" style={{ color: 'var(--text-primary)' }}>{s.name}</p>
-                            <p className="text-xs capitalize" style={{ color: 'var(--text-tertiary)' }}>{s.role}</p>
-                          </div>
-                        </div>
-                      </td>
-                      {days.map(d => {
-                        const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                        const isFuture = dateStr > todayISO();
-                        const status = attMap[s.id]?.[d];
-                        let beforeJoining = false;
-                        if (s.joining_date) {
-                          const jd = new Date(s.joining_date);
-                          if (jd.getFullYear() === year && jd.getMonth() + 1 === month && jd.getDate() > d) beforeJoining = true;
-                        }
-                        if (beforeJoining) return <td key={d} style={{ width: '32px', textAlign: 'center', padding: '4px 2px', background: 'var(--surface-2)', opacity: 0.4 }}><span style={{ color: 'var(--text-tertiary)' }}>—</span></td>;
-                        const cfg = status ? STATUS_CONFIG[status] : null;
-                        return (
-                          <td key={d} style={{ width: '32px', padding: '4px 2px', textAlign: 'center' }}>
-                            <button disabled={isFuture || markMutation.isPending} onClick={() => cycleStatus(s.id, d)}
-                              className="w-7 h-7 rounded-lg text-xs font-bold transition-all hover:scale-110 disabled:opacity-30 disabled:cursor-not-allowed"
-                              style={cfg ? { background: cfg.bg, color: cfg.color } : { background: 'var(--surface-2)', color: 'var(--text-tertiary)' }}>
-                              {cfg ? cfg.short : '·'}
-                            </button>
-                          </td>
-                        );
-                      })}
-                      <td className="text-center px-2 py-2 font-semibold text-xs" style={{ color: '#16a34a' }}>{summary.present}</td>
-                      <td className="text-center px-2 py-2 font-semibold text-xs" style={{ color: '#d97706' }}>{summary.half_day}</td>
-                      <td className="text-center px-2 py-2 font-semibold text-xs" style={{ color: '#dc2626' }}>{summary.absent}</td>
-                      <td className="text-center px-3 py-2">
-                        {s.monthly_salary > 0 ? (
-                          <div>
-                            <p className="font-bold text-sm" style={{ color: 'var(--accent)' }}>{fmt(summary.net_salary)}</p>
-                            {summary.deductions > 0 && <p className="text-xs" style={{ color: '#dc2626' }}>-{fmt(summary.deductions)}</p>}
-                          </div>
-                        ) : <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>—</p>}
-                      </td>
-                      <td className="text-center px-3 py-2">
-                        <button onClick={() => { setAdvanceModal(s); setAdvanceAmount(''); setAdvanceNote(''); setAdvanceGivenAt(new Date().toISOString().slice(0, 16)); }}
-                          className="text-xs font-semibold px-2 py-1 rounded-lg"
-                          style={{ background: summary.advance > 0 ? '#fef3c7' : 'var(--surface-2)', color: summary.advance > 0 ? '#d97706' : 'var(--text-tertiary)', border: '1px solid var(--surface-border)' }}>
-                          {summary.advance > 0 ? fmt(summary.advance) : '+ Advance'}
-                        </button>
-                      </td>
-                      <td className="text-center px-3 py-2">
-                        {s.monthly_salary > 0 ? (
-                          <p className="font-bold text-sm" style={{ color: '#16a34a' }}>{fmt(summary.payable_amount)}</p>
-                        ) : <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>—</p>}
-                      </td>
-                      <td className="text-center px-3 py-2">
-                        <button onClick={() => printSalarySlip(s)} className="p-1.5 rounded-lg btn-secondary" title="Print salary slip"><Printer className="h-4 w-4" /></button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          {/* Summary footer */}
-          <div className="flex items-center gap-6 px-5 py-3 flex-wrap" style={{ borderTop: '2px solid var(--surface-border)', background: 'var(--surface-2)' }}>
-            <p className="text-xs font-semibold uppercase" style={{ color: 'var(--text-tertiary)' }}>Month Total</p>
-            <div><p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Total Payroll</p><p className="font-bold text-sm" style={{ color: 'var(--accent)' }}>{fmt(summaries.reduce((s, sm) => s + sm.net_salary, 0))}</p></div>
-            <div><p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Total Advance</p><p className="font-bold text-sm" style={{ color: '#d97706' }}>{fmt(summaries.reduce((s, sm) => s + sm.advance, 0))}</p></div>
-            <div><p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Balance Payable</p><p className="font-bold text-sm" style={{ color: '#16a34a' }}>{fmt(summaries.reduce((s, sm) => s + sm.payable_amount, 0))}</p></div>
-          </div>
-        </div>
-      )}
-
-      {/* Advance Salary Modal */}
-      {advanceModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-          <div className="rounded-2xl p-6 w-full max-w-sm space-y-4" style={{ background: 'var(--surface)' }}>
-            <div className="flex items-center justify-between">
-              <h2 className="font-bold text-lg" style={{ color: 'var(--text-primary)' }}>Advance Salary — {advanceModal.name}</h2>
-              <button onClick={() => setAdvanceModal(null)}><X className="h-5 w-5" style={{ color: 'var(--text-tertiary)' }} /></button>
-            </div>
-            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Month: <b>{monthName}</b></p>
-            {advances.filter(a => a.staff_id === advanceModal.id).length > 0 && (
-              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--surface-border)' }}>
-                <p className="text-xs font-semibold px-3 py-2 uppercase" style={{ background: 'var(--surface-2)', color: 'var(--text-tertiary)' }}>Advances given this month</p>
-                {advances.filter(a => a.staff_id === advanceModal.id).map(a => (
-                  <div key={a.id} className="flex items-center justify-between px-3 py-2" style={{ borderTop: '1px solid var(--surface-border)' }}>
-                    <div>
-                      <p className="font-semibold text-sm" style={{ color: '#d97706' }}>{fmt(a.amount)}</p>
-                      {(a.given_at || a.created_at) && (
-                        <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                          {new Date(a.given_at ?? a.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                      )}
-                      {a.note && <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{a.note}</p>}
-                    </div>
-                    <button onClick={() => deleteAdvanceMutation.mutate(a.id)} className="p-1 rounded text-slate-400 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Advance Amount (₹) *</label>
-              <input type="number" value={advanceAmount} onChange={e => setAdvanceAmount(e.target.value)} placeholder="e.g. 2000" className={inp()} style={inpStyle} autoFocus />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Date & Time Given</label>
-              <input type="datetime-local" value={advanceGivenAt} onChange={e => setAdvanceGivenAt(e.target.value)} className={inp()} style={inpStyle} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Note (optional)</label>
-              <input value={advanceNote} onChange={e => setAdvanceNote(e.target.value)} placeholder="e.g. Emergency, Festival advance" className={inp()} style={inpStyle} />
-            </div>
-            <button onClick={() => addAdvanceMutation.mutate()} disabled={addAdvanceMutation.isPending}
-              className="w-full py-3 rounded-xl font-bold text-sm text-white disabled:opacity-60"
-              style={{ background: '#d97706' }}>
-              {addAdvanceMutation.isPending ? 'Saving…' : 'Give Advance'}
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'vehicles',   label: 'Vehicle Types',    icon: <Car className="h-4 w-4" /> },
   { id: 'services',   label: 'Services & Pricing', icon: <Droplets className="h-4 w-4" /> },
   { id: 'staff',      label: 'Staff',             icon: <Users className="h-4 w-4" /> },
-  { id: 'attendance', label: 'Attendance',        icon: <UserCheck className="h-4 w-4" /> },
 ];
 
 export function CarwashSetupPage() {
@@ -895,7 +546,6 @@ export function CarwashSetupPage() {
       {tab === 'vehicles'   && <VehiclesTab   tenantId={tenantId} />}
       {tab === 'services'   && <ServicesTab   tenantId={tenantId} />}
       {tab === 'staff'      && <StaffTab      tenantId={tenantId} />}
-      {tab === 'attendance' && <AttendanceTab tenantId={tenantId} />}
     </div>
   );
 }

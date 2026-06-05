@@ -80,6 +80,7 @@ const CarwashAppointmentsPage = lazy(() => import('@/modules/carwash/CarwashAppo
 const CarwashInventoryPage        = lazy(() => import('@/modules/carwash/CarwashInventoryPage').then(m => ({ default: m.CarwashInventoryPage })));
 const CarwashVehicleTypesPage     = lazy(() => import('@/modules/carwash/CarwashVehicleTypesPage').then(m => ({ default: m.CarwashVehicleTypesPage })));
 const CarwashSetupPage            = lazy(() => import('@/modules/carwash/CarwashSetupPage').then(m => ({ default: m.CarwashSetupPage })));
+const CarwashAttendancePage       = lazy(() => import('@/modules/carwash/CarwashAttendancePage').then(m => ({ default: m.CarwashAttendancePage })));
 
 // [clinic] [all tenants]
 const ClinicDashboard         = lazy(() => import('@/modules/clinic/ClinicDashboard').then(m => ({ default: m.ClinicDashboard })));
@@ -447,6 +448,7 @@ export default function App() {
             <Route path="carwash/appointments"  element={<PinLockGate settingKey="pin_lock_appointments" label="Appointments"> <CarwashAppointmentsPage /></PinLockGate>} />
             <Route path="carwash/inventory"     element={<PinLockGate settingKey="pin_lock_inventory"    label="Inventory">    <CarwashInventoryPage /></PinLockGate>} />
             <Route path="carwash/vehicle-types" element={<PinLockGate settingKey="pin_lock_vehicle_types" label="Vehicle Types"><CarwashVehicleTypesPage /></PinLockGate>} />
+            <Route path="carwash/attendance"     element={<PinLockGate settingKey="pin_lock_attendance"   label="Attendance">   <CarwashAttendancePage /></PinLockGate>} />
             <Route path="carwash/setup"         element={<PinLockGate settingKey="pin_lock_setup"        label="Setup">        <CarwashSetupPage /></PinLockGate>} />
 
             {/* [clinic] [all tenants] */}

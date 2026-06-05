@@ -490,6 +490,7 @@ const CARWASH_NAV_ITEMS = [
   { to: '/customers',             icon: Users,           label: 'Customers',     iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
   { to: '/carwash/reports',       icon: BarChart3,       label: 'Reports',       iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
   { to: '/carwash/broadcast',     icon: Radio,           label: 'Broadcast',     iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
+  { to: '/carwash/attendance',    icon: UserCheck,       label: 'Attendance',    iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
   { to: '/carwash/setup',         icon: Wrench,          label: 'Setup',         iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
 ];
 
