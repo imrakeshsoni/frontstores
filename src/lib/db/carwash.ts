@@ -1061,6 +1061,24 @@ export async function deleteSalaryAdvance(tenantId: string, id: string): Promise
   await db.execute(`UPDATE carwash_salary_advance SET deleted_at = ? WHERE id = ? AND tenant_id = ?`, [now(), id, tenantId]);
 }
 
+// Returns all attendance rows for a YYYY-MM range (inclusive)
+export async function getAttendanceForDateRange(tenantId: string, fromMonth: string, toMonth: string): Promise<CarwashAttendance[]> {
+  const db = await getDb();
+  return db.select<CarwashAttendance[]>(
+    `SELECT * FROM carwash_attendance WHERE tenant_id = ? AND substr(date,1,7) >= ? AND substr(date,1,7) <= ? AND deleted_at IS NULL ORDER BY date`,
+    [tenantId, fromMonth, toMonth]
+  );
+}
+
+// Returns all advances for a YYYY-MM range (inclusive)
+export async function getSalaryAdvancesForDateRange(tenantId: string, fromMonth: string, toMonth: string): Promise<CarwashSalaryAdvance[]> {
+  const db = await getDb();
+  return db.select<CarwashSalaryAdvance[]>(
+    `SELECT * FROM carwash_salary_advance WHERE tenant_id = ? AND month >= ? AND month <= ? AND deleted_at IS NULL ORDER BY month, created_at`,
+    [tenantId, fromMonth, toMonth]
+  );
+}
+
 // ── Memberships ───────────────────────────────────────────────────────────────
 
 export async function listMemberships(tenantId: string): Promise<CarwashMembership[]> {
