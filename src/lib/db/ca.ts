@@ -4,7 +4,8 @@ import { getDb, uuid, now } from './index';
 export interface CAClient {
   id: string; tenant_id: string;
   name: string; phone: string; email: string;
-  pan: string; gstin: string; address: string;
+  pan: string; gstin: string; tan: string; cin: string;
+  aadhaar: string; address: string; notes: string;
   client_type: string; updated_at: string; deleted_at: string | null;
 }
 
@@ -13,6 +14,12 @@ export interface CATask {
   task_type: string; financial_year: string; due_date: string | null;
   status: string; priority: string; description: string;
   fees: number; fees_paid: number; completed_at: string | null;
+  staff_id: string; updated_at: string; deleted_at: string | null;
+}
+
+export interface CAStaff {
+  id: string; tenant_id: string;
+  name: string; role: string; phone: string; email: string;
   updated_at: string; deleted_at: string | null;
 }
 
@@ -45,15 +52,15 @@ export async function createCAClient(tenantId: string, data: Omit<CAClient, 'id'
   const db = await getDb();
   const id = uuid();
   await db.execute(
-    `INSERT INTO ca_clients (id,tenant_id,name,phone,email,pan,gstin,address,client_type,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)`,
-    [id, tenantId, data.name, data.phone, data.email, data.pan, data.gstin, data.address, data.client_type, now()]
+    `INSERT INTO ca_clients (id,tenant_id,name,phone,email,pan,gstin,tan,cin,aadhaar,address,notes,client_type,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [id, tenantId, data.name, data.phone, data.email, data.pan, data.gstin, data.tan ?? '', data.cin ?? '', data.aadhaar ?? '', data.address, data.notes ?? '', data.client_type, now()]
   );
   return id;
 }
 
 export async function updateCAClient(tenantId: string, id: string, data: Partial<CAClient>): Promise<void> {
   const db = await getDb();
-  const fields = ['name','phone','email','pan','gstin','address','client_type'];
+  const fields = ['name','phone','email','pan','gstin','tan','cin','aadhaar','address','notes','client_type'];
   const updates: string[] = ['updated_at = ?'];
   const vals: unknown[] = [now()];
   for (const f of fields) { if (f in data) { updates.push(`${f} = ?`); vals.push((data as Record<string, unknown>)[f]); } }
@@ -153,6 +160,37 @@ export async function updateCAInvoice(tenantId: string, id: string, data: Partia
   const vals: unknown[] = [now()];
   for (const f of fields) { if (f in data) { updates.push(`${f} = ?`); vals.push((data as Record<string, unknown>)[f]); } }
   await db.execute(`UPDATE ca_invoices SET ${updates.join(', ')} WHERE id = ? AND tenant_id = ?`, [...vals, id, tenantId]);
+}
+
+// ── Staff ────────────────────────────────────────────────────────────────────
+
+export async function listCAStaff(tenantId: string): Promise<CAStaff[]> {
+  const db = await getDb();
+  return db.select<CAStaff[]>(`SELECT * FROM ca_staff WHERE tenant_id = ? AND deleted_at IS NULL ORDER BY name`, [tenantId]);
+}
+
+export async function createCAStaff(tenantId: string, data: Omit<CAStaff, 'id' | 'tenant_id' | 'updated_at' | 'deleted_at'>): Promise<string> {
+  const db = await getDb();
+  const id = uuid();
+  await db.execute(
+    `INSERT INTO ca_staff (id,tenant_id,name,role,phone,email,updated_at) VALUES (?,?,?,?,?,?,?)`,
+    [id, tenantId, data.name, data.role, data.phone, data.email, now()]
+  );
+  return id;
+}
+
+export async function updateCAStaff(tenantId: string, id: string, data: Partial<CAStaff>): Promise<void> {
+  const db = await getDb();
+  const fields = ['name','role','phone','email'];
+  const updates: string[] = ['updated_at = ?'];
+  const vals: unknown[] = [now()];
+  for (const f of fields) { if (f in data) { updates.push(`${f} = ?`); vals.push((data as Record<string, unknown>)[f]); } }
+  await db.execute(`UPDATE ca_staff SET ${updates.join(', ')} WHERE id = ? AND tenant_id = ?`, [...vals, id, tenantId]);
+}
+
+export async function deleteCAStaff(tenantId: string, id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(`UPDATE ca_staff SET deleted_at = ?, updated_at = ? WHERE id = ? AND tenant_id = ?`, [now(), now(), id, tenantId]);
 }
 
 // ── Stats ─────────────────────────────────────────────────────────────────────

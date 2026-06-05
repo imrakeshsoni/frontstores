@@ -258,11 +258,14 @@ const HotelRoomSetup       = lazy(() => import('@/modules/hotel/RoomSetupPage').
 const HotelSettings        = lazy(() => import('@/modules/hotel/HotelSettingsPage').then(m => ({ default: m.HotelSettingsPage })));
 
 // [ca] [all tenants]
-const CADashboard      = lazy(() => import('@/modules/ca/CADashboard').then(m => ({ default: m.CADashboard })));
-const CAClientsPage    = lazy(() => import('@/modules/ca/ClientsPage').then(m => ({ default: m.CAClientsPage })));
-const CATasksPage      = lazy(() => import('@/modules/ca/TasksPage').then(m => ({ default: m.CATasksPage })));
-const CADocumentsPage  = lazy(() => import('@/modules/ca/DocumentsPage').then(m => ({ default: m.CADocumentsPage })));
-const CAReportsPage    = lazy(() => import('@/modules/ca/CAReportsPage').then(m => ({ default: m.CAReportsPage })));
+const CADashboard             = lazy(() => import('@/modules/ca/CADashboard').then(m => ({ default: m.CADashboard })));
+const CAClientsPage           = lazy(() => import('@/modules/ca/ClientsPage').then(m => ({ default: m.CAClientsPage })));
+const CATasksPage             = lazy(() => import('@/modules/ca/TasksPage').then(m => ({ default: m.CATasksPage })));
+const CADocumentsPage         = lazy(() => import('@/modules/ca/DocumentsPage').then(m => ({ default: m.CADocumentsPage })));
+const CAReportsPage           = lazy(() => import('@/modules/ca/CAReportsPage').then(m => ({ default: m.CAReportsPage })));
+const CAInvoicesPage          = lazy(() => import('@/modules/ca/InvoicesPage').then(m => ({ default: m.CAInvoicesPage })));
+const CAComplianceCalendarPage = lazy(() => import('@/modules/ca/ComplianceCalendarPage').then(m => ({ default: m.CAComplianceCalendarPage })));
+const CAStaffPage             = lazy(() => import('@/modules/ca/StaffPage').then(m => ({ default: m.CAStaffPage })));
 
 // [events] [all tenants]
 const EventsDashboard  = lazy(() => import('@/modules/events/EventsDashboard').then(m => ({ default: m.EventsDashboard })));
@@ -612,6 +615,16 @@ export default function App() {
             <Route path="laundry/orders/new" element={<LaundryNewOrderPage />} />
             <Route path="laundry/services"   element={<LaundryServicesPage />} />
             <Route path="laundry/reports"    element={<LaundryReports />} />
+
+            {/* [ca] [all tenants] */}
+            <Route path="ca/dashboard"   element={<CADashboard />} />
+            <Route path="ca/clients"     element={<CAClientsPage />} />
+            <Route path="ca/tasks"       element={<CATasksPage />} />
+            <Route path="ca/documents"   element={<CADocumentsPage />} />
+            <Route path="ca/invoices"    element={<CAInvoicesPage />} />
+            <Route path="ca/compliance"  element={<CAComplianceCalendarPage />} />
+            <Route path="ca/staff"       element={<CAStaffPage />} />
+            <Route path="ca/reports"     element={<CAReportsPage />} />
 
             {/* [catering] [all tenants] */}
             <Route path="catering/dashboard"    element={<CateringDashboard />} />

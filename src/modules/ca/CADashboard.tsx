@@ -116,11 +116,13 @@ export function CADashboard() {
         {/* Quick actions */}
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
           <h2 className="font-semibold text-slate-900 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             {[
               { label: 'Add Client', icon: '👤', path: '/ca/clients' },
               { label: 'New Task', icon: '✅', path: '/ca/tasks' },
-              { label: 'Documents', icon: '📁', path: '/ca/documents' },
+              { label: 'Compliance', icon: '📅', path: '/ca/compliance' },
+              { label: 'Invoices', icon: '🧾', path: '/ca/invoices' },
+              { label: 'Staff', icon: '🧑‍💼', path: '/ca/staff' },
               { label: 'Reports', icon: '📊', path: '/ca/reports' },
             ].map(a => (
               <button key={a.label} onClick={() => navigate(a.path)}

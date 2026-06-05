@@ -19,7 +19,7 @@ export function CATasksPage() {
 
   const [form, setForm] = useState({
     client_id: '', task_type: '', financial_year: '', due_date: '', status: 'pending',
-    priority: 'normal', description: '', fees: '', fees_paid: '0',
+    priority: 'normal', description: '', fees: '', fees_paid: '0', staff_id: '',
   });
 
   const { data: tasks = [], isLoading } = useQuery({
@@ -39,6 +39,7 @@ export function CATasksPage() {
       client_id: form.client_id, task_type: form.task_type, financial_year: form.financial_year,
       due_date: form.due_date || null, status: form.status, priority: form.priority,
       description: form.description, fees: parseFloat(form.fees) || 0, fees_paid: parseFloat(form.fees_paid) || 0,
+      staff_id: form.staff_id,
     }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['ca-tasks'] }); qc.invalidateQueries({ queryKey: ['ca-stats'] }); setShowAdd(false); toast.success('Task created'); },
     onError: (e) => toast.error(String(e)),

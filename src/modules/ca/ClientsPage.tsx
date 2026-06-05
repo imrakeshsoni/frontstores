@@ -13,7 +13,7 @@ export function CAClientsPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ name: '', phone: '', email: '', pan: '', gstin: '', address: '', client_type: 'individual' });
+  const [form, setForm] = useState({ name: '', phone: '', email: '', pan: '', gstin: '', tan: '', cin: '', aadhaar: '', address: '', notes: '', client_type: 'individual' });
 
   const { data: clients = [], isLoading } = useQuery({
     queryKey: ['ca-clients', tenantId, search],
@@ -29,7 +29,7 @@ export function CAClientsPage() {
 
   const add = useMutation({
     mutationFn: () => createCAClient(tenantId, form),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['ca-clients'] }); setShowAdd(false); setForm({ name: '', phone: '', email: '', pan: '', gstin: '', address: '', client_type: 'individual' }); toast.success('Client added'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['ca-clients'] }); setShowAdd(false); setForm({ name: '', phone: '', email: '', pan: '', gstin: '', tan: '', cin: '', aadhaar: '', address: '', notes: '', client_type: 'individual' }); toast.success('Client added'); },
     onError: (e) => toast.error(String(e)),
   });
 
@@ -96,8 +96,12 @@ export function CAClientsPage() {
               { key: 'phone', label: 'Phone', placeholder: '9xxxxxxxxx' },
               { key: 'email', label: 'Email', placeholder: 'email@example.com' },
               { key: 'pan', label: 'PAN', placeholder: 'ABCDE1234F' },
+              { key: 'aadhaar', label: 'Aadhaar', placeholder: 'XXXX XXXX XXXX' },
               { key: 'gstin', label: 'GSTIN', placeholder: '22AAAAA0000A1Z5' },
+              { key: 'tan', label: 'TAN', placeholder: 'ABCD12345E' },
+              { key: 'cin', label: 'CIN (Company)', placeholder: 'U74999MH2021PTC123456' },
               { key: 'address', label: 'Address', placeholder: 'Full address' },
+              { key: 'notes', label: 'Notes', placeholder: 'Optional' },
             ].map(f => (
               <div key={f.key}>
                 <label className="block text-xs font-medium text-slate-600 mb-1">{f.label}</label>

@@ -1,0 +1,13 @@
+-- [ca] [all tenants]
+ALTER TABLE ca_clients ADD COLUMN IF NOT EXISTS tan TEXT DEFAULT '';
+ALTER TABLE ca_clients ADD COLUMN IF NOT EXISTS cin TEXT DEFAULT '';
+ALTER TABLE ca_clients ADD COLUMN IF NOT EXISTS aadhaar TEXT DEFAULT '';
+ALTER TABLE ca_clients ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';
+ALTER TABLE ca_tasks ADD COLUMN IF NOT EXISTS staff_id TEXT DEFAULT '';
+
+CREATE TABLE IF NOT EXISTS ca_staff (
+  id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL,
+  name TEXT NOT NULL, role TEXT DEFAULT 'article',
+  phone TEXT DEFAULT '', email TEXT DEFAULT '',
+  updated_at TEXT, deleted_at TEXT
+);

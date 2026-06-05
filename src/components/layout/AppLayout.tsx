@@ -389,12 +389,15 @@ const PRINTING_NAV_ITEMS = [
 
 // [ca] [all tenants]
 const CA_NAV_ITEMS = [
-  { to: '/ca/dashboard',  icon: LayoutDashboard, label: 'Dashboard',  iconBg: '#dbeafe', iconColor: '#2563eb' },
-  { to: '/ca/clients',    icon: Users,           label: 'Clients',    iconBg: '#ede9fe', iconColor: '#7c3aed' },
-  { to: '/ca/tasks',      icon: ClipboardList,   label: 'Tasks',      iconBg: '#dcfce7', iconColor: '#16a34a' },
-  { to: '/ca/documents',  icon: FileText,        label: 'Documents',  iconBg: '#fef3c7', iconColor: '#d97706' },
-  { to: '/ca/reports',    icon: BarChart3,       label: 'Reports',    iconBg: '#fee2e2', iconColor: '#dc2626' },
-  { to: '/settings',      icon: Settings,        label: 'Settings',   iconBg: '#f1f5f9', iconColor: '#64748b' },
+  { to: '/ca/dashboard',   icon: LayoutDashboard, label: 'Dashboard',   iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/ca/clients',     icon: Users,           label: 'Clients',     iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/ca/tasks',       icon: ClipboardList,   label: 'Tasks',       iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/ca/compliance',  icon: CalendarDays,    label: 'Compliance',  iconBg: '#fce7f3', iconColor: '#db2777' },
+  { to: '/ca/documents',   icon: FileText,        label: 'Documents',   iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/ca/invoices',    icon: Receipt,         label: 'Invoices',    iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/ca/staff',       icon: UserCheck,       label: 'Staff',       iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/ca/reports',     icon: BarChart3,       label: 'Reports',     iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/settings',       icon: Settings,        label: 'Settings',    iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
 
 // [events] [all tenants]
