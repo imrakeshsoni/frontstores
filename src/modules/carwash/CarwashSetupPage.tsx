@@ -1,10 +1,11 @@
 // [carwash] [all tenants] — unified setup: vehicle types, services, staff
 import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   Plus, Trash2, Edit2, X, Users, Car, Droplets,
-  ToggleLeft, ToggleRight,
+  ToggleLeft, ToggleRight, ChevronRight,
 } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import {
@@ -376,6 +377,7 @@ const emptyStaffForm: StaffForm = { name: '', phone: '', role: 'washer', monthly
 
 function StaffTab({ tenantId }: { tenantId: string }) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<CarwashStaff | null>(null);
   const [form, setForm] = useState<StaffForm>(emptyStaffForm);
@@ -431,7 +433,8 @@ function StaffTab({ tenantId }: { tenantId: string }) {
         )}
         {staff.map((s, i) => (
           <div key={s.id} className="flex items-center justify-between px-5 py-4"
-            style={{ borderBottom: i < staff.length - 1 ? '1px solid var(--surface-border)' : undefined }}>
+            style={{ borderBottom: i < staff.length - 1 ? '1px solid var(--surface-border)' : undefined, cursor: 'pointer' }}
+            onClick={() => navigate(`/carwash/staff/${s.id}`)}>
             <div className="flex items-center gap-3">
               <div className="h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold text-white" style={{ background: 'var(--accent)' }}>{s.name[0].toUpperCase()}</div>
               <div>
@@ -439,10 +442,11 @@ function StaffTab({ tenantId }: { tenantId: string }) {
                 <p className="text-xs capitalize" style={{ color: 'var(--text-tertiary)' }}>{s.role}{s.phone ? ` · ${s.phone}` : ''}</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3" onClick={e => e.stopPropagation()}>
               {s.monthly_salary > 0 && <p className="text-sm font-bold hidden sm:block" style={{ color: 'var(--accent)' }}>{fmt(s.monthly_salary)}/mo</p>}
               <button onClick={() => openEdit(s)} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50"><Edit2 className="h-4 w-4" /></button>
               <button onClick={() => { if (!confirm(`Remove ${s.name}?`)) return; deleteMutation.mutate(s.id); }} className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50"><Trash2 className="h-4 w-4" /></button>
+              <ChevronRight className="h-4 w-4 opacity-30" />
             </div>
           </div>
         ))}
@@ -523,7 +527,9 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 
 export function CarwashSetupPage() {
   const tenantId = useAppStore((s) => s.config?.tenant_id ?? '');
-  const [tab, setTab] = useState<Tab>('vehicles');
+  const [searchParams] = useSearchParams();
+  const initialTab = (searchParams.get('tab') as Tab) ?? 'vehicles';
+  const [tab, setTab] = useState<Tab>(initialTab);
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-5">

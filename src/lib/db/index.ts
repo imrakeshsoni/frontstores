@@ -51,6 +51,7 @@ async function runMigrations(db: Database) {
         .split(';')
         .map((s) => s.trim())
         .filter((s) => s.length > 0);
+      let migrationFailed = false;
       for (const stmt of statements) {
         try {
           await db.execute(stmt + ';');
@@ -62,10 +63,14 @@ async function runMigrations(db: Database) {
             msg.includes('duplicate column name')
           ) continue;
           reportError(`Migration ${name} failed: ${msg}`, undefined, `migration.${name}`);
-          throw e;
+          migrationFailed = true;
+          break;
         }
       }
-      await db.execute('INSERT INTO _migrations (name) VALUES (?)', [name]);
+      // Only mark as applied if all statements succeeded — failed migrations retry on next launch
+      if (!migrationFailed) {
+        await db.execute('INSERT INTO _migrations (name) VALUES (?)', [name]);
+      }
     }
   }
 }
