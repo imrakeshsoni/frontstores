@@ -436,7 +436,7 @@ function StaffTab({ tenantId }: { tenantId: string }) {
             style={{ borderBottom: i < staff.length - 1 ? '1px solid #e5e5ea' : undefined, cursor: 'pointer' }}
             onClick={() => navigate(`/carwash/staff/${s.id}`)}>
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold text-white" style={{ background: '#0071e3' }}>{s.name[0].toUpperCase()}</div>
+              <div className="h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold text-white" style={{ background: '#0071e3' }}>{((s.name?.[0] ?? '?').toUpperCase())}</div>
               <div>
                 <p className="font-semibold text-sm" style={{ color: '#1d1d1f' }}>{s.name}</p>
                 <p className="text-xs capitalize" style={{ color: '#86868b' }}>{s.role}{s.phone ? ` · ${s.phone}` : ''}</p>

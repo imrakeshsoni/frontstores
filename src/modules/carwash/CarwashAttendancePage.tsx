@@ -150,7 +150,7 @@ function TodayAttendanceModal({ staff, initialDate, tenantId, attMap, year, mont
                 <div className="flex items-center gap-3" style={{ flexShrink: 0 }}>
                   <div className="h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
                     style={{ background: cfg.dotColor, color: cfg.color, boxShadow: `0 2px 6px ${cfg.dotColor}50` }}>
-                    {s.name[0].toUpperCase()}
+                    {((s.name?.[0] ?? '?').toUpperCase())}
                   </div>
                   <div>
                     <p className="text-sm font-semibold" style={{ color: '#1d1d1f' }}>{s.name}</p>
@@ -621,8 +621,10 @@ export function CarwashAttendancePage() {
   const printSalarySlip = async (s: CarwashStaff) => {
     const summary = summaries.find(sm => sm.staff.id === s.id);
     if (!summary) return;
-    const logo = (config?.settings as any)?.logo_base64;
-    const shopName = config?.shop_name ?? 'Car Wash';
+    const rawLogo = (config?.settings as any)?.logo_base64;
+    // Strip quotes from base64 to prevent attribute injection in print HTML
+    const logo = rawLogo ? String(rawLogo).replace(/"/g, '') : null;
+    const shopName = (config?.shop_name ?? 'Car Wash').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const salaryDueDay = getSalaryDueDay(s.joining_date, year, month);
     const salaryDueStr = salaryDueDay
       ? new Date(year, month - 1, salaryDueDay).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -752,7 +754,7 @@ export function CarwashAttendancePage() {
                     <div className="flex items-center gap-2.5">
                       <div className="h-10 w-10 rounded-full flex items-center justify-center text-sm font-semibold text-white flex-shrink-0"
                         style={{ background: '#0071e3', boxShadow: '0 2px 8px rgba(0,113,227,0.4)' }}>
-                        {s.name[0].toUpperCase()}
+                        {((s.name?.[0] ?? '?').toUpperCase())}
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-semibold leading-tight" style={{ color: '#1d1d1f', wordBreak: 'break-word' }}>{s.name}</p>

@@ -63,8 +63,15 @@ export function MembershipPage() {
     onError: (e: any) => toast.error(e?.message ?? 'Failed'),
   });
 
-  const active = memberships.filter(m => m.is_active && m.used_washes < m.total_washes);
-  const expired = memberships.filter(m => !m.is_active || m.used_washes >= m.total_washes);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const active = memberships.filter(m =>
+    m.is_active && m.used_washes < m.total_washes &&
+    (!m.valid_until || m.valid_until >= todayStr)
+  );
+  const expired = memberships.filter(m =>
+    !m.is_active || m.used_washes >= m.total_washes ||
+    (m.valid_until != null && m.valid_until < todayStr)
+  );
 
   return (
     <div className="flex flex-col" style={{ background: '#f5f5f7', height: '100%', overflow: 'hidden' }}>

@@ -456,7 +456,7 @@ function StaffTab({ tenantId }: { tenantId: string }) {
             style={{ borderBottom: i < staff.length - 1 ? '1px solid var(--surface-border)' : undefined }}>
             <div className="flex items-center gap-2.5">
               <div className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: 'var(--accent)', color: 'var(--on-accent, #111)' }}>
-                {s.name[0].toUpperCase()}
+                {((s.name?.[0] ?? '?').toUpperCase())}
               </div>
               <div>
                 <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{s.name}</p>

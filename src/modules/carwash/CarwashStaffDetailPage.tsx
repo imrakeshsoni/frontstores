@@ -233,7 +233,7 @@ export function CarwashStaffDetailPage() {
           <div className="flex flex-col items-center gap-3 pt-2 pb-4" style={{ borderBottom: '1px solid #e5e5ea' }}>
             <div className="h-16 w-16 rounded-full flex items-center justify-center text-2xl font-bold text-white"
               style={{ background: staff.is_active ? '#0071e3' : '#9ca3af' }}>
-              {staff.name[0].toUpperCase()}
+              {((staff.name?.[0] ?? '?').toUpperCase())}
             </div>
             <div className="text-center">
               <h1 className="text-lg font-bold" style={{ color: '#1d1d1f' }}>{staff.name}</h1>

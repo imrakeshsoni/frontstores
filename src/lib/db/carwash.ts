@@ -563,8 +563,10 @@ export async function createJob(tenantId: string, data: {
   }
 
   if (data.membership_id) {
+    // Only increment if washes remain (prevent over-use of exhausted membership)
     await db.execute(
-      `UPDATE carwash_memberships SET used_washes = used_washes + 1, updated_at = ? WHERE id = ? AND tenant_id = ?`,
+      `UPDATE carwash_memberships SET used_washes = used_washes + 1, updated_at = ?
+       WHERE id = ? AND tenant_id = ? AND used_washes < total_washes`,
       [now(), data.membership_id, tenantId]
     );
   }
@@ -1062,6 +1064,7 @@ export async function getSalaryAdvancesForMonth(tenantId: string, month: string)
 }
 
 export async function addSalaryAdvance(tenantId: string, staffId: string, month: string, amount: number, note?: string, givenAt?: string): Promise<void> {
+  if (!amount || amount <= 0) throw new Error('Advance amount must be greater than zero');
   const db = await getDb();
   await db.execute(
     `INSERT INTO carwash_salary_advance (id, tenant_id, staff_id, month, amount, note, given_at) VALUES (?,?,?,?,?,?,?)`,

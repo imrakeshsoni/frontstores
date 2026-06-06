@@ -111,7 +111,7 @@ export function CarwashStaffPage() {
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
                 style={{ background: s.is_active ? '#0071e3' : '#9ca3af' }}>
-                {s.name[0].toUpperCase()}
+                {((s.name?.[0] ?? '?').toUpperCase())}
               </div>
               <div>
                 <p className="font-semibold" style={{ color: '#1d1d1f' }}>{s.name}</p>

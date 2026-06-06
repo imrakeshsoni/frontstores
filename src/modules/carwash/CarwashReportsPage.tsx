@@ -352,7 +352,7 @@ export function CarwashReportsPage() {
               <div key={sm.staff.id} className="flex items-center justify-between px-5 py-3">
                 <div className="flex items-center gap-3">
                   <div className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                    style={{ background: '#0071e3' }}>{sm.staff.name[0].toUpperCase()}</div>
+                    style={{ background: '#0071e3' }}>{((sm.staff.name?.[0] ?? '?').toUpperCase())}</div>
                   <div>
                     <p className="font-semibold text-sm" style={{ color: '#1d1d1f' }}>{sm.staff.name}</p>
                     <p className="text-xs capitalize" style={{ color: '#86868b' }}>
@@ -585,7 +585,7 @@ function AttendanceTab({ tenantId, config, fromMonth, setFromMonth, toMonth, set
               onClick={() => setExpandedStaff(isExpanded ? null : staff.id)}>
               <div className="flex items-center gap-3">
                 <div className="h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold text-white"
-                  style={{ background: '#0071e3' }}>{staff.name[0].toUpperCase()}</div>
+                  style={{ background: '#0071e3' }}>{((staff.name?.[0] ?? '?').toUpperCase())}</div>
                 <div className="text-left">
                   <p className="font-bold text-sm" style={{ color: '#1d1d1f' }}>{staff.name}</p>
                   <p className="text-xs capitalize" style={{ color: '#86868b' }}>{staff.role}{staff.monthly_salary > 0 ? ` · ${fmtRs(staff.monthly_salary)}/mo` : ''}</p>
