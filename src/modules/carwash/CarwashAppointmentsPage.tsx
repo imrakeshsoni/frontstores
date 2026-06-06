@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Plus, Calendar, Clock, Car, User, Trash2, CheckCircle, X } from 'lucide-react';
+import { Plus, Calendar, Clock, Car, User, Trash2, CheckCircle, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { NumberPlateScanner } from '@/components/ui/NumberPlateScanner';
 import { sendWhatsApp } from '@/lib/whatsapp';
@@ -48,7 +48,7 @@ type ApptForm = {
 };
 
 const emptyForm: ApptForm = {
-  appointment_time: '10:00', duration_minutes: '60', reg_number: '',
+  appointment_time: '10:00', duration_minutes: '0', reg_number: '',
   vehicle_type: 'sedan', make: '', model: '', customer_name: '', customer_phone: '',
   staff_ids: [], staff_names: [], selected_services: [], services_note: '', notes: '',
 };
@@ -108,8 +108,9 @@ export function CarwashAppointmentsPage() {
         if (!regVal.valid) throw new Error(regVal.error);
       }
       if (!form.appointment_time) throw new Error('Select a time slot');
-      const dur = Number(form.duration_minutes) || 60;
-      if (dur < 5 || dur > 480) throw new Error('Duration must be between 5 and 480 minutes');
+      // [carwash] [all tenants] — auto-sum durations from selected services; 0 if none selected
+      const selectedSvcObjs = availableServices.filter(s => form.selected_services.includes(s.name));
+      const dur = selectedSvcObjs.reduce((sum, s) => sum + (s.duration_minutes ?? 0), 0);
       return createAppointment(tenantId, {
         appointment_date: date,
         appointment_time: form.appointment_time,
@@ -338,13 +339,13 @@ export function CarwashAppointmentsPage() {
           <Calendar className="h-10 w-10 opacity-30" />
           <p className="text-sm" style={{ color: '#86868b' }}>No appointments for this day</p>
           <button onClick={() => setShowForm(true)}
-            className="px-4 py-2 rounded-xl text-sm font-semibold" style={{ background: '#0071e3', color: '#111' }}>
+            className="px-4 py-2 rounded-xl text-sm font-semibold" style={{ background: '#0071e3', color: '#ffffff' }}>
             Book First Appointment
           </button>
         </div>
       )}
 
-      <div className="space-y-3">
+      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))' }}>
         {pending.map(appt => {
           const sc = STATUS_CONFIG[appt.status];
           const timeLabel = TIME_SLOTS.find(t => t.value === appt.appointment_time)?.label ?? appt.appointment_time;
@@ -431,37 +432,41 @@ export function CarwashAppointmentsPage() {
         </div>
       )}
 
-      {/* Book form modal — landscape wide layout */}
+      {/* Book form modal — 80vw landscape */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={e => { if (e.target === e.currentTarget) { setShowForm(false); setForm(emptyForm); setVehiclePicker([]); } }}>
-          <div className="rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)', maxHeight: '90vh' }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6"
+          onClick={e => { if (e.target === e.currentTarget) { setShowForm(false); setForm(emptyForm); setVehiclePicker([]); } }}>
+          <div className="rounded-3xl flex flex-col"
+            style={{ width: '80vw', maxHeight: '92vh', background: '#ffffff', boxShadow: '0 8px 40px rgba(0,0,0,0.28), 0 2px 8px rgba(0,0,0,0.12)' }}>
 
             {/* Header */}
-            <div className="flex items-center justify-between px-7 py-5" style={{ borderBottom: '1px solid #e5e5ea' }}>
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-xl flex items-center justify-center" style={{ background: '#0071e3' }}>
-                  <Calendar className="h-5 w-5 text-white" />
+            <div className="flex items-center justify-between px-8 py-5" style={{ borderBottom: '1px solid #e5e5ea', flexShrink: 0 }}>
+              <div className="flex items-center gap-4">
+                <div className="h-11 w-11 rounded-2xl flex items-center justify-center" style={{ background: '#0071e3' }}>
+                  <Calendar className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <h2 className="font-bold text-xl" style={{ color: '#1d1d1f' }}>Book Appointment</h2>
-                  <p className="text-xs" style={{ color: '#86868b' }}>{new Date(date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                  <h2 className="font-bold text-2xl" style={{ color: '#1d1d1f', letterSpacing: '-0.3px' }}>Book Appointment</h2>
+                  <p className="text-sm mt-0.5" style={{ color: '#86868b' }}>{new Date(date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
                 </div>
               </div>
               <button onClick={() => { setShowForm(false); setForm(emptyForm); setVehiclePicker([]); }}
-                className="h-8 w-8 flex items-center justify-center rounded-xl transition-colors"
+                className="h-10 w-10 flex items-center justify-center rounded-xl transition-colors hover:bg-gray-100"
                 style={{ background: '#f2f2f7' }}>
-                <X className="h-4 w-4" style={{ color: '#86868b' }} />
+                <X className="h-5 w-5" style={{ color: '#86868b' }} />
               </button>
             </div>
 
-            {/* Two-column body — left 40% customer/vehicle, right 60% scheduling/services */}
-            <div className="grid flex-1 overflow-hidden" style={{ gridTemplateColumns: '2fr 3fr' }}>
+            {/* Two-column body */}
+            <div className="grid flex-1 overflow-hidden" style={{ gridTemplateColumns: '1fr 1fr' }}>
+
               {/* Left — Customer & Vehicle */}
-              <div className="px-7 py-6 space-y-4 overflow-y-auto" style={{ borderRight: '1px solid #e5e5ea' }}>
+              <div className="px-8 py-6 space-y-5 overflow-y-auto" style={{ borderRight: '1px solid #e5e5ea' }}>
                 <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#0071e3' }}>Customer & Vehicle</p>
 
+                {/* Reg number */}
                 <div>
-                  <label className="block text-xs font-semibold mb-1.5" style={{ color: '#86868b' }}>Registration Number</label>
+                  <label className="block text-sm font-semibold mb-2" style={{ color: '#3a3a3c' }}>Registration Number</label>
                   <div className="relative flex gap-2 items-center">
                     <div className="relative flex-1">
                       <input value={form.reg_number}
@@ -472,23 +477,18 @@ export function CarwashAppointmentsPage() {
                           const v = e.target.value.trim();
                           if (v && !validateRegNumber(v).valid) toast.error(validateRegNumber(v).error!);
                         }}
-                        placeholder="e.g. MH12AB1234 or 22BH0001AA"
+                        placeholder="e.g. MH12AB1234"
                         autoFocus
-                        className="w-full rounded-xl border px-3.5 py-2.5 text-sm font-bold tracking-wider outline-none"
+                        className="w-full rounded-xl border px-4 py-3 text-base font-bold tracking-wider outline-none"
                         style={{ borderColor: '#e5e5ea', background: '#f2f2f7', color: '#1d1d1f' }} />
-
-                      {/* Reg search dropdown */}
                       {regResults.length > 0 && (
                         <div className="absolute z-50 left-0 right-0 top-full mt-1 rounded-xl overflow-hidden shadow-xl"
                           style={{ background: '#ffffff', border: '1px solid #0071e3' }}>
                           {regResults.map((v, i) => (
-                            <button key={v.id} type="button"
-                              onMouseDown={() => selectVehicleFromReg(v)}
-                              className="w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors"
-                              style={{ background: i === regActiveIdx ? '#0071e3' : 'transparent',
-                                       color: i === regActiveIdx ? '#111' : '#1d1d1f',
-                                       borderBottom: '1px solid #e5e5ea' }}>
-                              <span className="text-lg flex-shrink-0">🚗</span>
+                            <button key={v.id} type="button" onMouseDown={() => selectVehicleFromReg(v)}
+                              className="w-full text-left px-4 py-3 flex items-center gap-3 transition-colors"
+                              style={{ background: i === regActiveIdx ? '#0071e3' : 'transparent', color: i === regActiveIdx ? '#ffffff' : '#1d1d1f', borderBottom: '1px solid #e5e5ea' }}>
+                              <span className="text-xl flex-shrink-0">🚗</span>
                               <div className="min-w-0">
                                 <p className="text-sm font-bold tracking-wider">{v.reg_number}</p>
                                 <p className="text-xs opacity-70">{v.customer_name ?? ''}{v.make || v.model ? ` · ${[v.make, v.model].filter(Boolean).join(' ')}` : ''}</p>
@@ -502,30 +502,26 @@ export function CarwashAppointmentsPage() {
                   </div>
                 </div>
 
+                {/* Phone */}
                 <div>
-                  <label className="block text-xs font-semibold mb-1.5" style={{ color: '#86868b' }}>Phone *</label>
+                  <label className="block text-sm font-semibold mb-2" style={{ color: '#3a3a3c' }}>Phone *</label>
                   <div className="relative">
                     <input value={form.customer_phone}
                       onChange={e => handlePhoneInput(e.target.value)}
                       onKeyDown={handlePhoneKeyDown}
                       onBlur={() => setTimeout(() => setPhoneResults([]), 150)}
                       placeholder="Type to search customer…"
-                      className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none"
+                      className="w-full rounded-xl border px-4 py-3 text-base outline-none"
                       style={{ borderColor: '#e5e5ea', background: '#f2f2f7', color: '#1d1d1f' }} />
-
-                    {/* Live search dropdown */}
                     {phoneResults.length > 0 && (
                       <div className="absolute z-50 left-0 right-0 top-full mt-1 rounded-xl overflow-hidden shadow-xl"
                         style={{ background: '#ffffff', border: '1px solid #0071e3' }}>
                         {phoneResults.map((c, i) => (
-                          <button key={c.id} type="button"
-                            onMouseDown={() => selectCustomerFromSearch(c)}
-                            className="w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors"
-                            style={{ background: i === phoneActiveIdx ? '#0071e3' : 'transparent',
-                                     color: i === phoneActiveIdx ? '#111' : '#1d1d1f',
-                                     borderBottom: '1px solid #e5e5ea' }}>
-                            <div className="h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                              style={{ background: i === phoneActiveIdx ? '#111' : '#0071e3', color: i === phoneActiveIdx ? '#0071e3' : '#111' }}>
+                          <button key={c.id} type="button" onMouseDown={() => selectCustomerFromSearch(c)}
+                            className="w-full text-left px-4 py-3 flex items-center gap-3 transition-colors"
+                            style={{ background: i === phoneActiveIdx ? '#0071e3' : 'transparent', color: i === phoneActiveIdx ? '#ffffff' : '#1d1d1f', borderBottom: '1px solid #e5e5ea' }}>
+                            <div className="h-8 w-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                              style={{ background: i === phoneActiveIdx ? 'rgba(255,255,255,0.25)' : '#e8f0fe', color: i === phoneActiveIdx ? '#ffffff' : '#0071e3' }}>
                               {c.name?.[0]?.toUpperCase()}
                             </div>
                             <div className="min-w-0">
@@ -538,37 +534,29 @@ export function CarwashAppointmentsPage() {
                     )}
                   </div>
 
-                  {/* Vehicle picker — keyboard nav with ↑↓ Enter, mouse click */}
                   {vehiclePicker.length > 0 && (
                     <div className="mt-2 rounded-xl overflow-hidden" style={{ border: '1px solid #0071e3', background: '#f2f2f7' }}>
-                      <p className="px-3 py-2 text-xs font-bold flex items-center justify-between"
+                      <p className="px-4 py-2.5 text-xs font-bold flex items-center justify-between"
                         style={{ color: '#0071e3', borderBottom: '1px solid #e5e5ea' }}>
                         <span>🚗 {vehiclePicker.length} vehicles — ↑↓ navigate, Enter to select</span>
-                        <button onClick={() => { setVehiclePicker([]); setVehiclePickerIdx(-1); }}>
-                          <X className="h-3.5 w-3.5" />
-                        </button>
+                        <button onClick={() => { setVehiclePicker([]); setVehiclePickerIdx(-1); }}><X className="h-3.5 w-3.5" /></button>
                       </p>
                       <div ref={vehiclePickerRef} className="max-h-52 overflow-y-auto">
                         {vehiclePicker.map((v, i) => (
                           <button key={v.id} type="button"
                             onClick={() => { populateFromVehicle(v); setVehiclePicker([]); setVehiclePickerIdx(-1); }}
                             onMouseEnter={() => setVehiclePickerIdx(i)}
-                            className="w-full text-left px-3 py-3 transition-colors flex items-center gap-3"
-                            style={{
-                              background: i === vehiclePickerIdx ? '#0071e3' : 'transparent',
-                              borderBottom: '1px solid #e5e5ea',
-                            }}>
+                            className="w-full text-left px-4 py-3 transition-colors flex items-center gap-3"
+                            style={{ background: i === vehiclePickerIdx ? '#0071e3' : 'transparent', borderBottom: '1px solid #e5e5ea' }}>
                             <span className="text-xl flex-shrink-0">🚗</span>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-bold" style={{ color: i === vehiclePickerIdx ? '#111' : '#1d1d1f' }}>
-                                {v.reg_number ?? 'No reg'}
-                              </p>
-                              <p className="text-xs" style={{ color: i === vehiclePickerIdx ? '#333' : '#86868b' }}>
+                              <p className="text-sm font-bold" style={{ color: i === vehiclePickerIdx ? '#ffffff' : '#1d1d1f' }}>{v.reg_number ?? 'No reg'}</p>
+                              <p className="text-xs" style={{ color: i === vehiclePickerIdx ? 'rgba(255,255,255,0.75)' : '#86868b' }}>
                                 {v.vehicle_type}{(v.make || v.model) ? ` · ${[v.make, v.model].filter(Boolean).join(' ')}` : ''}
                               </p>
                             </div>
                             {i === vehiclePickerIdx && (
-                              <span className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: '#111', color: '#0071e3' }}>Enter ↵</span>
+                              <span className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: 'rgba(255,255,255,0.2)', color: '#ffffff' }}>Enter ↵</span>
                             )}
                           </button>
                         ))}
@@ -577,40 +565,43 @@ export function CarwashAppointmentsPage() {
                   )}
                 </div>
 
+                {/* Customer name */}
                 <div>
-                  <label className="block text-xs font-semibold mb-1.5" style={{ color: '#86868b' }}>Customer Name *</label>
+                  <label className="block text-sm font-semibold mb-2" style={{ color: '#3a3a3c' }}>Customer Name *</label>
                   <input value={form.customer_name} onChange={e => setForm(f => ({ ...f, customer_name: e.target.value }))}
                     placeholder="Full name"
-                    className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none"
+                    className="w-full rounded-xl border px-4 py-3 text-base outline-none"
                     style={{ borderColor: '#e5e5ea', background: '#f2f2f7', color: '#1d1d1f' }} />
                 </div>
 
+                {/* Make + Model */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold mb-1.5" style={{ color: '#86868b' }}>Make</label>
+                    <label className="block text-sm font-semibold mb-2" style={{ color: '#3a3a3c' }}>Make</label>
                     <input value={form.make} onChange={e => setForm(f => ({ ...f, make: e.target.value }))}
                       placeholder="e.g. Maruti"
-                      className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none"
+                      className="w-full rounded-xl border px-4 py-3 text-base outline-none"
                       style={{ borderColor: '#e5e5ea', background: '#f2f2f7', color: '#1d1d1f' }} />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold mb-1.5" style={{ color: '#86868b' }}>Model</label>
+                    <label className="block text-sm font-semibold mb-2" style={{ color: '#3a3a3c' }}>Model</label>
                     <input value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))}
                       placeholder="e.g. Swift"
-                      className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none"
+                      className="w-full rounded-xl border px-4 py-3 text-base outline-none"
                       style={{ borderColor: '#e5e5ea', background: '#f2f2f7', color: '#1d1d1f' }} />
                   </div>
                 </div>
 
+                {/* Vehicle type */}
                 <div>
-                  <label className="block text-xs font-semibold mb-1.5" style={{ color: '#86868b' }}>Vehicle Type</label>
+                  <label className="block text-sm font-semibold mb-2" style={{ color: '#3a3a3c' }}>Vehicle Type</label>
                   <div className="flex flex-wrap gap-2">
                     {vehicleTypes.filter(vt => vt.is_active).map(vt => (
                       <button key={vt.id} onClick={() => setForm(f => ({ ...f, vehicle_type: vt.name as VehicleType }))}
-                        className="py-1.5 px-3 rounded-xl text-xs font-semibold transition-all"
+                        className="py-2.5 px-4 rounded-xl text-sm font-semibold transition-all"
                         style={form.vehicle_type === vt.name
-                          ? { background: '#0071e3', color: '#111' }
-                          : { background: '#f2f2f7', color: '#86868b', border: '1px solid #e5e5ea' }}>
+                          ? { background: '#0071e3', color: '#ffffff' }
+                          : { background: '#f2f2f7', color: '#3a3a3c', border: '1px solid #e5e5ea' }}>
                         {vt.icon} {vt.name}
                       </button>
                     ))}
@@ -619,79 +610,58 @@ export function CarwashAppointmentsPage() {
               </div>
 
               {/* Right — Scheduling & Details */}
-              <div className="px-7 py-6 space-y-4 overflow-y-auto">
+              <div className="px-8 py-6 space-y-5 overflow-y-auto">
                 <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#0071e3' }}>Scheduling & Details</p>
 
-                <div className="grid grid-cols-2 gap-3">
+                {/* 1. Date + Time */}
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold mb-1.5" style={{ color: '#86868b' }}>Date</label>
-                    <input type="date" value={date} onChange={e => setDate(e.target.value)}
-                      className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none"
-                      style={{ borderColor: '#e5e5ea', background: '#f2f2f7', color: '#1d1d1f' }} />
+                    <label className="block text-sm font-semibold mb-2" style={{ color: '#3a3a3c' }}>Date</label>
+                    <div className="flex items-center gap-2">
+                      <button type="button"
+                        disabled={date <= todayISO()}
+                        onClick={() => {
+                          const [y, m, d] = date.split('-').map(Number);
+                          const dt = new Date(y, m - 1, d - 1);
+                          setDate(`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`);
+                        }}
+                        className="flex-shrink-0 flex items-center justify-center rounded-xl transition-all"
+                        style={{ width: 42, height: 50, background: date <= todayISO() ? '#f2f2f7' : '#e8f0fe', color: date <= todayISO() ? '#c7c7cc' : '#0071e3', border: '1px solid #e5e5ea', cursor: date <= todayISO() ? 'not-allowed' : 'pointer' }}>
+                        <ChevronLeft className="h-5 w-5" />
+                      </button>
+                      <input type="date" value={date} min={todayISO()}
+                        onChange={e => { if (e.target.value >= todayISO()) setDate(e.target.value); }}
+                        className="flex-1 rounded-xl border px-3 py-3 text-base outline-none"
+                        style={{ borderColor: '#e5e5ea', background: '#f2f2f7', color: '#1d1d1f', height: 50 }} />
+                      <button type="button"
+                        onClick={() => {
+                          const [y, m, d] = date.split('-').map(Number);
+                          const dt = new Date(y, m - 1, d + 1);
+                          setDate(`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`);
+                        }}
+                        className="flex-shrink-0 flex items-center justify-center rounded-xl transition-all"
+                        style={{ width: 42, height: 50, background: '#e8f0fe', color: '#0071e3', border: '1px solid #e5e5ea', cursor: 'pointer' }}>
+                        <ChevronRight className="h-5 w-5" />
+                      </button>
+                    </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold mb-1.5" style={{ color: '#86868b' }}>Time *</label>
+                    <label className="block text-sm font-semibold mb-2" style={{ color: '#3a3a3c' }}>Time *</label>
                     <select value={form.appointment_time} onChange={e => setForm(f => ({ ...f, appointment_time: e.target.value }))}
-                      className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none"
-                      style={{ borderColor: '#e5e5ea', background: '#f2f2f7', color: '#1d1d1f' }}>
+                      className="w-full rounded-xl border px-4 text-base outline-none"
+                      style={{ borderColor: '#e5e5ea', background: '#f2f2f7', color: '#1d1d1f', height: '50px' }}>
                       {TIME_SLOTS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                     </select>
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold mb-1.5" style={{ color: '#86868b' }}>Duration</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[30, 45, 60, 90, 120, 180].map(d => (
-                      <button key={d} onClick={() => setForm(f => ({ ...f, duration_minutes: String(d) }))}
-                        className="py-2 rounded-xl text-xs font-semibold transition-all"
-                        style={form.duration_minutes === String(d)
-                          ? { background: '#0071e3', color: '#fff' }
-                          : { background: '#f2f2f7', color: '#86868b', border: '1px solid #e5e5ea' }}>
-                        {d} min
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* ── Assign Staff ── */}
-                <div className="rounded-xl p-4 space-y-3" style={{ background: '#f2f2f7', border: '1px solid #e5e5ea' }}>
+                {/* 2. Services Requested */}
+                <div className="rounded-2xl p-5 space-y-3" style={{ background: '#f7f7f8', border: '1px solid #e5e5ea' }}>
                   <div className="flex items-center gap-2">
-                    <div className="h-1.5 w-1.5 rounded-full" style={{ background: '#0071e3' }} />
-                    <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#0071e3' }}>Assign Staff</p>
-                    <span className="text-xs" style={{ color: '#86868b' }}>(select multiple)</span>
-                  </div>
-                  {staff.length === 0
-                    ? <p className="text-xs" style={{ color: '#86868b' }}>No staff added yet — go to Staff page to add.</p>
-                    : <div className="flex flex-wrap gap-2">
-                        {staff.map(s => {
-                          const sel = form.staff_ids.includes(s.id);
-                          return (
-                            <button key={s.id} type="button"
-                              onClick={() => setForm(f => {
-                                const ids = sel ? f.staff_ids.filter(id => id !== s.id) : [...f.staff_ids, s.id];
-                                const names = sel ? f.staff_names.filter(n => n !== s.name) : [...f.staff_names, s.name];
-                                return { ...f, staff_ids: ids, staff_names: names };
-                              })}
-                              className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
-                              style={sel
-                                ? { background: '#0071e3', color: '#111' }
-                                : { background: '#ffffff', color: '#86868b', border: '1px solid #e5e5ea' }}>
-                              {sel ? '✓ ' : ''}{s.name} <span style={{ opacity: 0.6 }}>({s.role})</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                  }
-                </div>
-
-                {/* ── Services Requested ── */}
-                <div className="rounded-xl p-4 space-y-3" style={{ background: '#f2f2f7', border: '1px solid #e5e5ea' }}>
-                  <div className="flex items-center gap-2">
-                    <div className="h-1.5 w-1.5 rounded-full" style={{ background: '#0071e3' }} />
-                    <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#0071e3' }}>Services Requested</p>
+                    <div className="h-2 w-2 rounded-full" style={{ background: '#0071e3' }} />
+                    <p className="text-sm font-bold" style={{ color: '#0071e3' }}>Services</p>
                     {form.selected_services.length > 0 && (
-                      <span className="px-1.5 py-0.5 rounded-full text-xs font-bold" style={{ background: '#0071e3', color: '#ffffff', border: 'none', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,113,227,0.5), 0 1px 2px rgba(0,0,0,0.15)' }}>
+                      <span className="px-2 py-0.5 rounded-full text-xs font-bold" style={{ background: '#0071e3', color: '#ffffff' }}>
                         {form.selected_services.length} selected
                       </span>
                     )}
@@ -699,7 +669,7 @@ export function CarwashAppointmentsPage() {
                   {availableServices.length === 0 ? (
                     <input value={form.services_note} onChange={e => setForm(f => ({ ...f, services_note: e.target.value }))}
                       placeholder="e.g. Foam Wash + Vacuum + Wax"
-                      className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none"
+                      className="w-full rounded-xl border px-4 py-3 text-base outline-none"
                       style={{ borderColor: '#e5e5ea', background: '#ffffff', color: '#1d1d1f' }} />
                   ) : (
                     <div className="flex flex-wrap gap-2">
@@ -713,13 +683,13 @@ export function CarwashAppointmentsPage() {
                                 ? f.selected_services.filter(s => s !== svc.name)
                                 : [...f.selected_services, svc.name],
                             }))}
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all"
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
                             style={sel
-                              ? { background: '#0071e3', color: '#111', border: '1px solid transparent' }
-                              : { background: '#ffffff', color: '#86868b', border: '1px solid #e5e5ea' }}>
+                              ? { background: '#0071e3', color: '#ffffff', border: '1px solid transparent' }
+                              : { background: '#ffffff', color: '#3a3a3c', border: '1px solid #e5e5ea' }}>
                             {sel && <span>✓</span>}
                             <span>{svc.name}</span>
-                            <span style={{ opacity: 0.6 }}>{svc.duration_minutes}m</span>
+                            <span style={{ opacity: 0.55, fontSize: '12px' }}>{svc.duration_minutes}m</span>
                           </button>
                         );
                       })}
@@ -727,29 +697,82 @@ export function CarwashAppointmentsPage() {
                   )}
                 </div>
 
+                {/* 4. Assign Staff */}
+                <div className="rounded-2xl p-5 space-y-3" style={{ background: '#f7f7f8', border: '1px solid #e5e5ea' }}>
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full" style={{ background: '#0071e3' }} />
+                    <p className="text-sm font-bold" style={{ color: '#0071e3' }}>Assign Staff</p>
+                    <span className="text-xs" style={{ color: '#86868b' }}>(select multiple)</span>
+                  </div>
+                  {staff.length === 0
+                    ? <p className="text-sm" style={{ color: '#86868b' }}>No staff added yet — go to Staff page to add.</p>
+                    : <div className="flex flex-wrap gap-2">
+                        {staff.map(s => {
+                          const sel = form.staff_ids.includes(s.id);
+                          return (
+                            <button key={s.id} type="button"
+                              onClick={() => setForm(f => {
+                                const ids = sel ? f.staff_ids.filter(id => id !== s.id) : [...f.staff_ids, s.id];
+                                const names = sel ? f.staff_names.filter(n => n !== s.name) : [...f.staff_names, s.name];
+                                return { ...f, staff_ids: ids, staff_names: names };
+                              })}
+                              className="px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                              style={sel
+                                ? { background: '#0071e3', color: '#ffffff' }
+                                : { background: '#ffffff', color: '#3a3a3c', border: '1px solid #e5e5ea' }}>
+                              {sel ? '✓ ' : ''}{s.name} <span style={{ opacity: 0.55 }}>({s.role})</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                  }
+                </div>
+
+                {/* Notes */}
                 <div>
-                  <label className="block text-xs font-semibold mb-1.5" style={{ color: '#86868b' }}>Notes</label>
+                  <label className="block text-sm font-semibold mb-2" style={{ color: '#3a3a3c' }}>Notes</label>
                   <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                     placeholder="Any special requests or instructions…"
                     rows={3}
-                    className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none resize-none"
+                    className="w-full rounded-xl border px-4 py-3 text-base outline-none resize-none"
                     style={{ borderColor: '#e5e5ea', background: '#f2f2f7', color: '#1d1d1f' }} />
                 </div>
               </div>
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-end gap-3 px-7 py-4" style={{ borderTop: '1px solid #e5e5ea', background: '#f2f2f7' }}>
+            <div className="flex items-center justify-end gap-3 px-8 py-5" style={{ borderTop: '1px solid #e5e5ea', background: '#f7f7f8', flexShrink: 0, borderRadius: '0 0 24px 24px' }}>
               <button onClick={() => { setShowForm(false); setForm(emptyForm); setVehiclePicker([]); }}
-                className="px-6 py-2.5 rounded-xl text-sm font-medium transition-colors"
-                style={{ background: '#ffffff', color: '#86868b', border: '1px solid #e5e5ea' }}>
+                className="px-7 py-3 rounded-xl text-sm font-semibold transition-colors"
+                style={{ background: '#ffffff', color: '#6b6b6b', border: '1px solid #e5e5ea' }}>
                 Cancel
               </button>
-              <button onClick={() => createMutation.mutate()} disabled={createMutation.isPending}
-                className="px-8 py-2.5 rounded-xl font-bold text-sm text-white disabled:opacity-60 transition-opacity"
-                style={{ background: '#0071e3' }}>
-                {createMutation.isPending ? 'Booking…' : '📅 Book Appointment'}
-              </button>
+              {(() => {
+                const mins = availableServices
+                  .filter(s => form.selected_services.includes(s.name))
+                  .reduce((sum, s) => sum + (s.duration_minutes ?? 0), 0);
+                const durLabel = mins >= 60
+                  ? `${Math.floor(mins / 60)}h${mins % 60 > 0 ? ` ${mins % 60}m` : ''}`
+                  : mins > 0 ? `${mins}m` : null;
+                return (
+                  <button onClick={() => createMutation.mutate()} disabled={createMutation.isPending}
+                    className="px-10 py-3 rounded-xl font-bold text-base text-white disabled:opacity-60 transition-opacity flex items-center gap-2"
+                    style={{ background: '#0071e3', boxShadow: '0 2px 8px rgba(0,113,227,0.4)' }}>
+                    {createMutation.isPending ? 'Booking…' : (
+                      <>
+                        <span>📅 Book Appointment</span>
+                        {durLabel && (
+                          <span className="px-2 py-0.5 rounded-lg text-sm font-semibold"
+                            style={{ background: 'rgba(255,255,255,0.2)', letterSpacing: '0.2px' }}>
+                            {durLabel}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </button>
+                );
+              })()}
+
             </div>
           </div>
         </div>

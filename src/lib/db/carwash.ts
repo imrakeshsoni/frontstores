@@ -1506,3 +1506,166 @@ export async function listTopLoyaltyCustomers(tenantId: string): Promise<Carwash
     [tenantId]
   );
 }
+
+// [carwash] [all tenants] — detect customers that look like duplicates
+// Groups by (a) same vehicle reg_number used with different phones, (b) same phone in multiple customer records
+export type DuplicateEntry = {
+  customer_id: string | null;
+  customer_name: string;
+  phone: string;
+  job_count: number;
+  last_seen: string;
+};
+export type DuplicateGroup = {
+  key: string;           // reg_number or phone
+  reason: 'vehicle' | 'phone';
+  display: string;       // human-readable label
+  entries: DuplicateEntry[];
+};
+
+export async function findDuplicateCustomerGroups(tenantId: string): Promise<DuplicateGroup[]> {
+  const db = await getDb();
+
+  // Group 1: same vehicle reg used with different customer phones in carwash_jobs
+  const vehicleRows = await db.select<any[]>(
+    `WITH base AS (
+       SELECT
+         UPPER(REPLACE(REPLACE(reg_number,' ',''),'-','')) AS reg,
+         REPLACE(REPLACE(REPLACE(customer_phone,'+',''),' ',''),'-','') AS phone,
+         MAX(customer_name) AS cname,
+         COUNT(*) AS job_count,
+         MAX(created_at) AS last_seen
+       FROM carwash_jobs
+       WHERE tenant_id = ?
+         AND deleted_at IS NULL
+         AND reg_number IS NOT NULL AND TRIM(reg_number) != ''
+         AND customer_phone IS NOT NULL AND TRIM(customer_phone) != ''
+       GROUP BY reg, phone
+     ),
+     dup_regs AS (
+       SELECT reg FROM base GROUP BY reg HAVING COUNT(*) > 1
+     )
+     SELECT b.reg, b.phone, b.cname, b.job_count, b.last_seen,
+            c.id AS customer_id
+     FROM base b
+     JOIN dup_regs d ON b.reg = d.reg
+     LEFT JOIN customers c ON c.tenant_id = ? AND REPLACE(REPLACE(REPLACE(c.phone,'+',''),' ',''),'-','') = b.phone AND c.deleted_at IS NULL
+     ORDER BY b.reg, b.last_seen DESC`,
+    [tenantId, tenantId]
+  );
+
+  // Group 2: same phone exists across multiple customer records (edge case)
+  const phoneRows = await db.select<any[]>(
+    `SELECT c.phone,
+            c.id AS customer_id,
+            c.name AS cname,
+            0 AS job_count,
+            c.created_at AS last_seen
+     FROM customers c
+     WHERE c.tenant_id = ? AND c.phone IS NOT NULL AND c.phone != '' AND c.deleted_at IS NULL
+       AND (SELECT COUNT(*) FROM customers c2 WHERE c2.tenant_id = ? AND c2.deleted_at IS NULL
+              AND REPLACE(REPLACE(REPLACE(c2.phone,'+',''),' ',''),'-','') = REPLACE(REPLACE(REPLACE(c.phone,'+',''),' ',''),'-','')) > 1
+     ORDER BY c.phone, c.created_at DESC`,
+    [tenantId, tenantId]
+  );
+
+  const groups: DuplicateGroup[] = [];
+
+  // Build vehicle groups
+  const vehicleMap = new Map<string, DuplicateEntry[]>();
+  for (const row of vehicleRows) {
+    const list = vehicleMap.get(row.reg) ?? [];
+    list.push({ customer_id: row.customer_id ?? null, customer_name: row.cname ?? 'Unknown', phone: row.phone, job_count: row.job_count, last_seen: row.last_seen });
+    vehicleMap.set(row.reg, list);
+  }
+  for (const [reg, entries] of vehicleMap) {
+    groups.push({ key: reg, reason: 'vehicle', display: reg, entries });
+  }
+
+  // Build phone groups
+  const phoneMap = new Map<string, DuplicateEntry[]>();
+  for (const row of phoneRows) {
+    const cleaned = row.phone?.replace(/\D/g, '') ?? '';
+    const list = phoneMap.get(cleaned) ?? [];
+    if (!list.find(e => e.customer_id === row.customer_id)) {
+      list.push({ customer_id: row.customer_id, customer_name: row.cname, phone: cleaned, job_count: row.job_count, last_seen: row.last_seen });
+    }
+    phoneMap.set(cleaned, list);
+  }
+  for (const [phone, entries] of phoneMap) {
+    // Don't duplicate a group already captured by vehicle matching
+    groups.push({ key: phone, reason: 'phone', display: phone, entries });
+  }
+
+  return groups;
+}
+
+// [carwash] [all tenants] — merge duplicate customers into one primary
+// Reassigns all jobs/vehicles/appointments to primary, soft-deletes duplicates
+export async function mergeCustomers(
+  tenantId: string,
+  keepId: string,
+  removeIds: string[]
+): Promise<void> {
+  const db = await getDb();
+  const nowTs = now();
+
+  // Fetch primary customer
+  const primRows = await db.select<any[]>(
+    `SELECT * FROM customers WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL LIMIT 1`,
+    [keepId, tenantId]
+  );
+  if (!primRows.length) throw new Error('Primary customer not found');
+  const primary = primRows[0];
+
+  for (const dupId of removeIds) {
+    const dupRows = await db.select<any[]>(
+      `SELECT * FROM customers WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL LIMIT 1`,
+      [dupId, tenantId]
+    );
+    if (!dupRows.length) continue;
+    const dup = dupRows[0];
+    const dupPhone = dup.phone?.replace(/\D/g, '') ?? '';
+
+    // Reassign carwash_jobs
+    await db.execute(
+      `UPDATE carwash_jobs SET customer_id=?, customer_name=?, customer_phone=?, updated_at=?
+       WHERE tenant_id=? AND deleted_at IS NULL AND (customer_id=? OR REPLACE(REPLACE(REPLACE(customer_phone,'+',''),' ',''),'-','')=?)`,
+      [keepId, primary.name, primary.phone, nowTs, tenantId, dupId, dupPhone]
+    );
+
+    // Reassign carwash_vehicles
+    await db.execute(
+      `UPDATE carwash_vehicles SET customer_id=?, customer_name=?, customer_phone=?, updated_at=?
+       WHERE tenant_id=? AND deleted_at IS NULL AND (customer_id=? OR REPLACE(REPLACE(REPLACE(customer_phone,'+',''),' ',''),'-','')=?)`,
+      [keepId, primary.name, primary.phone, nowTs, tenantId, dupId, dupPhone]
+    );
+
+    // Reassign carwash_appointments
+    await db.execute(
+      `UPDATE carwash_appointments SET customer_phone=?, customer_name=?, updated_at=?
+       WHERE tenant_id=? AND deleted_at IS NULL AND REPLACE(REPLACE(REPLACE(customer_phone,'+',''),' ',''),'-','')=?`,
+      [primary.phone, primary.name, nowTs, tenantId, dupPhone]
+    );
+
+    // Transfer loyalty points — add dup's points to primary's loyalty record
+    const loyaltyRows = await db.select<any[]>(
+      `SELECT total_points, redeemed_points FROM carwash_loyalty WHERE tenant_id=? AND customer_phone=? AND deleted_at IS NULL LIMIT 1`,
+      [tenantId, dupPhone]
+    );
+    if (loyaltyRows.length > 0) {
+      const pts = loyaltyRows[0].total_points - loyaltyRows[0].redeemed_points;
+      if (pts > 0 && primary.phone) {
+        await db.execute(
+          `UPDATE carwash_loyalty SET total_points = total_points + ?, updated_at=? WHERE tenant_id=? AND customer_phone=? AND deleted_at IS NULL`,
+          [pts, nowTs, tenantId, primary.phone.replace(/\D/g, '')]
+        );
+      }
+      // Soft-delete dup loyalty record
+      await db.execute(`UPDATE carwash_loyalty SET deleted_at=? WHERE tenant_id=? AND customer_phone=?`, [nowTs, tenantId, dupPhone]);
+    }
+
+    // Soft-delete duplicate customer
+    await db.execute(`UPDATE customers SET deleted_at=?, updated_at=? WHERE id=? AND tenant_id=?`, [nowTs, nowTs, dupId, tenantId]);
+  }
+}

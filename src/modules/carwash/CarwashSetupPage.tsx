@@ -72,7 +72,8 @@ function VehiclesTab({ tenantId }: { tenantId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between py-2"
+        style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f5f5f7' }}>
         <p className="text-sm font-medium" style={{ color: '#86868b' }}>Define the types of vehicles you service.</p>
         <div className="flex gap-2">
           {types.length === 0 && (
@@ -256,7 +257,8 @@ function ServicesTab({ tenantId }: { tenantId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between py-2"
+        style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f5f5f7' }}>
         <p className="text-sm font-medium" style={{ color: '#86868b' }}>Set prices for each service per vehicle type. Click any price to edit.</p>
         <button onClick={openAddSvc}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white"
@@ -417,7 +419,8 @@ function StaffTab({ tenantId }: { tenantId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between py-2"
+        style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f5f5f7' }}>
         <p className="text-sm font-medium" style={{ color: '#86868b' }}>Manage your wash team, salaries and deduction rules.</p>
         <button onClick={openAdd} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white" style={{ background: '#0071e3' }}>
           <Plus className="h-4 w-4" /> Add Staff
@@ -543,24 +546,24 @@ export function CarwashSetupPage() {
         </div>
       </div>
 
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-5">
-
-      {/* Tab bar */}
-      <div className="flex gap-1 p-1 rounded-2xl" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
-        {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
-            style={{ background: tab === t.id ? '#0071e3' : 'transparent', color: tab === t.id ? '#ffffff' : '#86868b' }}>
-            {t.icon} {t.label}
-          </button>
-        ))}
+      {/* [carwash] [all tenants] — Tab bar: outside scroll so it never moves */}
+      <div className="px-6 py-3" style={{ background: '#f5f5f7', flexShrink: 0, borderBottom: '1px solid #e5e5ea' }}>
+        <div className="flex gap-1 p-1 rounded-2xl" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          {TABS.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
+              style={{ background: tab === t.id ? '#0071e3' : 'transparent', color: tab === t.id ? '#ffffff' : '#86868b' }}>
+              {t.icon} {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {tab === 'vehicles'   && <VehiclesTab   tenantId={tenantId} />}
-      {tab === 'services'   && <ServicesTab   tenantId={tenantId} />}
-      {tab === 'staff'      && <StaffTab      tenantId={tenantId} />}
-
+      {/* Scrollable content — only tab body scrolls */}
+      <div className="flex-1 overflow-y-auto px-6 py-5">
+        {tab === 'vehicles'   && <VehiclesTab   tenantId={tenantId} />}
+        {tab === 'services'   && <ServicesTab   tenantId={tenantId} />}
+        {tab === 'staff'      && <StaffTab      tenantId={tenantId} />}
       </div>
     </div>
   );

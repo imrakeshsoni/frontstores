@@ -82,91 +82,170 @@ export function JobsListPage() {
 
   const renderCard = (j: (typeof jobs)[0]) => {
     const sc = STATUS_COLORS[j.status] ?? STATUS_COLORS.delivered;
+    const vehicleEmoji = j.vehicle_type === 'hatchback' ? '🚗' : j.vehicle_type === 'suv' ? '🚐' : j.vehicle_type === 'luxury' ? '🏎️' : '🚙';
+    const services = (j.items ?? []) as { service_name: string }[];
+    const carLabel = [j.make, j.model].filter(Boolean).join(' ') || j.vehicle_type || '';
     return (
       <div key={j.id} onClick={() => navigate(`/carwash/jobs/${j.id}`)}
-        className="rounded-2xl p-4 cursor-pointer hover:shadow-md transition-shadow flex items-center justify-between gap-4"
-        style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 text-lg"
-            style={{ background: sc.bg }}>
-            {j.vehicle_type === 'hatchback' ? '🚗' : j.vehicle_type === 'suv' ? '🚐' : j.vehicle_type === 'luxury' ? '🏎️' : '🚙'}
+        className="rounded-2xl cursor-pointer transition-shadow hover:shadow-lg"
+        style={{ background: 'var(--surface)', boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.05)', border: `1px solid ${sc.bg}` }}>
+
+        {/* Top row — reg number + status + amount */}
+        <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="text-xl flex-shrink-0">{vehicleEmoji}</span>
+            <div className="min-w-0">
+              <span className="font-bold" style={{ color: 'var(--text-primary)', fontSize: '17px', letterSpacing: '-0.3px' }}>
+                {j.reg_number}
+              </span>
+              <span className="ml-2 text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>{j.job_number}</span>
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="font-bold text-sm" style={{ color: '#1d1d1f' }}>
-              {j.reg_number}
-              <span className="ml-2 text-xs font-normal" style={{ color: '#86868b' }}>{j.job_number}</span>
-            </p>
-            <p className="text-xs" style={{ color: '#86868b' }}>
-              {[j.make, j.model].filter(Boolean).join(' ') || j.vehicle_type} · {j.customer_name || 'Walk-in'}
-              {j.staff_name ? ` · 👤 ${j.staff_name}` : ''}
-            </p>
-            <p className="text-xs mt-0.5" style={{ color: '#86868b' }}>
-              {(j.items ?? []).slice(0, 2).map((i: any) => i.service_name).join(', ')}
-              {(j.items ?? []).length > 2 ? ` +${(j.items ?? []).length - 2}` : ''}
-            </p>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-sm font-bold" style={{ color: 'var(--accent)' }}>{fmt(j.total)}</span>
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full"
+              style={{ background: sc.bg, color: sc.color }}>
+              {STATUS_LABELS[j.status]}
+            </span>
           </div>
         </div>
-        <div className="text-right flex-shrink-0">
-          <p className="font-bold text-sm" style={{ color: '#0071e3' }}>{fmt(j.total)}</p>
-          <span className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full mt-1"
-            style={{ background: sc.bg, color: sc.color }}>
-            {STATUS_LABELS[j.status]}
-          </span>
-          <p className="text-xs mt-1" style={{ color: '#86868b' }}>{fmtDate(j.created_at)}</p>
+
+        {/* Middle row — customer + car + staff */}
+        <div className="flex items-center gap-4 px-4 pb-2" style={{ borderBottom: '1px solid var(--surface-border)' }}>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>👤</span>
+            <span className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+              {j.customer_name || 'Walk-in'}
+            </span>
+          </div>
+          {carLabel && (
+            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>·</span>
+          )}
+          {carLabel && (
+            <span className="text-sm truncate" style={{ color: 'var(--text-primary)' }}>{carLabel}</span>
+          )}
+          {j.staff_name && (
+            <>
+              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>·</span>
+              <span className="text-sm" style={{ color: 'var(--text-primary)' }}>🔧 {j.staff_name}</span>
+            </>
+          )}
+        </div>
+
+        {/* Bottom row — services + time */}
+        <div className="flex items-center justify-between gap-3 px-4 py-2.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {services.slice(0, 3).map((svc, i) => (
+              <span key={i} className="text-xs font-medium px-2 py-0.5 rounded-md"
+                style={{ background: sc.bg, color: sc.color }}>
+                {svc.service_name}
+              </span>
+            ))}
+            {services.length > 3 && (
+              <span className="text-xs font-medium px-2 py-0.5 rounded-md" style={{ background: '#f2f2f7', color: '#6b6b6b' }}>
+                +{services.length - 3} more
+              </span>
+            )}
+            {services.length === 0 && (
+              <span className="text-xs" style={{ color: '#aeaeb2' }}>No services</span>
+            )}
+          </div>
+          <span className="text-xs flex-shrink-0 font-medium" style={{ color: '#6b6b6b' }}>{fmtDate(j.created_at)}</span>
         </div>
       </div>
     );
   };
 
-  return (
-    <div className="flex flex-col" style={{ background: '#f5f5f7', height: '100%', overflow: 'hidden' }}>
+  // [carwash] [all tenants] — tab config for the full-width status strip
+  const STATUS_TABS = [
+    { id: 'all',         label: 'All',         count: allCount,       color: '#0071e3', activeText: '#0071e3' },
+    { id: 'waiting',     label: 'Waiting',     count: waitingCount,   color: '#d97706', activeText: '#d97706' },
+    { id: 'in_progress', label: 'In Progress', count: progressCount,  color: '#2563eb', activeText: '#2563eb' },
+    { id: 'ready',       label: 'Ready',       count: readyCount,     color: '#16a34a', activeText: '#16a34a' },
+    { id: 'delivered',   label: 'Delivered',   count: deliveredCount, color: '#6b7280', activeText: '#6b7280' },
+  ];
 
-      {/* Header — floating white plate */}
+  return (
+    <div className="flex flex-col" style={{ background: 'var(--bg)', height: '100%', overflow: 'hidden' }}>
+
+      {/* Header */}
       <div className="px-6 py-4 flex items-center justify-between"
-        style={{ background: '#ffffff', boxShadow: '0 2px 12px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2)', position: 'relative', zIndex: 10 }}>
+        style={{ background: 'var(--surface)', borderBottom: '1px solid var(--surface-border)', position: 'relative', zIndex: 10 }}>
         <div>
-          <p className="text-xs uppercase tracking-widest mb-0.5" style={{ color: '#86868b', letterSpacing: '0.08em' }}>Car Wash</p>
-          <h1 className="text-2xl font-semibold" style={{ color: '#1d1d1f', letterSpacing: '-0.5px' }}>Job Cards</h1>
-          <p className="text-xs mt-0.5" style={{ color: '#86868b' }}>
+          <p className="text-xs uppercase tracking-widest mb-0.5" style={{ color: 'var(--text-secondary)', letterSpacing: '0.08em' }}>Car Wash</p>
+          <h1 className="text-2xl font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>Job Cards</h1>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
             {allCount} total · sorted latest first
           </p>
         </div>
         <button onClick={() => navigate('/carwash/jobs/new')}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm"
-          style={{ background: '#0071e3', color: '#ffffff', border: 'none', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,113,227,0.5), 0 1px 2px rgba(0,0,0,0.15)' }}>
+          style={{ background: 'var(--accent)', color: '#ffffff', border: 'none', cursor: 'pointer' }}>
           <Plus className="h-4 w-4" /> New Job
         </button>
+      </div>
+
+      {/* [carwash] [all tenants] — Full-width Apple-style status tab strip */}
+      <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--surface-border)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', width: '100%' }}>
+          {STATUS_TABS.map(({ id, label, count, color }, idx) => {
+            const isActive = filter === id;
+            const isLast = idx === STATUS_TABS.length - 1;
+            return (
+              <button
+                key={id}
+                onClick={() => handleFilterChange(id)}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '2px',
+                  padding: '16px 4px',
+                  background: isActive ? `${color}18` : 'transparent',
+                  borderBottom: isActive ? `3px solid ${color}` : '3px solid transparent',
+                  borderRight: isLast ? 'none' : '1px solid var(--surface-border)',
+                  cursor: 'pointer',
+                  transition: 'background 0.15s ease, border-color 0.15s ease',
+                  outline: 'none',
+                }}>
+                <span style={{
+                  fontSize: '22px',
+                  fontWeight: 700,
+                  lineHeight: 1,
+                  color: isActive ? color : 'var(--text-primary)',
+                  letterSpacing: '-0.5px',
+                }}>
+                  {count}
+                </span>
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: isActive ? 600 : 500,
+                  color: isActive ? color : 'var(--text-secondary)',
+                  letterSpacing: '0.01em',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto p-6 space-y-5">
 
-      {/* Date filter + status tabs */}
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <input type="date" value={date} onChange={(e) => handleDateChange(e.target.value)}
-            className="rounded-xl border px-3 py-2 text-sm outline-none"
-            style={{ borderColor: '#e5e5ea', background: '#ffffff', color: '#1d1d1f' }} />
-          {date
-            ? <button onClick={() => handleDateChange('')} className="text-xs px-2.5 py-1.5 rounded-lg font-semibold" style={{ background: '#f2f2f7', color: '#86868b', border: '1px solid #e5e5ea' }}>✕ Clear Date</button>
-            : <button onClick={() => handleDateChange(todayISO())} className="text-xs px-2.5 py-1.5 rounded-lg font-semibold" style={{ background: '#0071e3', color: '#111' }}>Today</button>
-          }
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {(['all', 'waiting', 'in_progress', 'ready', 'delivered'] as const).map(s => {
-            const cnt = s === 'all' ? allCount : (STATUS_COUNTS[s] ?? 0);
-            const sc = STATUS_COLORS[s] ?? { color: '#6b7280', bg: '#f3f4f6' };
-            return (
-              <button key={s} onClick={() => handleFilterChange(s)}
-                className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
-                style={filter === s
-                  ? { background: s === 'all' ? '#0071e3' : sc.color, color: '#fff' }
-                  : { background: sc.bg, color: s === 'all' ? '#86868b' : sc.color }}>
-                {s === 'all' ? 'All' : STATUS_LABELS[s]}{cnt > 0 ? ` (${cnt})` : ''}
-              </button>
-            );
-          })}
-        </div>
+      {/* Date filter */}
+      <div className="flex items-center gap-2">
+        <input type="date" value={date} onChange={(e) => handleDateChange(e.target.value)}
+          className="rounded-xl border px-3 py-2 text-sm outline-none"
+          style={{ borderColor: 'var(--surface-border)', background: 'var(--surface)', color: 'var(--text-primary)' }} />
+        {date
+          ? <button onClick={() => handleDateChange('')} className="text-xs px-2.5 py-1.5 rounded-lg font-semibold" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--surface-border)' }}>✕ Clear Date</button>
+          : <button onClick={() => handleDateChange(todayISO())} className="text-xs px-2.5 py-1.5 rounded-lg font-semibold" style={{ background: 'var(--accent)', color: '#fff' }}>Today</button>
+        }
       </div>
 
       {/* Jobs list */}
@@ -180,7 +259,7 @@ export function JobsListPage() {
           <>
             {activeJobs.length > 0 && (
               <>
-                <p className="text-xs font-bold uppercase tracking-wider pt-1" style={{ color: '#0071e3' }}>
+                <p className="text-xs font-bold uppercase tracking-wider pt-1" style={{ color: 'var(--accent)' }}>
                   Active — {activeJobs.length} job{activeJobs.length !== 1 ? 's' : ''}
                 </p>
                 {activeJobs.map(renderCard)}
@@ -195,9 +274,9 @@ export function JobsListPage() {
               </>
             )}
             {activeJobs.length === 0 && deliveredJobs.length === 0 && (
-              <div className="rounded-2xl p-10 flex flex-col items-center gap-3" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div className="rounded-2xl p-10 flex flex-col items-center gap-3" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
                 <Car className="h-10 w-10 opacity-30" />
-                <p className="text-sm" style={{ color: '#86868b' }}>No job cards yet</p>
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>No job cards yet</p>
               </div>
             )}
           </>
@@ -207,9 +286,9 @@ export function JobsListPage() {
         {!isLoading && filter !== 'all' && (
           <>
             {singleStatus.length === 0 ? (
-              <div className="rounded-2xl p-10 flex flex-col items-center gap-3" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div className="rounded-2xl p-10 flex flex-col items-center gap-3" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
                 <Car className="h-10 w-10 opacity-30" />
-                <p className="text-sm" style={{ color: '#86868b' }}>No {STATUS_LABELS[filter]?.toLowerCase()} jobs</p>
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>No {STATUS_LABELS[filter]?.toLowerCase()} jobs</p>
               </div>
             ) : singleStatus.map(renderCard)}
           </>

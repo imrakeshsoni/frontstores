@@ -36,7 +36,7 @@ type SettingsForm = {
 
 export function SettingsPage() {
   const config = useAppStore((s) => s.config);
-  const { loadConfig } = useAppStore();
+  const { refreshConfig } = useAppStore();
   const { theme, toggleTheme } = useTheme();
   const tenantId = config?.tenant_id ?? '';
 
@@ -218,7 +218,7 @@ export function SettingsPage() {
           maxLoginAttempts: form.maxLoginAttempts,
         } as Record<string, unknown>,
       });
-      await loadConfig();
+      await refreshConfig();
     },
     onSuccess: () => { toast.success('Settings saved'); setIsEditing(false); },
     onError: (err: any) => toast.error(err.message ?? 'Unable to save settings'),
@@ -471,7 +471,7 @@ export function SettingsPage() {
               const currentlyEnabled = config?.settings?.enable_gst !== false;
               const newSettings = { ...(config?.settings ?? {}), enable_gst: !currentlyEnabled };
               await updateAppConfig({ settings: newSettings });
-              await loadConfig();
+              await refreshConfig();
             }}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all"
             style={{ background: 'var(--accent)', color: 'var(--on-accent, #fff)' }}>
@@ -733,7 +733,7 @@ export function SettingsPage() {
 
 // [all apps] [all tenants] — WhatsApp Business API settings section
 function WhatsAppBusinessSection() {
-  const { config, loadConfig } = useAppStore();
+  const { config, refreshConfig } = useAppStore();
   const [phoneId, setPhoneId] = useState((config?.settings?.wa_phone_id as string) ?? '');
   const [token, setToken]     = useState((config?.settings?.wa_token as string) ?? '');
   const [testing, setTesting] = useState(false);
@@ -744,7 +744,7 @@ function WhatsAppBusinessSection() {
   const handleSave = async () => {
     if (!phoneId.trim() || !token.trim()) { toast.error('Both fields are required'); return; }
     await updateAppConfig({ settings: { ...(config?.settings ?? {}), wa_phone_id: phoneId.trim(), wa_token: token.trim() } });
-    await loadConfig();
+    await refreshConfig();
     toast.success('WhatsApp Business API credentials saved');
     setStatus('idle');
   };
@@ -763,7 +763,7 @@ function WhatsAppBusinessSection() {
     const s = { ...(config?.settings ?? {}) };
     delete s.wa_phone_id; delete s.wa_token;
     await updateAppConfig({ settings: s });
-    await loadConfig();
+    await refreshConfig();
     setPhoneId(''); setToken(''); setStatus('idle');
     toast.success('Credentials removed');
   };
@@ -829,21 +829,22 @@ function WhatsAppBusinessSection() {
 
 // ── Section PIN Lock ─────────────────────────────────────────────────────────
 // [carwash] [all tenants] — lock individual sections behind a 6-digit PIN
+// [carwash] [all tenants] — matches CARWASH_NAV_ITEMS exactly
 const PIN_SECTIONS = [
-  { key: 'pin_lock_dashboard',     label: 'Dashboard' },
-  { key: 'pin_lock_jobs',          label: 'Job Cards' },
-  { key: 'pin_lock_appointments',  label: 'Appointments' },
-  { key: 'pin_lock_inventory',     label: 'Inventory' },
-  { key: 'pin_lock_customers',     label: 'Customers' },
-  { key: 'pin_lock_expenses',      label: 'Expenses' },
-  { key: 'pin_lock_reports',       label: 'Reports' },
-  { key: 'pin_lock_broadcast',     label: 'Broadcast' },
-  { key: 'pin_lock_vehicle_types', label: 'Vehicle Types' },
-  { key: 'pin_lock_setup',         label: 'Setup' },
+  { key: 'pin_lock_dashboard',    label: 'Dashboard' },
+  { key: 'pin_lock_jobs',         label: 'Job Cards' },
+  { key: 'pin_lock_appointments', label: 'Appointments' },
+  { key: 'pin_lock_inventory',    label: 'Inventory' },
+  { key: 'pin_lock_customers',    label: 'Customers' },
+  { key: 'pin_lock_reports',      label: 'Reports' },
+  { key: 'pin_lock_broadcast',    label: 'Broadcast' },
+  { key: 'pin_lock_attendance',   label: 'Attendance' },
+  { key: 'pin_lock_setup',        label: 'Setup' },
 ];
 
 function SectionPinLockSection() {
-  const { config, loadConfig } = useAppStore();
+  // [carwash] [all tenants] — use refreshConfig (no isLoading flash) so page doesn't scroll to top on toggle
+  const { config, refreshConfig } = useAppStore();
   const settings = config?.settings ?? {};
   const savedPin = (settings['pin_lock_code'] as string) ?? '';
   const hasPin = savedPin.length === 6;
@@ -857,7 +858,7 @@ function SectionPinLockSection() {
 
   const saveSettings = async (updates: Record<string, unknown>) => {
     await updateAppConfig({ settings: { ...settings, ...updates } });
-    await loadConfig();
+    await refreshConfig();
   };
 
   const handleToggle = async (key: string, value: boolean) => {

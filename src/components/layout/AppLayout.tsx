@@ -74,6 +74,9 @@ import {
   ArrowLeftRight,
   ShirtIcon,
   Bug,
+  UserMinus,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { getShopTypeLabel } from '@/lib/shop/shopType';
@@ -497,6 +500,12 @@ const CARWASH_NAV_ITEMS = [
   { to: '/carwash/setup',         icon: Wrench,          label: 'Setup',         iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
 ];
 
+// [carwash] [all tenants] — employee mode shows only Job Cards + Appointments
+const CARWASH_EMPLOYEE_NAV_ITEMS = [
+  { to: '/carwash/jobs',         icon: ClipboardCheck, label: 'Job Cards',    iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
+  { to: '/carwash/appointments', icon: Calendar,       label: 'Appointments', iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
+];
+
 // [tyrescrap] [all tenants]
 const TYRESCRAP_NAV_ITEMS = [
   { to: '/tyrescrap/dashboard', icon: LayoutDashboard, label: 'Dashboard',  iconBg: '#dcfce7', iconColor: '#16a34a' },
@@ -514,12 +523,19 @@ export function AppLayout() {
   const navigate = useNavigate();
   const [showSwitchModal, setShowSwitchModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  // [carwash] [all tenants] — employee mode
+  const [isEmployeeMode, setIsEmployeeMode] = useState(false);
+  const [showOwnerLogin, setShowOwnerLogin] = useState(false);
+  const [ownerLoginUser, setOwnerLoginUser] = useState('');
+  const [ownerLoginPass, setOwnerLoginPass] = useState('');
+  const [ownerLoginError, setOwnerLoginError] = useState('');
+  const [showOwnerPass, setShowOwnerPass] = useState(false);
   // pick correct nav based on shop type
   const reRole = (config?.settings as any)?.re_role ?? 'resale';
   const activeNavItems =
     config?.shop_type === 'restaurant'  ? RESTAURANT_NAV_ITEMS :
     config?.shop_type === 'grocery'     ? GROCERY_NAV_ITEMS :
-    config?.shop_type === 'carwash'     ? CARWASH_NAV_ITEMS :
+    config?.shop_type === 'carwash'     ? (isEmployeeMode ? CARWASH_EMPLOYEE_NAV_ITEMS : CARWASH_NAV_ITEMS) :
     config?.shop_type === 'clinic'      ? CLINIC_NAV_ITEMS :
     config?.shop_type === 'beauty'      ? BEAUTY_NAV_ITEMS :
     config?.shop_type === 'study'       ? STUDY_NAV_ITEMS :
@@ -650,30 +666,51 @@ export function AppLayout() {
               {/* Menu */}
               <div className="absolute bottom-full left-0 right-0 mb-2 mx-0 rounded-2xl overflow-hidden shadow-xl z-50"
                 style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
-                <NavLink to="/sync" onClick={() => setShowUserMenu(false)}
-                  className="flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors hover:opacity-80"
-                  style={{ color: 'var(--text-primary)', borderBottom: '1px solid var(--surface-border)' }}>
-                  <RefreshCw className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--text-tertiary)' }} />
-                  Sync
-                </NavLink>
-                <NavLink to="/settings" onClick={() => setShowUserMenu(false)}
-                  className="flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors hover:opacity-80"
-                  style={{ color: 'var(--text-primary)', borderBottom: '1px solid var(--surface-border)' }}>
-                  <Settings className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--text-tertiary)' }} />
-                  Settings &amp; Updates
-                </NavLink>
-                <button onClick={() => { setShowUserMenu(false); setShowSwitchModal(true); }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors hover:opacity-80"
-                  style={{ color: 'var(--text-primary)', borderBottom: '1px solid var(--surface-border)' }}>
-                  <ArrowLeftRight className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--text-tertiary)' }} />
-                  Switch App
-                </button>
-                <button onClick={() => { setShowUserMenu(false); setAuthenticated(false); }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors hover:opacity-80"
-                  style={{ color: '#f87171' }}>
-                  <LogOut className="h-4 w-4 flex-shrink-0" />
-                  Logout
-                </button>
+                {/* [carwash] [all tenants] — employee mode: show only "Login as Owner" */}
+                {config?.shop_type === 'carwash' && isEmployeeMode ? (
+                  <button onClick={() => { setShowUserMenu(false); setOwnerLoginUser(''); setOwnerLoginPass(''); setOwnerLoginError(''); setShowOwnerLogin(true); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors hover:opacity-80"
+                    style={{ color: 'var(--text-primary)' }}>
+                    <LogIn className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--text-tertiary)' }} />
+                    Login as Owner
+                  </button>
+                ) : (
+                  <>
+                    <NavLink to="/sync" onClick={() => setShowUserMenu(false)}
+                      className="flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors hover:opacity-80"
+                      style={{ color: 'var(--text-primary)', borderBottom: '1px solid var(--surface-border)' }}>
+                      <RefreshCw className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--text-tertiary)' }} />
+                      Sync
+                    </NavLink>
+                    <NavLink to="/settings" onClick={() => setShowUserMenu(false)}
+                      className="flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors hover:opacity-80"
+                      style={{ color: 'var(--text-primary)', borderBottom: '1px solid var(--surface-border)' }}>
+                      <Settings className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--text-tertiary)' }} />
+                      Settings &amp; Updates
+                    </NavLink>
+                    <button onClick={() => { setShowUserMenu(false); setShowSwitchModal(true); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors hover:opacity-80"
+                      style={{ color: 'var(--text-primary)', borderBottom: '1px solid var(--surface-border)' }}>
+                      <ArrowLeftRight className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--text-tertiary)' }} />
+                      Switch App
+                    </button>
+                    {/* [carwash] [all tenants] — Login as Employee option */}
+                    {config?.shop_type === 'carwash' && (
+                      <button onClick={() => { setShowUserMenu(false); setIsEmployeeMode(true); navigate('/carwash/jobs'); }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors hover:opacity-80"
+                        style={{ color: 'var(--text-primary)', borderBottom: '1px solid var(--surface-border)' }}>
+                        <UserMinus className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--text-tertiary)' }} />
+                        Login as Employee
+                      </button>
+                    )}
+                    <button onClick={() => { setShowUserMenu(false); setAuthenticated(false); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors hover:opacity-80"
+                      style={{ color: '#f87171' }}>
+                      <LogOut className="h-4 w-4 flex-shrink-0" />
+                      Logout
+                    </button>
+                  </>
+                )}
               </div>
             </>
           )}
@@ -770,6 +807,93 @@ export function AppLayout() {
       </div>
       {/* [core] [all tenants] — Switch App modal */}
       {showSwitchModal && <SwitchAppModal onClose={() => setShowSwitchModal(false)} />}
+
+      {/* [carwash] [all tenants] — Owner login modal (used to exit employee mode) */}
+      {showOwnerLogin && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div className="w-full max-w-sm rounded-2xl p-6 shadow-2xl" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
+            <div className="flex items-center gap-3 mb-5">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'var(--accent-soft)' }}>
+                <LogIn className="h-5 w-5" style={{ color: 'var(--accent)' }} />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Login as Owner</h2>
+                <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Enter your credentials to continue</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Username</label>
+                <input
+                  type="text"
+                  value={ownerLoginUser}
+                  onChange={e => { setOwnerLoginUser(e.target.value); setOwnerLoginError(''); }}
+                  placeholder="Enter username"
+                  className="w-full rounded-xl border px-3 py-2.5 text-sm outline-none focus:ring-2"
+                  style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }}
+                  onKeyDown={e => e.key === 'Enter' && document.getElementById('owner-pass-input')?.focus()}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Password</label>
+                <div className="relative">
+                  <input
+                    id="owner-pass-input"
+                    type={showOwnerPass ? 'text' : 'password'}
+                    value={ownerLoginPass}
+                    onChange={e => { setOwnerLoginPass(e.target.value); setOwnerLoginError(''); }}
+                    placeholder="Enter password"
+                    className="w-full rounded-xl border px-3 py-2.5 text-sm outline-none focus:ring-2 pr-10"
+                    style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        const savedUser = (config?.settings as any)?.owner_username || config?.owner_name || '';
+                        const savedPass = (config?.settings as any)?.owner_password || '1234';
+                        if (ownerLoginUser.trim() === savedUser.trim() && ownerLoginPass === savedPass) {
+                          setIsEmployeeMode(false); setShowOwnerLogin(false);
+                        } else {
+                          setOwnerLoginError('Incorrect username or password');
+                        }
+                      }
+                    }}
+                  />
+                  <button type="button" onClick={() => setShowOwnerPass(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2"
+                    style={{ color: 'var(--text-tertiary)' }}>
+                    {showOwnerPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {ownerLoginError && (
+                <p className="text-xs font-medium" style={{ color: '#ef4444' }}>{ownerLoginError}</p>
+              )}
+            </div>
+
+            <div className="flex gap-2 mt-5">
+              <button onClick={() => setShowOwnerLogin(false)}
+                className="flex-1 rounded-xl py-2.5 text-sm font-medium transition-opacity hover:opacity-80"
+                style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
+                Cancel
+              </button>
+              <button onClick={() => {
+                const savedUser = (config?.settings as any)?.owner_username || config?.owner_name || '';
+                const savedPass = (config?.settings as any)?.owner_password || '1234';
+                if (ownerLoginUser.trim() === savedUser.trim() && ownerLoginPass === savedPass) {
+                  setIsEmployeeMode(false); setShowOwnerLogin(false);
+                } else {
+                  setOwnerLoginError('Incorrect username or password');
+                }
+              }}
+                className="flex-1 rounded-xl py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-80"
+                style={{ background: 'var(--accent)' }}>
+                Login
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

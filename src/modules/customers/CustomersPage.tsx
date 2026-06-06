@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Trash2, Users, X, Edit2, Car, Phone, Mail, Tag, Star, ClipboardList, Printer } from 'lucide-react';
+import { Plus, Search, Trash2, Users, X, Edit2, Car, Phone, Mail, Tag, Star, ClipboardList, Printer, AlertTriangle, ChevronDown, ChevronUp, Check, Merge } from 'lucide-react';
 import { toast } from 'sonner';
 import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { appCacheDir } from '@tauri-apps/api/path';
 import { useAppStore } from '@/app/store/app.store';
 import { listCustomers, createCustomer, updateCustomer, deleteCustomer } from '@/lib/db/customers';
-import { findVehiclesByPhone, upsertVehicle, listAllVehicleTypes, getJobsByCustomerPhone, type CarwashVehicle } from '@/lib/db/carwash';
+import { findVehiclesByPhone, upsertVehicle, listAllVehicleTypes, getJobsByCustomerPhone, findDuplicateCustomerGroups, mergeCustomers, type CarwashVehicle, type DuplicateGroup } from '@/lib/db/carwash';
 import { PageIntro } from '@/components/ui/PageIntro';
 import { EmptyState } from '@/components/ui/EmptyState';
 
@@ -63,6 +63,37 @@ export function CustomersPage() {
     queryKey: ['carwash-vtypes', tenantId],
     queryFn: () => listAllVehicleTypes(tenantId),
     enabled: !!tenantId,
+  });
+
+  // [carwash] [all tenants] — duplicate customer detection
+  const [dupExpanded, setDupExpanded] = useState(true);
+  const [mergeGroup, setMergeGroup] = useState<DuplicateGroup | null>(null);
+  const [mergeKeepId, setMergeKeepId] = useState<string | null>(null);
+
+  const { data: dupGroups = [], refetch: refetchDups } = useQuery<DuplicateGroup[]>({
+    queryKey: ['dup-groups', tenantId],
+    queryFn: () => findDuplicateCustomerGroups(tenantId),
+    enabled: !!tenantId && isCarwash,
+  });
+
+  const mergeMutation = useMutation({
+    mutationFn: async () => {
+      if (!mergeGroup || !mergeKeepId) throw new Error('Select the customer to keep');
+      const removeIds = mergeGroup.entries
+        .map(e => e.customer_id)
+        .filter((id): id is string => !!id && id !== mergeKeepId);
+      if (!removeIds.length) throw new Error('Nothing to merge — select a different primary');
+      await mergeCustomers(tenantId, mergeKeepId, removeIds);
+    },
+    onSuccess: () => {
+      toast.success('Customers merged successfully');
+      setMergeGroup(null);
+      setMergeKeepId(null);
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['dup-groups'] });
+      refetchDups();
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Merge failed'),
   });
 
   const addVehicleMutation = useMutation({
@@ -152,6 +183,70 @@ export function CustomersPage() {
           </button>
         }
       />
+
+      {/* [carwash] [all tenants] — duplicate customers alert */}
+      {isCarwash && dupGroups.length > 0 && (
+        <div className="rounded-2xl overflow-hidden" style={{ border: '1.5px solid #ffd60a', background: '#fffbea' }}>
+          <button type="button" onClick={() => setDupExpanded(v => !v)}
+            className="w-full flex items-center justify-between px-5 py-4 gap-3 text-left"
+            style={{ background: '#fff8cc' }}>
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 flex-shrink-0" style={{ color: '#b45309' }} />
+              <div>
+                <p className="font-bold text-sm" style={{ color: '#92400e' }}>
+                  {dupGroups.length} Possible Duplicate {dupGroups.length === 1 ? 'Group' : 'Groups'} Found
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: '#b45309' }}>
+                  Multiple customers linked to the same vehicle or phone number. Review and merge to keep records clean.
+                </p>
+              </div>
+            </div>
+            {dupExpanded ? <ChevronUp className="h-4 w-4 flex-shrink-0" style={{ color: '#b45309' }} /> : <ChevronDown className="h-4 w-4 flex-shrink-0" style={{ color: '#b45309' }} />}
+          </button>
+
+          {dupExpanded && (
+            <div className="divide-y" style={{ borderColor: '#fde68a' }}>
+              {dupGroups.map(group => (
+                <div key={group.key} className="px-5 py-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        {group.reason === 'vehicle'
+                          ? <Car className="h-4 w-4 flex-shrink-0" style={{ color: '#0071e3' }} />
+                          : <Phone className="h-4 w-4 flex-shrink-0" style={{ color: '#0071e3' }} />}
+                        <span className="font-bold text-sm" style={{ color: '#1d1d1f' }}>
+                          {group.reason === 'vehicle' ? 'Vehicle' : 'Phone'}: {group.display}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold" style={{ background: '#fee2e2', color: '#b91c1c' }}>
+                          {group.entries.length} customers
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {group.entries.map((e, i) => (
+                          <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm"
+                            style={{ background: '#f3f4f6', border: '1px solid #e5e7eb' }}>
+                            <span className="font-semibold" style={{ color: '#1d1d1f' }}>{e.customer_name}</span>
+                            <span style={{ color: '#6b7280' }}>·</span>
+                            <span style={{ color: '#6b7280' }}>{e.phone}</span>
+                            {e.job_count > 0 && <span className="text-xs" style={{ color: '#6b7280' }}>{e.job_count} job{e.job_count !== 1 ? 's' : ''}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <button type="button"
+                      onClick={() => { setMergeGroup(group); setMergeKeepId(group.entries.find(e => !!e.customer_id)?.customer_id ?? null); }}
+                      className="flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors"
+                      style={{ background: '#0071e3', color: '#ffffff' }}>
+                      <Merge className="h-4 w-4" />
+                      Merge
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="card p-5">
         <div className="relative max-w-md">
@@ -657,6 +752,89 @@ export function CustomersPage() {
               <button className="btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
               <button className="btn-primary" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
                 {saveMutation.isPending ? 'Saving…' : editing ? 'Update' : 'Create'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* [carwash] [all tenants] — merge customers modal */}
+      {mergeGroup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
+          <div className="rounded-3xl flex flex-col" style={{ width: 540, maxHeight: '90vh', background: '#ffffff', boxShadow: '0 8px 40px rgba(0,0,0,0.28)' }}>
+            <div className="flex items-center justify-between px-7 py-5" style={{ borderBottom: '1px solid #e5e5ea', flexShrink: 0 }}>
+              <div>
+                <h2 className="font-bold text-xl" style={{ color: '#1d1d1f' }}>Merge Duplicate Customers</h2>
+                <p className="text-sm mt-0.5" style={{ color: '#86868b' }}>
+                  {mergeGroup.reason === 'vehicle' ? `Vehicle: ${mergeGroup.display}` : `Phone: ${mergeGroup.display}`}
+                </p>
+              </div>
+              <button onClick={() => { setMergeGroup(null); setMergeKeepId(null); }}
+                className="h-9 w-9 flex items-center justify-center rounded-xl"
+                style={{ background: '#f2f2f7' }}>
+                <X className="h-4 w-4" style={{ color: '#86868b' }} />
+              </button>
+            </div>
+
+            <div className="px-7 py-5 overflow-y-auto space-y-4">
+              <p className="text-sm" style={{ color: '#3a3a3c' }}>
+                Select which customer record to <strong>keep</strong>. All job history, vehicles, and loyalty points from the others will be transferred to it, and the rest will be removed.
+              </p>
+
+              <div className="space-y-3">
+                {mergeGroup.entries.map((e, i) => {
+                  const isKeep = mergeKeepId === e.customer_id;
+                  const hasId = !!e.customer_id;
+                  return (
+                    <button key={i} type="button"
+                      disabled={!hasId}
+                      onClick={() => setMergeKeepId(e.customer_id)}
+                      className="w-full flex items-center gap-4 px-4 py-4 rounded-2xl text-left transition-all"
+                      style={isKeep
+                        ? { background: '#e8f0fe', border: '2px solid #0071e3' }
+                        : { background: '#f7f7f8', border: '2px solid #e5e5ea', opacity: hasId ? 1 : 0.5 }}>
+                      <div className="h-10 w-10 rounded-xl flex items-center justify-center font-bold text-base flex-shrink-0"
+                        style={{ background: isKeep ? '#0071e3' : '#e5e5ea', color: isKeep ? '#ffffff' : '#6b7280' }}>
+                        {isKeep ? <Check className="h-5 w-5" /> : (e.customer_name?.[0]?.toUpperCase() ?? '?')}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm" style={{ color: '#1d1d1f' }}>{e.customer_name}</p>
+                        <p className="text-xs mt-0.5" style={{ color: '#86868b' }}>
+                          📞 {e.phone}
+                          {e.job_count > 0 && <> · {e.job_count} job{e.job_count !== 1 ? 's' : ''}</>}
+                          {!hasId && <> · (no customer record)</>}
+                        </p>
+                      </div>
+                      {isKeep && (
+                        <span className="px-2.5 py-1 rounded-lg text-xs font-bold flex-shrink-0"
+                          style={{ background: '#0071e3', color: '#ffffff' }}>Keep</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {mergeGroup.entries.filter(e => !!e.customer_id && e.customer_id !== mergeKeepId).length > 0 && (
+                <div className="flex items-start gap-2 px-4 py-3 rounded-xl" style={{ background: '#fff3cd', border: '1px solid #fde68a' }}>
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: '#b45309' }} />
+                  <p className="text-xs" style={{ color: '#92400e' }}>
+                    The other {mergeGroup.entries.filter(e => !!e.customer_id && e.customer_id !== mergeKeepId).length} customer record(s) will be permanently removed after merging. This cannot be undone.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 px-7 py-5" style={{ borderTop: '1px solid #e5e5ea', flexShrink: 0 }}>
+              <button onClick={() => { setMergeGroup(null); setMergeKeepId(null); }}
+                className="px-6 py-2.5 rounded-xl text-sm font-semibold"
+                style={{ background: '#f2f2f7', color: '#3a3a3c' }}>
+                Cancel
+              </button>
+              <button onClick={() => mergeMutation.mutate()}
+                disabled={!mergeKeepId || mergeMutation.isPending}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50"
+                style={{ background: '#0071e3' }}>
+                <Merge className="h-4 w-4" />
+                {mergeMutation.isPending ? 'Merging…' : 'Merge Customers'}
               </button>
             </div>
           </div>
