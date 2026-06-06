@@ -239,6 +239,6 @@ export function MembershipPage() {
         </div>
       )}
       </div>
-    </div>{/* end scrollable */}
+    </div>
   );
 }

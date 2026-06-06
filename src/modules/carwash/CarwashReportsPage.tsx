@@ -383,7 +383,8 @@ export function CarwashReportsPage() {
         </div>
       )}
 
-      </> /* end dashboard tab */}
+      </>}
+      </div>
     </div>
   );
 }
@@ -931,7 +932,6 @@ function ExportTab({ tenantId, section, setSection, jobFrom, setJobFrom, jobTo, 
           )}
         </div>
       </div>
-      </div>
-    </div>{/* end scrollable */}
+    </div>
   );
 }

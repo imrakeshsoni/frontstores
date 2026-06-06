@@ -691,7 +691,7 @@ export function CarwashAppointmentsPage() {
                     <div className="h-1.5 w-1.5 rounded-full" style={{ background: '#0071e3' }} />
                     <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#0071e3' }}>Services Requested</p>
                     {form.selected_services.length > 0 && (
-                      <span className="px-1.5 py-0.5 rounded-full text-xs font-bold" style={ background: '#0071e3', color: '#ffffff', border: 'none', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,113,227,0.5), 0 1px 2px rgba(0,0,0,0.15)' }>
+                      <span className="px-1.5 py-0.5 rounded-full text-xs font-bold" style={{ background: '#0071e3', color: '#ffffff', border: 'none', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,113,227,0.5), 0 1px 2px rgba(0,0,0,0.15)' }}>
                         {form.selected_services.length} selected
                       </span>
                     )}
@@ -755,6 +755,6 @@ export function CarwashAppointmentsPage() {
         </div>
       )}
       </div>
-    </div>{/* end scrollable */}
+    </div>
   );
 }

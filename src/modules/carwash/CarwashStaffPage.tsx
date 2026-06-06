@@ -250,6 +250,6 @@ export function CarwashStaffPage() {
         </div>
       )}
       </div>
-    </div>{/* end scrollable */}
+    </div>
   );
 }

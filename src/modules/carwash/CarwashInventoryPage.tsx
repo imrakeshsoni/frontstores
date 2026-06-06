@@ -719,6 +719,6 @@ export function CarwashInventoryPage() {
         </div>
       )}
       </div>
-    </div>{/* end scrollable */}
+    </div>
   );
 }

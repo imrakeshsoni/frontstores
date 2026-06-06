@@ -218,6 +218,6 @@ export function BroadcastPage() {
         </div>
       </div>
       </div>
-    </div>{/* end scrollable */}
+    </div>
   );
 }

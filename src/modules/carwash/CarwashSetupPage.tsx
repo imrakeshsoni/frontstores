@@ -81,7 +81,7 @@ function VehiclesTab({ tenantId }: { tenantId: string }) {
           )}
           <button onClick={openAdd}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white"
-            style={ background: '#0071e3' }>
+            style={{ background: '#0071e3' }}>
             <Plus className="h-4 w-4" /> Add Vehicle Type
           </button>
         </div>
@@ -134,7 +134,7 @@ function VehiclesTab({ tenantId }: { tenantId: string }) {
             </div>
             <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}
               className="w-full py-3 rounded-xl font-bold text-sm text-white disabled:opacity-60"
-              style={ background: '#0071e3' }>
+              style={{ background: '#0071e3' }}>
               {saveMutation.isPending ? 'Saving…' : editing ? 'Update' : 'Add Vehicle Type'}
             </button>
           </div>
@@ -260,7 +260,7 @@ function ServicesTab({ tenantId }: { tenantId: string }) {
         <p className="text-sm font-medium" style={{ color: '#86868b' }}>Set prices for each service per vehicle type. Click any price to edit.</p>
         <button onClick={openAddSvc}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white"
-          style={ background: '#0071e3' }>
+          style={{ background: '#0071e3' }}>
           <Plus className="h-4 w-4" /> Add Service
         </button>
       </div>
@@ -361,7 +361,7 @@ function ServicesTab({ tenantId }: { tenantId: string }) {
             </label>
             <button onClick={() => saveSvcMutation.mutate()} disabled={saveSvcMutation.isPending}
               className="w-full py-3 rounded-xl font-bold text-sm text-white disabled:opacity-60"
-              style={ background: '#0071e3' }>
+              style={{ background: '#0071e3' }}>
               {saveSvcMutation.isPending ? 'Saving…' : editingSvc ? 'Update Service' : 'Add Service'}
             </button>
           </div>
@@ -419,7 +419,7 @@ function StaffTab({ tenantId }: { tenantId: string }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium" style={{ color: '#86868b' }}>Manage your wash team, salaries and deduction rules.</p>
-        <button onClick={openAdd} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white" style={ background: '#0071e3' }>
+        <button onClick={openAdd} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white" style={{ background: '#0071e3' }}>
           <Plus className="h-4 w-4" /> Add Staff
         </button>
       </div>
@@ -436,7 +436,7 @@ function StaffTab({ tenantId }: { tenantId: string }) {
             style={{ borderBottom: i < staff.length - 1 ? '1px solid #e5e5ea' : undefined, cursor: 'pointer' }}
             onClick={() => navigate(`/carwash/staff/${s.id}`)}>
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold text-white" style={ background: '#0071e3' }>{s.name[0].toUpperCase()}</div>
+              <div className="h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold text-white" style={{ background: '#0071e3' }}>{s.name[0].toUpperCase()}</div>
               <div>
                 <p className="font-semibold text-sm" style={{ color: '#1d1d1f' }}>{s.name}</p>
                 <p className="text-xs capitalize" style={{ color: '#86868b' }}>{s.role}{s.phone ? ` · ${s.phone}` : ''}</p>
@@ -507,7 +507,7 @@ function StaffTab({ tenantId }: { tenantId: string }) {
             </div>
             <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}
               className="w-full py-3 rounded-xl font-bold text-sm text-white disabled:opacity-60"
-              style={ background: '#0071e3' }>
+              style={{ background: '#0071e3' }}>
               {saveMutation.isPending ? 'Saving…' : editing ? 'Update Staff' : 'Add Staff Member'}
             </button>
           </div>

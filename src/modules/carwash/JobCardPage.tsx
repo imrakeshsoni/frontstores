@@ -588,7 +588,7 @@ export function JobCardPage() {
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6 max-w-2xl mx-auto w-full">
 
-        {/* Status */
+        {/* Status */}
         <div className="rounded-2xl p-5" style={{ background: statusInfo.bg, border: `2px solid ${statusInfo.color}40` }}>
           <div className="flex items-center justify-between">
             <div>

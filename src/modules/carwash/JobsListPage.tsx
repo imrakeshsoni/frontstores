@@ -230,8 +230,7 @@ export function JobsListPage() {
           </div>
         </div>
       )}
-    </div>
-      </div>{/* end scrollable content */}
+      </div>
     </div>
   );
 }
