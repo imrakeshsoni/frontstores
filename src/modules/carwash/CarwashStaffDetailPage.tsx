@@ -57,8 +57,8 @@ export function CarwashStaffDetailPage() {
 
   if (!staff) {
     return (
-      <div className="flex-1 flex items-center justify-center p-6" style={{ background: 'linear-gradient(160deg,#3d4f6b 0%,#2b3a54 100%)' }}>
-        <p style={{ color: 'rgba(255,255,255,0.35)' }}>Staff not found.</p>
+      <div className="flex-1 flex items-center justify-center p-6" style={{ background: '#f5f5f7' }}>
+        <p style={{ color: '#86868b' }}>Staff not found.</p>
       </div>
     );
   }
@@ -206,7 +206,7 @@ export function CarwashStaffDetailPage() {
   };
 
   return (
-    <div className="flex flex-col" style={{ background: 'linear-gradient(160deg,#3d4f6b 0%,#2b3a54 100%)', height: '100%', overflow: 'hidden' }}>
+    <div className="flex flex-col" style={{ background: '#f5f5f7', height: '100%', overflow: 'hidden' }}>
 
       {/* Header — floating white plate */}
       <div className="px-6 py-4 flex items-center gap-3"

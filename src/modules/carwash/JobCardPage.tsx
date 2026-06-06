@@ -553,8 +553,8 @@ export function JobCardPage() {
   if (!isNew) {
     if (loadingJob || !job) {
       return (
-        <div className="p-8 text-center" style={{ background: 'linear-gradient(160deg,#3d4f6b 0%,#2b3a54 100%)', minHeight: '100%' }}>
-          <div className="text-sm" style={{ color: 'rgba(255,255,255,0.35)' }}>{loadingJob ? 'Loading…' : 'Job not found'}</div>
+        <div className="p-8 text-center" style={{ background: '#f5f5f7', minHeight: '100%' }}>
+          <div className="text-sm" style={{ color: '#86868b' }}>{loadingJob ? 'Loading…' : 'Job not found'}</div>
           <button onClick={() => navigate('/carwash/jobs')} className="mt-4 btn-secondary">Back to Jobs</button>
         </div>
       );
@@ -564,7 +564,7 @@ export function JobCardPage() {
     const canAdvance = job.status !== 'delivered';
 
     return (
-      <div className="flex flex-col" style={{ background: 'linear-gradient(160deg,#3d4f6b 0%,#2b3a54 100%)', height: '100%', overflow: 'hidden' }}>
+      <div className="flex flex-col" style={{ background: '#f5f5f7', height: '100%', overflow: 'hidden' }}>
         {/* Header — floating white plate */}
         <div className="px-6 py-4 flex items-center gap-3"
           style={{ background: '#ffffff', boxShadow: '0 2px 12px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2)', position: 'relative', zIndex: 10 }}>
@@ -789,7 +789,7 @@ export function JobCardPage() {
     ?.slice(0, 3) ?? [];
 
   return (
-    <div className="flex flex-col" style={{ height: '100vh', overflow: 'hidden', background: 'linear-gradient(160deg,#3d4f6b 0%,#2b3a54 100%)' }}>
+    <div className="flex flex-col" style={{ height: '100vh', overflow: 'hidden', background: '#f5f5f7' }}>
 
       {/* Top bar — floating white plate */}
       <div className="flex-shrink-0 flex items-center gap-3 px-5 py-3" style={{ background: '#ffffff', boxShadow: '0 2px 12px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2)', position: 'relative', zIndex: 10 }}>

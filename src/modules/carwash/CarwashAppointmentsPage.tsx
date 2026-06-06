@@ -295,7 +295,7 @@ export function CarwashAppointmentsPage() {
   const done = appointments.filter(a => a.status === 'done' || a.status === 'cancelled');
 
   return (
-    <div className="flex flex-col" style={{ background: 'linear-gradient(160deg,#3d4f6b 0%,#2b3a54 100%)', height: '100%', overflow: 'hidden' }}>
+    <div className="flex flex-col" style={{ background: '#f5f5f7', height: '100%', overflow: 'hidden' }}>
 
       {/* Header — floating white plate */}
       <div className="px-6 py-4 flex items-center justify-between"

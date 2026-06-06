@@ -691,7 +691,7 @@ export function CarwashAttendancePage() {
   const innerShadow = 'inset 0 1px 3px rgba(0,0,0,0.06)';
 
   return (
-    <div className="flex flex-col" style={{ background: 'linear-gradient(160deg,#3d4f6b 0%,#2b3a54 100%)', height: '100%', overflow: 'hidden' }}>
+    <div className="flex flex-col" style={{ background: '#f5f5f7', height: '100%', overflow: 'hidden' }}>
 
       {/* Header — floating plate */}
       <div className="px-6 py-4 flex items-center justify-between"
@@ -727,8 +727,8 @@ export function CarwashAttendancePage() {
 
 {staff.length === 0 ? (
         <div className="flex-1 overflow-y-auto flex flex-col items-center justify-center gap-3 py-24">
-          <Users className="h-12 w-12" style={{ color: 'rgba(255,255,255,0.2)' }} />
-          <p className="text-base" style={{ color: 'rgba(255,255,255,0.35)' }}>No staff added yet — go to Staff page first</p>
+          <Users className="h-12 w-12" style={{ color: '#c7c7cc' }} />
+          <p className="text-base" style={{ color: '#86868b' }}>No staff added yet — go to Staff page first</p>
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
