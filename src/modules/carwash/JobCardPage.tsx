@@ -553,8 +553,8 @@ export function JobCardPage() {
   if (!isNew) {
     if (loadingJob || !job) {
       return (
-        <div className="p-8 text-center">
-          <div className="text-sm" style={{ color: 'var(--text-tertiary)' }}>{loadingJob ? 'Loading…' : 'Job not found'}</div>
+        <div className="p-8 text-center" style={{ background: 'linear-gradient(160deg,#1c2133 0%,#111520 100%)', minHeight: '100%' }}>
+          <div className="text-sm" style={{ color: 'rgba(255,255,255,0.35)' }}>{loadingJob ? 'Loading…' : 'Job not found'}</div>
           <button onClick={() => navigate('/carwash/jobs')} className="mt-4 btn-secondary">Back to Jobs</button>
         </div>
       );
@@ -564,16 +564,16 @@ export function JobCardPage() {
     const canAdvance = job.status !== 'delivered';
 
     return (
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 max-w-2xl mx-auto">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col" style={{ background: 'linear-gradient(160deg,#1c2133 0%,#111520 100%)', height: '100%', overflow: 'hidden' }}>
+        {/* Header — floating white plate */}
+        <div className="px-6 py-4 flex items-center gap-3"
+          style={{ background: '#ffffff', boxShadow: '0 2px 12px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2)', position: 'relative', zIndex: 10 }}>
           <button onClick={() => navigate('/carwash/jobs')} className="p-2 rounded-xl hover:bg-slate-100">
-            <ArrowLeft className="h-5 w-5" style={{ color: 'var(--text-secondary)' }} />
+            <ArrowLeft className="h-5 w-5" style={{ color: '#86868b' }} />
           </button>
           <div className="flex-1">
-            <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{job.job_number}</h1>
-            <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
-              Created {new Date(job.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} · {timeSince(job.created_at)} ago
-            </p>
+            <p className="text-xs uppercase tracking-widest" style={{ color: '#86868b', letterSpacing: '0.08em' }}>Car Wash · Job</p>
+            <h1 className="text-xl font-semibold" style={{ color: '#1d1d1f', letterSpacing: '-0.5px' }}>{job.job_number}</h1>
           </div>
           {job.status !== 'delivered' && (
             <button onClick={() => {
@@ -585,7 +585,10 @@ export function JobCardPage() {
           )}
         </div>
 
-        {/* Status */}
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 max-w-2xl mx-auto w-full">
+
+        {/* Status */
         <div className="rounded-2xl p-5" style={{ background: statusInfo.bg, border: `2px solid ${statusInfo.color}40` }}>
           <div className="flex items-center justify-between">
             <div>
@@ -624,9 +627,9 @@ export function JobCardPage() {
         </div>
 
         {/* Vehicle + Customer */}
-        <div className="rounded-2xl p-5 space-y-3" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
+        <div className="rounded-2xl p-5 space-y-3" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
           <div className="flex items-center justify-between">
-            <h2 className="font-bold" style={{ color: 'var(--text-primary)' }}>Vehicle & Customer</h2>
+            <h2 className="font-bold" style={{ color: '#1d1d1f' }}>Vehicle & Customer</h2>
             {job.status !== 'delivered' && !editMode && (
               <button onClick={() => {
                 setEditName(job.customer_name ?? '');
@@ -645,86 +648,86 @@ export function JobCardPage() {
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Customer Name</label>
+                  <label className="block text-xs font-medium mb-1" style={{ color: '#86868b' }}>Customer Name</label>
                   <input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Name"
                     className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-                    style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }} />
+                    style={{ borderColor: '#e5e5ea', background: '#f2f2f7', color: '#1d1d1f' }} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Phone</label>
+                  <label className="block text-xs font-medium mb-1" style={{ color: '#86868b' }}>Phone</label>
                   <input value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder="Phone"
                     className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-                    style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }} />
+                    style={{ borderColor: '#e5e5ea', background: '#f2f2f7', color: '#1d1d1f' }} />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Staff</label>
+                <label className="block text-xs font-medium mb-1" style={{ color: '#86868b' }}>Staff</label>
                 <select value={editStaffId} onChange={e => {
                   setEditStaffId(e.target.value);
                   setEditStaffName(staff.find(s => s.id === e.target.value)?.name ?? '');
                 }} className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-                  style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }}>
+                  style={{ borderColor: '#e5e5ea', background: '#f2f2f7', color: '#1d1d1f' }}>
                   <option value="">— No staff —</option>
                   {staff.map(s => <option key={s.id} value={s.id}>{s.name} ({s.role})</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Notes</label>
+                <label className="block text-xs font-medium mb-1" style={{ color: '#86868b' }}>Notes</label>
                 <input value={editNotes} onChange={e => setEditNotes(e.target.value)} placeholder="Notes"
                   className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-                  style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }} />
+                  style={{ borderColor: '#e5e5ea', background: '#f2f2f7', color: '#1d1d1f' }} />
               </div>
               <div className="flex gap-2">
                 <button onClick={() => setEditMode(false)} className="flex-1 btn-secondary py-2 rounded-xl text-sm">Cancel</button>
                 <button onClick={() => editMutation.mutate()} disabled={editMutation.isPending}
                   className="flex-1 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-60"
-                  style={{ background: 'var(--accent)' }}>Save</button>
+                  style={{ background: '#0071e3', color: '#ffffff' }}>Save</button>
               </div>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4 text-sm">
-              <div><p className="text-xs mb-0.5" style={{ color: 'var(--text-tertiary)' }}>Reg Number</p>
-                <p className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>{job.reg_number}</p></div>
-              <div><p className="text-xs mb-0.5" style={{ color: 'var(--text-tertiary)' }}>Vehicle Type</p>
-                <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{job.vehicle_type}</p></div>
-              {(job.make || job.model) && <div className="col-span-2"><p className="text-xs mb-0.5" style={{ color: 'var(--text-tertiary)' }}>Model</p>
-                <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{[job.make, job.model, job.color].filter(Boolean).join(' · ')}</p></div>}
-              {job.customer_name && <div><p className="text-xs mb-0.5" style={{ color: 'var(--text-tertiary)' }}>Customer</p>
-                <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{job.customer_name}</p></div>}
-              {job.customer_phone && <div><p className="text-xs mb-0.5" style={{ color: 'var(--text-tertiary)' }}>Phone</p>
-                <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{job.customer_phone}</p></div>}
-              {job.staff_name && <div><p className="text-xs mb-0.5" style={{ color: 'var(--text-tertiary)' }}>Staff</p>
-                <p className="font-medium" style={{ color: 'var(--text-primary)' }}>👤 {job.staff_name}</p></div>}
-              {job.notes && <div className="col-span-2"><p className="text-xs mb-0.5" style={{ color: 'var(--text-tertiary)' }}>Notes</p>
-                <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{job.notes}</p></div>}
+              <div><p className="text-xs mb-0.5" style={{ color: '#86868b' }}>Reg Number</p>
+                <p className="font-bold text-base" style={{ color: '#1d1d1f' }}>{job.reg_number}</p></div>
+              <div><p className="text-xs mb-0.5" style={{ color: '#86868b' }}>Vehicle Type</p>
+                <p className="font-medium" style={{ color: '#1d1d1f' }}>{job.vehicle_type}</p></div>
+              {(job.make || job.model) && <div className="col-span-2"><p className="text-xs mb-0.5" style={{ color: '#86868b' }}>Model</p>
+                <p className="font-medium" style={{ color: '#1d1d1f' }}>{[job.make, job.model, job.color].filter(Boolean).join(' · ')}</p></div>}
+              {job.customer_name && <div><p className="text-xs mb-0.5" style={{ color: '#86868b' }}>Customer</p>
+                <p className="font-medium" style={{ color: '#1d1d1f' }}>{job.customer_name}</p></div>}
+              {job.customer_phone && <div><p className="text-xs mb-0.5" style={{ color: '#86868b' }}>Phone</p>
+                <p className="font-medium" style={{ color: '#1d1d1f' }}>{job.customer_phone}</p></div>}
+              {job.staff_name && <div><p className="text-xs mb-0.5" style={{ color: '#86868b' }}>Staff</p>
+                <p className="font-medium" style={{ color: '#1d1d1f' }}>👤 {job.staff_name}</p></div>}
+              {job.notes && <div className="col-span-2"><p className="text-xs mb-0.5" style={{ color: '#86868b' }}>Notes</p>
+                <p className="font-medium" style={{ color: '#1d1d1f' }}>{job.notes}</p></div>}
             </div>
           )}
         </div>
 
         {/* Services */}
-        <div className="rounded-2xl p-5" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
-          <h2 className="font-bold mb-3" style={{ color: 'var(--text-primary)' }}>Services</h2>
+        <div className="rounded-2xl p-5" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <h2 className="font-bold mb-3" style={{ color: '#1d1d1f' }}>Services</h2>
           {(job.items ?? []).map(item => (
-            <div key={item.id} className="flex justify-between py-2" style={{ borderBottom: '1px solid var(--surface-border)' }}>
-              <span className="text-sm" style={{ color: 'var(--text-primary)' }}>{item.service_name}</span>
-              <span className="text-sm font-semibold" style={{ color: 'var(--accent)' }}>{fmt(item.price)}</span>
+            <div key={item.id} className="flex justify-between py-2" style={{ borderBottom: '1px solid #e5e5ea' }}>
+              <span className="text-sm" style={{ color: '#1d1d1f' }}>{item.service_name}</span>
+              <span className="text-sm font-semibold" style={{ color: '#0071e3' }}>{fmt(item.price)}</span>
             </div>
           ))}
           {job.discount > 0 && (
-            <div className="flex justify-between py-2" style={{ borderBottom: '1px solid var(--surface-border)' }}>
+            <div className="flex justify-between py-2" style={{ borderBottom: '1px solid #e5e5ea' }}>
               <span className="text-sm" style={{ color: '#dc2626' }}>Discount</span>
               <span className="text-sm font-semibold" style={{ color: '#dc2626' }}>-{fmt(job.discount)}</span>
             </div>
           )}
           {job.gst_amount > 0 && (
-            <div className="flex justify-between py-2" style={{ borderBottom: '1px solid var(--surface-border)' }}>
-              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>GST</span>
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{fmt(job.gst_amount)}</span>
+            <div className="flex justify-between py-2" style={{ borderBottom: '1px solid #e5e5ea' }}>
+              <span className="text-sm" style={{ color: '#86868b' }}>GST</span>
+              <span className="text-sm font-semibold" style={{ color: '#1d1d1f' }}>{fmt(job.gst_amount)}</span>
             </div>
           )}
           <div className="flex justify-between pt-3">
-            <span className="font-bold" style={{ color: 'var(--text-primary)' }}>Total</span>
-            <span className="text-lg font-bold" style={{ color: 'var(--accent)' }}>{fmt(job.total)}</span>
+            <span className="font-bold" style={{ color: '#1d1d1f' }}>Total</span>
+            <span className="text-lg font-bold" style={{ color: '#0071e3' }}>{fmt(job.total)}</span>
           </div>
           {job.membership_id && (
             <p className="mt-2 text-xs font-medium" style={{ color: '#7c3aed' }}>⭐ Membership applied</p>
@@ -746,17 +749,19 @@ export function JobCardPage() {
           </button>
         </div>
 
+        </div>{/* end scrollable */}
+
         {/* Settle modal */}
         {showSettle && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-            <div className="rounded-2xl p-6 w-full max-w-sm space-y-4" style={{ background: 'var(--surface)' }}>
-              <h2 className="font-bold text-lg" style={{ color: 'var(--text-primary)' }}>Collect Payment</h2>
-              <p className="text-2xl font-bold" style={{ color: 'var(--accent)' }}>{fmt(job.total)}</p>
+            <div className="rounded-2xl p-6 w-full max-w-sm space-y-4" style={{ background: '#ffffff' }}>
+              <h2 className="font-bold text-lg" style={{ color: '#1d1d1f' }}>Collect Payment</h2>
+              <p className="text-2xl font-bold" style={{ color: '#0071e3' }}>{fmt(job.total)}</p>
               <div className="flex gap-2">
                 {['cash', 'upi', 'card'].map(m => (
                   <button key={m} onClick={() => setSettlePayment(m)}
                     className={`flex-1 py-2 rounded-xl text-sm font-semibold capitalize ${settlePayment === m ? 'text-white' : 'btn-secondary'}`}
-                    style={settlePayment === m ? { background: 'var(--accent)' } : {}}>
+                    style={settlePayment === m ? { background: '#0071e3', color: '#ffffff' } : {}}>
                     {m === 'cash' ? '💵' : m === 'upi' ? '📱' : '💳'} {m}
                   </button>
                 ))}
@@ -766,7 +771,7 @@ export function JobCardPage() {
                 <button onClick={() => { settleMutation.mutate(); handlePrint(); }}
                   disabled={settleMutation.isPending}
                   className="flex-1 py-2.5 rounded-xl font-semibold text-sm text-white disabled:opacity-60"
-                  style={{ background: 'var(--accent)' }}>
+                  style={{ background: '#0071e3', color: '#ffffff' }}>
                   Print & Collect
                 </button>
               </div>
@@ -784,16 +789,16 @@ export function JobCardPage() {
     ?.slice(0, 3) ?? [];
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
+    <div className="flex flex-col" style={{ height: '100vh', overflow: 'hidden', background: 'linear-gradient(160deg,#1c2133 0%,#111520 100%)' }}>
 
-      {/* Top bar */}
-      <div className="flex-shrink-0 flex items-center gap-3 px-5 py-3" style={{ borderBottom: '1px solid var(--surface-border)', background: 'var(--surface)' }}>
+      {/* Top bar — floating white plate */}
+      <div className="flex-shrink-0 flex items-center gap-3 px-5 py-3" style={{ background: '#ffffff', boxShadow: '0 2px 12px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2)', position: 'relative', zIndex: 10 }}>
         <button onClick={() => navigate('/carwash/jobs')} className="p-1.5 rounded-xl hover:opacity-70">
-          <ArrowLeft className="h-5 w-5" style={{ color: 'var(--text-secondary)' }} />
+          <ArrowLeft className="h-5 w-5" style={{ color: '#86868b' }} />
         </button>
         <div className="flex items-center gap-2 flex-1">
-          <Car className="h-5 w-5" style={{ color: 'var(--accent)' }} />
-          <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>New Job Card</h1>
+          <Car className="h-5 w-5" style={{ color: '#0071e3' }} />
+          <h1 className="text-lg font-bold" style={{ color: '#1d1d1f' }}>New Job Card</h1>
           {vehicleHistory && vehicleHistory.visitCount > 0 && (
             <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: '#dcfce7', color: '#16a34a' }}>
               ↩ Return · {vehicleHistory.visitCount} visits
@@ -816,15 +821,15 @@ export function JobCardPage() {
       <div className="flex flex-1 overflow-hidden" style={{ gap: 0 }}>
 
         {/* ── LEFT PANEL: Customer → Vehicle → Staff ── */}
-        <div className="flex flex-col overflow-y-auto" style={{ width: '30%', borderRight: '1px solid var(--surface-border)', background: 'var(--bg)' }}>
+        <div className="flex flex-col overflow-y-auto" style={{ width: '30%', borderRight: '1px solid #e5e5ea', background: '#1a1f35' }}>
 
           {/* ── CUSTOMER ── */}
-          <div className="px-5 pt-5 pb-4 space-y-3" style={{ borderBottom: '1px solid var(--surface-border)' }}>
-            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--accent)' }}>👤 Customer</p>
+          <div className="px-5 pt-5 pb-4 space-y-3" style={{ borderBottom: '1px solid #e5e5ea' }}>
+            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#0071e3' }}>👤 Customer</p>
 
             {/* Phone */}
             <div>
-              <label className="block text-sm font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Mobile Number *</label>
+              <label className="block text-sm font-semibold mb-1.5" style={{ color: '#86868b' }}>Mobile Number *</label>
               <div className="relative">
                 <input value={customerPhone}
                   onChange={e => handlePhoneInput(e.target.value)}
@@ -832,23 +837,23 @@ export function JobCardPage() {
                   onBlur={() => setTimeout(() => setPhoneResults([]), 150)}
                   placeholder="Type to search or enter number" type="tel"
                   className="w-full rounded-xl border px-4 py-3 text-base font-bold outline-none"
-                  style={{ borderColor: customerPhone.replace(/\D/g,'').length===10 ? 'var(--accent)' : 'var(--surface-border)', background: 'var(--surface)', color: 'var(--text-primary)' }} />
+                  style={{ borderColor: customerPhone.replace(/\D/g,'').length===10 ? '#0071e3' : '#e5e5ea', background: '#ffffff', color: '#1d1d1f' }} />
                 {phoneSearching && (
-                  <svg className="animate-spin absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'var(--accent)' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg className="animate-spin absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: '#0071e3' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                   </svg>
                 )}
                 {phoneResults.length > 0 && (
                   <div className="absolute z-50 left-0 right-0 top-full mt-1 rounded-xl overflow-hidden shadow-xl"
-                    style={{ background: 'var(--surface)', border: '1px solid var(--accent)' }}>
+                    style={{ background: '#ffffff', border: '1px solid #0071e3' }}>
                     {phoneResults.map((c, i) => (
                       <button key={c.id} type="button" onMouseDown={() => selectCustomerResult(c)}
                         className="w-full text-left px-4 py-3 flex items-center gap-3 transition-colors"
-                        style={{ background: i === phoneResultsIdx ? 'var(--accent)' : 'transparent',
-                                 color: i === phoneResultsIdx ? '#111' : 'var(--text-primary)',
-                                 borderBottom: '1px solid var(--surface-border)' }}>
+                        style={{ background: i === phoneResultsIdx ? '#0071e3' : 'transparent',
+                                 color: i === phoneResultsIdx ? '#111' : '#1d1d1f',
+                                 borderBottom: '1px solid #e5e5ea' }}>
                         <div className="h-8 w-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
-                          style={{ background: i === phoneResultsIdx ? '#111' : 'var(--accent)', color: i === phoneResultsIdx ? 'var(--accent)' : '#111' }}>
+                          style={{ background: i === phoneResultsIdx ? '#111' : '#0071e3', color: i === phoneResultsIdx ? '#0071e3' : '#111' }}>
                           {c.name?.[0]?.toUpperCase()}
                         </div>
                         <div>
@@ -864,29 +869,29 @@ export function JobCardPage() {
 
             {/* Name */}
             <div>
-              <label className="block text-sm font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Customer Name</label>
+              <label className="block text-sm font-semibold mb-1.5" style={{ color: '#86868b' }}>Customer Name</label>
               <input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Auto-filled or enter name"
                 className="w-full rounded-xl border px-4 py-3 text-base outline-none"
-                style={{ borderColor: 'var(--surface-border)', background: 'var(--surface)', color: 'var(--text-primary)' }} />
+                style={{ borderColor: '#e5e5ea', background: '#ffffff', color: '#1d1d1f' }} />
             </div>
 
             {/* Multi-vehicle picker */}
             {phoneVehicles.length > 1 && (
               <div>
-                <p className="text-sm font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>
+                <p className="text-sm font-semibold mb-2" style={{ color: '#86868b' }}>
                   {phoneVehicles.length} vehicles found — select one:
                 </p>
                 <div className="space-y-1.5">
                   {phoneVehicles.map(v => (
                     <button key={v.id} onClick={() => selectPhoneVehicle(v)}
                       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-all"
-                      style={{ borderColor: regNumber === v.reg_number ? 'var(--accent)' : 'var(--surface-border)', background: 'var(--surface)', color: 'var(--text-primary)' }}>
+                      style={{ borderColor: regNumber === v.reg_number ? '#0071e3' : '#e5e5ea', background: '#ffffff', color: '#1d1d1f' }}>
                       <span className="text-lg">🚗</span>
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-sm tracking-wider">{v.reg_number}</p>
-                        {(v.make || v.model) && <p className="text-xs truncate" style={{ color: 'var(--text-tertiary)' }}>{[v.make, v.model].filter(Boolean).join(' ')}</p>}
+                        {(v.make || v.model) && <p className="text-xs truncate" style={{ color: '#86868b' }}>{[v.make, v.model].filter(Boolean).join(' ')}</p>}
                       </div>
-                      {regNumber === v.reg_number && <CheckCircle className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--accent)' }} />}
+                      {regNumber === v.reg_number && <CheckCircle className="h-4 w-4 flex-shrink-0" style={{ color: '#0071e3' }} />}
                     </button>
                   ))}
                 </div>
@@ -895,12 +900,12 @@ export function JobCardPage() {
           </div>
 
           {/* ── VEHICLE ── */}
-          <div className="px-5 pt-4 pb-4 space-y-3" style={{ borderBottom: '1px solid var(--surface-border)' }}>
-            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--accent)' }}>🚗 Vehicle</p>
+          <div className="px-5 pt-4 pb-4 space-y-3" style={{ borderBottom: '1px solid #e5e5ea' }}>
+            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#0071e3' }}>🚗 Vehicle</p>
 
             {/* Reg number */}
             <div>
-              <label className="block text-sm font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Registration Number *</label>
+              <label className="block text-sm font-semibold mb-1.5" style={{ color: '#86868b' }}>Registration Number *</label>
               <div className="flex gap-2 items-start">
                 <div className="relative flex-1">
                   <input ref={regRef} value={regNumber}
@@ -912,17 +917,17 @@ export function JobCardPage() {
                     }}
                     placeholder="MH12AB1234 or 22BH0001AA"
                     className="w-full rounded-xl border px-4 py-3 text-base font-bold tracking-widest outline-none"
-                    style={{ borderColor: regError ? '#f87171' : regNumber && !regError ? 'var(--accent)' : 'var(--surface-border)', background: 'var(--surface)', color: 'var(--text-primary)' }} />
+                    style={{ borderColor: regError ? '#f87171' : regNumber && !regError ? '#0071e3' : '#e5e5ea', background: '#ffffff', color: '#1d1d1f' }} />
                   {regError && <p className="text-xs mt-1 font-medium" style={{ color: '#f87171' }}>{regError}</p>}
                   {regResults.length > 0 && (
                     <div className="absolute z-50 left-0 right-0 top-full mt-1 rounded-xl overflow-hidden shadow-xl"
-                      style={{ background: 'var(--surface)', border: '1px solid var(--accent)' }}>
+                      style={{ background: '#ffffff', border: '1px solid #0071e3' }}>
                       {regResults.map((v, i) => (
                         <button key={v.id} type="button" onMouseDown={() => selectVehicleFromReg(v)}
                           className="w-full text-left px-4 py-3 flex items-center gap-3 transition-colors"
-                          style={{ background: i === regResultsIdx ? 'var(--accent)' : 'transparent',
-                                   color: i === regResultsIdx ? '#111' : 'var(--text-primary)',
-                                   borderBottom: '1px solid var(--surface-border)' }}>
+                          style={{ background: i === regResultsIdx ? '#0071e3' : 'transparent',
+                                   color: i === regResultsIdx ? '#111' : '#1d1d1f',
+                                   borderBottom: '1px solid #e5e5ea' }}>
                           <span className="text-lg">🚗</span>
                           <div>
                             <p className="text-sm font-bold tracking-wider">{v.reg_number}</p>
@@ -939,14 +944,14 @@ export function JobCardPage() {
 
             {/* Vehicle type pills */}
             <div>
-              <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>Vehicle Type</label>
+              <label className="block text-sm font-semibold mb-2" style={{ color: '#86868b' }}>Vehicle Type</label>
               <div className="flex flex-wrap gap-2">
                 {vehicleTypes.map(vt => (
                   <button key={vt.id} onClick={() => setVehicleType(vt.name)}
                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all"
                     style={vehicleType === vt.name
-                      ? { background: 'var(--accent)', color: 'var(--on-accent, #111)' }
-                      : { background: 'var(--surface)', border: '1px solid var(--surface-border)', color: 'var(--text-secondary)' }}>
+                      ? { background: '#0071e3', color: '#ffffff' }
+                      : { background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)', color: '#86868b' }}>
                     <span className="text-base">{vt.icon}</span> {vt.name}
                   </button>
                 ))}
@@ -961,10 +966,10 @@ export function JobCardPage() {
                 { label: 'Color', val: color, set: setColor, ph: 'White' },
               ].map(f => (
                 <div key={f.label}>
-                  <label className="block text-xs font-semibold mb-1" style={{ color: 'var(--text-secondary)' }}>{f.label}</label>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: '#86868b' }}>{f.label}</label>
                   <input value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph}
                     className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-                    style={{ borderColor: 'var(--surface-border)', background: 'var(--surface)', color: 'var(--text-primary)' }} />
+                    style={{ borderColor: '#e5e5ea', background: '#ffffff', color: '#1d1d1f' }} />
                 </div>
               ))}
             </div>
@@ -999,15 +1004,15 @@ export function JobCardPage() {
 
           {/* ── STAFF & JOB DETAILS ── */}
           <div className="px-5 pt-4 pb-5 space-y-3">
-            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--accent)' }}>⚙️ Job Details</p>
+            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#0071e3' }}>⚙️ Job Details</p>
 
             {/* Staff */}
             <div>
-              <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>
-                Assign Staff <span className="font-normal text-xs" style={{ color: 'var(--text-tertiary)' }}>(select multiple)</span>
+              <label className="block text-sm font-semibold mb-2" style={{ color: '#86868b' }}>
+                Assign Staff <span className="font-normal text-xs" style={{ color: '#86868b' }}>(select multiple)</span>
               </label>
               {staff.length === 0
-                ? <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No staff added yet — add in Staff page.</p>
+                ? <p className="text-sm" style={{ color: '#86868b' }}>No staff added yet — add in Staff page.</p>
                 : <div className="flex flex-wrap gap-2">
                     {staff.map(s => {
                       const sel = selectedStaffIds.includes(s.id);
@@ -1021,8 +1026,8 @@ export function JobCardPage() {
                           }}
                           className="px-3 py-2 rounded-xl text-sm font-semibold transition-all"
                           style={sel
-                            ? { background: 'var(--accent)', color: 'var(--on-accent, #111)' }
-                            : { background: 'var(--surface)', color: 'var(--text-secondary)', border: '1px solid var(--surface-border)' }}>
+                            ? { background: '#0071e3', color: '#ffffff' }
+                            : { background: '#ffffff', color: '#86868b', border: '1px solid #e5e5ea' }}>
                           {sel ? '✓ ' : ''}{s.name}
                         </button>
                       );
@@ -1033,28 +1038,28 @@ export function JobCardPage() {
 
             {/* Discount + Notes */}
             <div>
-              <label className="block text-sm font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Discount (₹)</label>
+              <label className="block text-sm font-semibold mb-1.5" style={{ color: '#86868b' }}>Discount (₹)</label>
               <input type="number" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="0"
                 className="w-full rounded-xl border px-4 py-3 text-base outline-none"
-                style={{ borderColor: 'var(--surface-border)', background: 'var(--surface)', color: 'var(--text-primary)' }} />
+                style={{ borderColor: '#e5e5ea', background: '#ffffff', color: '#1d1d1f' }} />
             </div>
             <div>
-              <label className="block text-sm font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Notes</label>
+              <label className="block text-sm font-semibold mb-1.5" style={{ color: '#86868b' }}>Notes</label>
               <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Special instructions…"
                 className="w-full rounded-xl border px-4 py-3 text-sm outline-none"
-                style={{ borderColor: 'var(--surface-border)', background: 'var(--surface)', color: 'var(--text-primary)' }} />
+                style={{ borderColor: '#e5e5ea', background: '#ffffff', color: '#1d1d1f' }} />
             </div>
           </div>
         </div>
 
         {/* ── CENTER: Services ── */}
-        <div className="flex-1 flex flex-col overflow-hidden p-4" style={{ background: 'var(--bg)' }}>
+        <div className="flex-1 flex flex-col overflow-hidden p-4" style={{ background: '#1a1f35' }}>
           <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--accent)' }}>
+            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#0071e3' }}>
               Services — {vehicleType} pricing
             </p>
             {selectedServices.length > 0 && (
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: 'var(--accent)', color: '#111' }}>
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: '#0071e3', color: '#ffffff' }}>
                 {selectedServices.length} selected
               </span>
             )}
@@ -1081,7 +1086,7 @@ export function JobCardPage() {
           {/* Services grid — scrolls if needed */}
           <div className="flex-1 overflow-y-auto">
             {services.length === 0 && (
-              <p className="text-sm text-center pt-8" style={{ color: 'var(--text-tertiary)' }}>No services yet — add them in Services page.</p>
+              <p className="text-sm text-center pt-8" style={{ color: '#86868b' }}>No services yet — add them in Services page.</p>
             )}
             <div className="grid grid-cols-2 gap-2">
               {services.map(svc => {
@@ -1091,8 +1096,8 @@ export function JobCardPage() {
                   <button key={svc.id} onClick={() => toggleService(svc)}
                     className="text-left px-4 py-3 rounded-xl text-sm font-medium transition-all flex items-center justify-between"
                     style={selected
-                      ? { background: 'var(--accent)', color: 'var(--on-accent, #111)' }
-                      : { background: 'var(--surface)', border: '1px solid var(--surface-border)', color: 'var(--text-primary)' }}>
+                      ? { background: '#0071e3', color: '#ffffff' }
+                      : { background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)', color: '#1d1d1f' }}>
                     <div>
                       <p className="font-semibold text-sm">{svc.name}</p>
                       <p className="text-xs opacity-60">{svc.duration_minutes} min</p>
@@ -1112,36 +1117,36 @@ export function JobCardPage() {
 
       {/* ── Bottom bar — total + create ── */}
       <div className="flex-shrink-0 flex items-center justify-between px-6 py-3"
-        style={{ borderTop: '1px solid var(--surface-border)', background: 'var(--surface)' }}>
+        style={{ borderTop: '1px solid #e5e5ea', background: '#ffffff' }}>
 
         {/* Left — breakdown */}
         <div className="flex items-center gap-6">
           {selectedServices.length === 0
-            ? <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Select services from the center to start</p>
+            ? <p className="text-sm" style={{ color: '#86868b' }}>Select services from the center to start</p>
             : <>
                 <div>
-                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Services</p>
-                  <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{selectedServices.length} selected</p>
+                  <p className="text-xs" style={{ color: '#86868b' }}>Services</p>
+                  <p className="text-sm font-bold" style={{ color: '#1d1d1f' }}>{selectedServices.length} selected</p>
                 </div>
                 <div>
-                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Subtotal</p>
-                  <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{fmt(subtotal)}</p>
+                  <p className="text-xs" style={{ color: '#86868b' }}>Subtotal</p>
+                  <p className="text-sm font-bold" style={{ color: '#1d1d1f' }}>{fmt(subtotal)}</p>
                 </div>
                 {discountAmt > 0 && (
                   <div>
-                    <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Discount</p>
+                    <p className="text-xs" style={{ color: '#86868b' }}>Discount</p>
                     <p className="text-sm font-bold" style={{ color: '#16a34a' }}>− {fmt(discountAmt)}</p>
                   </div>
                 )}
                 {gstEnabled && gstAmt > 0 && (
                   <div>
-                    <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>GST</p>
-                    <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{fmt(gstAmt)}</p>
+                    <p className="text-xs" style={{ color: '#86868b' }}>GST</p>
+                    <p className="text-sm font-bold" style={{ color: '#1d1d1f' }}>{fmt(gstAmt)}</p>
                   </div>
                 )}
-                <div style={{ borderLeft: '2px solid var(--surface-border)', paddingLeft: '1.5rem' }}>
-                  <p className="text-xs font-semibold" style={{ color: 'var(--text-tertiary)' }}>TOTAL</p>
-                  <p className="text-2xl font-bold" style={{ color: 'var(--accent)' }}>{fmt(total)}</p>
+                <div style={{ borderLeft: '2px solid #e5e5ea', paddingLeft: '1.5rem' }}>
+                  <p className="text-xs font-semibold" style={{ color: '#86868b' }}>TOTAL</p>
+                  <p className="text-2xl font-bold" style={{ color: '#0071e3' }}>{fmt(total)}</p>
                 </div>
               </>
           }
@@ -1152,7 +1157,7 @@ export function JobCardPage() {
           onClick={() => createMutation.mutate()}
           disabled={createMutation.isPending || selectedServices.length === 0}
           className="px-8 py-3 rounded-2xl font-bold text-base disabled:opacity-40 transition-all"
-          style={{ background: 'var(--accent)', color: 'var(--on-accent, #111)', minWidth: '180px' }}>
+          style={{ background: '#0071e3', color: '#ffffff', minWidth: '180px' }}>
           {createMutation.isPending ? 'Creating…' : '✓ Create Job Card'}
         </button>
       </div>

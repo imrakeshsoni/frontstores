@@ -22,7 +22,7 @@ const ROLES = ['washer', 'polisher', 'detailer', 'manager', 'cashier'];
 const ICON_OPTIONS = ['🚗','🚙','🏎️','🚐','🛻','🚌','🚎','🚑','🚒','🚕','🚚','🚛','🚜','🛺','🏍️','🛵','🚲'];
 
 const inp = (extra?: string) => `w-full rounded-xl border px-3 py-2 text-sm outline-none focus:ring-2 ${extra ?? ''}`;
-const inpStyle = { borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' } as React.CSSProperties;
+const inpStyle = { borderColor: '#e5e5ea', background: '#f2f2f7', color: '#1d1d1f' } as React.CSSProperties;
 function fmt(n: number) { return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`; }
 
 // ── Vehicle Types Tab ─────────────────────────────────────────────────────────
@@ -73,7 +73,7 @@ function VehiclesTab({ tenantId }: { tenantId: string }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Define the types of vehicles you service.</p>
+        <p className="text-sm font-medium" style={{ color: '#86868b' }}>Define the types of vehicles you service.</p>
         <div className="flex gap-2">
           {types.length === 0 && (
             <button onClick={() => seedMutation.mutate()} disabled={seedMutation.isPending}
@@ -81,26 +81,26 @@ function VehiclesTab({ tenantId }: { tenantId: string }) {
           )}
           <button onClick={openAdd}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white"
-            style={{ background: 'var(--accent)' }}>
+            style={ background: '#0071e3' }>
             <Plus className="h-4 w-4" /> Add Vehicle Type
           </button>
         </div>
       </div>
-      <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
-        {isLoading && <div className="p-6 text-sm animate-pulse" style={{ color: 'var(--text-tertiary)' }}>Loading…</div>}
+      <div className="rounded-2xl overflow-hidden" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        {isLoading && <div className="p-6 text-sm animate-pulse" style={{ color: '#86868b' }}>Loading…</div>}
         {!isLoading && types.length === 0 && (
           <div className="flex flex-col items-center py-12 gap-2">
             <Car className="h-10 w-10 opacity-20" />
-            <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No vehicle types yet. Click "Add Defaults" to get started.</p>
+            <p className="text-sm" style={{ color: '#86868b' }}>No vehicle types yet. Click "Add Defaults" to get started.</p>
           </div>
         )}
         {types.map((t, i) => (
           <div key={t.id} className="flex items-center justify-between px-5 py-3.5"
-            style={{ borderBottom: i < types.length - 1 ? '1px solid var(--surface-border)' : undefined }}>
+            style={{ borderBottom: i < types.length - 1 ? '1px solid #e5e5ea' : undefined }}>
             <div className="flex items-center gap-3">
               <span className="text-2xl">{t.icon}</span>
-              <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{t.name}</span>
-              {!t.is_active && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'var(--surface-2)', color: 'var(--text-tertiary)' }}>Inactive</span>}
+              <span className="font-semibold text-sm" style={{ color: '#1d1d1f' }}>{t.name}</span>
+              {!t.is_active && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: '#f2f2f7', color: '#86868b' }}>Inactive</span>}
             </div>
             <div className="flex items-center gap-2">
               <button onClick={() => openEdit(t)} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50"><Edit2 className="h-4 w-4" /></button>
@@ -111,22 +111,22 @@ function VehiclesTab({ tenantId }: { tenantId: string }) {
       </div>
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-          <div className="rounded-2xl p-6 w-full max-w-sm space-y-4" style={{ background: 'var(--surface)' }}>
+          <div className="rounded-2xl p-6 w-full max-w-sm space-y-4" style={{ background: '#ffffff' }}>
             <div className="flex items-center justify-between">
-              <h2 className="font-bold text-lg" style={{ color: 'var(--text-primary)' }}>{editing ? 'Edit Vehicle Type' : 'Add Vehicle Type'}</h2>
-              <button onClick={() => setShowForm(false)}><X className="h-5 w-5" style={{ color: 'var(--text-tertiary)' }} /></button>
+              <h2 className="font-bold text-lg" style={{ color: '#1d1d1f' }}>{editing ? 'Edit Vehicle Type' : 'Add Vehicle Type'}</h2>
+              <button onClick={() => setShowForm(false)}><X className="h-5 w-5" style={{ color: '#86868b' }} /></button>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Name *</label>
+              <label className="block text-sm font-medium mb-1.5" style={{ color: '#86868b' }}>Name *</label>
               <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. SUV, Bike, Truck" className={inp()} style={inpStyle} autoFocus />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>Icon</label>
+              <label className="block text-sm font-medium mb-2" style={{ color: '#86868b' }}>Icon</label>
               <div className="flex flex-wrap gap-2">
                 {ICON_OPTIONS.map(ic => (
                   <button key={ic} onClick={() => setIcon(ic)}
                     className="h-10 w-10 rounded-xl text-xl flex items-center justify-center border-2 transition-all"
-                    style={{ borderColor: icon === ic ? 'var(--accent)' : 'var(--surface-border)', background: icon === ic ? 'var(--surface-2)' : 'transparent' }}>
+                    style={{ borderColor: icon === ic ? '#0071e3' : '#e5e5ea', background: icon === ic ? '#f2f2f7' : 'transparent' }}>
                     {ic}
                   </button>
                 ))}
@@ -134,7 +134,7 @@ function VehiclesTab({ tenantId }: { tenantId: string }) {
             </div>
             <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}
               className="w-full py-3 rounded-xl font-bold text-sm text-white disabled:opacity-60"
-              style={{ background: 'var(--accent)' }}>
+              style={ background: '#0071e3' }>
               {saveMutation.isPending ? 'Saving…' : editing ? 'Update' : 'Add Vehicle Type'}
             </button>
           </div>
@@ -257,52 +257,52 @@ function ServicesTab({ tenantId }: { tenantId: string }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Set prices for each service per vehicle type. Click any price to edit.</p>
+        <p className="text-sm font-medium" style={{ color: '#86868b' }}>Set prices for each service per vehicle type. Click any price to edit.</p>
         <button onClick={openAddSvc}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white"
-          style={{ background: 'var(--accent)' }}>
+          style={ background: '#0071e3' }>
           <Plus className="h-4 w-4" /> Add Service
         </button>
       </div>
       {activeVtypes.length === 0 && (
-        <div className="rounded-2xl p-6 text-center text-sm" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)', color: 'var(--text-tertiary)' }}>
+        <div className="rounded-2xl p-6 text-center text-sm" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)', color: '#86868b' }}>
           Add vehicle types first (in the Vehicles tab) to set prices.
         </div>
       )}
       {activeVtypes.length > 0 && (
-        <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
+        <div className="rounded-2xl overflow-hidden" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
           <div className="overflow-x-auto">
             <table className="w-full text-sm" style={{ minWidth: `${200 + activeVtypes.length * 110}px` }}>
               <thead>
-                <tr style={{ background: 'var(--surface-2)', borderBottom: '1px solid var(--surface-border)' }}>
-                  <th className="text-left px-4 py-3 font-semibold sticky left-0 z-10" style={{ color: 'var(--text-secondary)', background: 'var(--surface-2)', minWidth: '180px' }}>Service</th>
-                  <th className="text-center px-3 py-3 font-semibold" style={{ color: 'var(--text-secondary)', width: '70px' }}>Min</th>
+                <tr style={{ background: '#f2f2f7', borderBottom: '1px solid #e5e5ea' }}>
+                  <th className="text-left px-4 py-3 font-semibold sticky left-0 z-10" style={{ color: '#86868b', background: '#f2f2f7', minWidth: '180px' }}>Service</th>
+                  <th className="text-center px-3 py-3 font-semibold" style={{ color: '#86868b', width: '70px' }}>Min</th>
                   {activeVtypes.map(vt => (
-                    <th key={vt.id} className="text-center px-3 py-3 font-semibold" style={{ color: 'var(--text-secondary)', minWidth: '100px' }}>{vt.icon} {vt.name}</th>
+                    <th key={vt.id} className="text-center px-3 py-3 font-semibold" style={{ color: '#86868b', minWidth: '100px' }}>{vt.icon} {vt.name}</th>
                   ))}
                   <th className="w-16" />
                 </tr>
               </thead>
               <tbody>
                 {svcLoading && Array.from({ length: 4 }).map((_, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid var(--surface-border)' }}>
+                  <tr key={i} style={{ borderBottom: '1px solid #e5e5ea' }}>
                     {Array.from({ length: activeVtypes.length + 3 }).map((_, j) => (
-                      <td key={j} className="px-4 py-3"><div className="h-4 rounded animate-pulse" style={{ background: 'var(--surface-2)' }} /></td>
+                      <td key={j} className="px-4 py-3"><div className="h-4 rounded animate-pulse" style={{ background: '#f2f2f7' }} /></td>
                     ))}
                   </tr>
                 ))}
                 {!svcLoading && services.length === 0 && (
-                  <tr><td colSpan={activeVtypes.length + 3} className="text-center py-10 text-sm" style={{ color: 'var(--text-tertiary)' }}>No services yet. Click "Add Service" above.</td></tr>
+                  <tr><td colSpan={activeVtypes.length + 3} className="text-center py-10 text-sm" style={{ color: '#86868b' }}>No services yet. Click "Add Service" above.</td></tr>
                 )}
                 {services.map(svc => (
-                  <tr key={svc.id} style={{ borderBottom: '1px solid var(--surface-border)', opacity: svc.is_active ? 1 : 0.5 }}>
-                    <td className="px-4 py-2 sticky left-0" style={{ background: 'var(--surface)' }}>
+                  <tr key={svc.id} style={{ borderBottom: '1px solid #e5e5ea', opacity: svc.is_active ? 1 : 0.5 }}>
+                    <td className="px-4 py-2 sticky left-0" style={{ background: '#ffffff' }}>
                       <button onClick={() => openEditSvc(svc)} className="text-left">
-                        <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{svc.name}</p>
-                        {!svc.is_active && <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Inactive</span>}
+                        <p className="font-semibold text-sm" style={{ color: '#1d1d1f' }}>{svc.name}</p>
+                        {!svc.is_active && <span className="text-xs" style={{ color: '#86868b' }}>Inactive</span>}
                       </button>
                     </td>
-                    <td className="text-center px-3 py-2 text-xs" style={{ color: 'var(--text-tertiary)' }}>{svc.duration_minutes}m</td>
+                    <td className="text-center px-3 py-2 text-xs" style={{ color: '#86868b' }}>{svc.duration_minutes}m</td>
                     {activeVtypes.map(vt => {
                       const key = priceKey(svc.id, vt.id);
                       const val = getCellValue(svc.id, vt.id);
@@ -317,14 +317,14 @@ function ServicesTab({ tenantId }: { tenantId: string }) {
                               onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
                               className="w-full rounded-lg border px-2 py-1.5 text-sm text-center font-semibold outline-none"
                               style={{
-                                borderColor: isSaved ? '#16a34a' : isDirty ? 'var(--accent)' : 'var(--surface-border)',
-                                background: isSaved ? '#f0fdf4' : isDirty ? 'color-mix(in srgb, var(--accent) 8%, var(--surface-2))' : 'var(--surface-2)',
-                                color: 'var(--text-primary)',
+                                borderColor: isSaved ? '#16a34a' : isDirty ? '#0071e3' : '#e5e5ea',
+                                background: isSaved ? '#f0fdf4' : isDirty ? '#e8f0fe' : '#f2f2f7',
+                                color: '#1d1d1f',
                                 transition: 'border-color 0.3s, background 0.3s',
                               }} />
                             {isSaved
                               ? <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs pointer-events-none font-bold" style={{ color: '#16a34a' }}>✓</span>
-                              : val && <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs pointer-events-none" style={{ color: 'var(--text-tertiary)' }}>₹</span>
+                              : val && <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs pointer-events-none" style={{ color: '#86868b' }}>₹</span>
                             }
                           </div>
                         </td>
@@ -342,26 +342,26 @@ function ServicesTab({ tenantId }: { tenantId: string }) {
       )}
       {showServiceForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-          <div className="rounded-2xl p-6 w-full max-w-sm space-y-4" style={{ background: 'var(--surface)' }}>
+          <div className="rounded-2xl p-6 w-full max-w-sm space-y-4" style={{ background: '#ffffff' }}>
             <div className="flex items-center justify-between">
-              <h2 className="font-bold text-lg" style={{ color: 'var(--text-primary)' }}>{editingSvc ? 'Edit Service' : 'Add Service'}</h2>
-              <button onClick={() => setShowServiceForm(false)}><X className="h-5 w-5" style={{ color: 'var(--text-tertiary)' }} /></button>
+              <h2 className="font-bold text-lg" style={{ color: '#1d1d1f' }}>{editingSvc ? 'Edit Service' : 'Add Service'}</h2>
+              <button onClick={() => setShowServiceForm(false)}><X className="h-5 w-5" style={{ color: '#86868b' }} /></button>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Service Name *</label>
+              <label className="block text-sm font-medium mb-1.5" style={{ color: '#86868b' }}>Service Name *</label>
               <input value={svcName} onChange={e => setSvcName(e.target.value)} placeholder="e.g. Basic Wash, Full Detail" className={inp()} style={inpStyle} autoFocus />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Duration (minutes)</label>
+              <label className="block text-sm font-medium mb-1.5" style={{ color: '#86868b' }}>Duration (minutes)</label>
               <input type="number" value={svcDuration} onChange={e => setSvcDuration(e.target.value)} placeholder="30" className={inp()} style={inpStyle} />
             </div>
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={svcActive} onChange={e => setSvcActive(e.target.checked)} />
-              <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Active (show in job card)</span>
+              <span className="text-sm font-medium" style={{ color: '#86868b' }}>Active (show in job card)</span>
             </label>
             <button onClick={() => saveSvcMutation.mutate()} disabled={saveSvcMutation.isPending}
               className="w-full py-3 rounded-xl font-bold text-sm text-white disabled:opacity-60"
-              style={{ background: 'var(--accent)' }}>
+              style={ background: '#0071e3' }>
               {saveSvcMutation.isPending ? 'Saving…' : editingSvc ? 'Update Service' : 'Add Service'}
             </button>
           </div>
@@ -418,32 +418,32 @@ function StaffTab({ tenantId }: { tenantId: string }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Manage your wash team, salaries and deduction rules.</p>
-        <button onClick={openAdd} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white" style={{ background: 'var(--accent)' }}>
+        <p className="text-sm font-medium" style={{ color: '#86868b' }}>Manage your wash team, salaries and deduction rules.</p>
+        <button onClick={openAdd} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white" style={ background: '#0071e3' }>
           <Plus className="h-4 w-4" /> Add Staff
         </button>
       </div>
-      <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
-        {isLoading && <div className="p-6 text-sm animate-pulse" style={{ color: 'var(--text-tertiary)' }}>Loading…</div>}
+      <div className="rounded-2xl overflow-hidden" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        {isLoading && <div className="p-6 text-sm animate-pulse" style={{ color: '#86868b' }}>Loading…</div>}
         {!isLoading && staff.length === 0 && (
           <div className="flex flex-col items-center py-12 gap-2">
             <Users className="h-10 w-10 opacity-20" />
-            <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No staff added yet</p>
+            <p className="text-sm" style={{ color: '#86868b' }}>No staff added yet</p>
           </div>
         )}
         {staff.map((s, i) => (
           <div key={s.id} className="flex items-center justify-between px-5 py-4"
-            style={{ borderBottom: i < staff.length - 1 ? '1px solid var(--surface-border)' : undefined, cursor: 'pointer' }}
+            style={{ borderBottom: i < staff.length - 1 ? '1px solid #e5e5ea' : undefined, cursor: 'pointer' }}
             onClick={() => navigate(`/carwash/staff/${s.id}`)}>
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold text-white" style={{ background: 'var(--accent)' }}>{s.name[0].toUpperCase()}</div>
+              <div className="h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold text-white" style={ background: '#0071e3' }>{s.name[0].toUpperCase()}</div>
               <div>
-                <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{s.name}</p>
-                <p className="text-xs capitalize" style={{ color: 'var(--text-tertiary)' }}>{s.role}{s.phone ? ` · ${s.phone}` : ''}</p>
+                <p className="font-semibold text-sm" style={{ color: '#1d1d1f' }}>{s.name}</p>
+                <p className="text-xs capitalize" style={{ color: '#86868b' }}>{s.role}{s.phone ? ` · ${s.phone}` : ''}</p>
               </div>
             </div>
             <div className="flex items-center gap-3" onClick={e => e.stopPropagation()}>
-              {s.monthly_salary > 0 && <p className="text-sm font-bold hidden sm:block" style={{ color: 'var(--accent)' }}>{fmt(s.monthly_salary)}/mo</p>}
+              {s.monthly_salary > 0 && <p className="text-sm font-bold hidden sm:block" style={{ color: '#0071e3' }}>{fmt(s.monthly_salary)}/mo</p>}
               <button onClick={() => openEdit(s)} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50"><Edit2 className="h-4 w-4" /></button>
               <button onClick={() => { if (!confirm(`Remove ${s.name}?`)) return; deleteMutation.mutate(s.id); }} className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50"><Trash2 className="h-4 w-4" /></button>
               <ChevronRight className="h-4 w-4 opacity-30" />
@@ -454,60 +454,60 @@ function StaffTab({ tenantId }: { tenantId: string }) {
 
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-          <div className="rounded-2xl p-6 w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto" style={{ background: 'var(--surface)' }}>
+          <div className="rounded-2xl p-6 w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto" style={{ background: '#ffffff' }}>
             <div className="flex items-center justify-between">
-              <h2 className="font-bold text-lg" style={{ color: 'var(--text-primary)' }}>{editing ? 'Edit Staff' : 'Add Staff'}</h2>
-              <button onClick={() => { setShowForm(false); setEditing(null); }}><X className="h-5 w-5" style={{ color: 'var(--text-tertiary)' }} /></button>
+              <h2 className="font-bold text-lg" style={{ color: '#1d1d1f' }}>{editing ? 'Edit Staff' : 'Add Staff'}</h2>
+              <button onClick={() => { setShowForm(false); setEditing(null); }}><X className="h-5 w-5" style={{ color: '#86868b' }} /></button>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Name *</label>
+              <label className="block text-sm font-medium mb-1.5" style={{ color: '#86868b' }}>Name *</label>
               <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ramesh" className={inp()} style={inpStyle} autoFocus />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Phone</label>
+                <label className="block text-sm font-medium mb-1.5" style={{ color: '#86868b' }}>Phone</label>
                 <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="9876543210" className={inp()} style={inpStyle} />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Role</label>
+                <label className="block text-sm font-medium mb-1.5" style={{ color: '#86868b' }}>Role</label>
                 <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} className={inp()} style={inpStyle}>
                   {ROLES.map(r => <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}
                 </select>
               </div>
             </div>
-            <div className="rounded-xl p-4 space-y-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-border)' }}>
-              <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--accent)' }}>💰 Salary Settings</p>
+            <div className="rounded-xl p-4 space-y-3" style={{ background: '#f2f2f7', border: '1px solid #e5e5ea' }}>
+              <p className="text-xs font-bold uppercase tracking-wider" style={{ color: '#0071e3' }}>💰 Salary Settings</p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Monthly Salary (₹)</label>
+                  <label className="block text-xs font-medium mb-1" style={{ color: '#86868b' }}>Monthly Salary (₹)</label>
                   <input type="number" value={form.monthly_salary} onChange={e => setForm(f => ({ ...f, monthly_salary: e.target.value }))} placeholder="15000" className={inp()} style={inpStyle} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Joining Date</label>
+                  <label className="block text-xs font-medium mb-1" style={{ color: '#86868b' }}>Joining Date</label>
                   <input type="date" value={form.joining_date} onChange={e => setForm(f => ({ ...f, joining_date: e.target.value }))} className={inp()} style={inpStyle} />
                 </div>
               </div>
-              <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>If staff joins mid-month, salary is pro-rated from joining date.</p>
+              <p className="text-xs" style={{ color: '#86868b' }}>If staff joins mid-month, salary is pro-rated from joining date.</p>
               <button type="button" onClick={() => setForm(f => ({ ...f, deduct_half_day: !f.deduct_half_day }))}
-                className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
                 <div className="text-left">
-                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Deduct half day?</p>
-                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Deduct 0.5 day salary on half day</p>
+                  <p className="text-sm font-medium" style={{ color: '#1d1d1f' }}>Deduct half day?</p>
+                  <p className="text-xs" style={{ color: '#86868b' }}>Deduct 0.5 day salary on half day</p>
                 </div>
-                {form.deduct_half_day ? <ToggleRight className="h-6 w-6 flex-shrink-0" style={{ color: 'var(--accent)' }} /> : <ToggleLeft className="h-6 w-6 flex-shrink-0" style={{ color: 'var(--text-tertiary)' }} />}
+                {form.deduct_half_day ? <ToggleRight className="h-6 w-6 flex-shrink-0" style={{ color: '#0071e3' }} /> : <ToggleLeft className="h-6 w-6 flex-shrink-0" style={{ color: '#86868b' }} />}
               </button>
               <button type="button" onClick={() => setForm(f => ({ ...f, deduct_full_day_leave: !f.deduct_full_day_leave }))}
-                className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
                 <div className="text-left">
-                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Deduct paid leave?</p>
-                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>When OFF, leave is paid (no deduction)</p>
+                  <p className="text-sm font-medium" style={{ color: '#1d1d1f' }}>Deduct paid leave?</p>
+                  <p className="text-xs" style={{ color: '#86868b' }}>When OFF, leave is paid (no deduction)</p>
                 </div>
-                {form.deduct_full_day_leave ? <ToggleRight className="h-6 w-6 flex-shrink-0" style={{ color: 'var(--accent)' }} /> : <ToggleLeft className="h-6 w-6 flex-shrink-0" style={{ color: 'var(--text-tertiary)' }} />}
+                {form.deduct_full_day_leave ? <ToggleRight className="h-6 w-6 flex-shrink-0" style={{ color: '#0071e3' }} /> : <ToggleLeft className="h-6 w-6 flex-shrink-0" style={{ color: '#86868b' }} />}
               </button>
             </div>
             <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}
               className="w-full py-3 rounded-xl font-bold text-sm text-white disabled:opacity-60"
-              style={{ background: 'var(--accent)' }}>
+              style={ background: '#0071e3' }>
               {saveMutation.isPending ? 'Saving…' : editing ? 'Update Staff' : 'Add Staff Member'}
             </button>
           </div>
@@ -532,18 +532,26 @@ export function CarwashSetupPage() {
   const [tab, setTab] = useState<Tab>(initialTab);
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-5">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-tertiary)' }}>Car Wash</p>
-        <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Setup</h1>
+    <div className="flex flex-col" style={{ background: 'linear-gradient(160deg,#1c2133 0%,#111520 100%)', height: '100%', overflow: 'hidden' }}>
+
+      {/* Header — floating white plate */}
+      <div className="px-6 py-4 flex items-center justify-between"
+        style={{ background: '#ffffff', boxShadow: '0 2px 12px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2)', position: 'relative', zIndex: 10 }}>
+        <div>
+          <p className="text-xs uppercase tracking-widest mb-0.5" style={{ color: '#86868b', letterSpacing: '0.08em' }}>Car Wash</p>
+          <h1 className="text-2xl font-semibold" style={{ color: '#1d1d1f', letterSpacing: '-0.5px' }}>Setup</h1>
+        </div>
       </div>
 
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-5">
+
       {/* Tab bar */}
-      <div className="flex gap-1 p-1 rounded-2xl" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
+      <div className="flex gap-1 p-1 rounded-2xl" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
         {TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
-            style={{ background: tab === t.id ? 'var(--accent)' : 'transparent', color: tab === t.id ? 'white' : 'var(--text-secondary)' }}>
+            style={{ background: tab === t.id ? '#0071e3' : 'transparent', color: tab === t.id ? '#ffffff' : '#86868b' }}>
             {t.icon} {t.label}
           </button>
         ))}
@@ -552,6 +560,8 @@ export function CarwashSetupPage() {
       {tab === 'vehicles'   && <VehiclesTab   tenantId={tenantId} />}
       {tab === 'services'   && <ServicesTab   tenantId={tenantId} />}
       {tab === 'staff'      && <StaffTab      tenantId={tenantId} />}
+
+      </div>
     </div>
   );
 }

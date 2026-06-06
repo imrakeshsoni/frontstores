@@ -146,27 +146,35 @@ export function CarwashReportsPage() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-6">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-tertiary)' }}>Car Wash</p>
-        <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Reports & Analytics</h1>
+    <div className="flex flex-col" style={{ background: 'linear-gradient(160deg,#1c2133 0%,#111520 100%)', height: '100%', overflow: 'hidden' }}>
+
+      {/* Header — floating white plate */}
+      <div className="px-6 py-4 flex items-center justify-between"
+        style={{ background: '#ffffff', boxShadow: '0 2px 12px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2)', position: 'relative', zIndex: 10 }}>
+        <div>
+          <p className="text-xs uppercase tracking-widest mb-0.5" style={{ color: '#86868b', letterSpacing: '0.08em' }}>Car Wash</p>
+          <h1 className="text-2xl font-semibold" style={{ color: '#1d1d1f', letterSpacing: '-0.5px' }}>Reports &amp; Analytics</h1>
+        </div>
       </div>
 
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+
       {/* Page tab switcher */}
-      <div className="flex gap-1 p-1 rounded-2xl" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
+      <div className="flex gap-1 p-1 rounded-2xl" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
         <button onClick={() => setPageTab('dashboard')}
           className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
-          style={{ background: pageTab === 'dashboard' ? 'var(--accent)' : 'transparent', color: pageTab === 'dashboard' ? '#111' : 'var(--text-secondary)' }}>
+          style={{ background: pageTab === 'dashboard' ? '#0071e3' : 'transparent', color: pageTab === 'dashboard' ? '#ffffff' : '#86868b' }}>
           <TrendingUp className="h-4 w-4" /> Dashboard
         </button>
         <button onClick={() => setPageTab('attendance')}
           className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
-          style={{ background: pageTab === 'attendance' ? 'var(--accent)' : 'transparent', color: pageTab === 'attendance' ? '#111' : 'var(--text-secondary)' }}>
+          style={{ background: pageTab === 'attendance' ? '#0071e3' : 'transparent', color: pageTab === 'attendance' ? '#ffffff' : '#86868b' }}>
           <CalendarDays className="h-4 w-4" /> Attendance
         </button>
         <button onClick={() => setPageTab('export')}
           className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
-          style={{ background: pageTab === 'export' ? 'var(--accent)' : 'transparent', color: pageTab === 'export' ? '#111' : 'var(--text-secondary)' }}>
+          style={{ background: pageTab === 'export' ? '#0071e3' : 'transparent', color: pageTab === 'export' ? '#ffffff' : '#86868b' }}>
           <FileSpreadsheet className="h-4 w-4" /> Export Data
         </button>
       </div>
@@ -206,8 +214,8 @@ export function CarwashReportsPage() {
           { label: 'Avg Ticket', value: todayStats?.delivered ? fmt(todayStats.revenue / todayStats.delivered) : '—', color: '#7c3aed', bg: '#ede9fe' },
           { label: 'Lapsed (30d)', value: String(lapsedCustomers.length), color: '#dc2626', bg: '#fee2e2' },
         ].map(s => (
-          <div key={s.label} className="rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
-            <p className="text-xs mb-1" style={{ color: 'var(--text-tertiary)' }}>{s.label}</p>
+          <div key={s.label} className="rounded-2xl p-4" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <p className="text-xs mb-1" style={{ color: '#86868b' }}>{s.label}</p>
             <p className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</p>
           </div>
         ))}
@@ -215,24 +223,24 @@ export function CarwashReportsPage() {
 
       {/* Monthly revenue chart */}
       {monthlyRevenue.length > 0 && (
-        <div className="rounded-2xl p-5" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
+        <div className="rounded-2xl p-5" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
           <div className="flex items-center gap-2 mb-4">
-            <TrendingUp className="h-4 w-4" style={{ color: 'var(--accent)' }} />
-            <h2 className="font-bold" style={{ color: 'var(--text-primary)' }}>Monthly Revenue</h2>
+            <TrendingUp className="h-4 w-4" style={{ color: '#0071e3' }} />
+            <h2 className="font-bold" style={{ color: '#1d1d1f' }}>Monthly Revenue</h2>
           </div>
           <div className="space-y-3">
             {monthlyRevenue.map(m => (
               <div key={m.month} className="flex items-center gap-3">
-                <span className="text-xs w-16 flex-shrink-0" style={{ color: 'var(--text-tertiary)' }}>
+                <span className="text-xs w-16 flex-shrink-0" style={{ color: '#86868b' }}>
                   {new Date(m.month + '-01').toLocaleDateString('en-IN', { month: 'short', year: '2-digit' })}
                 </span>
-                <div className="flex-1 h-6 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
+                <div className="flex-1 h-6 rounded-full overflow-hidden" style={{ background: '#f2f2f7' }}>
                   <div className="h-full rounded-full flex items-center px-2"
-                    style={{ width: `${(m.revenue / maxRevenue) * 100}%`, background: 'var(--accent)', minWidth: m.revenue > 0 ? '2rem' : 0 }}>
+                    style={{ width: `${(m.revenue / maxRevenue) * 100}%`, background: '#0071e3', minWidth: m.revenue > 0 ? '2rem' : 0 }}>
                     <span className="text-white text-xs font-bold truncate">{fmt(m.revenue)}</span>
                   </div>
                 </div>
-                <span className="text-xs w-16 text-right flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>{m.jobs} cars</span>
+                <span className="text-xs w-16 text-right flex-shrink-0" style={{ color: '#86868b' }}>{m.jobs} cars</span>
               </div>
             ))}
           </div>
@@ -242,18 +250,18 @@ export function CarwashReportsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Popular services */}
         {popularServices.length > 0 && (
-          <div className="rounded-2xl p-5" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
-            <h2 className="font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Popular Services (this month)</h2>
+          <div className="rounded-2xl p-5" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <h2 className="font-bold mb-4" style={{ color: '#1d1d1f' }}>Popular Services (this month)</h2>
             <div className="space-y-2">
               {popularServices.map((s, i) => (
-                <div key={s.service_name} className="flex items-center justify-between py-2" style={{ borderBottom: '1px solid var(--surface-border)' }}>
+                <div key={s.service_name} className="flex items-center justify-between py-2" style={{ borderBottom: '1px solid #e5e5ea' }}>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold w-5" style={{ color: 'var(--text-tertiary)' }}>#{i + 1}</span>
-                    <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{s.service_name}</span>
+                    <span className="text-sm font-bold w-5" style={{ color: '#86868b' }}>#{i + 1}</span>
+                    <span className="text-sm font-medium" style={{ color: '#1d1d1f' }}>{s.service_name}</span>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-bold" style={{ color: 'var(--accent)' }}>{s.count}×</p>
-                    <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{fmt(s.revenue)}</p>
+                    <p className="text-sm font-bold" style={{ color: '#0071e3' }}>{s.count}×</p>
+                    <p className="text-xs" style={{ color: '#86868b' }}>{fmt(s.revenue)}</p>
                   </div>
                 </div>
               ))}
@@ -263,17 +271,17 @@ export function CarwashReportsPage() {
 
         {/* Staff performance — today / week toggle */}
         {(staffToday.length > 0 || staffWeeklyAgg.length > 0) && (
-          <div className="rounded-2xl p-5" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
+          <div className="rounded-2xl p-5" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <Users className="h-4 w-4" style={{ color: 'var(--accent)' }} />
-                <h2 className="font-bold" style={{ color: 'var(--text-primary)' }}>Staff Performance</h2>
+                <Users className="h-4 w-4" style={{ color: '#0071e3' }} />
+                <h2 className="font-bold" style={{ color: '#1d1d1f' }}>Staff Performance</h2>
               </div>
               <div className="flex gap-1">
                 {(['today', 'week'] as const).map(v => (
                   <button key={v} onClick={() => setStaffView(v)}
                     className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${staffView === v ? 'text-white' : 'btn-secondary'}`}
-                    style={staffView === v ? { background: 'var(--accent)' } : {}}>
+                    style={staffView === v ? { background: '#0071e3', color: '#ffffff' } : {}}>
                     {v === 'today' ? 'Today' : 'This Week'}
                   </button>
                 ))}
@@ -281,18 +289,18 @@ export function CarwashReportsPage() {
             </div>
             <div className="space-y-2">
               {(staffView === 'today' ? staffToday : staffWeeklyAgg).map(s => (
-                <div key={s.staff_name} className="flex items-center justify-between py-2" style={{ borderBottom: '1px solid var(--surface-border)' }}>
-                  <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>👤 {s.staff_name}</span>
+                <div key={s.staff_name} className="flex items-center justify-between py-2" style={{ borderBottom: '1px solid #e5e5ea' }}>
+                  <span className="text-sm font-medium" style={{ color: '#1d1d1f' }}>👤 {s.staff_name}</span>
                   <div className="text-right">
-                    <p className="text-sm font-bold" style={{ color: 'var(--accent)' }}>{s.jobs} cars</p>
-                    <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                    <p className="text-sm font-bold" style={{ color: '#0071e3' }}>{s.jobs} cars</p>
+                    <p className="text-xs" style={{ color: '#86868b' }}>
                       {fmt(s.revenue)}{staffView === 'week' && (s as any).days ? ` · ${(s as any).days}d` : ''}
                     </p>
                   </div>
                 </div>
               ))}
               {(staffView === 'today' ? staffToday : staffWeeklyAgg).length === 0 && (
-                <p className="text-sm py-4 text-center" style={{ color: 'var(--text-tertiary)' }}>No data</p>
+                <p className="text-sm py-4 text-center" style={{ color: '#86868b' }}>No data</p>
               )}
             </div>
           </div>
@@ -301,20 +309,20 @@ export function CarwashReportsPage() {
 
       {/* Lapsed customers — win-back */}
       {lapsedCustomers.length > 0 && (
-        <div className="rounded-2xl p-5" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
+        <div className="rounded-2xl p-5" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
           <div className="flex items-center gap-2 mb-1">
             <PhoneCall className="h-4 w-4 text-red-500" />
-            <h2 className="font-bold" style={{ color: 'var(--text-primary)' }}>Win Back — {lapsedCustomers.length} customers (30+ days away)</h2>
+            <h2 className="font-bold" style={{ color: '#1d1d1f' }}>Win Back — {lapsedCustomers.length} customers (30+ days away)</h2>
           </div>
-          <p className="text-xs mb-4" style={{ color: 'var(--text-tertiary)' }}>
+          <p className="text-xs mb-4" style={{ color: '#86868b' }}>
             Send a WhatsApp message to bring them back. One tap per customer.
           </p>
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {lapsedCustomers.map((c, i) => (
-              <div key={i} className="flex items-center justify-between py-2 px-1" style={{ borderBottom: '1px solid var(--surface-border)' }}>
+              <div key={i} className="flex items-center justify-between py-2 px-1" style={{ borderBottom: '1px solid #e5e5ea' }}>
                 <div>
-                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{c.customer_name}</p>
-                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                  <p className="text-sm font-semibold" style={{ color: '#1d1d1f' }}>{c.customer_name}</p>
+                  <p className="text-xs" style={{ color: '#86868b' }}>
                     🚗 {c.reg_number} · Last: {new Date(c.last_visit).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
                   </p>
                 </div>
@@ -333,21 +341,21 @@ export function CarwashReportsPage() {
 
       {/* Payroll Summary — current month */}
       {salarySummaries.length > 0 && (
-        <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
-          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--surface-border)' }}>
-            <h2 className="font-bold" style={{ color: 'var(--text-primary)' }}>
+        <div className="rounded-2xl overflow-hidden" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #e5e5ea' }}>
+            <h2 className="font-bold" style={{ color: '#1d1d1f' }}>
               Payroll — {new Date(now.getFullYear(), now.getMonth()).toLocaleString('en-IN', { month: 'long', year: 'numeric' })}
             </h2>
           </div>
-          <div className="divide-y" style={{ borderColor: 'var(--surface-border)' }}>
+          <div className="divide-y" style={{ borderColor: '#e5e5ea' }}>
             {salarySummaries.map(sm => (
               <div key={sm.staff.id} className="flex items-center justify-between px-5 py-3">
                 <div className="flex items-center gap-3">
                   <div className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                    style={{ background: 'var(--accent)' }}>{sm.staff.name[0].toUpperCase()}</div>
+                    style={{ background: '#0071e3' }}>{sm.staff.name[0].toUpperCase()}</div>
                   <div>
-                    <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{sm.staff.name}</p>
-                    <p className="text-xs capitalize" style={{ color: 'var(--text-tertiary)' }}>
+                    <p className="font-semibold text-sm" style={{ color: '#1d1d1f' }}>{sm.staff.name}</p>
+                    <p className="text-xs capitalize" style={{ color: '#86868b' }}>
                       P:{sm.present} H:{sm.half_day} A:{sm.absent} L:{sm.leave}
                     </p>
                   </div>
@@ -355,19 +363,19 @@ export function CarwashReportsPage() {
                 <div className="text-right">
                   {sm.staff.monthly_salary > 0 ? (
                     <>
-                      <p className="font-bold text-sm" style={{ color: 'var(--accent)' }}>{fmt(sm.payable_amount)}</p>
+                      <p className="font-bold text-sm" style={{ color: '#0071e3' }}>{fmt(sm.payable_amount)}</p>
                       {sm.deductions > 0 && <p className="text-xs" style={{ color: '#dc2626' }}>−{fmt(sm.deductions)} deducted</p>}
                       {sm.advance > 0 && <p className="text-xs" style={{ color: '#f59e0b' }}>−{fmt(sm.advance)} advance</p>}
                     </>
                   ) : (
-                    <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Salary not set</p>
+                    <p className="text-xs" style={{ color: '#86868b' }}>Salary not set</p>
                   )}
                 </div>
               </div>
             ))}
-            <div className="flex items-center justify-between px-5 py-3" style={{ background: 'var(--surface-2)' }}>
-              <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>Total Payable</p>
-              <p className="font-bold text-base" style={{ color: 'var(--accent)' }}>
+            <div className="flex items-center justify-between px-5 py-3" style={{ background: '#f2f2f7' }}>
+              <p className="font-bold text-sm" style={{ color: '#1d1d1f' }}>Total Payable</p>
+              <p className="font-bold text-base" style={{ color: '#0071e3' }}>
                 {fmt(salarySummaries.reduce((s, sm) => s + sm.payable_amount, 0))}
               </p>
             </div>
@@ -515,26 +523,26 @@ function AttendanceTab({ tenantId, config, fromMonth, setFromMonth, toMonth, set
   return (
     <div className="space-y-4">
       {/* Filters */}
-      <div className="rounded-2xl p-4 space-y-3" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
-        <p className="text-xs font-semibold uppercase" style={{ color: 'var(--text-tertiary)' }}>Filter Report</p>
+      <div className="rounded-2xl p-4 space-y-3" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <p className="text-xs font-semibold uppercase" style={{ color: '#86868b' }}>Filter Report</p>
         <div className="flex flex-wrap gap-3 items-end">
           <div>
-            <label className="block text-xs font-semibold mb-1" style={{ color: 'var(--text-secondary)' }}>From Month</label>
+            <label className="block text-xs font-semibold mb-1" style={{ color: '#86868b' }}>From Month</label>
             <input type="month" value={fromMonth} onChange={e => setFromMonth(e.target.value)}
               className="px-3 py-2 rounded-xl text-sm"
-              style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-border)', color: 'var(--text-primary)', outline: 'none' }} />
+              style={{ background: '#f2f2f7', border: '1px solid #e5e5ea', color: '#1d1d1f', outline: 'none' }} />
           </div>
           <div>
-            <label className="block text-xs font-semibold mb-1" style={{ color: 'var(--text-secondary)' }}>To Month</label>
+            <label className="block text-xs font-semibold mb-1" style={{ color: '#86868b' }}>To Month</label>
             <input type="month" value={toMonth} onChange={e => setToMonth(e.target.value)}
               className="px-3 py-2 rounded-xl text-sm"
-              style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-border)', color: 'var(--text-primary)', outline: 'none' }} />
+              style={{ background: '#f2f2f7', border: '1px solid #e5e5ea', color: '#1d1d1f', outline: 'none' }} />
           </div>
           <div>
-            <label className="block text-xs font-semibold mb-1" style={{ color: 'var(--text-secondary)' }}>Employee</label>
+            <label className="block text-xs font-semibold mb-1" style={{ color: '#86868b' }}>Employee</label>
             <select value={selectedStaff} onChange={e => setSelectedStaff(e.target.value)}
               className="px-3 py-2 rounded-xl text-sm"
-              style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-border)', color: 'var(--text-primary)', outline: 'none' }}>
+              style={{ background: '#f2f2f7', border: '1px solid #e5e5ea', color: '#1d1d1f', outline: 'none' }}>
               <option value="all">All Staff</option>
               {allStaff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
@@ -542,22 +550,22 @@ function AttendanceTab({ tenantId, config, fromMonth, setFromMonth, toMonth, set
           <div className="flex gap-2">
             <button onClick={handlePrint}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold"
-              style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-border)', color: 'var(--text-secondary)' }}>
+              style={{ background: '#f2f2f7', border: '1px solid #e5e5ea', color: '#86868b' }}>
               <Printer className="h-4 w-4" /> Print
             </button>
             <button onClick={handleExportCSV}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold"
-              style={{ background: 'var(--accent)', color: '#111' }}>
+              style={{ background: '#0071e3', color: '#111' }}>
               <Download className="h-4 w-4" /> Export CSV
             </button>
           </div>
         </div>
       </div>
 
-      {attFetching && <p className="text-sm text-center py-8" style={{ color: 'var(--text-tertiary)' }}>Loading...</p>}
+      {attFetching && <p className="text-sm text-center py-8" style={{ color: '#86868b' }}>Loading...</p>}
 
       {!attFetching && summaryData.length === 0 && (
-        <p className="text-sm text-center py-8" style={{ color: 'var(--text-tertiary)' }}>No staff found</p>
+        <p className="text-sm text-center py-8" style={{ color: '#86868b' }}>No staff found</p>
       )}
 
       {/* Per-staff monthly summary cards */}
@@ -570,74 +578,74 @@ function AttendanceTab({ tenantId, config, fromMonth, setFromMonth, toMonth, set
         const totalPayable = ms.reduce((s, m) => s + m.payable_amount, 0);
 
         return (
-          <div key={staff.id} className="rounded-2xl overflow-hidden" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
+          <div key={staff.id} className="rounded-2xl overflow-hidden" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
             {/* Staff header */}
             <button className="w-full flex items-center justify-between px-5 py-4"
               onClick={() => setExpandedStaff(isExpanded ? null : staff.id)}>
               <div className="flex items-center gap-3">
                 <div className="h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold text-white"
-                  style={{ background: 'var(--accent)' }}>{staff.name[0].toUpperCase()}</div>
+                  style={{ background: '#0071e3' }}>{staff.name[0].toUpperCase()}</div>
                 <div className="text-left">
-                  <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>{staff.name}</p>
-                  <p className="text-xs capitalize" style={{ color: 'var(--text-tertiary)' }}>{staff.role}{staff.monthly_salary > 0 ? ` · ${fmtRs(staff.monthly_salary)}/mo` : ''}</p>
+                  <p className="font-bold text-sm" style={{ color: '#1d1d1f' }}>{staff.name}</p>
+                  <p className="text-xs capitalize" style={{ color: '#86868b' }}>{staff.role}{staff.monthly_salary > 0 ? ` · ${fmtRs(staff.monthly_salary)}/mo` : ''}</p>
                 </div>
               </div>
               <div className="flex items-center gap-6">
                 <div className="text-center">
-                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Present</p>
+                  <p className="text-xs" style={{ color: '#86868b' }}>Present</p>
                   <p className="font-bold text-sm" style={{ color: '#16a34a' }}>{totalPresent}</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Absent</p>
+                  <p className="text-xs" style={{ color: '#86868b' }}>Absent</p>
                   <p className="font-bold text-sm" style={{ color: '#dc2626' }}>{totalAbsent}</p>
                 </div>
                 {totalGross > 0 && <>
                   <div className="text-center">
-                    <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Gross</p>
-                    <p className="font-bold text-sm" style={{ color: 'var(--accent)' }}>{fmtRs(totalGross)}</p>
+                    <p className="text-xs" style={{ color: '#86868b' }}>Gross</p>
+                    <p className="font-bold text-sm" style={{ color: '#0071e3' }}>{fmtRs(totalGross)}</p>
                   </div>
                   {totalAdvance > 0 && <div className="text-center">
-                    <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Advance</p>
+                    <p className="text-xs" style={{ color: '#86868b' }}>Advance</p>
                     <p className="font-bold text-sm" style={{ color: '#dc2626' }}>−{fmtRs(totalAdvance)}</p>
                   </div>}
                   <div className="text-center">
-                    <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Payable</p>
+                    <p className="text-xs" style={{ color: '#86868b' }}>Payable</p>
                     <p className="font-bold text-sm" style={{ color: '#16a34a' }}>{fmtRs(totalPayable)}</p>
                   </div>
                 </>}
-                {isExpanded ? <ChevronUp className="h-4 w-4" style={{ color: 'var(--text-tertiary)' }} /> : <ChevronDown className="h-4 w-4" style={{ color: 'var(--text-tertiary)' }} />}
+                {isExpanded ? <ChevronUp className="h-4 w-4" style={{ color: '#86868b' }} /> : <ChevronDown className="h-4 w-4" style={{ color: '#86868b' }} />}
               </div>
             </button>
 
             {/* Expanded: month-by-month detail */}
             {isExpanded && (
-              <div style={{ borderTop: '1px solid var(--surface-border)' }}>
+              <div style={{ borderTop: '1px solid #e5e5ea' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
-                    <tr style={{ background: 'var(--surface-2)' }}>
+                    <tr style={{ background: '#f2f2f7' }}>
                       {['Month','Present','Half Day','Absent','Leave','Working Days','Gross','Advance','Payable'].map(h => (
-                        <th key={h} className="text-xs font-semibold px-4 py-2 text-left" style={{ color: 'var(--text-secondary)', borderBottom: '1px solid var(--surface-border)' }}>{h}</th>
+                        <th key={h} className="text-xs font-semibold px-4 py-2 text-left" style={{ color: '#86868b', borderBottom: '1px solid #e5e5ea' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {ms.map(m => (
                       <>
-                        <tr key={m.month} style={{ borderBottom: '1px solid var(--surface-border)' }}>
-                          <td className="px-4 py-2.5 text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        <tr key={m.month} style={{ borderBottom: '1px solid #e5e5ea' }}>
+                          <td className="px-4 py-2.5 text-xs font-semibold" style={{ color: '#1d1d1f' }}>
                             {new Date(m.month + '-01').toLocaleString('en-IN', { month: 'long', year: 'numeric' })}
                           </td>
                           <td className="px-4 py-2.5 text-xs font-bold" style={{ color: '#16a34a' }}>{m.present}</td>
                           <td className="px-4 py-2.5 text-xs font-bold" style={{ color: '#d97706' }}>{m.half_day}</td>
                           <td className="px-4 py-2.5 text-xs font-bold" style={{ color: '#dc2626' }}>{m.absent}</td>
                           <td className="px-4 py-2.5 text-xs" style={{ color: '#7c3aed' }}>{m.leave}</td>
-                          <td className="px-4 py-2.5 text-xs" style={{ color: 'var(--text-secondary)' }}>{m.working_days}</td>
-                          <td className="px-4 py-2.5 text-xs font-semibold" style={{ color: 'var(--accent)' }}>{m.net_salary > 0 ? fmtRs(m.net_salary) : '—'}</td>
+                          <td className="px-4 py-2.5 text-xs" style={{ color: '#86868b' }}>{m.working_days}</td>
+                          <td className="px-4 py-2.5 text-xs font-semibold" style={{ color: '#0071e3' }}>{m.net_salary > 0 ? fmtRs(m.net_salary) : '—'}</td>
                           <td className="px-4 py-2.5 text-xs font-semibold" style={{ color: '#dc2626' }}>{m.advance > 0 ? `−${fmtRs(m.advance)}` : '—'}</td>
                           <td className="px-4 py-2.5 text-xs font-bold" style={{ color: '#16a34a' }}>{m.net_salary > 0 ? fmtRs(m.payable_amount) : '—'}</td>
                         </tr>
                         {m.advanceEntries.length > 0 && (
-                          <tr key={m.month + '-adv'} style={{ background: 'rgba(220,38,38,0.04)', borderBottom: '1px solid var(--surface-border)' }}>
+                          <tr key={m.month + '-adv'} style={{ background: 'rgba(220,38,38,0.04)', borderBottom: '1px solid #e5e5ea' }}>
                             <td colSpan={9} className="px-4 py-1.5 text-xs" style={{ color: '#dc2626' }}>
                               Advance: {m.advanceEntries.map((a: CarwashSalaryAdvance) => `${fmtRs(a.amount)}${a.note ? ` (${a.note})` : ''} on ${new Date(a.given_at ?? a.created_at).toLocaleDateString('en-IN')}`).join(' · ')}
                             </td>
@@ -662,14 +670,14 @@ function AttendanceTab({ tenantId, config, fromMonth, setFromMonth, toMonth, set
 function DailyDetailSection({ staff, attendance }: { staff: CarwashStaff; attendance: CarwashAttendance[] }) {
   const ATT_BG: Record<string, string> = { present: '#dcfce7', half_day: '#fef3c7', absent: '#fee2e2', leave: '#ede9fe', holiday: '#e0f2fe' };
   if (attendance.length === 0) return (
-    <div className="px-4 py-3 text-xs" style={{ color: 'var(--text-tertiary)', borderTop: '1px solid var(--surface-border)' }}>
+    <div className="px-4 py-3 text-xs" style={{ color: '#86868b', borderTop: '1px solid #e5e5ea' }}>
       No attendance records in this period
     </div>
   );
   const sorted = [...attendance].sort((a, b) => a.date.localeCompare(b.date));
   return (
-    <div style={{ borderTop: '1px solid var(--surface-border)', padding: '12px 16px' }}>
-      <p className="text-xs font-semibold uppercase mb-2" style={{ color: 'var(--text-tertiary)' }}>Daily Record</p>
+    <div style={{ borderTop: '1px solid #e5e5ea', padding: '12px 16px' }}>
+      <p className="text-xs font-semibold uppercase mb-2" style={{ color: '#86868b' }}>Daily Record</p>
       <div className="flex flex-wrap gap-1.5">
         {sorted.map(a => {
           const d = new Date(a.date);
@@ -678,10 +686,10 @@ function DailyDetailSection({ staff, attendance }: { staff: CarwashStaff; attend
           return (
             <div key={a.id} title={`${dateLabel} (${dayName}) — ${ATT_LABELS[a.status] ?? a.status}`}
               className="flex flex-col items-center rounded-lg px-2 py-1.5"
-              style={{ background: ATT_BG[a.status] ?? 'var(--surface-2)', minWidth: '42px' }}>
-              <span className="text-xs font-semibold" style={{ color: ATT_COLORS[a.status] ?? 'var(--text-primary)' }}>{dateLabel}</span>
+              style={{ background: ATT_BG[a.status] ?? '#f2f2f7', minWidth: '42px' }}>
+              <span className="text-xs font-semibold" style={{ color: ATT_COLORS[a.status] ?? '#1d1d1f' }}>{dateLabel}</span>
               <span className="text-xs" style={{ color: '#6b7280' }}>{dayName}</span>
-              <span className="text-xs font-bold" style={{ color: ATT_COLORS[a.status] ?? 'var(--text-primary)' }}>{a.status === 'present' ? 'P' : a.status === 'half_day' ? 'H' : a.status === 'absent' ? 'A' : a.status === 'leave' ? 'L' : 'O'}</span>
+              <span className="text-xs font-bold" style={{ color: ATT_COLORS[a.status] ?? '#1d1d1f' }}>{a.status === 'present' ? 'P' : a.status === 'half_day' ? 'H' : a.status === 'absent' ? 'A' : a.status === 'leave' ? 'L' : 'O'}</span>
             </div>
           );
         })}
@@ -741,37 +749,37 @@ function ExportTab({ tenantId, section, setSection, jobFrom, setJobFrom, jobTo, 
         {SECTIONS.map(s => (
           <button key={s.id} onClick={() => setSection(s.id)}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
-            style={{ background: section === s.id ? 'var(--accent)' : 'var(--surface)', color: section === s.id ? '#111' : 'var(--text-secondary)', border: '1px solid var(--surface-border)' }}>
+            style={{ background: section === s.id ? '#0071e3' : '#ffffff', color: section === s.id ? '#111' : '#86868b', border: '1px solid #e5e5ea' }}>
             {s.label}
-            {s.count > 0 && <span className="text-xs px-1.5 py-0.5 rounded-full font-bold" style={{ background: section===s.id?'rgba(0,0,0,0.15)':'var(--surface-2)' }}>{s.count}</span>}
+            {s.count > 0 && <span className="text-xs px-1.5 py-0.5 rounded-full font-bold" style={{ background: section===s.id?'rgba(0,0,0,0.15)':'#f2f2f7' }}>{s.count}</span>}
           </button>
         ))}
       </div>
 
       {/* Filters */}
       {section === 'jobs' && (
-        <div className="rounded-2xl p-4 space-y-3" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
-          <p className="text-xs font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: 'var(--text-tertiary)' }}>
+        <div className="rounded-2xl p-4 space-y-3" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <p className="text-xs font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: '#86868b' }}>
             <Filter className="h-3.5 w-3.5" /> Filters
           </p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>From</label>
+              <label className="block text-xs font-medium mb-1" style={{ color: '#86868b' }}>From</label>
               <input type="date" value={jobFrom} onChange={e => setJobFrom(e.target.value)}
                 className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-                style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }} />
+                style={{ borderColor: '#e5e5ea', background: '#f2f2f7', color: '#1d1d1f' }} />
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>To</label>
+              <label className="block text-xs font-medium mb-1" style={{ color: '#86868b' }}>To</label>
               <input type="date" value={jobTo} onChange={e => setJobTo(e.target.value)}
                 className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-                style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }} />
+                style={{ borderColor: '#e5e5ea', background: '#f2f2f7', color: '#1d1d1f' }} />
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Status</label>
+              <label className="block text-xs font-medium mb-1" style={{ color: '#86868b' }}>Status</label>
               <select value={jobStatus} onChange={e => setJobStatus(e.target.value)}
                 className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-                style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }}>
+                style={{ borderColor: '#e5e5ea', background: '#f2f2f7', color: '#1d1d1f' }}>
                 <option value="">All</option>
                 <option value="delivered">Delivered</option>
                 <option value="waiting">Waiting</option>
@@ -780,10 +788,10 @@ function ExportTab({ tenantId, section, setSection, jobFrom, setJobFrom, jobTo, 
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Customer Phone</label>
+              <label className="block text-xs font-medium mb-1" style={{ color: '#86868b' }}>Customer Phone</label>
               <input value={jobCustomer} onChange={e => setJobCustomer(e.target.value)} placeholder="Search by phone"
                 className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-                style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }} />
+                style={{ borderColor: '#e5e5ea', background: '#f2f2f7', color: '#1d1d1f' }} />
             </div>
           </div>
         </div>
@@ -791,138 +799,139 @@ function ExportTab({ tenantId, section, setSection, jobFrom, setJobFrom, jobTo, 
 
       {/* Download bar */}
       <div className="flex items-center justify-between rounded-xl px-4 py-3"
-        style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
-        <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+        style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <p className="text-sm font-semibold" style={{ color: '#1d1d1f' }}>
           {isLoading ? 'Loading…' : `${count} ${SECTIONS.find(s=>s.id===section)?.label ?? ''} record${count !== 1 ? 's' : ''}`}
         </p>
         <button onClick={handleDownload} disabled={count === 0 || isLoading}
           className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-40 transition-all"
-          style={{ background: 'var(--accent)', color: '#111' }}>
+          style={{ background: '#0071e3', color: '#111' }}>
           <Download className="h-4 w-4" /> Download Excel (.csv)
         </button>
       </div>
 
       {/* Preview table */}
-      <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
+      <div className="rounded-2xl overflow-hidden" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
         <div className="overflow-x-auto max-h-96">
           {section === 'jobs' && (
             <table className="w-full text-xs">
-              <thead><tr style={{ background: 'var(--surface-2)', position: 'sticky', top: 0 }}>
+              <thead><tr style={{ background: '#f2f2f7', position: 'sticky', top: 0 }}>
                 {['Job #','Date','Reg','Type','Make/Model','Color','Customer','Phone','Services','Total','Status'].map(h => (
-                  <th key={h} className="px-3 py-2.5 text-left font-semibold" style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{h}</th>
+                  <th key={h} className="px-3 py-2.5 text-left font-semibold" style={{ color: '#86868b', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr></thead>
               <tbody>
                 {exportJobs.map((j:any) => (
-                  <tr key={j.id} style={{ borderTop: '1px solid var(--surface-border)' }}>
-                    <td className="px-3 py-2 font-bold" style={{ color: 'var(--accent)' }}>{j.job_number}</td>
-                    <td className="px-3 py-2" style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{new Date(j.created_at).toLocaleDateString('en-IN')}</td>
-                    <td className="px-3 py-2 font-semibold" style={{ color: 'var(--text-primary)' }}>{j.reg_number}</td>
-                    <td className="px-3 py-2 capitalize" style={{ color: 'var(--text-secondary)' }}>{j.vehicle_type}</td>
-                    <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{[j.make,j.model].filter(Boolean).join(' ')||'—'}</td>
-                    <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{j.color||'—'}</td>
-                    <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{j.customer_name||'—'}</td>
-                    <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{j.customer_phone||'—'}</td>
-                    <td className="px-3 py-2" style={{ color: 'var(--text-secondary)', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(j.items??[]).map((i:any)=>i.service_name).join(', ')}</td>
-                    <td className="px-3 py-2 font-bold" style={{ color: 'var(--accent)' }}>{fmt(j.total)}</td>
+                  <tr key={j.id} style={{ borderTop: '1px solid #e5e5ea' }}>
+                    <td className="px-3 py-2 font-bold" style={{ color: '#0071e3' }}>{j.job_number}</td>
+                    <td className="px-3 py-2" style={{ color: '#86868b', whiteSpace: 'nowrap' }}>{new Date(j.created_at).toLocaleDateString('en-IN')}</td>
+                    <td className="px-3 py-2 font-semibold" style={{ color: '#1d1d1f' }}>{j.reg_number}</td>
+                    <td className="px-3 py-2 capitalize" style={{ color: '#86868b' }}>{j.vehicle_type}</td>
+                    <td className="px-3 py-2" style={{ color: '#86868b' }}>{[j.make,j.model].filter(Boolean).join(' ')||'—'}</td>
+                    <td className="px-3 py-2" style={{ color: '#86868b' }}>{j.color||'—'}</td>
+                    <td className="px-3 py-2" style={{ color: '#86868b' }}>{j.customer_name||'—'}</td>
+                    <td className="px-3 py-2" style={{ color: '#86868b' }}>{j.customer_phone||'—'}</td>
+                    <td className="px-3 py-2" style={{ color: '#86868b', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(j.items??[]).map((i:any)=>i.service_name).join(', ')}</td>
+                    <td className="px-3 py-2 font-bold" style={{ color: '#0071e3' }}>{fmt(j.total)}</td>
                     <td className="px-3 py-2"><span className="px-2 py-0.5 rounded-full text-xs font-semibold capitalize" style={{ background: j.status==='delivered'?'#dcfce7':'#fef3c7', color: j.status==='delivered'?'#16a34a':'#d97706' }}>{j.status}</span></td>
                   </tr>
                 ))}
-                {exportJobs.length === 0 && !jobsFetching && <tr><td colSpan={11} className="px-3 py-8 text-center" style={{ color: 'var(--text-tertiary)' }}>No jobs found for selected filters</td></tr>}
+                {exportJobs.length === 0 && !jobsFetching && <tr><td colSpan={11} className="px-3 py-8 text-center" style={{ color: '#86868b' }}>No jobs found for selected filters</td></tr>}
               </tbody>
             </table>
           )}
 
           {section === 'customers' && (
             <table className="w-full text-xs">
-              <thead><tr style={{ background: 'var(--surface-2)', position: 'sticky', top: 0 }}>
+              <thead><tr style={{ background: '#f2f2f7', position: 'sticky', top: 0 }}>
                 {['Customer','Phone','Total Jobs','Total Spent','Last Visit'].map(h => (
-                  <th key={h} className="px-3 py-2.5 text-left font-semibold" style={{ color: 'var(--text-secondary)' }}>{h}</th>
+                  <th key={h} className="px-3 py-2.5 text-left font-semibold" style={{ color: '#86868b' }}>{h}</th>
                 ))}
               </tr></thead>
               <tbody>
                 {exportCustomers.map((c:any, i:number) => (
-                  <tr key={i} style={{ borderTop: '1px solid var(--surface-border)' }}>
-                    <td className="px-3 py-2 font-semibold" style={{ color: 'var(--text-primary)' }}>{c.customer_name||'—'}</td>
-                    <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{c.customer_phone||'—'}</td>
-                    <td className="px-3 py-2 font-bold text-center" style={{ color: 'var(--text-primary)' }}>{c.total_jobs}</td>
-                    <td className="px-3 py-2 font-bold" style={{ color: 'var(--accent)' }}>{fmt(c.total_spent)}</td>
-                    <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{new Date(c.last_visit).toLocaleDateString('en-IN')}</td>
+                  <tr key={i} style={{ borderTop: '1px solid #e5e5ea' }}>
+                    <td className="px-3 py-2 font-semibold" style={{ color: '#1d1d1f' }}>{c.customer_name||'—'}</td>
+                    <td className="px-3 py-2" style={{ color: '#86868b' }}>{c.customer_phone||'—'}</td>
+                    <td className="px-3 py-2 font-bold text-center" style={{ color: '#1d1d1f' }}>{c.total_jobs}</td>
+                    <td className="px-3 py-2 font-bold" style={{ color: '#0071e3' }}>{fmt(c.total_spent)}</td>
+                    <td className="px-3 py-2" style={{ color: '#86868b' }}>{new Date(c.last_visit).toLocaleDateString('en-IN')}</td>
                   </tr>
                 ))}
-                {exportCustomers.length === 0 && !custFetching && <tr><td colSpan={5} className="px-3 py-8 text-center" style={{ color: 'var(--text-tertiary)' }}>No customer data</td></tr>}
+                {exportCustomers.length === 0 && !custFetching && <tr><td colSpan={5} className="px-3 py-8 text-center" style={{ color: '#86868b' }}>No customer data</td></tr>}
               </tbody>
             </table>
           )}
 
           {section === 'staff' && (
             <table className="w-full text-xs">
-              <thead><tr style={{ background: 'var(--surface-2)', position: 'sticky', top: 0 }}>
+              <thead><tr style={{ background: '#f2f2f7', position: 'sticky', top: 0 }}>
                 {['Name','Phone','Role','Monthly Salary','Joining Date','Deduct Half Day','Deduct Leave'].map(h => (
-                  <th key={h} className="px-3 py-2.5 text-left font-semibold" style={{ color: 'var(--text-secondary)' }}>{h}</th>
+                  <th key={h} className="px-3 py-2.5 text-left font-semibold" style={{ color: '#86868b' }}>{h}</th>
                 ))}
               </tr></thead>
               <tbody>
                 {exportStaff.map((s:any) => (
-                  <tr key={s.id} style={{ borderTop: '1px solid var(--surface-border)' }}>
-                    <td className="px-3 py-2 font-semibold" style={{ color: 'var(--text-primary)' }}>{s.name}</td>
-                    <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{s.phone||'—'}</td>
-                    <td className="px-3 py-2 capitalize" style={{ color: 'var(--text-secondary)' }}>{s.role}</td>
-                    <td className="px-3 py-2 font-bold" style={{ color: 'var(--accent)' }}>{s.monthly_salary>0?fmt(s.monthly_salary):'—'}</td>
-                    <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{s.joining_date?new Date(s.joining_date).toLocaleDateString('en-IN'):'—'}</td>
+                  <tr key={s.id} style={{ borderTop: '1px solid #e5e5ea' }}>
+                    <td className="px-3 py-2 font-semibold" style={{ color: '#1d1d1f' }}>{s.name}</td>
+                    <td className="px-3 py-2" style={{ color: '#86868b' }}>{s.phone||'—'}</td>
+                    <td className="px-3 py-2 capitalize" style={{ color: '#86868b' }}>{s.role}</td>
+                    <td className="px-3 py-2 font-bold" style={{ color: '#0071e3' }}>{s.monthly_salary>0?fmt(s.monthly_salary):'—'}</td>
+                    <td className="px-3 py-2" style={{ color: '#86868b' }}>{s.joining_date?new Date(s.joining_date).toLocaleDateString('en-IN'):'—'}</td>
                     <td className="px-3 py-2 text-center">{s.deduct_half_day?'✓':'—'}</td>
                     <td className="px-3 py-2 text-center">{s.deduct_full_day_leave?'✓':'—'}</td>
                   </tr>
                 ))}
-                {exportStaff.length === 0 && !staffFetching && <tr><td colSpan={7} className="px-3 py-8 text-center" style={{ color: 'var(--text-tertiary)' }}>No staff data</td></tr>}
+                {exportStaff.length === 0 && !staffFetching && <tr><td colSpan={7} className="px-3 py-8 text-center" style={{ color: '#86868b' }}>No staff data</td></tr>}
               </tbody>
             </table>
           )}
 
           {section === 'services' && (
             <table className="w-full text-xs">
-              <thead><tr style={{ background: 'var(--surface-2)', position: 'sticky', top: 0 }}>
+              <thead><tr style={{ background: '#f2f2f7', position: 'sticky', top: 0 }}>
                 {['Service Name','Duration (min)','Active'].map(h => (
-                  <th key={h} className="px-3 py-2.5 text-left font-semibold" style={{ color: 'var(--text-secondary)' }}>{h}</th>
+                  <th key={h} className="px-3 py-2.5 text-left font-semibold" style={{ color: '#86868b' }}>{h}</th>
                 ))}
               </tr></thead>
               <tbody>
                 {exportServices.map((s:any) => (
-                  <tr key={s.id} style={{ borderTop: '1px solid var(--surface-border)' }}>
-                    <td className="px-3 py-2 font-semibold" style={{ color: 'var(--text-primary)' }}>{s.name}</td>
-                    <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{s.duration_minutes} min</td>
+                  <tr key={s.id} style={{ borderTop: '1px solid #e5e5ea' }}>
+                    <td className="px-3 py-2 font-semibold" style={{ color: '#1d1d1f' }}>{s.name}</td>
+                    <td className="px-3 py-2" style={{ color: '#86868b' }}>{s.duration_minutes} min</td>
                     <td className="px-3 py-2"><span className="px-2 py-0.5 rounded-full text-xs font-semibold" style={{ background: s.is_active?'#dcfce7':'#fee2e2', color: s.is_active?'#16a34a':'#dc2626' }}>{s.is_active?'Active':'Inactive'}</span></td>
                   </tr>
                 ))}
-                {exportServices.length === 0 && !svcFetching && <tr><td colSpan={3} className="px-3 py-8 text-center" style={{ color: 'var(--text-tertiary)' }}>No services</td></tr>}
+                {exportServices.length === 0 && !svcFetching && <tr><td colSpan={3} className="px-3 py-8 text-center" style={{ color: '#86868b' }}>No services</td></tr>}
               </tbody>
             </table>
           )}
 
           {section === 'inventory' && (
             <table className="w-full text-xs">
-              <thead><tr style={{ background: 'var(--surface-2)', position: 'sticky', top: 0 }}>
+              <thead><tr style={{ background: '#f2f2f7', position: 'sticky', top: 0 }}>
                 {['Item','Category','Unit','Qty','Min Qty','Cost/Unit'].map(h => (
-                  <th key={h} className="px-3 py-2.5 text-left font-semibold" style={{ color: 'var(--text-secondary)' }}>{h}</th>
+                  <th key={h} className="px-3 py-2.5 text-left font-semibold" style={{ color: '#86868b' }}>{h}</th>
                 ))}
               </tr></thead>
               <tbody>
                 {exportInventory.map((i:any) => (
-                  <tr key={i.id} style={{ borderTop: '1px solid var(--surface-border)' }}>
-                    <td className="px-3 py-2 font-semibold" style={{ color: 'var(--text-primary)' }}>{i.name}</td>
-                    <td className="px-3 py-2 capitalize" style={{ color: 'var(--text-secondary)' }}>{i.category}</td>
-                    <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{i.unit}</td>
-                    <td className="px-3 py-2 font-bold" style={{ color: i.quantity <= i.min_quantity ? '#dc2626' : 'var(--text-primary)' }}>{i.quantity}</td>
-                    <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{i.min_quantity}</td>
-                    <td className="px-3 py-2 font-bold" style={{ color: 'var(--accent)' }}>{i.cost_per_unit>0?fmt(i.cost_per_unit):'—'}</td>
+                  <tr key={i.id} style={{ borderTop: '1px solid #e5e5ea' }}>
+                    <td className="px-3 py-2 font-semibold" style={{ color: '#1d1d1f' }}>{i.name}</td>
+                    <td className="px-3 py-2 capitalize" style={{ color: '#86868b' }}>{i.category}</td>
+                    <td className="px-3 py-2" style={{ color: '#86868b' }}>{i.unit}</td>
+                    <td className="px-3 py-2 font-bold" style={{ color: i.quantity <= i.min_quantity ? '#dc2626' : '#1d1d1f' }}>{i.quantity}</td>
+                    <td className="px-3 py-2" style={{ color: '#86868b' }}>{i.min_quantity}</td>
+                    <td className="px-3 py-2 font-bold" style={{ color: '#0071e3' }}>{i.cost_per_unit>0?fmt(i.cost_per_unit):'—'}</td>
                   </tr>
                 ))}
-                {exportInventory.length === 0 && !invFetching && <tr><td colSpan={6} className="px-3 py-8 text-center" style={{ color: 'var(--text-tertiary)' }}>No inventory items</td></tr>}
+                {exportInventory.length === 0 && !invFetching && <tr><td colSpan={6} className="px-3 py-8 text-center" style={{ color: '#86868b' }}>No inventory items</td></tr>}
               </tbody>
             </table>
           )}
         </div>
       </div>
-    </div>
+      </div>
+    </div>{/* end scrollable */}
   );
 }

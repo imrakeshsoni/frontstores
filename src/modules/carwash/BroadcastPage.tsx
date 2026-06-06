@@ -86,14 +86,20 @@ export function BroadcastPage() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-5">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col" style={{ background: 'linear-gradient(160deg,#1c2133 0%,#111520 100%)', height: '100%', overflow: 'hidden' }}>
+
+      {/* Header — floating white plate */}
+      <div className="px-6 py-4 flex items-center justify-between"
+        style={{ background: '#ffffff', boxShadow: '0 2px 12px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2)', position: 'relative', zIndex: 10 }}>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-tertiary)' }}>Car Wash</p>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Broadcast Message</h1>
-          <p className="text-sm mt-0.5" style={{ color: 'var(--text-tertiary)' }}>Send a message to all your customers at once</p>
+          <p className="text-xs uppercase tracking-widest mb-0.5" style={{ color: '#86868b', letterSpacing: '0.08em' }}>Car Wash</p>
+          <h1 className="text-2xl font-semibold" style={{ color: '#1d1d1f', letterSpacing: '-0.5px' }}>Broadcast Message</h1>
+          <p className="text-xs mt-0.5" style={{ color: '#86868b' }}>Send a message to all your customers at once</p>
         </div>
       </div>
+
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-5">
 
       {/* API status banner */}
       {!hasApi && (
@@ -116,15 +122,15 @@ export function BroadcastPage() {
         {/* Left — Compose */}
         <div className="space-y-4">
           {/* Template picker */}
-          <div className="rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
-            <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--accent)' }}>Choose Template</p>
+          <div className="rounded-2xl p-4" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: '#0071e3' }}>Choose Template</p>
             <div className="space-y-1.5">
               {TEMPLATES.map((t, i) => (
                 <button key={i} onClick={() => handleTemplateSelect(i)}
                   className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
                   style={selectedTemplate === i
-                    ? { background: 'var(--accent)', color: 'var(--on-accent, #111)' }
-                    : { background: 'var(--surface-2)', color: 'var(--text-primary)' }}>
+                    ? { background: '#0071e3', color: '#ffffff' }
+                    : { background: '#f2f2f7', color: '#1d1d1f' }}>
                   {t.label}
                 </button>
               ))}
@@ -132,37 +138,37 @@ export function BroadcastPage() {
           </div>
 
           {/* Message editor */}
-          <div className="rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
-            <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--accent)' }}>
-              Message <span className="font-normal normal-case" style={{ color: 'var(--text-tertiary)' }}>— use {'{name}'} for customer name</span>
+          <div className="rounded-2xl p-4" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#0071e3' }}>
+              Message <span className="font-normal normal-case" style={{ color: '#86868b' }}>— use {'{name}'} for customer name</span>
             </p>
             <textarea value={message} onChange={e => setMessage(e.target.value)} rows={8}
               className="w-full rounded-xl border px-3.5 py-3 text-sm outline-none resize-none"
-              style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)', fontFamily: 'monospace' }}
+              style={{ borderColor: '#e5e5ea', background: '#f2f2f7', color: '#1d1d1f', fontFamily: 'monospace' }}
               placeholder="Type your message here…" />
-            <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>{message.length} characters</p>
+            <p className="text-xs mt-1" style={{ color: '#86868b' }}>{message.length} characters</p>
           </div>
         </div>
 
         {/* Right — Recipients + Preview */}
         <div className="space-y-4">
           {/* Recipients */}
-          <div className="rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
+          <div className="rounded-2xl p-4" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center gap-2 mb-3">
-              <Users className="h-4 w-4" style={{ color: 'var(--accent)' }} />
-              <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--accent)' }}>Recipients</p>
-              <span className="ml-auto text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{customers.length}</span>
+              <Users className="h-4 w-4" style={{ color: '#0071e3' }} />
+              <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#0071e3' }}>Recipients</p>
+              <span className="ml-auto text-sm font-bold" style={{ color: '#1d1d1f' }}>{customers.length}</span>
             </div>
-            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+            <p className="text-sm" style={{ color: '#86868b' }}>
               All customers with a valid 10-digit phone number
             </p>
             {allCustomers.length === 0 && (
-              <p className="text-xs mt-2" style={{ color: 'var(--text-tertiary)' }}>No customers with phone numbers yet. They appear here after job cards are created.</p>
+              <p className="text-xs mt-2" style={{ color: '#86868b' }}>No customers with phone numbers yet. They appear here after job cards are created.</p>
             )}
           </div>
 
           {/* Preview */}
-          <div className="rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
+          <div className="rounded-2xl p-4" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center gap-2 mb-3">
               <MessageSquare className="h-4 w-4" style={{ color: '#25d366' }} />
               <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#25d366' }}>Preview</p>
@@ -174,15 +180,15 @@ export function BroadcastPage() {
 
           {/* Progress / Result */}
           {sending && (
-            <div className="rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
-              <p className="text-sm font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>Sending…</p>
-              <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
+            <div className="rounded-2xl p-4" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <p className="text-sm font-semibold mb-2" style={{ color: '#1d1d1f' }}>Sending…</p>
+              <div className="h-2 rounded-full overflow-hidden" style={{ background: '#f2f2f7' }}>
                 <div className="h-2 rounded-full transition-all" style={{
                   width: `${progress.total > 0 ? (progress.done / progress.total) * 100 : 0}%`,
                   background: '#25d366',
                 }} />
               </div>
-              <p className="text-xs mt-1.5" style={{ color: 'var(--text-tertiary)' }}>
+              <p className="text-xs mt-1.5" style={{ color: '#86868b' }}>
                 {progress.done} of {progress.total} messages
               </p>
             </div>
@@ -211,6 +217,7 @@ export function BroadcastPage() {
           </button>
         </div>
       </div>
-    </div>
+      </div>
+    </div>{/* end scrollable */}
   );
 }

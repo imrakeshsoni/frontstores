@@ -57,8 +57,8 @@ export function CarwashStaffDetailPage() {
 
   if (!staff) {
     return (
-      <div className="flex-1 flex items-center justify-center p-6">
-        <p style={{ color: 'var(--text-tertiary)' }}>Staff not found.</p>
+      <div className="flex-1 flex items-center justify-center p-6" style={{ background: 'linear-gradient(160deg,#1c2133 0%,#111520 100%)' }}>
+        <p style={{ color: 'rgba(255,255,255,0.35)' }}>Staff not found.</p>
       </div>
     );
   }
@@ -206,32 +206,38 @@ export function CarwashStaffDetailPage() {
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex flex-col" style={{ background: 'linear-gradient(160deg,#1c2133 0%,#111520 100%)', height: '100%', overflow: 'hidden' }}>
 
-      {/* Header bar */}
-      <div className="flex items-center gap-3 px-6 py-4 flex-shrink-0" style={{ borderBottom: '1px solid var(--surface-border)' }}>
+      {/* Header — floating white plate */}
+      <div className="px-6 py-4 flex items-center gap-3"
+        style={{ background: '#ffffff', boxShadow: '0 2px 12px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2)', position: 'relative', zIndex: 10, flexShrink: 0 }}>
         <button onClick={() => navigate('/carwash/setup?tab=staff')}
           className="flex items-center gap-1 text-sm font-medium transition-opacity hover:opacity-70"
-          style={{ color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+          style={{ color: '#0071e3', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
           <ChevronLeft className="h-4 w-4" /> Back to Staff
         </button>
+        <div className="w-px h-5 mx-1" style={{ background: '#e5e5ea' }}/>
+        <div>
+          <p className="text-xs uppercase tracking-widest" style={{ color: '#86868b', letterSpacing: '0.08em' }}>Car Wash · Staff</p>
+          <h1 className="text-lg font-semibold" style={{ color: '#1d1d1f', letterSpacing: '-0.5px' }}>{staff.name}</h1>
+        </div>
       </div>
 
       {/* Two-column body */}
       <div className="flex-1 flex overflow-hidden">
 
         {/* ── LEFT: Staff profile ── */}
-        <div className="w-72 flex-shrink-0 overflow-y-auto p-5 space-y-4" style={{ borderRight: '1px solid var(--surface-border)' }}>
+        <div className="w-72 flex-shrink-0 overflow-y-auto p-5 space-y-4" style={{ background: '#ffffff', borderRight: '1px solid #e5e5ea' }}>
 
           {/* Avatar + name */}
-          <div className="flex flex-col items-center gap-3 pt-2 pb-4" style={{ borderBottom: '1px solid var(--surface-border)' }}>
+          <div className="flex flex-col items-center gap-3 pt-2 pb-4" style={{ borderBottom: '1px solid #e5e5ea' }}>
             <div className="h-16 w-16 rounded-full flex items-center justify-center text-2xl font-bold text-white"
-              style={{ background: staff.is_active ? 'var(--accent)' : '#9ca3af' }}>
+              style={{ background: staff.is_active ? '#0071e3' : '#9ca3af' }}>
               {staff.name[0].toUpperCase()}
             </div>
             <div className="text-center">
-              <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{staff.name}</h1>
-              <p className="text-xs capitalize mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+              <h1 className="text-lg font-bold" style={{ color: '#1d1d1f' }}>{staff.name}</h1>
+              <p className="text-xs capitalize mt-0.5" style={{ color: '#86868b' }}>
                 {staff.role}{!staff.is_active ? ' · Inactive' : ''}
               </p>
             </div>
@@ -241,39 +247,39 @@ export function CarwashStaffDetailPage() {
           <div className="space-y-3">
             {staff.phone && (
               <div className="flex items-center gap-2.5">
-                <Phone className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--text-tertiary)' }} />
+                <Phone className="h-4 w-4 flex-shrink-0" style={{ color: '#86868b' }} />
                 <div>
-                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Phone</p>
-                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{staff.phone}</p>
+                  <p className="text-xs" style={{ color: '#86868b' }}>Phone</p>
+                  <p className="text-sm font-semibold" style={{ color: '#1d1d1f' }}>{staff.phone}</p>
                 </div>
               </div>
             )}
             {joiningDateStr && (
               <div className="flex items-center gap-2.5">
-                <Calendar className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--text-tertiary)' }} />
+                <Calendar className="h-4 w-4 flex-shrink-0" style={{ color: '#86868b' }} />
                 <div>
-                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Joined</p>
-                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{joiningDateStr}</p>
+                  <p className="text-xs" style={{ color: '#86868b' }}>Joined</p>
+                  <p className="text-sm font-semibold" style={{ color: '#1d1d1f' }}>{joiningDateStr}</p>
                 </div>
               </div>
             )}
             {staff.monthly_salary > 0 && (
               <div className="flex items-center gap-2.5">
-                <IndianRupee className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--text-tertiary)' }} />
+                <IndianRupee className="h-4 w-4 flex-shrink-0" style={{ color: '#86868b' }} />
                 <div>
-                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Monthly Salary</p>
-                  <p className="text-sm font-bold" style={{ color: 'var(--accent)' }}>{fmt(staff.monthly_salary)}</p>
+                  <p className="text-xs" style={{ color: '#86868b' }}>Monthly Salary</p>
+                  <p className="text-sm font-bold" style={{ color: '#0071e3' }}>{fmt(staff.monthly_salary)}</p>
                 </div>
               </div>
             )}
             <div className="flex items-start gap-2.5">
-              <BadgeCheck className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: 'var(--text-tertiary)' }} />
+              <BadgeCheck className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: '#86868b' }} />
               <div>
-                <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Deduction rules</p>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                <p className="text-xs" style={{ color: '#86868b' }}>Deduction rules</p>
+                <p className="text-xs mt-0.5" style={{ color: '#86868b' }}>
                   Half day: {staff.deduct_half_day ? 'deducted' : 'full pay'}
                 </p>
-                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                <p className="text-xs" style={{ color: '#86868b' }}>
                   Leave: {staff.deduct_full_day_leave ? 'deducted' : 'paid'}
                 </p>
               </div>
@@ -283,10 +289,10 @@ export function CarwashStaffDetailPage() {
 
         {/* ── RIGHT: Payment history ── */}
         <div className="flex-1 overflow-y-auto p-5">
-          <h2 className="text-base font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Salary History</h2>
+          <h2 className="text-base font-bold mb-4" style={{ color: '#1d1d1f' }}>Salary History</h2>
 
           {months.length === 0 ? (
-            <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No salary history yet.</p>
+            <p className="text-sm" style={{ color: '#86868b' }}>No salary history yet.</p>
           ) : (
             <div className="space-y-2.5">
               {months.map(mon => {
@@ -303,7 +309,7 @@ export function CarwashStaffDetailPage() {
 
                 return (
                   <div key={mon} className="rounded-2xl overflow-hidden"
-                    style={{ background: 'var(--surface)', border: `1px solid ${payment ? '#86efac' : 'var(--surface-border)'}` }}>
+                    style={{ background: '#ffffff', border: `1px solid ${payment ? '#86efac' : '#e5e5ea'}` }}>
                     <div className="flex items-center justify-between px-4 py-3">
                       <div className="flex items-center gap-3">
                         {payment ? (
@@ -311,13 +317,13 @@ export function CarwashStaffDetailPage() {
                             <BadgeCheck className="h-4 w-4" style={{ color: '#16a34a' }} />
                           </div>
                         ) : (
-                          <div className="h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--surface-2)' }}>
-                            <Clock className="h-4 w-4" style={{ color: 'var(--text-tertiary)' }} />
+                          <div className="h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#f2f2f7' }}>
+                            <Clock className="h-4 w-4" style={{ color: '#86868b' }} />
                           </div>
                         )}
                         <div>
-                          <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{monthLabel(mon)}</p>
-                          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                          <p className="font-semibold text-sm" style={{ color: '#1d1d1f' }}>{monthLabel(mon)}</p>
+                          <p className="text-xs" style={{ color: '#86868b' }}>
                             P:{summary.present} H:{summary.half_day} A:{summary.absent} L:{summary.leave} · {summary.payable_days.toFixed(1)} days
                           </p>
                           {payment && (
@@ -331,17 +337,17 @@ export function CarwashStaffDetailPage() {
                         <div className="text-right">
                           {staff.monthly_salary > 0 ? (
                             <>
-                              <p className="text-base font-bold" style={{ color: payment ? '#16a34a' : 'var(--accent)' }}>{fmt(payable)}</p>
+                              <p className="text-base font-bold" style={{ color: payment ? '#16a34a' : '#0071e3' }}>{fmt(payable)}</p>
                               {advTotal > 0 && <p className="text-xs" style={{ color: '#f59e0b' }}>−{fmt(advTotal)} advance</p>}
                               {summary.deductions > 0 && <p className="text-xs" style={{ color: '#dc2626' }}>−{fmt(summary.deductions)} deducted</p>}
                             </>
                           ) : (
-                            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Salary not set</p>
+                            <p className="text-xs" style={{ color: '#86868b' }}>Salary not set</p>
                           )}
                         </div>
                         <button onClick={() => printSalarySlip(mon)}
                           className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-opacity hover:opacity-75"
-                          style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-border)', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                          style={{ background: '#f2f2f7', border: '1px solid #e5e5ea', color: '#86868b', cursor: 'pointer' }}>
                           <Printer className="h-3.5 w-3.5" /> Print
                         </button>
                       </div>

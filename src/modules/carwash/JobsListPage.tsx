@@ -85,66 +85,71 @@ export function JobsListPage() {
     return (
       <div key={j.id} onClick={() => navigate(`/carwash/jobs/${j.id}`)}
         className="rounded-2xl p-4 cursor-pointer hover:shadow-md transition-shadow flex items-center justify-between gap-4"
-        style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
+        style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
         <div className="flex items-center gap-3 min-w-0">
           <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 text-lg"
             style={{ background: sc.bg }}>
             {j.vehicle_type === 'hatchback' ? '🚗' : j.vehicle_type === 'suv' ? '🚐' : j.vehicle_type === 'luxury' ? '🏎️' : '🚙'}
           </div>
           <div className="min-w-0">
-            <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>
+            <p className="font-bold text-sm" style={{ color: '#1d1d1f' }}>
               {j.reg_number}
-              <span className="ml-2 text-xs font-normal" style={{ color: 'var(--text-tertiary)' }}>{j.job_number}</span>
+              <span className="ml-2 text-xs font-normal" style={{ color: '#86868b' }}>{j.job_number}</span>
             </p>
-            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+            <p className="text-xs" style={{ color: '#86868b' }}>
               {[j.make, j.model].filter(Boolean).join(' ') || j.vehicle_type} · {j.customer_name || 'Walk-in'}
               {j.staff_name ? ` · 👤 ${j.staff_name}` : ''}
             </p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+            <p className="text-xs mt-0.5" style={{ color: '#86868b' }}>
               {(j.items ?? []).slice(0, 2).map((i: any) => i.service_name).join(', ')}
               {(j.items ?? []).length > 2 ? ` +${(j.items ?? []).length - 2}` : ''}
             </p>
           </div>
         </div>
         <div className="text-right flex-shrink-0">
-          <p className="font-bold text-sm" style={{ color: 'var(--accent)' }}>{fmt(j.total)}</p>
+          <p className="font-bold text-sm" style={{ color: '#0071e3' }}>{fmt(j.total)}</p>
           <span className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full mt-1"
             style={{ background: sc.bg, color: sc.color }}>
             {STATUS_LABELS[j.status]}
           </span>
-          <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>{fmtDate(j.created_at)}</p>
+          <p className="text-xs mt-1" style={{ color: '#86868b' }}>{fmtDate(j.created_at)}</p>
         </div>
       </div>
     );
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col" style={{ background: 'linear-gradient(160deg,#1c2133 0%,#111520 100%)', height: '100%', overflow: 'hidden' }}>
+
+      {/* Header — floating white plate */}
+      <div className="px-6 py-4 flex items-center justify-between"
+        style={{ background: '#ffffff', boxShadow: '0 2px 12px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2)', position: 'relative', zIndex: 10 }}>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-tertiary)' }}>Car Wash</p>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Job Cards</h1>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+          <p className="text-xs uppercase tracking-widest mb-0.5" style={{ color: '#86868b', letterSpacing: '0.08em' }}>Car Wash</p>
+          <h1 className="text-2xl font-semibold" style={{ color: '#1d1d1f', letterSpacing: '-0.5px' }}>Job Cards</h1>
+          <p className="text-xs mt-0.5" style={{ color: '#86868b' }}>
             {allCount} total · sorted latest first
           </p>
         </div>
         <button onClick={() => navigate('/carwash/jobs/new')}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm text-white"
-          style={{ background: 'var(--accent)' }}>
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm"
+          style={{ background: '#0071e3', color: '#ffffff', border: 'none', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,113,227,0.5), 0 1px 2px rgba(0,0,0,0.15)' }}>
           <Plus className="h-4 w-4" /> New Job
         </button>
       </div>
+
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-5">
 
       {/* Date filter + status tabs */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <input type="date" value={date} onChange={(e) => handleDateChange(e.target.value)}
             className="rounded-xl border px-3 py-2 text-sm outline-none"
-            style={{ borderColor: 'var(--surface-border)', background: 'var(--surface)', color: 'var(--text-primary)' }} />
+            style={{ borderColor: '#e5e5ea', background: '#ffffff', color: '#1d1d1f' }} />
           {date
-            ? <button onClick={() => handleDateChange('')} className="text-xs px-2.5 py-1.5 rounded-lg font-semibold" style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--surface-border)' }}>✕ Clear Date</button>
-            : <button onClick={() => handleDateChange(todayISO())} className="text-xs px-2.5 py-1.5 rounded-lg font-semibold" style={{ background: 'var(--accent)', color: '#111' }}>Today</button>
+            ? <button onClick={() => handleDateChange('')} className="text-xs px-2.5 py-1.5 rounded-lg font-semibold" style={{ background: '#f2f2f7', color: '#86868b', border: '1px solid #e5e5ea' }}>✕ Clear Date</button>
+            : <button onClick={() => handleDateChange(todayISO())} className="text-xs px-2.5 py-1.5 rounded-lg font-semibold" style={{ background: '#0071e3', color: '#111' }}>Today</button>
           }
         </div>
         <div className="flex flex-wrap gap-2">
@@ -155,8 +160,8 @@ export function JobsListPage() {
               <button key={s} onClick={() => handleFilterChange(s)}
                 className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
                 style={filter === s
-                  ? { background: s === 'all' ? 'var(--accent)' : sc.color, color: '#fff' }
-                  : { background: sc.bg, color: s === 'all' ? 'var(--text-secondary)' : sc.color }}>
+                  ? { background: s === 'all' ? '#0071e3' : sc.color, color: '#fff' }
+                  : { background: sc.bg, color: s === 'all' ? '#86868b' : sc.color }}>
                 {s === 'all' ? 'All' : STATUS_LABELS[s]}{cnt > 0 ? ` (${cnt})` : ''}
               </button>
             );
@@ -167,7 +172,7 @@ export function JobsListPage() {
       {/* Jobs list */}
       <div className="space-y-2">
         {isLoading && Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-20 rounded-2xl animate-pulse" style={{ background: 'var(--surface-2)' }} />
+          <div key={i} className="h-20 rounded-2xl animate-pulse" style={{ background: '#f2f2f7' }} />
         ))}
 
         {/* All filter: active group first, then delivered */}
@@ -175,7 +180,7 @@ export function JobsListPage() {
           <>
             {activeJobs.length > 0 && (
               <>
-                <p className="text-xs font-bold uppercase tracking-wider pt-1" style={{ color: 'var(--accent)' }}>
+                <p className="text-xs font-bold uppercase tracking-wider pt-1" style={{ color: '#0071e3' }}>
                   Active — {activeJobs.length} job{activeJobs.length !== 1 ? 's' : ''}
                 </p>
                 {activeJobs.map(renderCard)}
@@ -183,16 +188,16 @@ export function JobsListPage() {
             )}
             {deliveredJobs.length > 0 && (
               <>
-                <p className="text-xs font-bold uppercase tracking-wider pt-3" style={{ color: 'var(--text-tertiary)' }}>
+                <p className="text-xs font-bold uppercase tracking-wider pt-3" style={{ color: '#86868b' }}>
                   Delivered — {deliveredJobs.length} job{deliveredJobs.length !== 1 ? 's' : ''}
                 </p>
                 {deliveredJobs.map(renderCard)}
               </>
             )}
             {activeJobs.length === 0 && deliveredJobs.length === 0 && (
-              <div className="rounded-2xl p-10 flex flex-col items-center gap-3" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
+              <div className="rounded-2xl p-10 flex flex-col items-center gap-3" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
                 <Car className="h-10 w-10 opacity-30" />
-                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No job cards yet</p>
+                <p className="text-sm" style={{ color: '#86868b' }}>No job cards yet</p>
               </div>
             )}
           </>
@@ -202,9 +207,9 @@ export function JobsListPage() {
         {!isLoading && filter !== 'all' && (
           <>
             {singleStatus.length === 0 ? (
-              <div className="rounded-2xl p-10 flex flex-col items-center gap-3" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
+              <div className="rounded-2xl p-10 flex flex-col items-center gap-3" style={{ background: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)', border: '1px solid rgba(255,255,255,0.08)' }}>
                 <Car className="h-10 w-10 opacity-30" />
-                <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No {STATUS_LABELS[filter]?.toLowerCase()} jobs</p>
+                <p className="text-sm" style={{ color: '#86868b' }}>No {STATUS_LABELS[filter]?.toLowerCase()} jobs</p>
               </div>
             ) : singleStatus.map(renderCard)}
           </>
@@ -214,7 +219,7 @@ export function JobsListPage() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between pt-2">
-          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+          <p className="text-xs" style={{ color: '#86868b' }}>
             Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalCount)} of {totalCount}
           </p>
           <div className="flex gap-2">
@@ -225,6 +230,8 @@ export function JobsListPage() {
           </div>
         </div>
       )}
+    </div>
+      </div>{/* end scrollable content */}
     </div>
   );
 }
