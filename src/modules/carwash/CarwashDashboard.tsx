@@ -59,7 +59,7 @@ export function CarwashDashboard() {
   const raisedShadow = '0 1px 3px rgba(0,0,0,0.14), 0 6px 18px rgba(0,0,0,0.12), 0 20px 40px rgba(0,0,0,0.09)';
 
   return (
-    <div className="flex flex-col" style={{ background: 'linear-gradient(160deg,#1c2133 0%,#111520 100%)', height: '100%', overflow: 'hidden' }}>
+    <div className="flex flex-col" style={{ background: 'linear-gradient(160deg,#3d4f6b 0%,#2b3a54 100%)', height: '100%', overflow: 'hidden' }}>
 
       {/* Header — floating white plate */}
       <div className="px-6 py-4 flex items-center justify-between"
