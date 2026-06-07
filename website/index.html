@@ -840,6 +840,14 @@
           </div>
           <div class="dl-row-arrow">↓</div>
         </a>
+        <a href="#" class="dl-row" id="dl-android">
+          <div class="dl-row-icon">🤖</div>
+          <div class="dl-row-info">
+            <div class="dl-row-label">Android <span class="dl-badge">FREE TRIAL</span></div>
+            <div class="dl-row-meta">Phone / Tablet · Android 8+ · .apk</div>
+          </div>
+          <div class="dl-row-arrow">↓</div>
+        </a>
       </div>
       <div class="dl-version" id="dl-version">Fetching latest version…</div>
 
@@ -855,6 +863,12 @@
         <div class="install-note-title">ℹ️ Windows — SmartScreen popup</div>
         <p>Windows may show <strong>"Windows protected your PC"</strong> — normal for new apps. FrontStores is safe.<br><br>
         Click <strong>More info</strong> → then <strong>Run anyway</strong> to install.</p>
+      </div>
+
+      <div id="android-install-note" class="install-note win">
+        <div class="install-note-title">ℹ️ Android — Install from outside Play Store</div>
+        <p>Android may show <strong>"Install blocked for your safety"</strong> — normal for apps installed outside the Play Store. FrontStores is safe.<br><br>
+        Tap <strong>Settings</strong> in that prompt → enable <strong>"Allow from this source"</strong> → go back and tap <strong>Install</strong>.</p>
       </div>
     </div>
   </div>
@@ -955,9 +969,11 @@
       const winUrl   = find(/x64[_-]en-US\.msi$/i) || find(/\.msi$/i) || find(/x64.*setup\.exe$/i);
       const macArm   = find(/aarch64\.dmg$/i);
       const macIntel = find(/x86_64\.dmg$/i);
+      const androidUrl = find(/\.apk$/i);
       if (winUrl)   document.getElementById('dl-win').href = winUrl;
       if (macArm)   document.getElementById('dl-mac-arm').href = macArm;
       if (macIntel) document.getElementById('dl-mac-intel').href = macIntel;
+      if (androidUrl) document.getElementById('dl-android').href = androidUrl;
       document.getElementById('dl-version').textContent = `Latest: ${data.tag_name} · Free 30-day trial`;
     } catch {
       document.getElementById('dl-version').textContent = 'Coming soon — first release dropping shortly';
@@ -968,13 +984,21 @@
   document.getElementById('dl-mac-arm').addEventListener('click', () => {
     document.getElementById('mac-install-note').style.display = 'block';
     document.getElementById('win-install-note').style.display = 'none';
+    document.getElementById('android-install-note').style.display = 'none';
   });
   document.getElementById('dl-mac-intel').addEventListener('click', () => {
     document.getElementById('mac-install-note').style.display = 'block';
     document.getElementById('win-install-note').style.display = 'none';
+    document.getElementById('android-install-note').style.display = 'none';
   });
   document.getElementById('dl-win').addEventListener('click', () => {
     document.getElementById('win-install-note').style.display = 'block';
+    document.getElementById('mac-install-note').style.display = 'none';
+    document.getElementById('android-install-note').style.display = 'none';
+  });
+  document.getElementById('dl-android').addEventListener('click', () => {
+    document.getElementById('android-install-note').style.display = 'block';
+    document.getElementById('win-install-note').style.display = 'none';
     document.getElementById('mac-install-note').style.display = 'none';
   });
 
