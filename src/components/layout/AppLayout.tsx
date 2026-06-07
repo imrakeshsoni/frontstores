@@ -327,6 +327,7 @@ const HARDWARE_NAV_ITEMS = [
   { to: '/hardware/inventory', icon: Boxes,           label: 'Inventory',    iconBg: '#cffafe', iconColor: '#0891b2' },
   { to: '/hardware/credit',    icon: BookOpen,        label: 'Udhar Khata',  iconBg: '#f3e8ff', iconColor: '#9333ea' },
   { to: '/hardware/quotations', icon: FileText,       label: 'Quotations',   iconBg: '#e0e7ff', iconColor: '#4f46e5' },
+  { to: '/hardware/broadcast', icon: Radio,           label: 'Broadcast',    iconBg: '#dcfce7', iconColor: '#16a34a' },
   { to: '/hardware/staff',       icon: UserCheck,       label: 'Staff',        iconBg: '#ede9fe', iconColor: '#7c3aed' },
   { to: '/hardware/attendance',  icon: ClipboardCheck,  label: 'Attendance',   iconBg: '#ccfbf1', iconColor: '#0d9488' },
   { to: '/hardware/reports',   icon: BarChart3,       label: 'Reports',      iconBg: '#e0f2fe', iconColor: '#0284c7' },

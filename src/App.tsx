@@ -179,6 +179,7 @@ const HardwareCreditPage = lazy(() => import('@/modules/hardware/CreditAccountsP
 const HardwareInventoryPage = lazy(() => import('@/modules/hardware/HardwareInventoryPage').then(m => ({ default: m.HardwareInventoryPage })));
 const HardwareQuotationPage = lazy(() => import('@/modules/hardware/HardwareQuotationPage').then(m => ({ default: m.HardwareQuotationPage })));
 const HardwareSetupPage  = lazy(() => import('@/modules/hardware/HardwareSetupPage').then(m => ({ default: m.HardwareSetupPage })));
+const HardwareBroadcastPage = lazy(() => import('@/modules/hardware/HardwareBroadcastPage').then(m => ({ default: m.HardwareBroadcastPage })));
 const HardwareReports    = lazy(() => import('@/modules/hardware/HardwareReportsPage').then(m => ({ default: m.HardwareReportsPage })));
 const HardwareStaffPage       = lazy(() => import('@/modules/hardware/HardwareStaffPage').then(m => ({ default: m.HardwareStaffPage })));
 const HardwareAttendancePage  = lazy(() => import('@/modules/hardware/HardwareAttendancePage').then(m => ({ default: m.HardwareAttendancePage })));
@@ -575,6 +576,7 @@ export default function App() {
             <Route path="hardware/inventory" element={<HardwareInventoryPage />} />
             <Route path="hardware/credit"    element={<HardwareCreditPage />} />
             <Route path="hardware/quotations" element={<HardwareQuotationPage />} />
+            <Route path="hardware/broadcast" element={<HardwareBroadcastPage />} />
             <Route path="hardware/setup"     element={<HardwareSetupPage />} />
             <Route path="hardware/reports"   element={<HardwareReports />} />
             <Route path="hardware/staff"          element={<HardwareStaffPage />} />

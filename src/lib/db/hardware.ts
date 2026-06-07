@@ -1020,3 +1020,29 @@ export async function getHwSalaryPaymentsForStaff(tenantId: string, staffId: str
     [tenantId, staffId]
   );
 }
+
+// ── Broadcast recipients ──────────────────────────────────────────────────────
+// [hardware] [all tenants]
+
+export interface HwBroadcastRecipient { name: string; phone: string }
+
+export async function listHwBroadcastRecipients(tenantId: string): Promise<HwBroadcastRecipient[]> {
+  const db = await getDb();
+  const rows = await db.select<any[]>(
+    `SELECT customer_name AS name, customer_phone AS phone FROM hw_sales
+       WHERE tenant_id=? AND deleted_at IS NULL AND customer_phone IS NOT NULL AND customer_phone != ''
+     UNION
+     SELECT customer_name AS name, phone FROM hw_credit_accounts
+       WHERE tenant_id=? AND deleted_at IS NULL AND phone IS NOT NULL AND phone != ''`,
+    [tenantId, tenantId]
+  );
+  const seen = new Set<string>();
+  const out: HwBroadcastRecipient[] = [];
+  for (const r of rows) {
+    const phone = String(r.phone ?? '').replace(/\D/g, '');
+    if (phone.length !== 10 || seen.has(phone)) continue;
+    seen.add(phone);
+    out.push({ name: r.name || 'Customer', phone });
+  }
+  return out;
+}
