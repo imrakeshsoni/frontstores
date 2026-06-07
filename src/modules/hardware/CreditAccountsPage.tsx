@@ -1,9 +1,10 @@
 // [hardware] [all tenants]
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, ChevronRight, ArrowLeft } from 'lucide-react';
+import { Plus, Search, ChevronRight, ArrowLeft, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAppStore } from '@/app/store/app.store';
+import { sendWhatsApp } from '@/lib/whatsapp';
 import {
   listHwCreditAccounts, saveHwCreditAccount, deleteHwCreditAccount,
   listHwCreditTransactions, addHwCreditTransaction,
@@ -12,8 +13,27 @@ import {
 
 function fmt(n: number) { return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`; }
 
+function ageInDays(dateStr: string): number {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return 0;
+  return Math.max(0, Math.floor((Date.now() - d.getTime()) / 86400000));
+}
+
+function agingBuckets(transactions: HwCreditTransaction[]) {
+  const buckets = { d0_30: 0, d31_60: 0, d60_plus: 0 };
+  for (const tx of transactions) {
+    if (tx.type !== 'debit') continue;
+    const age = ageInDays(tx.date);
+    if (age <= 30) buckets.d0_30 += tx.amount;
+    else if (age <= 60) buckets.d31_60 += tx.amount;
+    else buckets.d60_plus += tx.amount;
+  }
+  return buckets;
+}
+
 export function CreditAccountsPage() {
   const tenantId = useAppStore(s => s.config?.tenant_id ?? '');
+  const shopName = useAppStore(s => s.config?.shop_name ?? 'our shop');
   const qc = useQueryClient();
 
   const [search, setSearch] = useState('');
@@ -80,6 +100,14 @@ export function CreditAccountsPage() {
     },
   });
 
+  const aging = useMemo(() => agingBuckets(transactions), [transactions]);
+
+  function sendReminder(acc: HwCreditAccount) {
+    if (!acc.phone) { toast.error('No phone number on this account'); return; }
+    const msg = `Hello ${acc.customer_name}, this is a reminder from ${shopName}. Your outstanding balance is ${fmt(Math.abs(acc.balance))}. Please clear it at your earliest convenience. Thank you!`;
+    sendWhatsApp(acc.phone, msg);
+  }
+
   if (selected) {
     return (
       <div className="p-6 space-y-5">
@@ -95,11 +123,40 @@ export function CreditAccountsPage() {
 
         {/* Balance card */}
         <div className={`rounded-2xl p-5 ${selected.balance > 0 ? 'bg-red-50 border border-red-100' : 'bg-green-50 border border-green-100'}`}>
-          <p className="text-sm text-slate-500">Outstanding Balance</p>
-          <p className={`text-3xl font-bold ${selected.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-            {fmt(Math.abs(selected.balance))}
-          </p>
-          <p className="text-xs text-slate-400 mt-1">{selected.balance > 0 ? 'Customer owes you' : selected.balance < 0 ? 'You owe customer' : 'Clear'}</p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm text-slate-500">Outstanding Balance</p>
+              <p className={`text-3xl font-bold ${selected.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                {fmt(Math.abs(selected.balance))}
+              </p>
+              <p className="text-xs text-slate-400 mt-1">{selected.balance > 0 ? 'Customer owes you' : selected.balance < 0 ? 'You owe customer' : 'Clear'}</p>
+            </div>
+            {selected.balance > 0 && (
+              <button
+                onClick={() => sendReminder(selected)}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-white"
+                style={{ background: '#16a34a' }}
+              >
+                <MessageCircle className="h-4 w-4" /> Send Reminder
+              </button>
+            )}
+          </div>
+          {selected.balance > 0 && (aging.d0_30 + aging.d31_60 + aging.d60_plus > 0) && (
+            <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-red-100">
+              <div className="text-center">
+                <p className="text-xs text-slate-400">0-30 days</p>
+                <p className="text-sm font-semibold text-slate-700">{fmt(aging.d0_30)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-slate-400">31-60 days</p>
+                <p className="text-sm font-semibold text-orange-600">{fmt(aging.d31_60)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-slate-400">60+ days</p>
+                <p className="text-sm font-semibold text-red-600">{fmt(aging.d60_plus)}</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Add transaction */}
@@ -160,8 +217,15 @@ export function CreditAccountsPage() {
               {transactions.map(tx => (
                 <div key={tx.id} className="flex items-center justify-between text-sm">
                   <div>
-                    <p className="font-medium text-slate-800">{tx.description || (tx.type === 'debit' ? 'Sale' : 'Payment')}</p>
-                    <p className="text-xs text-slate-400">{tx.date}</p>
+                    <p className="font-medium text-slate-800">
+                      {tx.description || (tx.type === 'debit' ? 'Sale' : 'Payment')}
+                      {tx.reference_bill_no && (
+                        <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100">
+                          Bill {tx.reference_bill_no}
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-xs text-slate-400">{tx.date} · {ageInDays(tx.date)}d ago</p>
                   </div>
                   <span className={`font-semibold ${tx.type === 'debit' ? 'text-red-600' : 'text-green-600'}`}>
                     {tx.type === 'debit' ? '+' : '-'}{fmt(tx.amount)}
@@ -221,22 +285,28 @@ export function CreditAccountsPage() {
       ) : (
         <div className="space-y-2">
           {accounts.map(a => (
-            <button
+            <div
               key={a.id}
-              onClick={() => setSelected(a)}
-              className="w-full text-left bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3 flex items-center justify-between hover:shadow-md transition-all"
+              className="w-full bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3 flex items-center justify-between hover:shadow-md transition-all"
             >
-              <div>
+              <button onClick={() => setSelected(a)} className="flex-1 text-left min-w-0">
                 <p className="font-medium text-slate-900">{a.customer_name}</p>
                 <p className="text-xs text-slate-400">{a.phone}</p>
-              </div>
+              </button>
               <div className="flex items-center gap-3">
                 <span className={`font-semibold ${a.balance > 0 ? 'text-red-600' : a.balance < 0 ? 'text-green-600' : 'text-slate-400'}`}>
                   {fmt(Math.abs(a.balance))}
                 </span>
-                <ChevronRight className="h-4 w-4 text-slate-400" />
+                {a.balance > 0 && a.phone && (
+                  <button onClick={() => sendReminder(a)} className="p-2 rounded-lg hover:bg-green-50 text-green-600" title="Send WhatsApp reminder">
+                    <MessageCircle className="h-4 w-4" />
+                  </button>
+                )}
+                <button onClick={() => setSelected(a)} className="p-1">
+                  <ChevronRight className="h-4 w-4 text-slate-400" />
+                </button>
               </div>
-            </button>
+            </div>
           ))}
         </div>
       )}

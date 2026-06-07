@@ -13,6 +13,7 @@ import {
   Truck,
   BarChart3,
   Settings,
+  Settings2,
   Store,
   BookOpen,
   Wallet,
@@ -323,8 +324,13 @@ const HARDWARE_NAV_ITEMS = [
   { to: '/hardware/dashboard', icon: LayoutDashboard, label: 'Dashboard',    iconBg: '#fef3c7', iconColor: '#d97706' },
   { to: '/hardware/pos',       icon: ShoppingCart,    label: 'Billing',      iconBg: '#dcfce7', iconColor: '#16a34a' },
   { to: '/hardware/products',  icon: Package,         label: 'Products',     iconBg: '#cffafe', iconColor: '#0891b2' },
+  { to: '/hardware/inventory', icon: Boxes,           label: 'Inventory',    iconBg: '#cffafe', iconColor: '#0891b2' },
   { to: '/hardware/credit',    icon: BookOpen,        label: 'Udhar Khata',  iconBg: '#f3e8ff', iconColor: '#9333ea' },
+  { to: '/hardware/quotations', icon: FileText,       label: 'Quotations',   iconBg: '#e0e7ff', iconColor: '#4f46e5' },
+  { to: '/hardware/staff',       icon: UserCheck,       label: 'Staff',        iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/hardware/attendance',  icon: ClipboardCheck,  label: 'Attendance',   iconBg: '#fef3c7', iconColor: '#d97706' },
   { to: '/hardware/reports',   icon: BarChart3,       label: 'Reports',      iconBg: '#e0f2fe', iconColor: '#0284c7' },
+  { to: '/hardware/setup',     icon: Settings2,       label: 'Setup',        iconBg: '#f1f5f9', iconColor: '#64748b' },
   { to: '/settings',           icon: Settings,        label: 'Settings',     iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
 

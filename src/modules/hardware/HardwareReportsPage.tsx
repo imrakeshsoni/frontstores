@@ -1,26 +1,35 @@
 // [hardware] [all tenants]
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { BarChart3, TrendingUp, AlertTriangle, BookOpen } from 'lucide-react';
+import { BarChart3, TrendingUp, AlertTriangle, BookOpen, Receipt, Download } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
-import { listHwSales, listHwProducts, listHwCreditAccounts, getHardwareStats } from '@/lib/db/hardware';
+import {
+  listHwSales, listHwProducts, listHwCreditAccounts, getHardwareStats,
+  getHwProfitAndGstSummary, getHwTopProducts, getHwCategoryMix,
+} from '@/lib/db/hardware';
 
 function fmt(n: number) { return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`; }
+function fmt2(n: number) { return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`; }
 
-function getMonthOptions() {
-  const months: string[] = [];
-  const now = new Date();
-  for (let i = 0; i < 6; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push(d.toISOString().slice(0, 7));
-  }
-  return months;
+function todayISO() { return new Date().toISOString().slice(0, 10); }
+function firstOfMonthISO() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; }
+
+function downloadCSV(filename: string, rows: string[][]) {
+  const csv = rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
 }
+
+type View = 'sales' | 'gst' | 'stock' | 'credit';
 
 export function HardwareReportsPage() {
   const tenantId = useAppStore(s => s.config?.tenant_id ?? '');
-  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
-  const [view, setView] = useState<'sales' | 'stock' | 'credit'>('sales');
+  const [from, setFrom] = useState(firstOfMonthISO());
+  const [to, setTo] = useState(todayISO());
+  const [view, setView] = useState<View>('sales');
 
   const { data: stats } = useQuery({
     queryKey: ['hw-stats', tenantId],
@@ -29,14 +38,38 @@ export function HardwareReportsPage() {
   });
 
   const { data: sales = [] } = useQuery({
-    queryKey: ['hw-sales-report', tenantId, month],
-    queryFn: () => listHwSales(tenantId, { month }),
+    queryKey: ['hw-sales-report', tenantId, from, to],
+    queryFn: () => listHwSales(tenantId, { from, to }),
+    enabled: !!tenantId,
+  });
+
+  const { data: profitSummary } = useQuery({
+    queryKey: ['hw-profit-gst', tenantId, from, to],
+    queryFn: () => getHwProfitAndGstSummary(tenantId, { from, to }),
+    enabled: !!tenantId && (view === 'gst' || view === 'sales'),
+  });
+
+  const { data: topProducts = [] } = useQuery({
+    queryKey: ['hw-top-products-report', tenantId, from, to],
+    queryFn: () => getHwTopProducts(tenantId, { from, to, limit: 8 }),
+    enabled: !!tenantId && view === 'sales',
+  });
+
+  const { data: categoryMix = [] } = useQuery({
+    queryKey: ['hw-category-mix-report', tenantId, from, to],
+    queryFn: () => getHwCategoryMix(tenantId, { from, to, limit: 8 }),
     enabled: !!tenantId && view === 'sales',
   });
 
   const { data: lowStockItems = [] } = useQuery({
     queryKey: ['hw-low-stock', tenantId],
     queryFn: () => listHwProducts(tenantId, { lowStock: true }),
+    enabled: !!tenantId && view === 'stock',
+  });
+
+  const { data: allProducts = [] } = useQuery({
+    queryKey: ['hw-products-all', tenantId],
+    queryFn: () => listHwProducts(tenantId, {}),
     enabled: !!tenantId && view === 'stock',
   });
 
@@ -50,24 +83,40 @@ export function HardwareReportsPage() {
   const totalPaid = sales.reduce((s, sale) => s + sale.paid, 0);
   const totalDue = totalSalesRevenue - totalPaid;
   const totalCreditOutstanding = creditAccounts.reduce((s, a) => s + a.balance, 0);
+  const stockValuation = allProducts.reduce((s, p) => s + p.stock * p.purchase_price, 0);
+
+  function exportSalesCSV() {
+    const rows = [
+      ['Bill No', 'Date', 'Customer', 'Subtotal', 'Discount', 'GST', 'Total', 'Paid', 'Balance', 'Payment Mode'],
+      ...sales.map(s => [s.bill_no, s.sale_date, s.customer_name || 'Walk-in', s.subtotal.toFixed(2), s.discount.toFixed(2), s.tax_total.toFixed(2), s.total.toFixed(2), s.paid.toFixed(2), (s.total - s.paid).toFixed(2), s.payment_mode]),
+    ];
+    downloadCSV(`hardware-sales-${from}-to-${to}.csv`, rows);
+  }
+
+  function exportStockCSV() {
+    const rows = [
+      ['Name', 'Category', 'Brand', 'Variant', 'Stock', 'Unit', 'Min Stock', 'Purchase Price', 'Selling Price', 'Stock Value', 'GST Rate'],
+      ...allProducts.map(p => [p.name, p.category, p.brand, p.variant, String(p.stock), p.unit, String(p.min_stock), p.purchase_price.toFixed(2), p.selling_price.toFixed(2), (p.stock * p.purchase_price).toFixed(2), String(p.gst_rate)]),
+    ];
+    downloadCSV('hardware-stock-valuation.csv', rows);
+  }
+
+  const TABS: { key: View; label: string; icon: typeof BarChart3 }[] = [
+    { key: 'sales', label: 'Sales', icon: BarChart3 },
+    { key: 'gst', label: 'GST & Profit', icon: Receipt },
+    { key: 'stock', label: 'Stock', icon: AlertTriangle },
+    { key: 'credit', label: 'Credit Accounts', icon: BookOpen },
+  ];
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-xl font-bold text-slate-900">Reports</h1>
-        {view === 'sales' && (
-          <select
-            value={month}
-            onChange={e => setMonth(e.target.value)}
-            className="px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none"
-          >
-            {getMonthOptions().map(m => (
-              <option key={m} value={m}>
-                {new Date(m + '-01').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
-              </option>
-            ))}
-          </select>
-        )}
+        <div className="flex items-center gap-2">
+          <input type="date" value={from} onChange={e => setFrom(e.target.value)} className="px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none" />
+          <span className="text-slate-400 text-sm">to</span>
+          <input type="date" value={to} onChange={e => setTo(e.target.value)} className="px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none" />
+        </div>
       </div>
 
       {/* Summary cards */}
@@ -88,12 +137,8 @@ export function HardwareReportsPage() {
       </div>
 
       {/* View tabs */}
-      <div className="flex gap-2">
-        {([
-          { key: 'sales', label: 'Sales', icon: BarChart3 },
-          { key: 'stock', label: 'Low Stock', icon: AlertTriangle },
-          { key: 'credit', label: 'Credit Accounts', icon: BookOpen },
-        ] as const).map(tab => (
+      <div className="flex gap-2 flex-wrap">
+        {TABS.map(tab => (
           <button
             key={tab.key}
             onClick={() => setView(tab.key)}
@@ -111,6 +156,12 @@ export function HardwareReportsPage() {
       {/* Sales view */}
       {view === 'sales' && (
         <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-slate-900">Sales — {from} to {to}</h2>
+            <button onClick={exportSalesCSV} disabled={sales.length === 0} className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 border border-slate-200 hover:bg-slate-50 disabled:opacity-40">
+              <Download className="h-4 w-4" /> Export CSV
+            </button>
+          </div>
           <div className="grid grid-cols-3 gap-4">
             {[
               { label: 'Total Revenue', value: fmt(totalSalesRevenue), color: '#16a34a' },
@@ -123,10 +174,58 @@ export function HardwareReportsPage() {
               </div>
             ))}
           </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+              <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2"><TrendingUp className="h-4 w-4 text-amber-600" /> Top Products</h3>
+              {topProducts.length === 0 ? (
+                <p className="text-slate-400 text-sm text-center py-4">No sales in range</p>
+              ) : (
+                <div className="space-y-2">
+                  {topProducts.map((p, i) => (
+                    <div key={p.product_id || i} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-xs font-semibold text-slate-400 w-5">{i + 1}.</span>
+                        <p className="font-medium text-slate-800 truncate">{p.product_name}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="font-semibold text-slate-900">{fmt(p.revenue)}</p>
+                        <p className="text-xs text-slate-400">{p.quantity} sold</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+              <h3 className="font-semibold text-slate-900 mb-3">Category Mix</h3>
+              {categoryMix.length === 0 ? (
+                <p className="text-slate-400 text-sm text-center py-4">No sales in range</p>
+              ) : (
+                <div className="space-y-2">
+                  {categoryMix.map(c => {
+                    const pct = totalSalesRevenue > 0 ? (c.revenue / totalSalesRevenue) * 100 : 0;
+                    return (
+                      <div key={c.category}>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="font-medium text-slate-800">{c.category}</span>
+                          <span className="text-slate-500">{fmt(c.revenue)} · {pct.toFixed(0)}%</span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: '#d97706' }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-            <h2 className="font-semibold text-slate-900 mb-4">Sales — {month}</h2>
+            <h2 className="font-semibold text-slate-900 mb-4">Bills</h2>
             {sales.length === 0 ? (
-              <p className="text-slate-400 text-sm text-center py-4">No sales this month</p>
+              <p className="text-slate-400 text-sm text-center py-4">No sales in this range</p>
             ) : (
               <div className="space-y-2">
                 {sales.map(s => (
@@ -147,25 +246,92 @@ export function HardwareReportsPage() {
         </div>
       )}
 
-      {/* Low stock view */}
-      {view === 'stock' && (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <h2 className="font-semibold text-slate-900 mb-4">Low Stock Items ({lowStockItems.length})</h2>
-          {lowStockItems.length === 0 ? (
-            <p className="text-slate-400 text-sm text-center py-4">All stock levels are healthy</p>
-          ) : (
-            <div className="space-y-2">
-              {lowStockItems.map(p => (
-                <div key={p.id} className="flex items-center justify-between text-sm bg-orange-50 rounded-xl px-3 py-2">
-                  <div>
-                    <p className="font-medium text-slate-800">{p.name}</p>
-                    <p className="text-xs text-slate-400">{p.category} · {p.brand}</p>
-                  </div>
-                  <span className="text-orange-600 font-semibold">{p.stock} / {p.min_stock} {p.unit}</span>
-                </div>
-              ))}
+      {/* GST & Profit view */}
+      {view === 'gst' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+              <p className="text-xs text-slate-500">Revenue (incl. GST)</p>
+              <p className="text-xl font-bold mt-1 text-slate-900">{fmt2(profitSummary?.revenue ?? 0)}</p>
             </div>
-          )}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+              <p className="text-xs text-slate-500">Cost of Goods Sold</p>
+              <p className="text-xl font-bold mt-1 text-slate-700">{fmt2(profitSummary?.cost ?? 0)}</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+              <p className="text-xs text-slate-500">Gross Profit</p>
+              <p className="text-xl font-bold mt-1" style={{ color: (profitSummary?.profit ?? 0) >= 0 ? '#16a34a' : '#dc2626' }}>{fmt2(profitSummary?.profit ?? 0)}</p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+            <h2 className="font-semibold text-slate-900 mb-4">GST Collected — by Rate Slab</h2>
+            {(!profitSummary || profitSummary.gstSlabs.length === 0) ? (
+              <p className="text-slate-400 text-sm text-center py-4">No taxed sales in this range</p>
+            ) : (
+              <div className="space-y-2">
+                <div className="grid grid-cols-3 gap-2 text-xs font-medium text-slate-400 px-1">
+                  <span>GST Rate</span><span className="text-right">Taxable Value</span><span className="text-right">Tax Collected</span>
+                </div>
+                {profitSummary.gstSlabs.map(slab => (
+                  <div key={slab.gst_rate} className="grid grid-cols-3 gap-2 text-sm bg-slate-50 rounded-lg px-3 py-2">
+                    <span className="font-medium text-slate-800">{slab.gst_rate}%</span>
+                    <span className="text-right text-slate-600">{fmt2(slab.taxable)}</span>
+                    <span className="text-right font-semibold text-slate-900">{fmt2(slab.tax)}</span>
+                  </div>
+                ))}
+                <div className="grid grid-cols-3 gap-2 text-sm px-3 pt-2 border-t border-slate-100">
+                  <span className="font-semibold text-slate-900">Total</span>
+                  <span className="text-right font-semibold text-slate-900">{fmt2(profitSummary.gstSlabs.reduce((s, x) => s + x.taxable, 0))}</span>
+                  <span className="text-right font-semibold text-amber-700">{fmt2(profitSummary.gstSlabs.reduce((s, x) => s + x.tax, 0))}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5">
+            <p className="text-sm font-medium text-amber-900">Stock Valuation (at purchase price): {fmt2(profitSummary?.stockValuation ?? 0)}</p>
+            <p className="text-xs text-amber-700 mt-1">Total value of inventory currently on your shelves — useful for GST audits and insurance estimates.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Stock view */}
+      {view === 'stock' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+              <p className="text-xs text-slate-500">Stock Valuation (purchase price × qty)</p>
+              <p className="text-xl font-bold mt-1 text-slate-900">{fmt2(stockValuation)}</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-slate-500">Products tracked</p>
+                <p className="text-xl font-bold mt-1 text-slate-900">{allProducts.length}</p>
+              </div>
+              <button onClick={exportStockCSV} disabled={allProducts.length === 0} className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 border border-slate-200 hover:bg-slate-50 disabled:opacity-40">
+                <Download className="h-4 w-4" /> Export CSV
+              </button>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+            <h2 className="font-semibold text-slate-900 mb-4">Low Stock Items ({lowStockItems.length})</h2>
+            {lowStockItems.length === 0 ? (
+              <p className="text-slate-400 text-sm text-center py-4">All stock levels are healthy</p>
+            ) : (
+              <div className="space-y-2">
+                {lowStockItems.map(p => (
+                  <div key={p.id} className="flex items-center justify-between text-sm bg-orange-50 rounded-xl px-3 py-2">
+                    <div>
+                      <p className="font-medium text-slate-800">{p.name}</p>
+                      <p className="text-xs text-slate-400">{p.category} · {p.brand}</p>
+                    </div>
+                    <span className="text-orange-600 font-semibold">{p.stock} / {p.min_stock} {p.unit}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

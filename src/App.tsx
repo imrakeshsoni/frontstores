@@ -176,7 +176,13 @@ const HardwareDashboard  = lazy(() => import('@/modules/hardware/HardwareDashboa
 const HardwarePOSPage    = lazy(() => import('@/modules/hardware/HardwarePOSPage').then(m => ({ default: m.HardwarePOSPage })));
 const HardwareProductsPage = lazy(() => import('@/modules/hardware/HardwareProductsPage').then(m => ({ default: m.HardwareProductsPage })));
 const HardwareCreditPage = lazy(() => import('@/modules/hardware/CreditAccountsPage').then(m => ({ default: m.CreditAccountsPage })));
+const HardwareInventoryPage = lazy(() => import('@/modules/hardware/HardwareInventoryPage').then(m => ({ default: m.HardwareInventoryPage })));
+const HardwareQuotationPage = lazy(() => import('@/modules/hardware/HardwareQuotationPage').then(m => ({ default: m.HardwareQuotationPage })));
+const HardwareSetupPage  = lazy(() => import('@/modules/hardware/HardwareSetupPage').then(m => ({ default: m.HardwareSetupPage })));
 const HardwareReports    = lazy(() => import('@/modules/hardware/HardwareReportsPage').then(m => ({ default: m.HardwareReportsPage })));
+const HardwareStaffPage       = lazy(() => import('@/modules/hardware/HardwareStaffPage').then(m => ({ default: m.HardwareStaffPage })));
+const HardwareAttendancePage  = lazy(() => import('@/modules/hardware/HardwareAttendancePage').then(m => ({ default: m.HardwareAttendancePage })));
+const HardwareStaffDetailPage = lazy(() => import('@/modules/hardware/HardwareStaffDetailPage').then(m => ({ default: m.HardwareStaffDetailPage })));
 
 // [laundry] [all tenants]
 const LaundryDashboard   = lazy(() => import('@/modules/laundry/LaundryDashboard').then(m => ({ default: m.LaundryDashboard })));
@@ -566,8 +572,14 @@ export default function App() {
             <Route path="hardware/dashboard" element={<HardwareDashboard />} />
             <Route path="hardware/pos"       element={<HardwarePOSPage />} />
             <Route path="hardware/products"  element={<HardwareProductsPage />} />
+            <Route path="hardware/inventory" element={<HardwareInventoryPage />} />
             <Route path="hardware/credit"    element={<HardwareCreditPage />} />
+            <Route path="hardware/quotations" element={<HardwareQuotationPage />} />
+            <Route path="hardware/setup"     element={<HardwareSetupPage />} />
             <Route path="hardware/reports"   element={<HardwareReports />} />
+            <Route path="hardware/staff"          element={<HardwareStaffPage />} />
+            <Route path="hardware/staff/:staffId" element={<HardwareStaffDetailPage />} />
+            <Route path="hardware/attendance"     element={<HardwareAttendancePage />} />
 
             {/* [hotel] [all tenants] */}
             <Route path="hotel/dashboard"    element={<HotelDashboard />} />
