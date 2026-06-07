@@ -961,42 +961,67 @@
 
   async function loadRelease() {
     try {
-      const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`);
-      const data = await res.json();
-      if (!data.tag_name) throw new Error('no release');
-      const assets = data.assets || [];
-      const find = (re) => assets.find(a => re.test(a.name))?.browser_download_url || null;
-      const winUrl   = find(/x64[_-]en-US\.msi$/i) || find(/\.msi$/i) || find(/x64.*setup\.exe$/i);
-      const macArm   = find(/aarch64\.dmg$/i);
-      const macIntel = find(/x86_64\.dmg$/i);
-      const androidUrl = find(/\.apk$/i);
+      // Look across the most recent releases (not just "latest") so that while a
+      // brand-new release is still building (zero assets), links keep pointing at
+      // the newest release that actually has each installer — instead of "#".
+      const res = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=5`);
+      const releases = await res.json();
+      if (!Array.isArray(releases) || releases.length === 0) throw new Error('no release');
+
+      const findAcross = (re) => {
+        for (const rel of releases) {
+          const match = (rel.assets || []).find(a => re.test(a.name));
+          if (match) return match.browser_download_url;
+        }
+        return null;
+      };
+      const winUrl   = findAcross(/x64[_-]en-US\.msi$/i) || findAcross(/\.msi$/i) || findAcross(/x64.*setup\.exe$/i);
+      const macArm   = findAcross(/aarch64\.dmg$/i);
+      const macIntel = findAcross(/x86_64\.dmg$/i);
+      const androidUrl = findAcross(/\.apk$/i);
       if (winUrl)   document.getElementById('dl-win').href = winUrl;
       if (macArm)   document.getElementById('dl-mac-arm').href = macArm;
       if (macIntel) document.getElementById('dl-mac-intel').href = macIntel;
       if (androidUrl) document.getElementById('dl-android').href = androidUrl;
-      document.getElementById('dl-version').textContent = `Latest: ${data.tag_name} · Free 30-day trial`;
+      document.getElementById('dl-version').textContent = `Latest: ${releases[0].tag_name} · Free 30-day trial`;
     } catch {
       document.getElementById('dl-version').textContent = 'Coming soon — first release dropping shortly';
     }
   }
   loadRelease();
 
-  document.getElementById('dl-mac-arm').addEventListener('click', () => {
+  // Don't let "#" placeholder hrefs (asset not published yet) jump the page to top
+  function guardPlaceholder(e) {
+    const href = e.currentTarget.getAttribute('href');
+    if (!href || href === '#') {
+      e.preventDefault();
+      toastNoAsset();
+    }
+  }
+  function toastNoAsset() {
+    document.getElementById('dl-version').textContent = 'That build is still publishing — please check back in a few minutes.';
+  }
+
+  document.getElementById('dl-mac-arm').addEventListener('click', (e) => {
+    guardPlaceholder(e);
     document.getElementById('mac-install-note').style.display = 'block';
     document.getElementById('win-install-note').style.display = 'none';
     document.getElementById('android-install-note').style.display = 'none';
   });
-  document.getElementById('dl-mac-intel').addEventListener('click', () => {
+  document.getElementById('dl-mac-intel').addEventListener('click', (e) => {
+    guardPlaceholder(e);
     document.getElementById('mac-install-note').style.display = 'block';
     document.getElementById('win-install-note').style.display = 'none';
     document.getElementById('android-install-note').style.display = 'none';
   });
-  document.getElementById('dl-win').addEventListener('click', () => {
+  document.getElementById('dl-win').addEventListener('click', (e) => {
+    guardPlaceholder(e);
     document.getElementById('win-install-note').style.display = 'block';
     document.getElementById('mac-install-note').style.display = 'none';
     document.getElementById('android-install-note').style.display = 'none';
   });
-  document.getElementById('dl-android').addEventListener('click', () => {
+  document.getElementById('dl-android').addEventListener('click', (e) => {
+    guardPlaceholder(e);
     document.getElementById('android-install-note').style.display = 'block';
     document.getElementById('win-install-note').style.display = 'none';
     document.getElementById('mac-install-note').style.display = 'none';
