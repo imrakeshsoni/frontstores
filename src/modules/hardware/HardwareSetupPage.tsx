@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { useAppStore } from '@/app/store/app.store';
 import { updateAppConfig } from '@/lib/db/config';
 
-const ACCENT = '#d97706';
+const ACCENT = '#2563eb';
 const GST_RATES = [0, 5, 12, 18, 28];
 const PAYMENT_MODES = ['cash', 'upi', 'card', 'credit'];
 
@@ -46,7 +46,7 @@ function TagListEditor({ label, placeholder, values, onChange }: { label: string
       <div className="flex flex-wrap gap-2">
         {values.length === 0 && <p className="text-xs text-slate-400">No entries yet — these appear as quick-suggestions in Products and Billing.</p>}
         {values.map(v => (
-          <span key={v} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-100">
+          <span key={v} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-blue-50 text-blue-800 border border-blue-100">
             {v}
             <button onClick={() => onChange(values.filter(x => x !== v))} className="hover:text-red-500">
               <X className="h-3 w-3" />
@@ -101,7 +101,7 @@ export function HardwareSetupPage() {
   return (
     <div className="p-6 space-y-5">
       <div className="flex items-center gap-2">
-        <Settings2 className="h-5 w-5 text-amber-600" />
+        <Settings2 className="h-5 w-5 text-blue-600" />
         <h1 className="text-xl font-bold text-slate-900">Setup</h1>
       </div>
 
@@ -119,7 +119,7 @@ export function HardwareSetupPage() {
       </div>
 
       {tab === 'catalog' && (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-6 max-w-2xl">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5 space-y-6 max-w-2xl">
           <p className="text-xs text-slate-400">Build quick-pick suggestion lists for the Products and Billing pages — handy for paint shades, hardware categories, and common brands you stock.</p>
           <TagListEditor label="Categories" placeholder="e.g. Paint, Tools, Plumbing, Electrical" values={categories} onChange={setCategories} />
           <TagListEditor label="Brands" placeholder="e.g. Asian Paints, Berger, Stanley, Havells" values={brands} onChange={setBrands} />
@@ -128,7 +128,7 @@ export function HardwareSetupPage() {
       )}
 
       {tab === 'billing' && (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-5 max-w-2xl">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5 space-y-5 max-w-2xl">
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">Bill Number Prefix</label>
             <input value="HW" disabled className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm bg-slate-50 text-slate-400" />
@@ -150,9 +150,9 @@ export function HardwareSetupPage() {
               <p className="text-xs text-slate-400 mt-1">Pre-selected at the billing counter to speed up checkout.</p>
             </div>
           </div>
-          <div className="rounded-xl bg-amber-50 border border-amber-100 p-4">
-            <p className="text-sm font-medium text-amber-900">Shop GSTIN: {config?.gstin || '— not set —'}</p>
-            <p className="text-xs text-amber-700 mt-1">GSTIN, shop name, address and phone are managed under <span className="font-semibold">Settings → Shop Details</span> and appear automatically on every printed bill and quotation.</p>
+          <div className="rounded-xl bg-blue-50 border border-blue-100 p-4">
+            <p className="text-sm font-medium text-blue-900">Shop GSTIN: {config?.gstin || '— not set —'}</p>
+            <p className="text-xs text-blue-700 mt-1">GSTIN, shop name, address and phone are managed under <span className="font-semibold">Settings → Shop Details</span> and appear automatically on every printed bill and quotation.</p>
           </div>
         </div>
       )}

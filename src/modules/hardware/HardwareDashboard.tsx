@@ -57,7 +57,7 @@ export function HardwareDashboard() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {cards.map(c => (
-          <button key={c.label} onClick={() => navigate(c.path)} className="text-left p-4 rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-all">
+          <button key={c.label} onClick={() => navigate(c.path)} className="text-left p-4 rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-medium text-slate-500">{c.label}</span>
               <span className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ background: c.bg }}>
@@ -71,7 +71,7 @@ export function HardwareDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Revenue trend chart */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5">
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-blue-600" />
@@ -84,18 +84,24 @@ export function HardwareDashboard() {
           ) : (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={chartData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="hwRevenueBar" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={1} />
+                    <stop offset="100%" stopColor="#1d4ed8" stopOpacity={0.85} />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
                 <Tooltip formatter={(v: number) => fmt(v)} labelFormatter={(l, p) => p?.[0]?.payload ? `${p[0].payload.month} · ${p[0].payload.bills} bills` : l} />
-                <Bar dataKey="revenue" fill="#d97706" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="revenue" fill="url(#hwRevenueBar)" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
         </div>
 
         {/* Top products */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5">
           <h2 className="font-semibold text-slate-900 mb-3">Top Selling Products</h2>
           {topProducts.length === 0 ? (
             <p className="text-slate-400 text-sm text-center py-8">No sales yet</p>
@@ -104,7 +110,7 @@ export function HardwareDashboard() {
               {topProducts.map((p, i) => (
                 <div key={p.product_id || i} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-xs font-semibold text-amber-600 w-5">{i + 1}.</span>
+                    <span className="text-xs font-semibold text-blue-600 w-5">{i + 1}.</span>
                     <p className="font-medium text-slate-800 truncate">{p.product_name}</p>
                   </div>
                   <p className="font-semibold text-slate-900 shrink-0">{fmt(p.revenue)}</p>
@@ -117,10 +123,10 @@ export function HardwareDashboard() {
 
       {/* Low stock alerts */}
       {lowStockItems.length > 0 && (
-        <div className="bg-orange-50 border border-orange-100 rounded-2xl p-5">
+        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5">
           <div className="flex items-center gap-2 mb-3">
-            <AlertTriangle className="h-4 w-4 text-orange-500" />
-            <h2 className="font-semibold text-orange-800">Low Stock Alerts ({lowStockItems.length})</h2>
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <h2 className="font-semibold text-amber-800">Low Stock Alerts ({lowStockItems.length})</h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {lowStockItems.slice(0, 8).map(p => (
@@ -129,18 +135,18 @@ export function HardwareDashboard() {
                   <p className="font-medium text-slate-800">{p.name}</p>
                   <p className="text-xs text-slate-400">{p.category} — {p.brand}</p>
                 </div>
-                <span className="text-xs font-semibold text-orange-600">
+                <span className="text-xs font-semibold text-amber-600">
                   {p.stock} {p.unit} (min: {p.min_stock})
                 </span>
               </div>
             ))}
           </div>
-          <button onClick={() => navigate('/hardware/inventory')} className="mt-3 text-sm font-medium text-orange-700 hover:underline">Manage stock →</button>
+          <button onClick={() => navigate('/hardware/inventory')} className="mt-3 text-sm font-medium text-amber-700 hover:underline">Manage stock →</button>
         </div>
       )}
 
       {/* Quick actions */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5">
         <h2 className="font-semibold text-slate-900 mb-4">Quick Actions</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {[
@@ -151,8 +157,8 @@ export function HardwareDashboard() {
             { label: 'Credit / Udhar', icon: BookOpen, path: '/hardware/credit' },
             { label: 'Reports', icon: TrendingUp, path: '/hardware/reports' },
           ].map(a => (
-            <button key={a.label} onClick={() => navigate(a.path)} className="flex flex-col items-center gap-2 p-4 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors">
-              <a.icon className="h-5 w-5 text-amber-600" />
+            <button key={a.label} onClick={() => navigate(a.path)} className="flex flex-col items-center gap-2 p-4 rounded-xl border border-slate-100 hover:bg-blue-50/60 hover:border-blue-200 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+              <a.icon className="h-5 w-5 text-blue-600" />
               <span className="text-xs font-medium text-slate-700">{a.label}</span>
             </button>
           ))}

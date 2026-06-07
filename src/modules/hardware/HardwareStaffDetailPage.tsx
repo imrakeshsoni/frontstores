@@ -12,7 +12,7 @@ import {
   type HardwareStaff,
 } from '@/lib/db/hardware';
 
-const ACCENT = '#d97706';
+const ACCENT = '#2563eb';
 
 function fmt(n: number) { return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`; }
 
@@ -134,7 +134,7 @@ export function HardwareStaffDetailPage() {
       .paid-bar .badge{font-weight:700;color:#15803d;font-size:12px}
       .paid-bar .detail{font-size:11px;color:#166534}
       .footer{text-align:center;font-size:10px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:8px}
-      .green{color:#16a34a} .red{color:#dc2626} .amber{color:#d97706}
+      .green{color:#16a34a} .red{color:#dc2626} .amber{color:#2563eb}
       @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
     </style></head><body>
     <div class="page">

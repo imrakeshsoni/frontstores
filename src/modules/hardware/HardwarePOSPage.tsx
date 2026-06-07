@@ -1,5 +1,5 @@
 // [hardware] [all tenants]
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Trash2, CheckCircle, Printer, BadgeIndianRupee } from 'lucide-react';
 import { toast } from 'sonner';
@@ -12,7 +12,7 @@ import {
   type HwProduct, type HwCreditAccount,
 } from '@/lib/db/hardware';
 
-const ACCENT = '#d97706';
+const ACCENT = '#2563eb';
 
 interface CartItem {
   product: HwProduct;
@@ -46,6 +46,7 @@ export function HardwarePOSPage() {
   const [paid, setPaid] = useState('');
   const [creditAccountId, setCreditAccountId] = useState('');
   const [creditSearch, setCreditSearch] = useState('');
+  const [resultIndex, setResultIndex] = useState(0);
   const [completedBill, setCompletedBill] = useState<{ billNo: string; total: number; balance: number } | null>(null);
 
   const { data: products = [] } = useQuery({
@@ -69,6 +70,32 @@ export function HardwarePOSPage() {
       return [...prev, { product, quantity: 1, rate: product.selling_price, discount: 0, gst_rate: product.gst_rate ?? 0 }];
     });
     setSearch('');
+    setResultIndex(0);
+  }
+
+  const resultRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  useEffect(() => {
+    setResultIndex(0);
+  }, [search, products.length]);
+
+  useEffect(() => {
+    resultRefs.current[resultIndex]?.scrollIntoView({ block: 'nearest' });
+  }, [resultIndex]);
+
+  function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (products.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setResultIndex(i => Math.min(i + 1, products.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setResultIndex(i => Math.max(i - 1, 0));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const p = products[resultIndex];
+      if (p) addToCart(p);
+    }
   }
 
   function patchItem(productId: string, patch: Partial<CartItem>) {
@@ -236,25 +263,32 @@ export function HardwarePOSPage() {
               placeholder="Search by name, brand, category, or scan barcode…"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300"
+              onKeyDown={handleSearchKeyDown}
+              className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
               autoFocus
             />
           </div>
           {products.length > 0 && (
             <div className="border border-slate-200 rounded-xl overflow-hidden max-h-72 overflow-y-auto">
-              {products.map(p => (
+              <p className="px-4 py-1.5 text-[11px] text-slate-400 bg-slate-50 border-b border-slate-100">Use ↑ ↓ to navigate, Enter to add to bill</p>
+              {products.map((p, i) => (
                 <button
                   key={p.id}
+                  ref={el => { resultRefs.current[i] = el; }}
                   onClick={() => addToCart(p)}
-                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 border-b border-slate-100 last:border-0 text-left"
+                  onMouseEnter={() => setResultIndex(i)}
+                  className={`w-full flex items-center justify-between px-4 py-3 border-b border-slate-100 last:border-0 text-left transition-colors ${i === resultIndex ? 'bg-blue-50' : 'hover:bg-slate-50'}`}
                 >
                   <div>
                     <p className="font-medium text-slate-800">{p.name}{p.variant ? <span className="text-slate-400 font-normal"> · {p.variant}</span> : ''}</p>
                     <p className="text-xs text-slate-400">{p.category} · {p.brand} · Stock: {p.stock} {p.unit} · GST {p.gst_rate}%</p>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-slate-900">{fmt(p.selling_price)}</p>
-                    <p className="text-xs text-slate-400">/{p.unit}</p>
+                  <div className="text-right flex items-center gap-2">
+                    <div>
+                      <p className="font-semibold text-slate-900">{fmt(p.selling_price)}</p>
+                      <p className="text-xs text-slate-400">/{p.unit}</p>
+                    </div>
+                    {i === resultIndex && <span className="text-[10px] font-semibold text-blue-600 border border-blue-200 rounded px-1.5 py-0.5">↵ Enter</span>}
                   </div>
                 </button>
               ))}
@@ -317,7 +351,7 @@ export function HardwarePOSPage() {
               className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none" />
           </div>
 
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-3 text-sm">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5 space-y-3 text-sm">
             <div className="flex justify-between text-slate-500"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
             <div className="flex items-center justify-between text-slate-500">
               <span>Discount</span>
@@ -358,7 +392,7 @@ export function HardwarePOSPage() {
                 <div className="max-h-32 overflow-y-auto space-y-1">
                   {creditAccounts.map(acc => (
                     <button key={acc.id} onClick={() => { setCreditAccountId(acc.id); setCustomerName(acc.customer_name); setCustomerPhone(acc.phone); }}
-                      className={`w-full text-left px-3 py-2 rounded-xl text-sm border ${creditAccountId === acc.id ? 'border-amber-400 bg-amber-50' : 'border-slate-200 hover:bg-slate-50'}`}>
+                      className={`w-full text-left px-3 py-2 rounded-xl text-sm border ${creditAccountId === acc.id ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:bg-slate-50'}`}>
                       <span className="font-medium text-slate-800">{acc.customer_name}</span>
                       <span className="text-xs text-slate-400 ml-2">{acc.phone} · Balance {fmt(acc.balance)}</span>
                     </button>
@@ -372,7 +406,7 @@ export function HardwarePOSPage() {
                         qc.invalidateQueries({ queryKey: ['hw-credit-accounts-pos'] });
                         toast.success('Credit account created');
                       }}
-                      className="w-full text-left px-3 py-2 rounded-xl text-sm border border-dashed border-amber-300 text-amber-700"
+                      className="w-full text-left px-3 py-2 rounded-xl text-sm border border-dashed border-blue-300 text-blue-700"
                     >
                       + Create new account "{creditSearch}"
                     </button>
@@ -400,7 +434,7 @@ export function HardwarePOSPage() {
               </div>
             )}
             {paymentMode === 'credit' && (
-              <div className="flex justify-between text-sm font-semibold rounded-xl px-3 py-2 bg-amber-50 text-amber-700">
+              <div className="flex justify-between text-sm font-semibold rounded-xl px-3 py-2 bg-blue-50 text-blue-700">
                 <span className="flex items-center gap-1.5"><BadgeIndianRupee className="h-4 w-4" /> Adding to Khata</span>
                 <span>{fmt(grandTotal - paidAmt)}</span>
               </div>

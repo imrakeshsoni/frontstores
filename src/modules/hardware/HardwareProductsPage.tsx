@@ -199,7 +199,7 @@ export function HardwareProductsPage() {
           <button
             onClick={() => { setForm(emptyForm()); setShowForm(true); }}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white"
-            style={{ background: '#d97706' }}
+            style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', boxShadow: '0 4px 12px -2px rgba(37,99,235,0.4)' }}
           >
             <Plus className="h-4 w-4" /> Add Product
           </button>
@@ -208,7 +208,7 @@ export function HardwareProductsPage() {
 
       {/* Add/Edit form */}
       {showForm && (
-        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 space-y-4">
+        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 space-y-4">
           <h2 className="font-semibold text-slate-900">{form.id ? 'Edit Product' : 'New Product'}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <div>
@@ -282,7 +282,7 @@ export function HardwareProductsPage() {
               onClick={() => saveProduct.mutate()}
               disabled={!form.name?.trim() || saveProduct.isPending}
               className="px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
-              style={{ background: '#d97706' }}
+              style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', boxShadow: '0 4px 12px -2px rgba(37,99,235,0.4)' }}
             >
               {saveProduct.isPending ? 'Saving…' : 'Save'}
             </button>
@@ -364,13 +364,13 @@ export function HardwareProductsPage() {
             return (
               <div
                 key={p.id}
-                className={`bg-white rounded-xl border shadow-sm p-4 flex items-center gap-4 ${lowStock ? 'border-orange-200' : 'border-slate-100'}`}
+                className={`bg-white rounded-xl border shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 p-4 flex items-center gap-4 ${lowStock ? 'border-amber-200' : 'border-slate-100'}`}
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-medium text-slate-900">{p.name}{p.variant ? <span className="text-slate-400 font-normal"> · {p.variant}</span> : ''}</p>
                     {lowStock && (
-                      <span className="flex items-center gap-1 text-xs text-orange-600 font-semibold">
+                      <span className="flex items-center gap-1 text-xs text-amber-600 font-semibold">
                         <AlertTriangle className="h-3 w-3" /> Low Stock{reorderQty > 0 ? ` · reorder ${reorderQty} ${p.unit}` : ''}
                       </span>
                     )}

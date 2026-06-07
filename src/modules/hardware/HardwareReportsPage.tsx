@@ -124,10 +124,10 @@ export function HardwareReportsPage() {
         {[
           { label: "Today's Sales", value: stats?.todaySales ?? 0, suffix: ' bills', color: '#2563eb', bg: '#dbeafe' },
           { label: "Today's Revenue", value: fmt(stats?.todayRevenue ?? 0), color: '#16a34a', bg: '#dcfce7' },
-          { label: 'Low Stock', value: stats?.lowStockCount ?? 0, suffix: ' items', color: '#d97706', bg: '#fef3c7' },
+          { label: 'Low Stock', value: stats?.lowStockCount ?? 0, suffix: ' items', color: '#2563eb', bg: '#dbeafe' },
           { label: 'Credit Due', value: fmt(stats?.creditOutstanding ?? 0), color: '#dc2626', bg: '#fee2e2' },
         ].map(c => (
-          <div key={c.label} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+          <div key={c.label} className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-4">
             <p className="text-xs text-slate-500">{c.label}</p>
             <p className="text-xl font-bold mt-1" style={{ color: c.color }}>
               {c.value}{c.suffix ?? ''}
@@ -144,7 +144,7 @@ export function HardwareReportsPage() {
             onClick={() => setView(tab.key)}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
             style={view === tab.key
-              ? { background: '#d97706', color: 'white' }
+              ? { background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', color: 'white', boxShadow: '0 2px 8px -2px rgba(37,99,235,0.4)' }
               : { background: '#f1f5f9', color: '#64748b' }}
           >
             <tab.icon className="h-4 w-4" />
@@ -176,8 +176,8 @@ export function HardwareReportsPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-              <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2"><TrendingUp className="h-4 w-4 text-amber-600" /> Top Products</h3>
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5">
+              <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2"><TrendingUp className="h-4 w-4 text-blue-600" /> Top Products</h3>
               {topProducts.length === 0 ? (
                 <p className="text-slate-400 text-sm text-center py-4">No sales in range</p>
               ) : (
@@ -197,7 +197,7 @@ export function HardwareReportsPage() {
                 </div>
               )}
             </div>
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5">
               <h3 className="font-semibold text-slate-900 mb-3">Category Mix</h3>
               {categoryMix.length === 0 ? (
                 <p className="text-slate-400 text-sm text-center py-4">No sales in range</p>
@@ -212,7 +212,7 @@ export function HardwareReportsPage() {
                           <span className="text-slate-500">{fmt(c.revenue)} · {pct.toFixed(0)}%</span>
                         </div>
                         <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: '#d97706' }} />
+                          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: 'linear-gradient(90deg, #3b82f6, #1d4ed8)' }} />
                         </div>
                       </div>
                     );
@@ -222,7 +222,7 @@ export function HardwareReportsPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5">
             <h2 className="font-semibold text-slate-900 mb-4">Bills</h2>
             {sales.length === 0 ? (
               <p className="text-slate-400 text-sm text-center py-4">No sales in this range</p>
@@ -250,21 +250,21 @@ export function HardwareReportsPage() {
       {view === 'gst' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-4">
               <p className="text-xs text-slate-500">Revenue (incl. GST)</p>
               <p className="text-xl font-bold mt-1 text-slate-900">{fmt2(profitSummary?.revenue ?? 0)}</p>
             </div>
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-4">
               <p className="text-xs text-slate-500">Cost of Goods Sold</p>
               <p className="text-xl font-bold mt-1 text-slate-700">{fmt2(profitSummary?.cost ?? 0)}</p>
             </div>
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-4">
               <p className="text-xs text-slate-500">Gross Profit</p>
               <p className="text-xl font-bold mt-1" style={{ color: (profitSummary?.profit ?? 0) >= 0 ? '#16a34a' : '#dc2626' }}>{fmt2(profitSummary?.profit ?? 0)}</p>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5">
             <h2 className="font-semibold text-slate-900 mb-4">GST Collected — by Rate Slab</h2>
             {(!profitSummary || profitSummary.gstSlabs.length === 0) ? (
               <p className="text-slate-400 text-sm text-center py-4">No taxed sales in this range</p>
@@ -283,15 +283,15 @@ export function HardwareReportsPage() {
                 <div className="grid grid-cols-3 gap-2 text-sm px-3 pt-2 border-t border-slate-100">
                   <span className="font-semibold text-slate-900">Total</span>
                   <span className="text-right font-semibold text-slate-900">{fmt2(profitSummary.gstSlabs.reduce((s, x) => s + x.taxable, 0))}</span>
-                  <span className="text-right font-semibold text-amber-700">{fmt2(profitSummary.gstSlabs.reduce((s, x) => s + x.tax, 0))}</span>
+                  <span className="text-right font-semibold text-blue-700">{fmt2(profitSummary.gstSlabs.reduce((s, x) => s + x.tax, 0))}</span>
                 </div>
               </div>
             )}
           </div>
 
-          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5">
-            <p className="text-sm font-medium text-amber-900">Stock Valuation (at purchase price): {fmt2(profitSummary?.stockValuation ?? 0)}</p>
-            <p className="text-xs text-amber-700 mt-1">Total value of inventory currently on your shelves — useful for GST audits and insurance estimates.</p>
+          <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5">
+            <p className="text-sm font-medium text-blue-900">Stock Valuation (at purchase price): {fmt2(profitSummary?.stockValuation ?? 0)}</p>
+            <p className="text-xs text-blue-700 mt-1">Total value of inventory currently on your shelves — useful for GST audits and insurance estimates.</p>
           </div>
         </div>
       )}
@@ -300,11 +300,11 @@ export function HardwareReportsPage() {
       {view === 'stock' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-4">
               <p className="text-xs text-slate-500">Stock Valuation (purchase price × qty)</p>
               <p className="text-xl font-bold mt-1 text-slate-900">{fmt2(stockValuation)}</p>
             </div>
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex items-center justify-between">
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-4 flex items-center justify-between">
               <div>
                 <p className="text-xs text-slate-500">Products tracked</p>
                 <p className="text-xl font-bold mt-1 text-slate-900">{allProducts.length}</p>
@@ -314,19 +314,19 @@ export function HardwareReportsPage() {
               </button>
             </div>
           </div>
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5">
             <h2 className="font-semibold text-slate-900 mb-4">Low Stock Items ({lowStockItems.length})</h2>
             {lowStockItems.length === 0 ? (
               <p className="text-slate-400 text-sm text-center py-4">All stock levels are healthy</p>
             ) : (
               <div className="space-y-2">
                 {lowStockItems.map(p => (
-                  <div key={p.id} className="flex items-center justify-between text-sm bg-orange-50 rounded-xl px-3 py-2">
+                  <div key={p.id} className="flex items-center justify-between text-sm bg-amber-50 rounded-xl px-3 py-2">
                     <div>
                       <p className="font-medium text-slate-800">{p.name}</p>
                       <p className="text-xs text-slate-400">{p.category} · {p.brand}</p>
                     </div>
-                    <span className="text-orange-600 font-semibold">{p.stock} / {p.min_stock} {p.unit}</span>
+                    <span className="text-amber-600 font-semibold">{p.stock} / {p.min_stock} {p.unit}</span>
                   </div>
                 ))}
               </div>
@@ -337,7 +337,7 @@ export function HardwareReportsPage() {
 
       {/* Credit view */}
       {view === 'credit' && (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-slate-900">Credit Outstanding</h2>
             <span className="font-bold text-red-600">{fmt(totalCreditOutstanding)}</span>

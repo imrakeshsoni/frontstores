@@ -121,7 +121,7 @@ export function HardwareInventoryPage() {
             key={t.key}
             onClick={() => setTab(t.key)}
             className="px-4 py-2 rounded-lg text-sm font-semibold transition-all"
-            style={tab === t.key ? { background: 'white', color: '#d97706', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' } : { color: '#64748b' }}
+            style={tab === t.key ? { background: 'white', color: '#2563eb', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' } : { color: '#64748b' }}
           >
             {t.label}
           </button>
@@ -129,7 +129,7 @@ export function HardwareInventoryPage() {
       </div>
 
       {tab === 'stock-in' && (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4 max-w-2xl">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5 space-y-4 max-w-2xl">
           <h2 className="font-semibold text-slate-900">Record Stock In (Purchase)</h2>
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">Product *</label>
@@ -145,7 +145,7 @@ export function HardwareInventoryPage() {
             {!selectedProduct && productSearch.trim() && (
               <div className="mt-1 max-h-48 overflow-y-auto border border-slate-100 rounded-xl divide-y divide-slate-50">
                 {filteredProducts.slice(0, 20).map(p => (
-                  <button key={p.id} onClick={() => { setProductId(p.id); setProductSearch(''); }} className="w-full text-left px-3 py-2 text-sm hover:bg-amber-50 flex justify-between">
+                  <button key={p.id} onClick={() => { setProductId(p.id); setProductSearch(''); }} className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex justify-between">
                     <span>{p.name}{p.variant ? ` · ${p.variant}` : ''}{p.brand ? <span className="text-slate-400"> ({p.brand})</span> : ''}</span>
                     <span className="text-slate-400">{p.stock} {p.unit}</span>
                   </button>
@@ -179,7 +179,7 @@ export function HardwareInventoryPage() {
             onClick={() => stockIn.mutate()}
             disabled={!selectedProduct || !qty || stockIn.isPending}
             className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
-            style={{ background: '#d97706' }}
+            style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', boxShadow: '0 4px 12px -2px rgba(37,99,235,0.4)' }}
           >
             {stockIn.isPending ? 'Saving…' : 'Record Stock In'}
           </button>
@@ -207,7 +207,7 @@ export function HardwareInventoryPage() {
                 const meta = REASON_META[m.reason] ?? REASON_META.adjustment;
                 const Icon = meta.icon;
                 return (
-                  <div key={m.id} className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex items-center gap-4">
+                  <div key={m.id} className="bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-4 flex items-center gap-4">
                     <Icon className={`h-5 w-5 shrink-0 ${meta.color}`} />
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-slate-900">{m.product_name}</p>
@@ -238,14 +238,14 @@ export function HardwareInventoryPage() {
             {lowStockProducts.map(p => {
               const reorderQty = Math.max(0, p.min_stock - p.stock);
               return (
-                <div key={p.id} className="bg-white rounded-xl border border-orange-200 shadow-sm p-4 flex items-center gap-4">
-                  <AlertTriangle className="h-5 w-5 text-orange-500 shrink-0" />
+                <div key={p.id} className="bg-white rounded-xl border border-amber-200 shadow-sm hover:shadow-md transition-shadow duration-200 p-4 flex items-center gap-4">
+                  <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-slate-900">{p.name}{p.variant ? ` · ${p.variant}` : ''}</p>
                     <p className="text-xs text-slate-400">{p.category}{p.brand ? ` · ${p.brand}` : ''}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-orange-600">{p.stock} / {p.min_stock} {p.unit}</p>
+                    <p className="text-sm font-semibold text-amber-600">{p.stock} / {p.min_stock} {p.unit}</p>
                     <p className="text-xs text-slate-400">suggest reorder: {reorderQty} {p.unit}</p>
                   </div>
                   <div className="text-right">
@@ -255,7 +255,7 @@ export function HardwareInventoryPage() {
                   <button
                     onClick={() => { setTab('stock-in'); setProductId(p.id); setProductSearch(''); setQty(String(reorderQty || '')); }}
                     className="px-3 py-2 rounded-lg text-xs font-semibold text-white"
-                    style={{ background: '#d97706' }}
+                    style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' }}
                   >
                     Stock In
                   </button>

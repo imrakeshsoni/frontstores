@@ -14,7 +14,7 @@ import {
   type HardwareStaff, type HwAttendanceStatus, type HwStaffSalarySummary, type HardwareSalaryPayment,
 } from '@/lib/db/hardware';
 
-const ACCENT = '#d97706';
+const ACCENT = '#2563eb';
 
 const STATUS_CONFIG: Record<HwAttendanceStatus, { label: string; short: string; color: string; bg: string; dotColor: string }> = {
   present:  { label: 'Present',  short: 'P', color: '#ffffff', bg: '#000000', dotColor: '#000000' },
@@ -104,7 +104,7 @@ function TodayAttendanceModal({ staff, initialDate, attMap, year, month, onClose
             className={`rounded-lg w-9 h-9 flex items-center justify-center border ${canGoBack ? 'bg-slate-100 border-slate-200 text-slate-900 cursor-pointer' : 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed'}`}>
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <div className={`text-center px-4 py-1.5 rounded-xl flex-1 mx-3 ${isToday ? 'bg-amber-50' : 'bg-slate-100'}`}>
+          <div className={`text-center px-4 py-1.5 rounded-xl flex-1 mx-3 ${isToday ? 'bg-blue-50' : 'bg-slate-100'}`}>
             <p className="text-sm font-bold" style={{ color: isToday ? ACCENT : '#1d1d1f' }}>{dateLabel}</p>
             {isToday && <p className="text-xs font-medium" style={{ color: ACCENT }}>Today</p>}
           </div>
@@ -625,7 +625,7 @@ export function HardwareAttendancePage() {
     <div class="section-title">Attendance — ${monthName}</div>
     <div class="row"><span>Working Days (period)</span><span>${summary.working_days}</span></div>
     <div class="row"><span class="green">Present Days</span><span class="green">${summary.present}</span></div>
-    <div class="row"><span style="color:#d97706">Half Days</span><span style="color:#d97706">${summary.half_day}</span></div>
+    <div class="row"><span style="color:#2563eb">Half Days</span><span style="color:#2563eb">${summary.half_day}</span></div>
     <div class="row"><span style="color:#7c3aed">Leave Days</span><span style="color:#7c3aed">${summary.leave}</span></div>
     <div class="row"><span class="red">Absent Days</span><span class="red">${summary.absent}</span></div>
     <div class="section-title">Salary Calculation</div>
@@ -862,7 +862,7 @@ export function HardwareAttendancePage() {
         <p className="text-xs font-semibold uppercase tracking-widest mr-1 text-slate-400">Month Total</p>
         {[
           { label: 'Staff',      value: String(staff.length),                                           color: '#ffffff' },
-          { label: 'Gross',      value: fmt(summaries.reduce((a, sm) => a + sm.net_salary, 0)),         color: '#fbbf24' },
+          { label: 'Gross',      value: fmt(summaries.reduce((a, sm) => a + sm.net_salary, 0)),         color: '#60a5fa' },
           { label: 'Deductions', value: fmt(summaries.reduce((a, sm) => a + sm.deductions, 0)),         color: '#f87171' },
           { label: 'Advances',   value: fmt(summaries.reduce((a, sm) => a + sm.advance, 0)),            color: '#fb923c' },
           { label: 'Payable',    value: fmt(summaries.reduce((a, sm) => a + sm.payable_amount, 0)),     color: '#4ade80' },

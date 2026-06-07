@@ -149,7 +149,7 @@ export function CreditAccountsPage() {
               </div>
               <div className="text-center">
                 <p className="text-xs text-slate-400">31-60 days</p>
-                <p className="text-sm font-semibold text-orange-600">{fmt(aging.d31_60)}</p>
+                <p className="text-sm font-semibold text-amber-600">{fmt(aging.d31_60)}</p>
               </div>
               <div className="text-center">
                 <p className="text-xs text-slate-400">60+ days</p>
@@ -160,7 +160,7 @@ export function CreditAccountsPage() {
         </div>
 
         {/* Add transaction */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5 space-y-4">
           <h2 className="font-semibold text-slate-900">Add Transaction</h2>
           <div className="flex gap-3">
             {(['debit', 'credit'] as const).map(t => (
@@ -201,14 +201,14 @@ export function CreditAccountsPage() {
             onClick={() => addTx.mutate()}
             disabled={!txAmount || addTx.isPending}
             className="w-full py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
-            style={{ background: '#d97706' }}
+            style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', boxShadow: '0 4px 12px -2px rgba(37,99,235,0.4)' }}
           >
             Add Transaction
           </button>
         </div>
 
         {/* Transaction history */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5">
           <h2 className="font-semibold text-slate-900 mb-4">Transaction History</h2>
           {transactions.length === 0 ? (
             <p className="text-slate-400 text-sm text-center py-4">No transactions yet</p>
@@ -220,7 +220,7 @@ export function CreditAccountsPage() {
                     <p className="font-medium text-slate-800">
                       {tx.description || (tx.type === 'debit' ? 'Sale' : 'Payment')}
                       {tx.reference_bill_no && (
-                        <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100">
+                        <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">
                           Bill {tx.reference_bill_no}
                         </span>
                       )}
@@ -253,20 +253,20 @@ export function CreditAccountsPage() {
         <button
           onClick={() => setShowAdd(true)}
           className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white"
-          style={{ background: '#d97706' }}
+          style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', boxShadow: '0 4px 12px -2px rgba(37,99,235,0.4)' }}
         >
           <Plus className="h-4 w-4" /> Add Account
         </button>
       </div>
 
       {showAdd && (
-        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 space-y-3">
+        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 space-y-3">
           <h2 className="font-semibold text-slate-900">New Credit Account</h2>
           <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Customer name *" className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none" />
           <input value={newPhone} onChange={e => setNewPhone(e.target.value)} placeholder="Phone" className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none" />
           <input value={newAddress} onChange={e => setNewAddress(e.target.value)} placeholder="Address" className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none" />
           <div className="flex gap-3">
-            <button onClick={() => addAccount.mutate()} disabled={!newName.trim()} className="px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50" style={{ background: '#d97706' }}>Save</button>
+            <button onClick={() => addAccount.mutate()} disabled={!newName.trim()} className="px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' }}>Save</button>
             <button onClick={() => setShowAdd(false)} className="px-4 py-2 rounded-xl text-sm text-slate-500 hover:bg-slate-100">Cancel</button>
           </div>
         </div>

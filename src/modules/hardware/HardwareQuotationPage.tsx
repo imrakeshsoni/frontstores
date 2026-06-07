@@ -12,7 +12,7 @@ import {
   convertHwQuotationToSale, type HwProduct, type HwQuotation,
 } from '@/lib/db/hardware';
 
-const ACCENT = '#4f46e5';
+const ACCENT = '#2563eb';
 
 interface QuoteLine {
   key: string;
@@ -248,7 +248,7 @@ export function HardwareQuotationPage() {
           <h1 className="text-xl font-bold text-slate-900">New Quotation</h1>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">Customer Name *</label>
@@ -336,7 +336,7 @@ export function HardwareQuotationPage() {
             onClick={() => saveQuote.mutate()}
             disabled={!customerName.trim() || lines.length === 0 || saveQuote.isPending}
             className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
-            style={{ background: ACCENT }}
+            style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', boxShadow: '0 4px 12px -2px rgba(37,99,235,0.4)' }}
           >
             {saveQuote.isPending ? 'Saving…' : 'Save Quotation'}
           </button>
@@ -352,7 +352,7 @@ export function HardwareQuotationPage() {
         <button
           onClick={() => { resetForm(); setView('new'); }}
           className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white"
-          style={{ background: ACCENT }}
+          style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', boxShadow: '0 4px 12px -2px rgba(37,99,235,0.4)' }}
         >
           <Plus className="h-4 w-4" /> New Quotation
         </button>
@@ -379,7 +379,7 @@ export function HardwareQuotationPage() {
           {quotations.map(q => {
             const meta = STATUS_META[q.status];
             return (
-              <div key={q.id} className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-wrap items-center gap-3">
+              <div key={q.id} className="bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 p-4 flex flex-wrap items-center gap-3">
                 <div className="flex-1 min-w-[180px]">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-medium text-slate-900">{q.customer_name}</p>

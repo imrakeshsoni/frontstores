@@ -11,7 +11,7 @@ import {
 } from '@/lib/db/hardware';
 
 const ROLES = ['salesman', 'cashier', 'helper', 'storekeeper', 'manager', 'delivery'];
-const ACCENT = '#d97706';
+const ACCENT = '#2563eb';
 
 type StaffForm = {
   name: string; phone: string; role: string;
@@ -154,7 +154,7 @@ export function HardwareStaffPage() {
             <div>
               <label className="block text-sm font-medium text-slate-500 mb-1.5">Name *</label>
               <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ramesh"
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-400" />
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400" />
             </div>
 
             {/* Phone + Role */}
@@ -162,19 +162,19 @@ export function HardwareStaffPage() {
               <div>
                 <label className="block text-sm font-medium text-slate-500 mb-1.5">Phone</label>
                 <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="9876543210"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-400" />
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-500 mb-1.5">Role</label>
                 <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none capitalize focus:border-amber-400">
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none capitalize focus:border-blue-400">
                   {ROLES.map(r => <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}
                 </select>
               </div>
             </div>
 
             {/* Salary section */}
-            <div className="rounded-xl p-4 space-y-3 bg-amber-50 border border-amber-100">
+            <div className="rounded-xl p-4 space-y-3 bg-blue-50 border border-blue-100">
               <p className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5" style={{ color: ACCENT }}>
                 <IndianRupee className="h-3.5 w-3.5" /> Salary Settings
               </p>
@@ -184,14 +184,14 @@ export function HardwareStaffPage() {
                   <label className="block text-xs font-medium text-slate-500 mb-1">Monthly Salary (₹)</label>
                   <input type="number" value={form.monthly_salary} onChange={e => setForm(f => ({ ...f, monthly_salary: e.target.value }))}
                     placeholder="15000"
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-400" />
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
                     <Calendar className="h-3 w-3" /> Joining Date
                   </label>
                   <input type="date" value={form.joining_date} onChange={e => setForm(f => ({ ...f, joining_date: e.target.value }))}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-400" />
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400" />
                 </div>
               </div>
 
