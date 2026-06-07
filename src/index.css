@@ -613,6 +613,23 @@
   }
   .nav-item.active svg { color: var(--accent); }
 
+  /* ── Sidebar nav — colorful hover + 3D lift [core] [all tenants] ── */
+  .sidebar-nav-item {
+    transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .sidebar-nav-item:hover:not(.active) {
+    background: var(--nav-tint) !important;
+    transform: translateX(3px) translateY(-1px);
+    box-shadow: 0 8px 20px -8px var(--nav-glow);
+  }
+  .sidebar-nav-item .nav-icon-badge {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .sidebar-nav-item:hover .nav-icon-badge {
+    transform: scale(1.12) translateY(-1px) rotate(-4deg);
+    box-shadow: 0 6px 14px -4px var(--nav-glow);
+  }
+
   /* ── Empty state ── */
   .empty-state {
     @apply card flex min-h-[260px] flex-col items-center justify-center px-6 py-10 text-center;

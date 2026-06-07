@@ -8,6 +8,14 @@ import { getHardwareStats, listHwProducts, getHwRevenueTrend, getHwTopProducts }
 
 function fmt(n: number) { return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`; }
 
+const RANK_COLORS = [
+  'linear-gradient(135deg, #fbbf24, #d97706)',
+  'linear-gradient(135deg, #94a3b8, #475569)',
+  'linear-gradient(135deg, #fb923c, #c2410c)',
+  'linear-gradient(135deg, #818cf8, #4338ca)',
+  'linear-gradient(135deg, #38bdf8, #0369a1)',
+];
+
 export function HardwareDashboard() {
   const tenantId = useAppStore(s => s.config?.tenant_id ?? '');
   const shopName = useAppStore(s => s.config?.shop_name ?? 'Hardware Store');
@@ -40,31 +48,40 @@ export function HardwareDashboard() {
   });
 
   const cards = [
-    { label: "Today's Sales", value: stats?.todaySales ?? 0, icon: ShoppingCart, color: '#2563eb', bg: '#dbeafe', path: '/hardware/pos' },
-    { label: "Today's Revenue", value: fmt(stats?.todayRevenue ?? 0), icon: TrendingUp, color: '#16a34a', bg: '#dcfce7', path: '/hardware/reports' },
-    { label: 'Low Stock Items', value: stats?.lowStockCount ?? 0, icon: AlertTriangle, color: '#d97706', bg: '#fef3c7', path: '/hardware/products' },
-    { label: 'Credit Outstanding', value: fmt(stats?.creditOutstanding ?? 0), icon: BookOpen, color: '#dc2626', bg: '#fee2e2', path: '/hardware/credit' },
+    { label: "Today's Sales", value: stats?.todaySales ?? 0, icon: ShoppingCart, gradient: 'linear-gradient(135deg, #6366f1, #4338ca)', glow: 'rgba(99,102,241,0.35)', path: '/hardware/pos' },
+    { label: "Today's Revenue", value: fmt(stats?.todayRevenue ?? 0), icon: TrendingUp, gradient: 'linear-gradient(135deg, #22c55e, #15803d)', glow: 'rgba(34,197,94,0.35)', path: '/hardware/reports' },
+    { label: 'Low Stock Items', value: stats?.lowStockCount ?? 0, icon: AlertTriangle, gradient: 'linear-gradient(135deg, #fb923c, #ea580c)', glow: 'rgba(251,146,60,0.35)', path: '/hardware/products' },
+    { label: 'Credit Outstanding', value: fmt(stats?.creditOutstanding ?? 0), icon: BookOpen, gradient: 'linear-gradient(135deg, #f43f5e, #be123c)', glow: 'rgba(244,63,94,0.35)', path: '/hardware/credit' },
   ];
 
   const chartData = revenueTrend.map(r => ({ ...r, label: new Date(`${r.month}-01`).toLocaleDateString('en-IN', { month: 'short' }) }));
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">{shopName}</h1>
-        <p className="text-slate-500 text-sm mt-0.5">Hardware & Paint Store</p>
+      <div className="rounded-3xl p-6 text-white relative overflow-hidden" style={{ background: 'linear-gradient(120deg, #4338ca 0%, #6366f1 45%, #0ea5e9 100%)', boxShadow: '0 12px 32px -8px rgba(67,56,202,0.45)' }}>
+        <div className="absolute -right-10 -top-16 h-48 w-48 rounded-full" style={{ background: 'rgba(255,255,255,0.10)' }} />
+        <div className="absolute -right-2 bottom-[-3rem] h-32 w-32 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }} />
+        <div className="relative">
+          <h1 className="text-2xl font-bold" style={{ color: 'white' }}>{shopName}</h1>
+          <p className="text-sm mt-0.5" style={{ color: 'rgba(255,255,255,0.8)' }}>Hardware & Paint Store · Dashboard</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {cards.map(c => (
-          <button key={c.label} onClick={() => navigate(c.path)} className="text-left p-4 rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200">
+          <button
+            key={c.label}
+            onClick={() => navigate(c.path)}
+            className="text-left p-4 rounded-2xl text-white transition-all duration-200 hover:-translate-y-1"
+            style={{ background: c.gradient, boxShadow: `0 10px 24px -8px ${c.glow}` }}
+          >
             <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-medium text-slate-500">{c.label}</span>
-              <span className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ background: c.bg }}>
-                <c.icon className="h-4 w-4" style={{ color: c.color }} />
+              <span className="text-xs font-medium text-white/80">{c.label}</span>
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ background: 'rgba(255,255,255,0.22)' }}>
+                <c.icon className="h-4 w-4 text-white" />
               </span>
             </div>
-            <p className="text-2xl font-bold text-slate-900">{c.value}</p>
+            <p className="text-2xl font-bold" style={{ color: 'white' }}>{c.value}</p>
           </button>
         ))}
       </div>
@@ -86,8 +103,8 @@ export function HardwareDashboard() {
               <BarChart data={chartData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
                 <defs>
                   <linearGradient id="hwRevenueBar" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={1} />
-                    <stop offset="100%" stopColor="#1d4ed8" stopOpacity={0.85} />
+                    <stop offset="0%" stopColor="#818cf8" stopOpacity={1} />
+                    <stop offset="100%" stopColor="#4338ca" stopOpacity={0.9} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
@@ -107,15 +124,22 @@ export function HardwareDashboard() {
             <p className="text-slate-400 text-sm text-center py-8">No sales yet</p>
           ) : (
             <div className="space-y-2.5">
-              {topProducts.map((p, i) => (
-                <div key={p.product_id || i} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-xs font-semibold text-blue-600 w-5">{i + 1}.</span>
-                    <p className="font-medium text-slate-800 truncate">{p.product_name}</p>
+              {topProducts.map((p, i) => {
+                return (
+                  <div key={p.product_id || i} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
+                        style={{ background: RANK_COLORS[i % RANK_COLORS.length] }}
+                      >
+                        {i + 1}
+                      </span>
+                      <p className="font-medium text-slate-800 truncate">{p.product_name}</p>
+                    </div>
+                    <p className="font-semibold text-slate-900 shrink-0">{fmt(p.revenue)}</p>
                   </div>
-                  <p className="font-semibold text-slate-900 shrink-0">{fmt(p.revenue)}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -150,15 +174,21 @@ export function HardwareDashboard() {
         <h2 className="font-semibold text-slate-900 mb-4">Quick Actions</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {[
-            { label: 'New Bill', icon: ShoppingCart, path: '/hardware/pos' },
-            { label: 'Products', icon: Boxes, path: '/hardware/products' },
-            { label: 'Inventory', icon: Boxes, path: '/hardware/inventory' },
-            { label: 'Quotation', icon: FileText, path: '/hardware/quotations' },
-            { label: 'Credit / Udhar', icon: BookOpen, path: '/hardware/credit' },
-            { label: 'Reports', icon: TrendingUp, path: '/hardware/reports' },
+            { label: 'New Bill', icon: ShoppingCart, path: '/hardware/pos', color: '#4338ca', bg: '#e0e7ff' },
+            { label: 'Products', icon: Boxes, path: '/hardware/products', color: '#0369a1', bg: '#e0f2fe' },
+            { label: 'Inventory', icon: Boxes, path: '/hardware/inventory', color: '#0d9488', bg: '#ccfbf1' },
+            { label: 'Quotation', icon: FileText, path: '/hardware/quotations', color: '#7c3aed', bg: '#ede9fe' },
+            { label: 'Credit / Udhar', icon: BookOpen, path: '/hardware/credit', color: '#be123c', bg: '#ffe4e6' },
+            { label: 'Reports', icon: TrendingUp, path: '/hardware/reports', color: '#15803d', bg: '#dcfce7' },
           ].map(a => (
-            <button key={a.label} onClick={() => navigate(a.path)} className="flex flex-col items-center gap-2 p-4 rounded-xl border border-slate-100 hover:bg-blue-50/60 hover:border-blue-200 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
-              <a.icon className="h-5 w-5 text-blue-600" />
+            <button
+              key={a.label}
+              onClick={() => navigate(a.path)}
+              className="flex flex-col items-center gap-2 p-4 rounded-xl border border-slate-100 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
+            >
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: a.bg }}>
+                <a.icon className="h-5 w-5" style={{ color: a.color }} />
+              </span>
               <span className="text-xs font-medium text-slate-700">{a.label}</span>
             </button>
           ))}

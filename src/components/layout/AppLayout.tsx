@@ -637,16 +637,18 @@ export function AppLayout() {
             <NavLink
               key={to}
               to={to}
-              className="flex items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all"
-              style={({ isActive }) => isActive
-                ? { background: 'var(--accent-soft)' }
-                : {}}
+              className={({ isActive }) => `sidebar-nav-item flex items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all ${isActive ? 'active' : ''}`}
+              style={({ isActive }) => ({
+                background: isActive ? 'var(--accent-soft)' : 'transparent',
+                ['--nav-tint' as any]: `${iconBg}`,
+                ['--nav-glow' as any]: `${iconColor}4d`,
+              })}
             >
               {({ isActive }) => (
                 <>
                   <span
-                    className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg"
-                    style={{ background: isActive ? 'transparent' : 'var(--surface-2)', opacity: isActive ? 1 : 0.9 }}
+                    className="nav-icon-badge flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg"
+                    style={{ background: iconBg }}
                   >
                     <Icon className="h-3.5 w-3.5" style={{ color: isActive ? 'var(--accent)' : iconColor }} />
                   </span>
