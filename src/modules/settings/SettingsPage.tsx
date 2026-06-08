@@ -849,6 +849,12 @@ function StaffLoginsSection({ tenantId }: { tenantId: string }) {
     queryFn: () => listStaffUsers(tenantId),
     enabled: !!tenantId,
   });
+  const { data: cloudSync } = useQuery({
+    queryKey: ['cloud-sync-status', tenantId],
+    queryFn: () => getCloudSyncStatus(),
+    enabled: !!tenantId,
+  });
+  const cloudSyncEnabled = !!cloudSync?.enabled;
 
   // Reconcile pending requests with the server whenever this section is open
   useEffect(() => {
@@ -893,18 +899,25 @@ function StaffLoginsSection({ tenantId }: { tenantId: string }) {
       <p className="section-label mb-1 text-violet-300">👥 Staff Logins</p>
       <p className="text-xs text-slate-400 mb-4">
         Add a username + password for staff (e.g. a biller). Each request is sent to FrontStores for approval —
-        once approved, that person can sign in on this device with their own credentials and works on the same shop data.
-        Their password stays on this device, just like yours.
+        once approved, that person can sign in with their own credentials, including on a brand-new device
+        (their login travels there via Cloud Sync). Their password stays local, just like yours.
       </p>
 
+      {!cloudSyncEnabled && (
+        <div className="card-strong border border-amber-800/50 bg-amber-950/30 p-3 mb-4 text-xs text-amber-300">
+          ⚠️ Enable <span className="font-semibold">Cloud Sync</span> first (in the Cloud Sync card below) so staff logins
+          can also work on other devices — that's how their credentials travel safely from this device to a new one.
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
-        <input className="input" placeholder="Username (min 3 chars)" value={staffUsername} onChange={e => setStaffUsername(e.target.value)} />
-        <input className="input" type="password" placeholder="Password (min 4 chars)" value={staffPassword} onChange={e => setStaffPassword(e.target.value)} />
-        <input className="input" type="password" placeholder="Confirm password" value={staffConfirm} onChange={e => setStaffConfirm(e.target.value)} />
+        <input className="input" placeholder="Username (min 3 chars)" value={staffUsername} onChange={e => setStaffUsername(e.target.value)} disabled={!cloudSyncEnabled} />
+        <input className="input" type="password" placeholder="Password (min 4 chars)" value={staffPassword} onChange={e => setStaffPassword(e.target.value)} disabled={!cloudSyncEnabled} />
+        <input className="input" type="password" placeholder="Confirm password" value={staffConfirm} onChange={e => setStaffConfirm(e.target.value)} disabled={!cloudSyncEnabled} />
       </div>
       <button
         onClick={handleAddStaffUser}
-        disabled={submitting || staffUsername.trim().length < 3 || staffPassword.length < 4}
+        disabled={!cloudSyncEnabled || submitting || staffUsername.trim().length < 3 || staffPassword.length < 4}
         className="btn-secondary disabled:opacity-40"
       >
         {submitting ? 'Sending request…' : '➕ Request Staff Login'}

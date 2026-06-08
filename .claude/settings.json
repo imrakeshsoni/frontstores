@@ -76,7 +76,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "launchctl list com.frontstores.server 2>/dev/null | grep -q '\"PID\"' || launchctl load ~/Library/LaunchAgents/com.frontstores.server.plist 2>/dev/null; launchctl list com.frontstores.tunnel 2>/dev/null | grep -q '\"PID\"' || launchctl load ~/Library/LaunchAgents/com.frontstores.tunnel.plist 2>/dev/null; open '/Users/rakeshsoni/Documents/Cloud Software/frontstores/admin-app/index.html'; echo '{\"systemMessage\": \"FrontStores server + tunnel running. Admin panel opened. Password: qodXjlMOr4YZG25wDSLoRANZ\"}'",
+            "command": "launchctl list com.frontstores.server 2>/dev/null | grep -q '\"PID\"' || launchctl load ~/Library/LaunchAgents/com.frontstores.server.plist 2>/dev/null; launchctl list com.frontstores.tunnel 2>/dev/null | grep -q '\"PID\"' || launchctl load ~/Library/LaunchAgents/com.frontstores.tunnel.plist 2>/dev/null; echo '{\"systemMessage\": \"FrontStores server + tunnel running. Admin panel: use the native FrontStores Admin app. Password: qodXjlMOr4YZG25wDSLoRANZ\"}'",
             "timeout": 15,
             "statusMessage": "Starting FrontStores server & tunnel..."
           }

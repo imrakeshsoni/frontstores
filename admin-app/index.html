@@ -407,7 +407,7 @@
     .act-head { background: rgba(255,255,255,.03); border-bottom: 1px solid rgba(255,255,255,.08); }
     .act-head .act-cell { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
 
-    /* BROADCAST */
+    /* ANNOUNCEMENTS — shares the .broadcast-form layout */
     .broadcast-form { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 20px; padding: 24px; margin-bottom: 24px; }
     .broadcast-form h3 { font-size: 15px; font-weight: 700; margin-bottom: 16px; }
     .bc-input {
@@ -518,9 +518,6 @@
       <div class="nav-item" id="tab-activity" onclick="switchTab('activity')">
         <span class="nav-icon">📋</span> Activity Log
       </div>
-      <div class="nav-item" id="tab-broadcast" onclick="switchTab('broadcast')">
-        <span class="nav-icon">📢</span> Broadcast
-      </div>
       <div class="nav-item" id="tab-announcements" onclick="switchTab('announcements')">
         <span class="nav-icon">📣</span> Announcements
       </div>
@@ -572,6 +569,13 @@
           <button class="filter-btn"        id="f-frozen"   onclick="setFilter('frozen')">Frozen</button>
           <button class="filter-btn"        id="f-switch"   onclick="setFilter('switch')" style="border-color:rgba(167,139,250,.4);color:#a78bfa">🔄 Switch Requests</button>
           <button class="export-btn" onclick="exportCSV()">⬇ Export CSV</button>
+        </div>
+
+        <div class="type-filter-row">
+          <span style="font-size:12px;color:var(--muted);font-weight:600">Tag:</span>
+          <button class="filter-btn active" id="tag-all"    onclick="setTagFilter('all')">All</button>
+          <button class="filter-btn"        id="tag-client" onclick="setTagFilter('client')">✅ Clients</button>
+          <button class="filter-btn"        id="tag-tester" onclick="setTagFilter('tester')">🧪 Testers</button>
         </div>
 
         <div class="type-filter-row">
@@ -632,6 +636,7 @@
           <button class="filter-btn active" id="ef-all"      onclick="setEFilter('all')">All</button>
           <button class="filter-btn"        id="ef-open"     onclick="setEFilter('open')">Open</button>
           <button class="filter-btn"        id="ef-resolved" onclick="setEFilter('resolved')">Resolved</button>
+          <button class="btn-sm" style="margin-left:auto;color:#fb7185;border-color:rgba(251,113,133,.3)" onclick="clearAllErrors()">🗑 Clear All</button>
         </div>
         <div id="errors-list"></div>
       </div>
@@ -751,18 +756,6 @@
         </div>
       </div>
 
-      <!-- BROADCAST TAB -->
-      <div class="tab-page" id="page-broadcast">
-        <div class="broadcast-form">
-          <h3>📢 New Broadcast</h3>
-          <input class="bc-input" id="bc-title" placeholder="Title (e.g. New feature released!)" />
-          <textarea class="bc-textarea" id="bc-message" placeholder="Message shown to all users on next app launch…"></textarea>
-          <button class="bc-submit" onclick="sendBroadcast()">Send Broadcast</button>
-        </div>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:16px">Active broadcasts are shown to all app users on next launch.</div>
-        <div id="broadcast-list"></div>
-      </div>
-
       <!-- ANNOUNCEMENTS TAB -->
       <div class="tab-page" id="page-announcements">
         <div class="broadcast-form">
@@ -831,8 +824,20 @@ const LABELS = { medical:'Medical Store', restaurant:'Restaurant / Café', groce
 const TYPE_COLORS = ['#8b5cf6','#06b6d4','#10b981','#f59e0b','#f43f5e','#3b82f6','#ec4899','#a78bfa'];
 
 let password = '', allCustomers = [], allErrors = [], allContacts = [], allActivity = [];
-let filter = 'all', typeFilter = 'all', eFilter = 'all', cFilter = 'all', openId = null;
+let filter = 'all', typeFilter = 'all', tagFilter = 'all', eFilter = 'all', cFilter = 'all', openId = null;
 let healthInterval = null;
+
+// [core] — Native admin app on this Mac passes the password as `local_token` so
+// the admin never has to type it. Strip it from the URL immediately so it never
+// lands in browser history or screenshots, then sign in silently.
+(function autoLoginFromLocalToken() {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('local_token');
+  if (!token) return;
+  history.replaceState(null, '', window.location.pathname);
+  password = token;
+  document.addEventListener('DOMContentLoaded', () => loadAll(true));
+})();
 
 function escHtml(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
@@ -870,14 +875,14 @@ const PAGE_META = {
   analytics: { title:'Analytics', sub:'Revenue, growth and churn overview' },
   health:    { title:'Health',    sub:'Service status and uptime' },
   activity:  { title:'Activity Log', sub:'Admin actions history' },
-  broadcast: { title:'Broadcast', sub:'Messages sent to all users' },
   announcements: { title:'Announcements', sub:'Silent push notices shown to every tenant, instantly' },
   syncrequests: { title:'Cloud Sync', sub:'Requests to enable Cloud Sync, awaiting approval' },
   staffrequests: { title:'Staff Logins', sub:'Staff login requests from owners, awaiting approval' },
 };
 
 function switchTab(t) {
-  ['customers','contacts','errors','analytics','health','activity','broadcast','announcements','devices','syncrequests','staffrequests'].forEach(x => {
+  if (document.getElementById('customer-detail')?.classList.contains('open')) closePanel();
+  ['customers','contacts','errors','analytics','health','activity','announcements','devices','syncrequests','staffrequests'].forEach(x => {
     document.getElementById('tab-'+x)?.classList.toggle('active', x===t);
     document.getElementById('page-'+x)?.classList.toggle('active', x===t);
   });
@@ -888,7 +893,6 @@ function switchTab(t) {
   if (t === 'health')    { loadHealth(); if (!healthInterval) healthInterval = setInterval(loadHealth, 30000); }
   else                   { if (healthInterval) { clearInterval(healthInterval); healthInterval = null; } }
   if (t === 'activity')  loadActivity();
-  if (t === 'broadcast') loadBroadcast();
   if (t === 'announcements') loadAnnouncements();
   if (t === 'devices')   loadDevices();
   if (t === 'syncrequests') loadSyncRequests();
@@ -996,6 +1000,11 @@ function setTypeFilter(t) {
   ['all','medical','restaurant','grocery','carwash','clinic','beauty','study'].forEach(x=>document.getElementById('ft-'+x).classList.toggle('active',x===t));
   renderCustomers();
 }
+function setTagFilter(t) {
+  tagFilter = t;
+  ['all','client','tester'].forEach(x=>document.getElementById('tag-'+x).classList.toggle('active',x===t));
+  renderCustomers();
+}
 
 function planBadge(c) {
   const pt = c.plan_type;
@@ -1006,9 +1015,37 @@ function planBadge(c) {
   return '';
 }
 
+function customerRowHtml(c) {
+  const st = subStatus(c);
+  const d = daysLeft(c.expires_at);
+  const icon = ICONS[c.shop_type]||'🏪';
+  const reg = c.registered_at ? new Date(c.registered_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : '—';
+  let badge, bar='';
+  const isSwitchReq = st==='pending' && c.switch_request;
+  if (st==='pending')  badge=`<span class="badge" style="background:rgba(167,139,250,.15);color:#a78bfa;border:1px solid rgba(167,139,250,.3)">${isSwitchReq?'🔄 Switch Request':'⏳ Pending'}</span>`;
+  else if (st==='active')   { badge=`<span class="badge badge-active">✓ ${d}d left</span>`; bar=`<div class="days-bar"><div class="days-fill" style="width:${Math.min(100,(d/30)*100)}%;background:var(--green)"></div></div>`; }
+  else if (st==='expiring') { badge=`<span class="badge badge-expiring">⚠ ${d}d left</span>`; bar=`<div class="days-bar"><div class="days-fill" style="width:${Math.min(100,(d/30)*100)}%;background:var(--gold)"></div></div>`; }
+  else if (st==='expired')  badge=`<span class="badge badge-expired">✕ Expired</span>`;
+  else if (st==='frozen')   badge=`<span class="badge badge-frozen">🧊 Frozen</span>`;
+  else if (st==='revoked')  badge=`<span class="badge badge-revoked">🚫 Revoked</span>`;
+  const rowClass = st==='frozen'?'frozen-row':st==='revoked'?'revoked-row':'';
+  const tid = escHtml(c.tenant_id||'');
+  const testBadge = !c.is_client ? `<span class="badge" style="background:rgba(168,85,247,.15);color:#c084fc;border:1px solid rgba(168,85,247,.3)">🧪 Tester</span>` : '';
+  return `<tr class="${rowClass}" onclick="openPanel('${tid}')">
+    <td><div class="shop-name">${escHtml(c.shop_name||'Unknown')} ${testBadge}</div><div class="shop-id">${tid.substring(0,20)}…</div></td>
+    <td><span class="type-chip">${icon} ${escHtml(LABELS[c.shop_type]||c.shop_type||'—')}</span></td>
+    <td><div style="font-size:13px">${escHtml(c.owner_name||'—')}</div><div style="font-size:12px;color:var(--muted)">${escHtml(c.phone||c.email||'—')}</div></td>
+    <td style="color:var(--muted);font-size:13px">${reg}</td>
+    <td>${badge}${bar}</td>
+    <td>${planBadge(c)}</td>
+  </tr>`;
+}
+
 function renderCustomers() {
   const q = document.getElementById('search').value.toLowerCase();
   let list = allCustomers.filter(c => {
+    if (tagFilter === 'client' && !c.is_client) return false;   // only explicitly-tagged clients
+    if (tagFilter === 'tester' && c.is_client) return false;    // everything not explicitly promoted to "client"
     const st = subStatus(c);
     if (filter === 'switch') return !!c.switch_request && st === 'pending';
     if (filter !== 'all' && st !== filter) return false;
@@ -1018,30 +1055,7 @@ function renderCustomers() {
   });
   const tbody = document.getElementById('tbody');
   if (!list.length) { tbody.innerHTML=`<tr><td colspan="6"><div class="empty">No customers found</div></td></tr>`; return; }
-  tbody.innerHTML = list.map(c => {
-    const st = subStatus(c);
-    const d = daysLeft(c.expires_at);
-    const icon = ICONS[c.shop_type]||'🏪';
-    const reg = c.registered_at ? new Date(c.registered_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : '—';
-    let badge, bar='';
-    const isSwitchReq = st==='pending' && c.switch_request;
-    if (st==='pending')  badge=`<span class="badge" style="background:rgba(167,139,250,.15);color:#a78bfa;border:1px solid rgba(167,139,250,.3)">${isSwitchReq?'🔄 Switch Request':'⏳ Pending'}</span>`;
-    else if (st==='active')   { badge=`<span class="badge badge-active">✓ ${d}d left</span>`; bar=`<div class="days-bar"><div class="days-fill" style="width:${Math.min(100,(d/30)*100)}%;background:var(--green)"></div></div>`; }
-    else if (st==='expiring') { badge=`<span class="badge badge-expiring">⚠ ${d}d left</span>`; bar=`<div class="days-bar"><div class="days-fill" style="width:${Math.min(100,(d/30)*100)}%;background:var(--gold)"></div></div>`; }
-    else if (st==='expired')  badge=`<span class="badge badge-expired">✕ Expired</span>`;
-    else if (st==='frozen')   badge=`<span class="badge badge-frozen">🧊 Frozen</span>`;
-    else if (st==='revoked')  badge=`<span class="badge badge-revoked">🚫 Revoked</span>`;
-    const rowClass = st==='frozen'?'frozen-row':st==='revoked'?'revoked-row':'';
-    const tid = escHtml(c.tenant_id||'');
-    return `<tr class="${rowClass}" onclick="openPanel('${tid}')">
-      <td><div class="shop-name">${escHtml(c.shop_name||'Unknown')}</div><div class="shop-id">${tid.substring(0,20)}…</div></td>
-      <td><span class="type-chip">${icon} ${escHtml(LABELS[c.shop_type]||c.shop_type||'—')}</span></td>
-      <td><div style="font-size:13px">${escHtml(c.owner_name||'—')}</div><div style="font-size:12px;color:var(--muted)">${escHtml(c.phone||c.email||'—')}</div></td>
-      <td style="color:var(--muted);font-size:13px">${reg}</td>
-      <td>${badge}${bar}</td>
-      <td>${planBadge(c)}</td>
-    </tr>`;
-  }).join('');
+  tbody.innerHTML = list.map(customerRowHtml).join('');
 }
 
 async function exportCSV() {
@@ -1182,6 +1196,25 @@ function renderPanel(c) {
         <div class="cd-label" style="margin-bottom:6px">Admin Notes</div>
         <textarea class="dp-textarea" id="dp-notes-ta" placeholder="Private notes about this customer…" onblur="saveNotes('${tid}', this.value)" style="min-height:80px"></textarea>
       </div>
+      <div style="margin-top:16px">
+        <div class="cd-label" style="margin-bottom:6px">Communication Log</div>
+        ${(c.comm_log||[]).length ? `<div style="max-height:140px;overflow-y:auto;margin-bottom:10px;display:flex;flex-direction:column;gap:6px">
+          ${c.comm_log.slice().reverse().map(l => `<div style="font-size:12px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:6px 10px">
+            <span style="color:var(--muted)">${new Date(l.at).toLocaleDateString('en-IN',{day:'numeric',month:'short'})} · ${escHtml(l.channel)}</span>
+            <div style="margin-top:2px">${escHtml(l.message)}</div>
+          </div>`).join('')}
+        </div>` : ''}
+        <div style="display:flex;gap:8px">
+          <select id="dp-comm-channel" style="flex:0 0 110px;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;color:var(--fg);font-size:13px;padding:8px">
+            <option value="phone">📞 Phone</option>
+            <option value="whatsapp">💬 WhatsApp</option>
+            <option value="email">📧 Email</option>
+            <option value="other" selected>Other</option>
+          </select>
+          <input id="dp-comm-msg" class="dp-textarea" placeholder="What was discussed…" style="min-height:auto;flex:1" />
+          <button class="action-btn" style="flex:0 0 auto" onclick="addCommLog('${tid}')">Log</button>
+        </div>
+      </div>
     </div>
 
     <!-- CARD 2: Subscription -->
@@ -1202,6 +1235,11 @@ function renderPanel(c) {
       <div class="cd-extend-row">
         <button class="cd-extend-btn approve-months-btn-${tid}" id="am-6-${tid}" data-months="6" onclick="selectApproveMonths('${tid}',6)">6 Months</button>
         <button class="cd-extend-btn approve-months-btn-${tid}" id="am-12-${tid}" data-months="12" onclick="selectApproveMonths('${tid}',12)">1 Year</button>
+      </div>
+      <div class="cd-card-title" style="margin-top:14px">Tag this signup as</div>
+      <div class="cd-extend-row">
+        <button class="cd-extend-btn active approve-type-btn-${tid}" id="at-tester-${tid}" data-type="tester" onclick="selectApproveType('${tid}','tester')">🧪 Tester</button>
+        <button class="cd-extend-btn approve-type-btn-${tid}" id="at-client-${tid}" data-type="client" onclick="selectApproveType('${tid}','client')">✅ Client</button>
       </div>
       <button class="action-btn" style="background:linear-gradient(135deg,#7c3aed,#9333ea);color:#fff;font-size:15px;padding:14px;box-shadow:0 4px 18px rgba(124,58,237,.3);margin-bottom:16px" onclick="doApproveWithMonths('${tid}',this)">
         ✅ Approve &amp; Start <span id="approve-months-label-${tid}">1-Month</span> Trial
@@ -1236,6 +1274,10 @@ function renderPanel(c) {
     <!-- CARD 3: Account Control -->
     <div class="cd-card">
       <div class="cd-card-title">Account Control</div>
+      ${c.is_client
+        ? `<button class="action-btn" style="background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.2);color:#c084fc;margin-bottom:10px" onclick="toggleClientTag('${tid}',false,this)">🧪 Mark as Tester</button>`
+        : `<button class="action-btn" style="background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.25);color:#34d399;margin-bottom:10px" onclick="toggleClientTag('${tid}',true,this)">✅ Mark as Client</button>`
+      }
       ${isFrozen
         ? `<button class="action-btn btn-unfreeze" style="margin-bottom:10px" onclick="doAction('${tid}','unfreeze',this)">✅ Unfreeze Account</button>`
         : `<button class="action-btn btn-freeze" style="margin-bottom:10px" onclick="doAction('${tid}','freeze',this)" ${isRevoked?'disabled':''}>🧊 Freeze Account</button>`
@@ -1285,6 +1327,34 @@ function renderPanel(c) {
         <span style="display:block;font-size:11px;font-weight:400;color:var(--muted);margin-top:3px">Enables cloud sync + mobile dashboard for this customer</span>
       </button>`}
 
+      ${(() => {
+        const staffEntries = Object.entries(c.pending_staff_users || {});
+        if (!staffEntries.length) return '';
+        const statusMeta = {
+          approved: { color: '#34d399', label: '✓ Approved' },
+          pending:  { color: '#fbbf24', label: '⏳ Pending' },
+          rejected: { color: '#f87171', label: '✕ Rejected' },
+        };
+        const approvedCount = staffEntries.filter(([,r]) => r.status === 'approved').length;
+        return `
+      <div style="border-top:1px solid var(--border);margin:12px 0"></div>
+      <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:12px;padding:14px">
+        <div style="font-size:13px;font-weight:700;color:var(--fg);margin-bottom:8px">👥 Staff Logins — ${approvedCount} approved</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${staffEntries.map(([rid, r]) => {
+            const meta = statusMeta[r.status] || statusMeta.pending;
+            return `<div style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:8px 12px">
+              <div>
+                <div style="font-size:13px;font-weight:600">${escHtml(r.username)}</div>
+                <div style="font-size:11px;color:var(--muted)">Requested ${new Date(r.requested_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</div>
+              </div>
+              <span class="badge" style="background:${meta.color}22;color:${meta.color};border:1px solid ${meta.color}44">${meta.label}</span>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+      })()}
+
       ${c.switch_request ? `
       <div style="border-top:1px solid var(--border);margin:12px 0"></div>
       <div style="background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.2);border-radius:12px;padding:14px">
@@ -1316,6 +1386,19 @@ async function doAction(id, action, el) {
     const r = await api(`/admin/api/customers/${id}/${action}`, { method:'POST' });
     if (!r.ok) { showToast('Action failed', true); return; }
     showToast(`✅ ${msgs[action]||action} — ${c?.shop_name||id.substring(0,8)}`);
+    await loadAll();
+  } catch { showToast('⚠ Connection error', true); }
+  finally { if (el) { el.classList.remove('loading'); el.innerHTML = origText; } }
+}
+
+async function toggleClientTag(id, isClient, el) {
+  const c = allCustomers.find(x=>x.tenant_id===id);
+  const origText = el?.innerHTML;
+  if (el) { el.classList.add('loading'); el.innerHTML = `<span class="spin">↻</span> Working…`; }
+  try {
+    const r = await api(`/admin/api/customers/${id}/tag`, { method:'POST', body: JSON.stringify({ is_client: isClient }) });
+    if (!r.ok) { showToast('Action failed', true); return; }
+    showToast(isClient ? `✅ Marked as Client — ${c?.shop_name||id.substring(0,8)}` : `🧪 Marked as Tester — ${c?.shop_name||id.substring(0,8)}`);
     await loadAll();
   } catch { showToast('⚠ Connection error', true); }
   finally { if (el) { el.classList.remove('loading'); el.innerHTML = origText; } }
@@ -1433,6 +1516,12 @@ function selectApproveMonths(tid, months) {
   if (label) label.textContent = months + '-Month';
 }
 
+function selectApproveType(tid, type) {
+  document.querySelectorAll(`.approve-type-btn-${tid}`).forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById(`at-${type}-${tid}`);
+  if (btn) btn.classList.add('active');
+}
+
 function onApproveCustomInput(tid) {
   document.querySelectorAll(`.approve-months-btn-${tid}`).forEach(b => b.classList.remove('active'));
   const val = parseInt(document.getElementById(`approve-custom-${tid}`)?.value);
@@ -1445,13 +1534,15 @@ async function doApproveWithMonths(tid, el) {
   const customVal = parseInt(custom?.value);
   const active = document.querySelector(`.approve-months-btn-${tid}.active`);
   const months = customVal > 0 ? customVal : (active ? parseInt(active.dataset.months) : 1);
+  const activeType = document.querySelector(`.approve-type-btn-${tid}.active`);
+  const is_client = activeType?.dataset.type === 'client';
   const c = allCustomers.find(x=>x.tenant_id===tid);
   const orig = el?.innerHTML;
   if (el) { el.classList.add('loading'); el.innerHTML = `<span class="spin">↻</span> Working…`; }
   try {
-    const r = await api(`/admin/api/customers/${tid}/approve`, { method:'POST', body: JSON.stringify({ months }) });
+    const r = await api(`/admin/api/customers/${tid}/approve`, { method:'POST', body: JSON.stringify({ months, is_client }) });
     if (!r.ok) { showToast('Approval failed', true); return; }
-    showToast(`✅ Approved — ${months}-month trial — ${c?.shop_name||tid.substring(0,8)}`);
+    showToast(`✅ Approved — ${months}-month trial — ${is_client?'Client':'Tester'} — ${c?.shop_name||tid.substring(0,8)}`);
     await loadAll();
   } catch { showToast('⚠ Connection error', true); }
   finally { if (el) { el.classList.remove('loading'); el.innerHTML = orig; } }
@@ -1791,6 +1882,16 @@ function renderErrors() {
     </div>`;
   }).join('');
 }
+async function clearAllErrors() {
+  if (!confirm(`Delete all ${allErrors.length} error reports? This cannot be undone.`)) return;
+  try {
+    const r = await api('/admin/api/errors/clear-all', { method:'POST' });
+    if (!r.ok) { showToast('Failed to clear errors', true); return; }
+    allErrors = [];
+    renderErrors(); updateBadge();
+    showToast('🗑 All errors cleared');
+  } catch { showToast('⚠ Connection error', true); }
+}
 function toggleStack(id) { document.getElementById('stack-'+id)?.classList.toggle('open'); }
 async function resolveErr(id) {
   await api(`/admin/api/errors/${id}/resolve`, { method:'POST' });
@@ -1900,48 +2001,6 @@ function renderActivity() {
   }).join('');
 }
 
-// BROADCAST
-async function loadBroadcast() {
-  try {
-    const r = await api('/admin/api/broadcast');
-    if (!r.ok) return;
-    const list = await r.json();
-    const el = document.getElementById('broadcast-list');
-    if (!list.length) { el.innerHTML=`<div class="empty">No broadcasts yet.</div>`; return; }
-    el.innerHTML = list.map(b => `
-      <div class="bc-card ${b.active?'':'inactive'}">
-        <div class="bc-card-top">
-          <div class="bc-title">${escHtml(b.title)}</div>
-          <span class="${b.active?'bc-active-badge':'bc-inactive-badge'}">${b.active?'Active':'Inactive'}</span>
-        </div>
-        <div class="bc-msg">${escHtml(b.message)}</div>
-        <div class="bc-meta">Created ${new Date(b.created_at).toLocaleString('en-IN')}</div>
-        ${b.active ? `<div style="margin-top:10px"><button class="btn-sm" onclick="deactivateBroadcast('${escHtml(b.id)}')">Deactivate</button></div>` : ''}
-      </div>
-    `).join('');
-  } catch(e) { console.error('broadcast error', e); }
-}
-async function sendBroadcast() {
-  const title   = document.getElementById('bc-title').value.trim();
-  const message = document.getElementById('bc-message').value.trim();
-  if (!title || !message) { showToast('Enter title and message', true); return; }
-  try {
-    const r = await api('/admin/api/broadcast', { method:'POST', body: JSON.stringify({ title, message }) });
-    if (r.ok) {
-      showToast('✅ Broadcast sent');
-      document.getElementById('bc-title').value = '';
-      document.getElementById('bc-message').value = '';
-      await loadBroadcast();
-    } else showToast('Failed to send broadcast', true);
-  } catch { showToast('⚠ Connection error', true); }
-}
-async function deactivateBroadcast(id) {
-  try {
-    await api(`/admin/api/broadcast/${id}/deactivate`, { method:'POST' });
-    showToast('Broadcast deactivated');
-    await loadBroadcast();
-  } catch { showToast('⚠ Connection error', true); }
-}
 
 // ANNOUNCEMENTS — pushed silently + instantly to every tenant's app (no manual update click)
 async function loadAnnouncements() {

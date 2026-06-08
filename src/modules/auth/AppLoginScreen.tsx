@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from '@/app/store/app.store';
 import { verifyAuth, resetPasswordWithCode, resetPasswordWithPhonePin, unlockWithCode, getAuthUsername } from '@/lib/db/auth';
-import { verifyStaffAuth } from '@/lib/db/staffUsers';
+import { verifyStaffAuth, refreshStaffUserApprovals } from '@/lib/db/staffUsers';
 import { claimSession } from '@/lib/db/session';
 import { enqueue } from '@/lib/syncQueue';
 import { uuid, now } from '@/lib/db/index';
@@ -178,7 +178,10 @@ export function AppLoginScreen() {
         return;
       }
 
-      // Not the owner login — check approved staff logins for this tenant
+      // Not the owner login — a newly-approved staff user has no other way to trigger
+      // the local pending→approved sync (they can't reach Settings until they can log in),
+      // so refresh approvals here, right before checking staff credentials.
+      await refreshStaffUserApprovals(tenantId);
       const staffResult = await verifyStaffAuth(tenantId, username, password, maxAttempts);
       if (staffResult.ok) {
         await completeLogin(username.trim().toLowerCase());

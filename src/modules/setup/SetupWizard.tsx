@@ -188,35 +188,22 @@ export function SetupWizard() {
       await sqliteDb.execute(
         `INSERT OR REPLACE INTO app_config (id, tenant_id, shop_type, shop_name, owner_name, phone, email, address_line1, city, is_setup_complete, settings)
          VALUES (?,?,?,?,?,?,?,?,?,1,'{}')`,
-        [uuid, tenantId, shopType, shopName, data.staff?.[0]?.name ?? shopName, data.phone ?? '', data.email ?? '', data.address_line1 ?? '', data.city ?? '']
+        [uuid, tenantId, shopType, shopName, data.owner_name ?? shopName, data.phone ?? '', data.email ?? '', data.address_line1 ?? '', data.city ?? '']
       );
 
-      // Import each table
-      const tables: Array<[string, string, string[]]> = [
-        ['carwash_jobs',       'id,tenant_id,job_number,vehicle_id,reg_number,vehicle_type,make,model,color,customer_name,customer_phone,customer_id,staff_id,staff_name,status,payment_method,payment_status,subtotal,discount,gst_amount,total,membership_id,notes,started_at,completed_at,delivered_at,created_at,updated_at,deleted_at', ['id','tenant_id','job_number','vehicle_id','reg_number','vehicle_type','make','model','color','customer_name','customer_phone','customer_id','staff_id','staff_name','status','payment_method','payment_status','subtotal','discount','gst_amount','total','membership_id','notes','started_at','completed_at','delivered_at','created_at','updated_at','deleted_at']],
-        ['customers',          'id,tenant_id,name,phone,email,address,city,tags,credit_limit,notes,created_at,updated_at,deleted_at', ['id','tenant_id','name','phone','email','address','city','tags','credit_limit','notes','created_at','updated_at','deleted_at']],
-        ['carwash_vehicles',   'id,tenant_id,customer_id,customer_name,customer_phone,reg_number,vehicle_type,make,model,color,notes,created_at,updated_at,deleted_at', ['id','tenant_id','customer_id','customer_name','customer_phone','reg_number','vehicle_type','make','model','color','notes','created_at','updated_at','deleted_at']],
-        ['carwash_staff',      'id,tenant_id,name,phone,role,monthly_salary,joining_date,deduct_half_day,deduct_full_day_leave,is_active,created_at,updated_at,deleted_at', ['id','tenant_id','name','phone','role','monthly_salary','joining_date','deduct_half_day','deduct_full_day_leave','is_active','created_at','updated_at','deleted_at']],
-        ['carwash_attendance', 'id,tenant_id,staff_id,date,status,note,updated_at,deleted_at', ['id','tenant_id','staff_id','date','status','note','updated_at','deleted_at']],
-        ['carwash_services',   'id,tenant_id,name,description,price_hatchback,price_sedan,price_suv,price_luxury,duration_minutes,gst_rate,is_active,sort_order,created_at,updated_at,deleted_at', ['id','tenant_id','name','description','price_hatchback','price_sedan','price_suv','price_luxury','duration_minutes','gst_rate','is_active','sort_order','created_at','updated_at','deleted_at']],
-        ['carwash_memberships','id,tenant_id,customer_name,customer_phone,customer_id,vehicle_id,reg_number,package_name,total_washes,used_washes,amount_paid,valid_until,is_active,created_at,updated_at,deleted_at', ['id','tenant_id','customer_name','customer_phone','customer_id','vehicle_id','reg_number','package_name','total_washes','used_washes','amount_paid','valid_until','is_active','created_at','updated_at','deleted_at']],
-      ];
-
-      const tableData: Record<string, any[]> = {
-        carwash_jobs: data.jobs ?? [], customers: data.customers ?? [],
-        carwash_vehicles: data.vehicles ?? [], carwash_staff: data.staff ?? [],
-        carwash_attendance: data.attendance ?? [], carwash_services: data.services ?? [],
-        carwash_memberships: data.memberships ?? [],
-      };
-
-      for (const [table, , cols] of tables) {
-        const rows = tableData[table] ?? [];
+      // Import every synced table generically — works for any shop type, not just carwash.
+      // Mirrors the schema-driven INSERT OR REPLACE pattern in pullDelta (cloudSync.ts).
+      for (const table of Object.keys(data)) {
+        const rows = data[table];
+        if (!Array.isArray(rows) || !rows.length) continue;
         for (const row of rows) {
-          const vals = cols.map(c => row[c] ?? null);
+          if (!row || typeof row !== 'object') continue;
+          const cols = Object.keys(row);
+          if (!cols.length) continue;
           const placeholders = cols.map(() => '?').join(',');
           try {
-            await sqliteDb.execute(`INSERT OR REPLACE INTO ${table} (${cols.join(',')}) VALUES (${placeholders})`, vals);
-          } catch { /* skip incompatible rows */ }
+            await sqliteDb.execute(`INSERT OR REPLACE INTO ${table} (${cols.join(',')}) VALUES (${placeholders})`, cols.map(c => row[c] ?? null));
+          } catch { /* table doesn't exist on this device's schema — skip */ }
         }
       }
 
@@ -426,6 +413,20 @@ export function SetupWizard() {
                   <p className="text-sm text-slate-500">Downloading all your data from the cloud. This may take a moment.</p>
                 </div>
               )}
+
+              {mlStatus === 'done' && (
+                <div className="text-center py-8">
+                  <div className="text-4xl mb-4">🎉</div>
+                  <h3 className="font-bold text-slate-800 mb-2">Your Shop's Data Is On This Device</h3>
+                  <p className="text-sm text-slate-500 mb-5">Log in below with your username and password to continue — staff logins work here too.</p>
+                  <button
+                    onClick={() => { setMobileLogin(false); setMlStatus('idle'); setMlError(''); }}
+                    className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors"
+                  >
+                    Continue →
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -464,7 +465,7 @@ export function SetupWizard() {
                 >
                   <div className="text-2xl mb-1">📱</div>
                   <div className="font-medium text-slate-800 text-sm">Log in with Cloud Sync</div>
-                  <div className="text-slate-500 text-xs mt-0.5">Access your shop data on this device — phone number + PIN</div>
+                  <div className="text-slate-500 text-xs mt-0.5">Bring your shop's data to this device — owner's phone number + Sync PIN. Staff can then log in here too.</div>
                 </button>
               </div>
 

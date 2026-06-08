@@ -5,6 +5,7 @@
 // leaves the device; only the username + a request id are sent for approval.
 import { getDb, uuid, now } from './index';
 import { hashPassword, randomSalt, hasAuth, getAuthUsername } from './auth';
+import { getCloudSyncStatus } from './cloudSync';
 import { enqueue } from '../syncQueue';
 
 const SERVER = 'https://update.frontstores.com';
@@ -60,6 +61,14 @@ export async function requestStaffUser(
   const cleanUsername = username.trim().toLowerCase();
   if (cleanUsername.length < 3) return { ok: false, error: 'Username must be at least 3 characters' };
   if (password.length < 4) return { ok: false, error: 'Password must be at least 4 characters' };
+
+  // Staff logins ride on Cloud Sync to reach other devices (the credential row
+  // syncs down via the generic table sync) — without it, a staff member could
+  // never log in from anywhere but the owner's own machine.
+  const syncStatus = await getCloudSyncStatus();
+  if (!syncStatus.enabled) {
+    return { ok: false, error: 'Enable Cloud Sync first (Settings → Cloud Sync) so staff can also log in from other devices' };
+  }
 
   const db = await getDb();
 

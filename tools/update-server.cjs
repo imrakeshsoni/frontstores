@@ -79,7 +79,6 @@ const SUBS_FILE     = path.join(DATA_DIR, 'subscriptions.json');
 const ERRORS_FILE   = path.join(DATA_DIR, 'errors.json');
 const CONTACTS_FILE = path.join(DATA_DIR, 'contacts.json');
 const ACTIVITY_FILE  = path.join(DATA_DIR, 'activity.json');
-const BROADCAST_FILE = path.join(DATA_DIR, 'broadcast.json');
 const ANNOUNCEMENTS_FILE = path.join(DATA_DIR, 'announcements.json'); // [core] [all apps] [all tenants]
 const NOTES_FILE     = path.join(DATA_DIR, 'notes.json');
 const SYNC_DIR      = path.join(DATA_DIR, 'sync');
@@ -124,8 +123,6 @@ function saveContacts(d)    { fs.writeFileSync(CONTACTS_FILE,  JSON.stringify(d,
 function saveErrors(d)      { fs.writeFileSync(ERRORS_FILE, JSON.stringify(d, null, 2)); }
 function loadActivity()     { try { return JSON.parse(fs.readFileSync(ACTIVITY_FILE,  'utf8')); } catch { return []; } }
 function saveActivity(d)    { fs.writeFileSync(ACTIVITY_FILE,  JSON.stringify(d, null, 2)); }
-function loadBroadcast()    { try { return JSON.parse(fs.readFileSync(BROADCAST_FILE, 'utf8')); } catch { return []; } }
-function saveBroadcast(d)   { fs.writeFileSync(BROADCAST_FILE, JSON.stringify(d, null, 2)); }
 // [core] [all apps] [all tenants] — announcements silently polled by every desktop app
 function loadAnnouncements()  { try { return JSON.parse(fs.readFileSync(ANNOUNCEMENTS_FILE, 'utf8')); } catch { return []; } }
 function saveAnnouncements(d) { fs.writeFileSync(ANNOUNCEMENTS_FILE, JSON.stringify(d, null, 2)); }
@@ -1364,6 +1361,16 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
 const ADMIN_HTML = path.join(__dirname, '..', 'admin-app', 'index.html');
 
 const adminServer = http.createServer(async (req, res) => {
+  try {
+    await handleAdminRequest(req, res);
+  } catch (e) {
+    console.error('Admin server error:', e);
+    if (!res.headersSent) { res.writeHead(500, {'Content-Type':'application/json'}); res.end(JSON.stringify({ ok: false, error: 'Internal server error' })); }
+    else res.end();
+  }
+});
+
+async function handleAdminRequest(req, res) {
   const url      = new URL(req.url, `http://localhost:${ADMIN_PORT}`);
   const pathname = url.pathname;
 
@@ -1427,7 +1434,12 @@ const adminServer = http.createServer(async (req, res) => {
       console.log(`🚫 Revoked: ${subs[tenantId].shop_name}`);
     } else if (action === 'approve') {
       let months = 1;
-      try { const b = await readBody(req); months = parseInt(JSON.parse(b).months) || 1; } catch {}
+      try {
+        const b = JSON.parse(await readBody(req));
+        months = parseInt(b.months) || 1;
+        // Admin picks tester vs client right at approval time — defaults to tester if not sent
+        if (typeof b.is_client === 'boolean') subs[tenantId].is_client = b.is_client;
+      } catch {}
       subs[tenantId].prev_expires_at = subs[tenantId].expires_at || null;
       subs[tenantId].account_status = 'active';
       subs[tenantId].expires_at = addMonths(new Date().toISOString(), months);
@@ -1438,6 +1450,25 @@ const adminServer = http.createServer(async (req, res) => {
     const actionLabels = { extend: '+30 days', freeze: 'Frozen', unfreeze: 'Unfrozen', revoke: 'Revoked', approve: 'Approved — trial started' };
     logActivity(tenantId, subs[tenantId].shop_name, action, actionLabels[action] || action);
     json(res, { ok: true, expires_at: subs[tenantId].expires_at }); return;
+  }
+
+  // POST /admin/api/customers/:id/tag — mark a tenant as a client (real) or leave as tester
+  // [core] [all tenants] — every signup defaults to "tester"; admin explicitly promotes to "client"
+  // so the main Customers list only ever shows confirmed real customers
+  const tagAction = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/tag$/);
+  if (req.method === 'POST' && tagAction) {
+    if (!checkAuth(req)) { res.writeHead(401); res.end(); return; }
+    const tenantId = tagAction[1];
+    const body = await readBody(req);
+    try {
+      const { is_client } = JSON.parse(body);
+      const subs = loadSubs();
+      if (!subs[tenantId]) { json(res, { ok: false, error: 'Not found' }, 404); return; }
+      subs[tenantId].is_client = !!is_client;
+      saveSubs(subs);
+      logActivity(tenantId, subs[tenantId].shop_name, 'tag', is_client ? 'Marked as Client' : 'Marked as Tester');
+      json(res, { ok: true }); return;
+    } catch { res.writeHead(400); res.end('Bad request'); return; }
   }
 
   // POST /admin/api/customers/:id/set-unlock-code
@@ -1635,6 +1666,12 @@ const adminServer = http.createServer(async (req, res) => {
     json(res, { ok: true }); return;
   }
 
+  // POST /admin/api/errors/clear-all — wipes the whole error log
+  if (req.method === 'POST' && pathname === '/admin/api/errors/clear-all') {
+    saveErrors([]);
+    json(res, { ok: true }); return;
+  }
+
   // GET /admin/api/contacts
   if (req.method === 'GET' && pathname === '/admin/api/contacts') {
     json(res, loadContacts()); return;
@@ -1746,7 +1783,7 @@ const adminServer = http.createServer(async (req, res) => {
     const body = await readBody(req);
     try {
       const { channel, message } = JSON.parse(body);
-      if (!['whatsapp','email','call','other'].includes(channel)) { res.writeHead(400); res.end('Invalid channel'); return; }
+      if (!['phone','whatsapp','email','other'].includes(channel)) { res.writeHead(400); res.end('Invalid channel'); return; }
       const subs = loadSubs();
       if (!subs[tenantId]) { json(res, { ok: false, error: 'Not found' }, 404); return; }
       if (!Array.isArray(subs[tenantId].comm_log)) subs[tenantId].comm_log = [];
@@ -1965,35 +2002,6 @@ const adminServer = http.createServer(async (req, res) => {
     json(res, { ok: true }); return;
   }
 
-  // GET /admin/api/broadcast
-  if (req.method === 'GET' && pathname === '/admin/api/broadcast') {
-    json(res, loadBroadcast()); return;
-  }
-
-  // POST /admin/api/broadcast
-  if (req.method === 'POST' && pathname === '/admin/api/broadcast') {
-    const body = await readBody(req);
-    try {
-      const { title, message } = JSON.parse(body);
-      if (!title || !message) { res.writeHead(400); res.end('Missing title or message'); return; }
-      const broadcasts = loadBroadcast();
-      broadcasts.unshift({ id: crypto.randomUUID(), title: sanitize(title, 200), message: sanitize(message, 2000), created_at: new Date().toISOString(), active: true });
-      saveBroadcast(broadcasts);
-      json(res, { ok: true });
-    } catch { res.writeHead(400); res.end('Bad request'); }
-    return;
-  }
-
-  // POST /admin/api/broadcast/:id/deactivate
-  const broadcastDeact = pathname.match(/^\/admin\/api\/broadcast\/([^/]+)\/deactivate$/);
-  if (req.method === 'POST' && broadcastDeact) {
-    const broadcasts = loadBroadcast();
-    const idx = broadcasts.findIndex(b => b.id === broadcastDeact[1]);
-    if (idx !== -1) broadcasts[idx].active = false;
-    saveBroadcast(broadcasts);
-    json(res, { ok: true }); return;
-  }
-
   // ── Auto-Fix & Deploy ─────────────────────────────────────────────────────
 
   const AUTOFIX_STATUS_FILE = path.join(DATA_DIR, 'autofix-status.json');
@@ -2187,7 +2195,7 @@ Rules:
   }
 
   res.writeHead(404); res.end('Not found');
-});
+}
 
 // Public server — listen on all interfaces (tunneled via Cloudflare)
 publicServer.listen(PUBLIC_PORT, '0.0.0.0', () => {
