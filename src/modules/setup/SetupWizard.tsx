@@ -101,7 +101,10 @@ export function SetupWizard() {
   const [restoring, setRestoring] = useState(false);
 
   // [core] [all tenants] — Reinstall flow: DB deleted but account exists on server
+  // Phone is the guaranteed identity key (every tenant has one); email is optional fallback
+  const [reinstallPhone, setReinstallPhone] = useState('');
   const [reinstallEmail, setReinstallEmail] = useState('');
+  const [reinstallUseEmail, setReinstallUseEmail] = useState(false);
   const [reinstallLooking, setReinstallLooking] = useState(false);
   const [reinstallError, setReinstallError] = useState('');
   const [showReinstall, setShowReinstall] = useState(false);
@@ -243,18 +246,24 @@ export function SetupWizard() {
 
   // [core] [all tenants] — Look up existing account by email, re-create local DB
   async function handleReinstall() {
+    const phone = reinstallPhone.trim();
     const email = reinstallEmail.trim().toLowerCase();
-    if (!email) return;
+    if (!phone && !email) return;
     setReinstallLooking(true);
     setReinstallError('');
     try {
-      const res = await fetch(`${SERVER}/lookup-tenant?email=${encodeURIComponent(email)}`, {
+      const params = new URLSearchParams();
+      if (phone) params.set('phone', phone);
+      if (email) params.set('email', email);
+      const res = await fetch(`${SERVER}/lookup-tenant?${params.toString()}`, {
         signal: AbortSignal.timeout(8000),
       });
       if (!res.ok) throw new Error('Server unreachable');
       const data = await res.json();
       if (!data.found) {
-        setReinstallError('No account found with that email. Please sign up as new.');
+        setReinstallError(phone
+          ? 'No account found with that mobile number. Please sign up as new.'
+          : 'No account found with that email. Please sign up as new.');
         return;
       }
       // Re-create local DB with the existing tenant_id
@@ -474,15 +483,34 @@ export function SetupWizard() {
               {/* Reinstall form — shown when "I already have an account" is clicked */}
               {showReinstall && (
                 <div className="border-t border-slate-100 pt-5 mt-2">
-                  <p className="text-sm font-medium text-slate-700 mb-1">Enter the email you registered with</p>
+                  <p className="text-sm font-medium text-slate-700 mb-1">
+                    {reinstallUseEmail ? 'Enter the email you registered with' : 'Enter your registered mobile number'}
+                  </p>
                   <p className="text-xs text-slate-400 mb-3">We'll find your account and restore it. Your old data is gone, but your account and approval remain active.</p>
-                  <input
-                    type="email"
-                    value={reinstallEmail}
-                    onChange={e => { setReinstallEmail(e.target.value); setReinstallError(''); }}
-                    placeholder="yourname@email.com"
-                    className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-400 mb-2"
-                  />
+                  {reinstallUseEmail ? (
+                    <input
+                      type="email"
+                      value={reinstallEmail}
+                      onChange={e => { setReinstallEmail(e.target.value); setReinstallError(''); }}
+                      placeholder="yourname@email.com"
+                      className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-400 mb-2"
+                    />
+                  ) : (
+                    <input
+                      type="tel"
+                      value={reinstallPhone}
+                      onChange={e => { setReinstallPhone(e.target.value); setReinstallError(''); }}
+                      placeholder="98765 43210"
+                      className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-400 mb-2"
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => { setReinstallUseEmail(v => !v); setReinstallError(''); }}
+                    className="text-xs text-purple-500 hover:text-purple-600 mb-2"
+                  >
+                    {reinstallUseEmail ? '← Use mobile number instead' : "Don't have access to that number? Use email instead"}
+                  </button>
                   {reinstallError && <p className="text-xs text-red-500 mb-2">{reinstallError}</p>}
                   <div className="space-y-3 mb-3">
                     <div>
@@ -500,7 +528,7 @@ export function SetupWizard() {
                   </div>
                   <button
                     onClick={handleReinstall}
-                    disabled={!reinstallEmail || password.length < 4 || password !== confirmPassword || reinstallLooking}
+                    disabled={(reinstallUseEmail ? !reinstallEmail : !reinstallPhone) || password.length < 4 || password !== confirmPassword || reinstallLooking}
                     className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl text-sm transition-colors"
                   >
                     {reinstallLooking ? '🔍 Looking up your account…' : '🔑 Recover My Account'}

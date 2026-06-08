@@ -325,12 +325,28 @@ const publicServer = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-  // GET /lookup-tenant?email=xxx — used by reinstall flow to find existing tenant by email
+  // GET /lookup-tenant?phone=xxx (primary) or ?email=xxx (fallback) — used by reinstall flow to find existing tenant
   if (req.method === 'GET' && pathname === '/lookup-tenant') {
+    if (rateLimit(req, res, 'lookup-tenant', 20, 60 * 60 * 1000)) return;
+    const phone = url.searchParams.get('phone')?.trim();
     const email = url.searchParams.get('email')?.toLowerCase().trim();
-    if (!email) { json(res, { found: false }); return; }
+    if (!phone && !email) { json(res, { found: false }); return; }
     const subs = loadSubs();
-    const match = Object.values(subs).find(s => s.email?.toLowerCase().trim() === email);
+    let match = null;
+    // Phone is the guaranteed identity key — match on the last 10 digits (handles +91, spaces, etc.)
+    if (phone) {
+      const p = phone.replace(/\D/g, '');
+      if (p.length >= 10) {
+        match = Object.values(subs).find(s => {
+          const sp = String(s.phone || '').replace(/\D/g, '');
+          return sp.length >= 10 && sp.slice(-10) === p.slice(-10);
+        }) || null;
+      }
+    }
+    // Email is optional — only used as a fallback when phone doesn't resolve
+    if (!match && email) {
+      match = Object.values(subs).find(s => s.email?.toLowerCase().trim() === email) || null;
+    }
     if (!match) { json(res, { found: false }); return; }
     json(res, {
       found: true,
