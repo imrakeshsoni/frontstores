@@ -66,7 +66,22 @@
       "Bash(curl -s -X POST http://localhost:3001/api/shop-ai -H 'Content-Type: application/json' -d '{\"sessionId\":\"r2\",\"shopContext\":{\"shopName\":\"Roshan Medical\"},\"message\":\"aaj kitna hua\"}')",
       "Bash(curl -s -X POST http://localhost:3001/api/shop-ai -H 'Content-Type: application/json' -d '{\"sessionId\":\"r3\",\"shopContext\":{\"shopName\":\"Roshan Medical\"},\"message\":\"what is running low on stock\"}')",
       "Bash(curl -s -X POST http://localhost:3001/api/shop-ai -H 'Content-Type: application/json' -d '{\"sessionId\":\"r4\",\"shopContext\":{\"shopName\":\"Roshan Medical\"},\"message\":\"I want to add a new product\"}')",
-      "Bash(curl -s -X POST http://localhost:3001/api/shop-ai -H 'Content-Type: application/json' -d '{\"sessionId\":\"r5\",\"shopContext\":{\"shopName\":\"Roshan Medical\"},\"message\":\"search for crocin\"}')"
+      "Bash(curl -s -X POST http://localhost:3001/api/shop-ai -H 'Content-Type: application/json' -d '{\"sessionId\":\"r5\",\"shopContext\":{\"shopName\":\"Roshan Medical\"},\"message\":\"search for crocin\"}')",
+      "Bash(launchctl list *)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "launchctl list com.frontstores.server 2>/dev/null | grep -q '\"PID\"' || launchctl load ~/Library/LaunchAgents/com.frontstores.server.plist 2>/dev/null; launchctl list com.frontstores.tunnel 2>/dev/null | grep -q '\"PID\"' || launchctl load ~/Library/LaunchAgents/com.frontstores.tunnel.plist 2>/dev/null; open '/Users/rakeshsoni/Documents/Cloud Software/frontstores/admin-app/index.html'; echo '{\"systemMessage\": \"FrontStores server + tunnel running. Admin panel opened. Password: qodXjlMOr4YZG25wDSLoRANZ\"}'",
+            "timeout": 15,
+            "statusMessage": "Starting FrontStores server & tunnel..."
+          }
+        ]
+      }
     ]
   }
 }

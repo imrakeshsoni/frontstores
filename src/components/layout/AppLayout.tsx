@@ -80,6 +80,7 @@ import {
   EyeOff,
 } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
+import { verifyAuth } from '@/lib/db/auth';
 import { getShopTypeLabel } from '@/lib/shop/shopType';
 import { VoiceAssistant } from '@/components/voice/VoiceAssistant';
 import { StudyVoiceAssistant } from '@/modules/study/StudyVoiceAssistant';
@@ -536,6 +537,19 @@ export function AppLayout() {
   const [ownerLoginPass, setOwnerLoginPass] = useState('');
   const [ownerLoginError, setOwnerLoginError] = useState('');
   const [showOwnerPass, setShowOwnerPass] = useState(false);
+  // [carwash] [all tenants] — verify against the real app_auth table (same as main login), not placeholder settings fields
+  const attemptOwnerLogin = async () => {
+    const tenantId = config?.tenant_id ?? '';
+    const result = await verifyAuth(tenantId, ownerLoginUser.trim(), ownerLoginPass);
+    if (result.ok) {
+      setIsEmployeeMode(false);
+      setShowOwnerLogin(false);
+    } else if (result.locked) {
+      setOwnerLoginError('Too many failed attempts. Try again later.');
+    } else {
+      setOwnerLoginError('Incorrect username or password');
+    }
+  };
   // pick correct nav based on shop type
   const reRole = (config?.settings as any)?.re_role ?? 'resale';
   const activeNavItems =
@@ -855,15 +869,7 @@ export function AppLayout() {
                     className="w-full rounded-xl border px-3 py-2.5 text-sm outline-none focus:ring-2 pr-10"
                     style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }}
                     onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        const savedUser = (config?.settings as any)?.owner_username || config?.owner_name || '';
-                        const savedPass = (config?.settings as any)?.owner_password || '1234';
-                        if (ownerLoginUser.trim() === savedUser.trim() && ownerLoginPass === savedPass) {
-                          setIsEmployeeMode(false); setShowOwnerLogin(false);
-                        } else {
-                          setOwnerLoginError('Incorrect username or password');
-                        }
-                      }
+                      if (e.key === 'Enter') attemptOwnerLogin();
                     }}
                   />
                   <button type="button" onClick={() => setShowOwnerPass(v => !v)}
@@ -885,15 +891,7 @@ export function AppLayout() {
                 style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)' }}>
                 Cancel
               </button>
-              <button onClick={() => {
-                const savedUser = (config?.settings as any)?.owner_username || config?.owner_name || '';
-                const savedPass = (config?.settings as any)?.owner_password || '1234';
-                if (ownerLoginUser.trim() === savedUser.trim() && ownerLoginPass === savedPass) {
-                  setIsEmployeeMode(false); setShowOwnerLogin(false);
-                } else {
-                  setOwnerLoginError('Incorrect username or password');
-                }
-              }}
+              <button onClick={attemptOwnerLogin}
                 className="flex-1 rounded-xl py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-80"
                 style={{ background: 'var(--accent)' }}>
                 Login

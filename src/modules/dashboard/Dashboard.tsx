@@ -1,35 +1,27 @@
 import { useQuery } from '@tanstack/react-query';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { TrendingUp, ShoppingCart, AlertTriangle, IndianRupee, Activity, CalendarCheck, Clock } from 'lucide-react';
+import { TrendingUp, ShoppingCart, AlertTriangle, IndianRupee, Activity, CalendarCheck, Clock, AlertCircle } from 'lucide-react';
 import { format, subDays, differenceInDays } from 'date-fns';
 import { useState } from 'react';
 import { useAppStore } from '@/app/store/app.store';
 import { getSalesSummary, listOrders } from '@/lib/db/orders';
 import { getLowStockAlerts, getExpiryAlerts } from '@/lib/db/inventory';
-import { PageIntro } from '@/components/ui/PageIntro';
 import { DailyClosingReport } from '@/modules/reports/DailyClosingReport';
 
-function StatCard({ label, value, icon: Icon, iconBg, meta }: {
-  label: string; value: string; icon: React.ElementType; iconBg: string; meta: string;
-}) {
-  return (
-    <div className="stat-tile">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>{label}</p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{value}</p>
-          <p className="mt-2 text-xs" style={{ color: 'var(--text-tertiary)' }}>{meta}</p>
-        </div>
-        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl" style={{ background: iconBg }}>
-          <Icon className="h-4.5 w-4.5 text-white" style={{ width: '1.125rem', height: '1.125rem' }} />
-        </div>
-      </div>
-    </div>
-  );
+function fmtCurrency(n: number) {
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
 }
+
+const RANK_COLORS = [
+  'linear-gradient(135deg, #fbbf24, #d97706)',
+  'linear-gradient(135deg, #94a3b8, #475569)',
+  'linear-gradient(135deg, #fb923c, #c2410c)',
+  'linear-gradient(135deg, #818cf8, #4338ca)',
+  'linear-gradient(135deg, #38bdf8, #0369a1)',
+];
 
 export function Dashboard() {
   const tenantId = useAppStore((s) => s.config?.tenant_id ?? '');
+  const shopName = useAppStore((s) => s.config?.shop_name ?? 'Medical Store');
   const from30 = format(subDays(new Date(), 30), 'yyyy-MM-dd');
   const today = format(new Date(), 'yyyy-MM-dd');
   const [showClosing, setShowClosing] = useState(false);
@@ -68,175 +60,161 @@ export function Dashboard() {
   const todayRevenue = todayOrders?.items.reduce((s, o) => s + Number(o.total), 0) ?? 0;
   const todayOrderCount = todayOrders?.total ?? 0;
 
-  const formatCurrency = (n: number) =>
-    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
+  const cards = [
+    { label: "Today's Revenue", value: fmtCurrency(todayRevenue), icon: IndianRupee, gradient: 'linear-gradient(135deg, #6366f1, #4338ca)', glow: 'rgba(99,102,241,0.35)', meta: 'Real-time snapshot' },
+    { label: "Today's Orders", value: String(todayOrderCount), icon: ShoppingCart, gradient: 'linear-gradient(135deg, #22c55e, #15803d)', glow: 'rgba(34,197,94,0.35)', meta: 'Counter activity' },
+    { label: 'Monthly Revenue', value: fmtCurrency(summary?.total_revenue ?? 0), icon: TrendingUp, gradient: 'linear-gradient(135deg, #fb923c, #ea580c)', glow: 'rgba(251,146,60,0.35)', meta: 'Last 30 days' },
+    { label: 'Low Stock Items', value: String(lowStockItems?.length ?? 0), icon: AlertTriangle, gradient: 'linear-gradient(135deg, #f43f5e, #be123c)', glow: 'rgba(244,63,94,0.35)', meta: 'Needs attention' },
+  ];
 
-  // Build a simple daily timeline from the 30-day orders
-  const dailyMap: Record<string, number> = {};
-  for (let i = 29; i >= 0; i--) {
-    dailyMap[format(subDays(new Date(), i), 'yyyy-MM-dd')] = 0;
-  }
+  const greeting = `Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'} 👋`;
 
   return (
-    <div className="page-shell page-stack">
-      <PageIntro
-        eyebrow="Overview"
-        title={`Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'} 👋`}
-        description={`${format(new Date(), 'dd MMMM yyyy')} · Medical Store Dashboard`}
-        actions={
-          <>
-            <button onClick={() => setShowClosing(true)} className="btn-secondary flex items-center gap-1.5 text-sm">
-              <CalendarCheck size={14} /> Daily Closing
-            </button>
-            <span className="chip"><Clock size={12} className="mr-1" />Live</span>
-          </>
-        }
-      />
+    <div className="p-6 space-y-6">
       {showClosing && <DailyClosingReport onClose={() => setShowClosing(false)} />}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Today's Revenue"
-          value={formatCurrency(todayRevenue)}
-          icon={IndianRupee}
-          iconBg="#0071E3"
-          meta="Real-time snapshot"
-        />
-        <StatCard
-          label="Today's Orders"
-          value={String(todayOrderCount)}
-          icon={ShoppingCart}
-          iconBg="#34C759"
-          meta="Counter activity"
-        />
-        <StatCard
-          label="Monthly Revenue"
-          value={formatCurrency(summary?.total_revenue ?? 0)}
-          icon={TrendingUp}
-          iconBg="#1D1D1F"
-          meta="Last 30 days"
-        />
-        <StatCard
-          label="Low Stock Items"
-          value={String(lowStockItems?.length ?? 0)}
-          icon={AlertTriangle}
-          iconBg="#FF9500"
-          meta="Needs attention"
-        />
+      {/* Header banner */}
+      <div className="rounded-3xl p-6 text-white relative overflow-hidden flex items-center justify-between gap-4 flex-wrap" style={{ background: 'linear-gradient(120deg, #4338ca 0%, #6366f1 45%, #0ea5e9 100%)', boxShadow: '0 12px 32px -8px rgba(67,56,202,0.45)' }}>
+        <div className="absolute -right-10 -top-16 h-48 w-48 rounded-full" style={{ background: 'rgba(255,255,255,0.10)' }} />
+        <div className="absolute -right-2 bottom-[-3rem] h-32 w-32 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }} />
+        <div className="relative">
+          <h1 className="text-2xl font-bold" style={{ color: 'white' }}>{shopName}</h1>
+          <p className="text-sm mt-0.5" style={{ color: 'rgba(255,255,255,0.8)' }}>{greeting} · {format(new Date(), 'dd MMMM yyyy')} · Medical Store Dashboard</p>
+        </div>
+        <div className="relative flex items-center gap-2">
+          <button onClick={() => setShowClosing(true)} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all hover:-translate-y-0.5" style={{ background: 'rgba(255,255,255,0.18)', color: 'white' }}>
+            <CalendarCheck size={14} /> Daily Closing
+          </button>
+          <span className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold" style={{ background: 'rgba(255,255,255,0.18)', color: 'white' }}>
+            <Clock size={12} /> Live
+          </span>
+        </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.45fr_0.55fr]">
-        <div className="card p-6 md:p-8">
-          <div className="mb-6 flex items-start justify-between gap-4">
-            <div>
-              <p className="section-label">Summary</p>
-              <h2 className="mt-2">30-day performance</h2>
+      {/* KPI cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {cards.map(c => (
+          <div key={c.label} className="text-left p-4 rounded-2xl text-white transition-all duration-200 hover:-translate-y-1" style={{ background: c.gradient, boxShadow: `0 10px 24px -8px ${c.glow}` }}>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.8)' }}>{c.label}</span>
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ background: 'rgba(255,255,255,0.22)' }}>
+                <c.icon className="h-4 w-4 text-white" />
+              </span>
             </div>
-            <div className="chip">
-              <Activity className="mr-2 h-3.5 w-3.5" />
-              Updated every minute
+            <p className="text-2xl font-bold" style={{ color: 'white' }}>{c.value}</p>
+            <p className="text-xs mt-1.5" style={{ color: 'rgba(255,255,255,0.75)' }}>{c.meta}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* 30-day performance + Payment breakdown */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div className="xl:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Activity className="h-4 w-4 text-blue-600" />
+              <span className="text-sm text-slate-500">30-day performance · Updated every minute</span>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="rounded-2xl p-5 text-white" style={{ background: 'var(--text-primary)' }}>
-              <p className="text-sm text-white/60">Total orders</p>
-              <p className="mt-2 text-3xl font-semibold">{summary?.total_orders ?? 0}</p>
+            <div className="rounded-2xl p-5 text-white" style={{ background: 'linear-gradient(135deg, #6366f1, #4338ca)' }}>
+              <p className="text-sm" style={{ color: 'rgba(255,255,255,0.75)' }}>Total orders</p>
+              <p className="mt-2 text-3xl font-bold">{summary?.total_orders ?? 0}</p>
             </div>
-            <div className="card-strong p-5">
+            <div className="rounded-2xl p-5 bg-slate-50 border border-slate-100">
               <p className="text-sm text-slate-500">Tax collected</p>
-              <p className="mt-2 text-2xl font-semibold text-slate-950">{formatCurrency(summary?.total_tax ?? 0)}</p>
+              <p className="mt-2 text-2xl font-bold text-slate-900">{fmtCurrency(summary?.total_tax ?? 0)}</p>
             </div>
-            <div className="card-strong p-5">
+            <div className="rounded-2xl p-5 bg-slate-50 border border-slate-100">
               <p className="text-sm text-slate-500">Avg order value</p>
-              <p className="mt-2 text-2xl font-semibold text-slate-950">
+              <p className="mt-2 text-2xl font-bold text-slate-900">
                 {summary?.total_orders
-                  ? formatCurrency(Math.round((summary.total_revenue) / summary.total_orders))
-                  : formatCurrency(0)}
+                  ? fmtCurrency(Math.round((summary.total_revenue) / summary.total_orders))
+                  : fmtCurrency(0)}
               </p>
             </div>
-            <div className="card-strong p-5">
+            <div className="rounded-2xl p-5 bg-slate-50 border border-slate-100">
               <p className="text-sm text-slate-500">Total discount</p>
-              <p className="mt-2 text-2xl font-semibold text-slate-950">{formatCurrency(summary?.total_discount ?? 0)}</p>
+              <p className="mt-2 text-2xl font-bold text-slate-900">{fmtCurrency(summary?.total_discount ?? 0)}</p>
             </div>
           </div>
         </div>
 
-        <div className="card p-6">
-          <p className="section-label">Payment breakdown</p>
-          <h2 className="mt-2">By method (30 days)</h2>
-          <div className="mt-6 space-y-3">
-            {(summary?.by_payment ?? []).map((p) => (
-              <div key={p.payment_method} className="card-strong flex items-center justify-between gap-4 p-4">
-                <p className="font-medium text-slate-950 capitalize">{p.payment_method}</p>
-                <div className="text-right">
-                  <p className="font-semibold text-slate-950">{formatCurrency(Number(p.total))}</p>
-                  <p className="text-xs text-slate-500">{p.count} orders</p>
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5">
+          <h2 className="font-semibold text-slate-900 mb-3">Payment breakdown <span className="text-xs font-normal text-slate-400">(30 days)</span></h2>
+          {(summary?.by_payment ?? []).length === 0 ? (
+            <p className="text-sm text-slate-400 text-center py-8">No sales data yet — create your first bill in POS</p>
+          ) : (
+            <div className="space-y-2.5">
+              {(summary?.by_payment ?? []).map((p, i) => (
+                <div key={p.payment_method} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white" style={{ background: RANK_COLORS[i % RANK_COLORS.length] }}>
+                      {i + 1}
+                    </span>
+                    <p className="font-medium text-slate-800 capitalize truncate">{p.payment_method}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="font-semibold text-slate-900">{fmtCurrency(Number(p.total))}</p>
+                    <p className="text-xs text-slate-400">{p.count} orders</p>
+                  </div>
                 </div>
-              </div>
-            ))}
-            {!summary?.by_payment?.length && (
-              <p className="text-sm text-slate-500">No sales data yet — create your first bill in POS</p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="card p-6">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <p className="section-label">Low Stock Alerts</p>
-            <h2 className="mt-2">
-              Items running low
-              {(lowStockItems?.length ?? 0) > 0 && (
-                <span className="ml-2 badge badge-red">{lowStockItems?.length}</span>
-              )}
-            </h2>
-          </div>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {(lowStockItems ?? []).slice(0, 6).map((a: any) => (
-            <div key={a.id} className="card-strong flex items-center justify-between gap-4 p-4 text-sm">
-              <div>
-                <p className="font-medium text-slate-950">{a.name}</p>
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">{a.sku ?? a.unit}</p>
-              </div>
-              <div className="text-right">
-                <span className="badge badge-red">{a.stock_qty} {a.unit}</span>
-                <p className="mt-1 text-xs text-slate-400">min: {a.min_stock_qty}</p>
-              </div>
+              ))}
             </div>
-          ))}
-          {!lowStockItems?.length && (
-            <p className="text-sm text-emerald-600 col-span-3">All items are well stocked</p>
           )}
         </div>
       </div>
 
-      {/* Expiry Alerts */}
-      {(expiringBatches?.length ?? 0) > 0 && (
-        <div className="card p-6">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <p className="section-label">Expiry Alerts</p>
-              <h2 className="mt-2">
-                Medicines expiring within 90 days
-                <span className="ml-2 badge badge-red">{expiringBatches?.length}</span>
-              </h2>
-            </div>
+      {/* Low stock alerts */}
+      {(lowStockItems?.length ?? 0) > 0 && (
+        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <h2 className="font-semibold text-amber-800">Items running low ({lowStockItems?.length})</h2>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {(lowStockItems ?? []).slice(0, 6).map((a: any) => (
+              <div key={a.id} className="flex justify-between items-center text-sm bg-white rounded-xl px-3 py-2">
+                <div>
+                  <p className="font-medium text-slate-800">{a.name}</p>
+                  <p className="text-xs text-slate-400">{a.sku ?? a.unit}</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs font-semibold text-amber-600">{a.stock_qty} {a.unit}</span>
+                  <p className="text-xs text-slate-400">min: {a.min_stock_qty}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {(lowStockItems?.length ?? 0) === 0 && (
+        <div className="bg-green-50 border border-green-100 rounded-2xl p-5 text-center">
+          <p className="text-sm font-medium text-green-700">✓ All items are well stocked</p>
+        </div>
+      )}
+
+      {/* Expiry alerts */}
+      {(expiringBatches?.length ?? 0) > 0 && (
+        <div className="bg-rose-50 border border-rose-100 rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertCircle className="h-4 w-4 text-rose-500" />
+            <h2 className="font-semibold text-rose-800">Medicines expiring within 90 days ({expiringBatches?.length})</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
             {(expiringBatches ?? []).slice(0, 9).map((b: any) => {
               const daysLeft = differenceInDays(new Date(b.expiry_date), new Date());
-              const color = daysLeft <= 30 ? 'badge-red' : daysLeft <= 60 ? 'bg-orange-950 text-orange-300' : 'bg-yellow-950 text-yellow-300';
+              const badgeColor = daysLeft <= 30 ? '#dc2626' : daysLeft <= 60 ? '#ea580c' : '#ca8a04';
+              const badgeBg = daysLeft <= 30 ? '#fee2e2' : daysLeft <= 60 ? '#ffedd5' : '#fef9c3';
               return (
-                <div key={b.id} className="card-strong flex items-center justify-between gap-4 p-4 text-sm">
-                  <div>
-                    <p className="font-medium text-slate-950">{b.product_name}</p>
-                    <p className="text-xs text-slate-500">Batch: {b.batch_no || '—'} · Qty: {b.quantity}</p>
+                <div key={b.id} className="flex justify-between items-center text-sm bg-white rounded-xl px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="font-medium text-slate-800 truncate">{b.product_name}</p>
+                    <p className="text-xs text-slate-400">Batch: {b.batch_no || '—'} · Qty: {b.quantity}</p>
                   </div>
-                  <div className="text-right">
-                    <span className={`badge ${color}`}>{daysLeft}d</span>
-                    <p className="mt-1 text-xs text-slate-400">{b.expiry_date}</p>
+                  <div className="text-right shrink-0">
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: badgeBg, color: badgeColor }}>{daysLeft}d</span>
+                    <p className="text-xs text-slate-400 mt-0.5">{b.expiry_date}</p>
                   </div>
                 </div>
               );
@@ -245,26 +223,27 @@ export function Dashboard() {
         </div>
       )}
 
-      <div className="card p-6">
-        <p className="section-label">Recent Bills</p>
-        <h2 className="mt-2 mb-4">Latest orders</h2>
-        <div className="space-y-2">
-          {(recentOrders?.items ?? []).map((o) => (
-            <div key={o.id} className="card-strong flex items-center justify-between gap-4 p-4 text-sm">
-              <div>
-                <p className="font-semibold text-slate-950">{o.bill_number}</p>
-                <p className="text-xs text-slate-400">{o.customer_name ?? 'Walk-in customer'}</p>
+      {/* Recent bills */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5">
+        <h2 className="font-semibold text-slate-900 mb-3">Latest orders</h2>
+        {!recentOrders?.items?.length ? (
+          <p className="text-sm text-slate-400 text-center py-8">No orders yet</p>
+        ) : (
+          <div className="space-y-2.5">
+            {(recentOrders?.items ?? []).map((o) => (
+              <div key={o.id} className="flex items-center justify-between text-sm">
+                <div className="min-w-0">
+                  <p className="font-semibold text-slate-900 truncate">{o.bill_number}</p>
+                  <p className="text-xs text-slate-400 truncate">{o.customer_name ?? 'Walk-in customer'}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="font-semibold text-slate-900">{fmtCurrency(o.total)}</p>
+                  <p className="text-xs text-slate-400 capitalize">{o.payment_method}</p>
+                </div>
               </div>
-              <div className="text-right">
-                <p className="font-semibold">{formatCurrency(o.total)}</p>
-                <p className="text-xs text-slate-400 capitalize">{o.payment_method}</p>
-              </div>
-            </div>
-          ))}
-          {!recentOrders?.items?.length && (
-            <p className="text-sm text-slate-500">No orders yet</p>
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
