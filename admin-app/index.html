@@ -562,12 +562,9 @@
       <div class="tab-page active" id="page-customers">
         <div class="toolbar">
           <input class="search-input" id="search" placeholder="Search by shop name, owner or ID…" oninput="renderCustomers()" />
-          <button class="filter-btn active" id="f-all"      onclick="setFilter('all')">All</button>
-          <button class="filter-btn"        id="f-pending"  onclick="setFilter('pending')">Pending</button>
-          <button class="filter-btn"        id="f-active"   onclick="setFilter('active')">Active</button>
-          <button class="filter-btn"        id="f-expiring" onclick="setFilter('expiring')">Expiring</button>
-          <button class="filter-btn"        id="f-expired"  onclick="setFilter('expired')">Expired</button>
-          <button class="filter-btn"        id="f-frozen"   onclick="setFilter('frozen')">Frozen</button>
+          <button class="filter-btn active" id="tag-all"    onclick="setTagFilter('all')">All</button>
+          <button class="filter-btn"        id="tag-client" onclick="setTagFilter('client')">✅ Clients</button>
+          <button class="filter-btn"        id="tag-tester" onclick="setTagFilter('tester')">🧪 Testers</button>
           <button class="export-btn" onclick="exportCSV()">⬇ Export</button>
         </div>
 
@@ -1018,8 +1015,8 @@ function planBadgeText(c) {
 function renderCustomers() {
   const q = document.getElementById('search').value.toLowerCase();
   let list = allCustomers.filter(c => {
-    const st = subStatus(c);
-    if (filter !== 'all' && st !== filter) return false;
+    if (tagFilter === 'client' && !c.is_client) return false;
+    if (tagFilter === 'tester' && c.is_client) return false;
     if (!q) return true;
     return (c.shop_name||'').toLowerCase().includes(q)||(c.owner_name||'').toLowerCase().includes(q)||(c.tenant_id||'').toLowerCase().includes(q);
   });
