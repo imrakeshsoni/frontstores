@@ -1548,19 +1548,39 @@ async function handleAdminRequest(req, res) {
     json(res, requests); return;
   }
 
-  // GET /admin/api/staff-user-requests — pending staff-login requests across all tenants
+  // GET /admin/api/staff-user-requests — all staff logins across all tenants (pending + approved)
   if (req.method === 'GET' && pathname === '/admin/api/staff-user-requests') {
     if (!checkAuth(req)) { res.writeHead(401); res.end(); return; }
     const subs = loadSubs();
-    const requests = [];
+    const pending = [], approved = [];
     for (const [tenant_id, s] of Object.entries(subs)) {
       for (const [request_id, r] of Object.entries(s.pending_staff_users || {})) {
-        if (r.status === 'pending') {
-          requests.push({ tenant_id, request_id, shop_name: s.shop_name, shop_type: s.shop_type, username: r.username, requested_at: r.requested_at });
-        }
+        if (r.status === 'rejected') continue;
+        const entry = { tenant_id, request_id, shop_name: s.shop_name, shop_type: s.shop_type, username: r.username, requested_at: r.requested_at, approved_at: r.approved_at || null };
+        if (r.status === 'pending') pending.push(entry);
+        else if (r.status === 'approved') approved.push(entry);
       }
     }
-    json(res, requests); return;
+    json(res, { pending, approved }); return;
+  }
+
+  // POST /admin/api/customers/:id/delete-staff-user — { request_id } — revokes login, forces re-request
+  const deleteStaffUserMatch = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/delete-staff-user$/);
+  if (req.method === 'POST' && deleteStaffUserMatch) {
+    if (!checkAuth(req)) { res.writeHead(401); res.end(); return; }
+    const tenantId = deleteStaffUserMatch[1];
+    try {
+      const { request_id } = JSON.parse(await readBody(req));
+      const subs = loadSubs();
+      const sub = subs[tenantId];
+      if (!sub || !sub.pending_staff_users?.[request_id]) { json(res, { ok: false, error: 'Not found' }, 404); return; }
+      const username = sub.pending_staff_users[request_id].username;
+      sub.pending_staff_users[request_id].status = 'rejected';
+      saveSubs(subs);
+      logActivity(tenantId, sub.shop_name, 'staff_user_deleted', `Deleted staff login "${username}" — user must re-request`);
+      console.log(`🗑  Staff login "${username}" deleted for ${sub.shop_name}`);
+      json(res, { ok: true }); return;
+    } catch { json(res, { ok: false, error: 'Invalid request' }, 400); return; }
   }
 
   // POST /admin/api/customers/:id/approve-sync — approve a pending request, auto-issue code, enable immediately

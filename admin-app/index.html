@@ -152,6 +152,25 @@
     .sc-expired  { border-top: 3px solid #dc2626; }
     .sc-blocked  { border-top: 3px solid #6b7280; }
 
+    /* CUSTOMER CARDS */
+    #customers-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .c-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      padding: 18px 20px; cursor: pointer; transition: box-shadow .15s, transform .15s;
+      display: flex; flex-direction: column; gap: 0;
+    }
+    .c-card:hover { box-shadow: 0 6px 24px rgba(0,0,0,.1); transform: translateY(-2px); border-color: var(--border2); }
+    .c-card.frozen-row { opacity: .5; }
+    .c-card.revoked-row { opacity: .3; }
+    .c-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+    .c-card-name { font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.3; }
+    .c-card-type { font-size: 11px; color: var(--muted); margin-top: 3px; }
+    .c-card-divider { height: 1px; background: var(--border); margin: 12px 0; }
+    .c-card-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 12px; }
+    .c-card-row:last-child { margin-bottom: 0; }
+    .c-card-lbl { color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: .06em; font-size: 10px; }
+    .c-card-val { color: var(--text); font-weight: 600; font-size: 12px; text-align: right; }
+
     /* TOOLBAR / FILTERS */
     .toolbar { margin-bottom: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     .type-filter-row { margin-bottom: 16px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -541,42 +560,18 @@
 
       <!-- CUSTOMERS TAB -->
       <div class="tab-page active" id="page-customers">
-        <div class="stats-row">
-          <div class="stat-card sc-total"    data-icon="🏪"><div class="label">Total</div><div class="value" id="s-total">—</div></div>
-          <div class="stat-card sc-pending"  data-icon="⏳"><div class="label">Pending</div><div class="value" id="s-pending">—</div></div>
-          <div class="stat-card sc-active"   data-icon="✓"><div class="label">Active</div><div class="value" id="s-active">—</div></div>
-          <div class="stat-card sc-expiring" data-icon="⚡"><div class="label">Expiring 7d</div><div class="value" id="s-expiring">—</div></div>
-          <div class="stat-card sc-expired"  data-icon="✕"><div class="label">Expired</div><div class="value" id="s-expired">—</div></div>
-          <div class="stat-card sc-blocked"  data-icon="🔒"><div class="label">Blocked</div><div class="value" id="s-blocked">—</div></div>
-        </div>
-
         <div class="toolbar">
           <input class="search-input" id="search" placeholder="Search by shop name, owner or ID…" oninput="renderCustomers()" />
           <button class="filter-btn active" id="f-all"      onclick="setFilter('all')">All</button>
-          <button class="filter-btn"        id="f-pending"  onclick="setFilter('pending')">⏳ Pending</button>
+          <button class="filter-btn"        id="f-pending"  onclick="setFilter('pending')">Pending</button>
           <button class="filter-btn"        id="f-active"   onclick="setFilter('active')">Active</button>
           <button class="filter-btn"        id="f-expiring" onclick="setFilter('expiring')">Expiring</button>
           <button class="filter-btn"        id="f-expired"  onclick="setFilter('expired')">Expired</button>
           <button class="filter-btn"        id="f-frozen"   onclick="setFilter('frozen')">Frozen</button>
-          <button class="filter-btn"        id="f-switch"   onclick="setFilter('switch')" style="border-color:rgba(167,139,250,.4);color:#a78bfa">🔄 Switch Requests</button>
-          <button class="export-btn" onclick="exportCSV()">⬇ Export CSV</button>
+          <button class="export-btn" onclick="exportCSV()">⬇ Export</button>
         </div>
 
-        <div class="type-filter-row">
-          <span style="font-size:12px;color:var(--muted);font-weight:600">Tag:</span>
-          <button class="filter-btn active" id="tag-all"    onclick="setTagFilter('all')">All</button>
-          <button class="filter-btn"        id="tag-client" onclick="setTagFilter('client')">✅ Clients</button>
-          <button class="filter-btn"        id="tag-tester" onclick="setTagFilter('tester')">🧪 Testers</button>
-        </div>
-
-
-        <div class="table-wrap">
-          <table>
-            <thead><tr>
-              <th>Shop</th><th>Type</th><th>Contact</th><th>Joined</th><th>Subscription</th><th>Plan</th>
-            </tr></thead>
-            <tbody id="tbody"></tbody>
-          </table>
+        <div id="customers-grid">
         </div>
       </div>
 
@@ -975,46 +970,62 @@ function planBadge(c) {
   return '';
 }
 
-function customerRowHtml(c) {
+function customerCardHtml(c) {
   const st = subStatus(c);
   const d = daysLeft(c.expires_at);
   const icon = ICONS[c.shop_type]||'🏪';
   const reg = c.registered_at ? new Date(c.registered_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : '—';
-  let badge, bar='';
-  const isSwitchReq = st==='pending' && c.switch_request;
-  if (st==='pending')  badge=`<span class="badge" style="background:rgba(167,139,250,.15);color:#a78bfa;border:1px solid rgba(167,139,250,.3)">${isSwitchReq?'🔄 Switch Request':'⏳ Pending'}</span>`;
-  else if (st==='active')   { badge=`<span class="badge badge-active">✓ ${d}d left</span>`; bar=`<div class="days-bar"><div class="days-fill" style="width:${Math.min(100,(d/30)*100)}%;background:var(--green)"></div></div>`; }
-  else if (st==='expiring') { badge=`<span class="badge badge-expiring">⚠ ${d}d left</span>`; bar=`<div class="days-bar"><div class="days-fill" style="width:${Math.min(100,(d/30)*100)}%;background:var(--gold)"></div></div>`; }
-  else if (st==='expired')  badge=`<span class="badge badge-expired">✕ Expired</span>`;
-  else if (st==='frozen')   badge=`<span class="badge badge-frozen">🧊 Frozen</span>`;
-  else if (st==='revoked')  badge=`<span class="badge badge-revoked">🚫 Revoked</span>`;
-  const rowClass = st==='frozen'?'frozen-row':st==='revoked'?'revoked-row':'';
   const tid = escHtml(c.tenant_id||'');
-  const testBadge = !c.is_client ? `<span class="badge" style="background:rgba(168,85,247,.15);color:#c084fc;border:1px solid rgba(168,85,247,.3)">🧪 Tester</span>` : '';
-  return `<tr class="${rowClass}" onclick="openPanel('${tid}')">
-    <td><div class="shop-name">${escHtml(c.shop_name||'Unknown')} ${testBadge}</div><div class="shop-id">${tid.substring(0,20)}…</div></td>
-    <td><span class="type-chip">${icon} ${escHtml(LABELS[c.shop_type]||c.shop_type||'—')}</span></td>
-    <td><div style="font-size:13px">${escHtml(c.owner_name||'—')}</div><div style="font-size:12px;color:var(--muted)">${escHtml(c.phone||c.email||'—')}</div></td>
-    <td style="color:var(--muted);font-size:13px">${reg}</td>
-    <td>${badge}${bar}</td>
-    <td>${planBadge(c)}</td>
-  </tr>`;
+  let badge;
+  if (st==='pending')  badge=`<span class="badge badge-new">Pending</span>`;
+  else if (st==='active')   badge=`<span class="badge badge-active">${d}d left</span>`;
+  else if (st==='expiring') badge=`<span class="badge badge-expiring">${d}d left</span>`;
+  else if (st==='expired')  badge=`<span class="badge badge-expired">Expired</span>`;
+  else if (st==='frozen')   badge=`<span class="badge badge-frozen">Frozen</span>`;
+  else if (st==='revoked')  badge=`<span class="badge badge-revoked">Revoked</span>`;
+  const cardClass = `c-card${st==='frozen'?' frozen-row':st==='revoked'?' revoked-row':''}`;
+  const testerDot = !c.is_client ? `<span style="font-size:10px;font-weight:700;background:#ede9fe;color:#6d28d9;padding:2px 7px;border-radius:2px;margin-left:6px">Tester</span>` : '';
+  let daysBar = '';
+  if (st==='active'||st==='expiring') {
+    const pct = Math.min(100, (d/30)*100);
+    const color = st==='active' ? '#16a34a' : '#d97706';
+    daysBar = `<div style="height:3px;background:var(--border);border-radius:99px;margin-top:10px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${color};border-radius:99px"></div></div>`;
+  }
+  return `<div class="${cardClass}" onclick="openPanel('${tid}')">
+    <div class="c-card-top">
+      <div>
+        <div class="c-card-name">${icon} ${escHtml(c.shop_name||'Unknown')}${testerDot}</div>
+        <div class="c-card-type">${escHtml(LABELS[c.shop_type]||c.shop_type||'—')}</div>
+      </div>
+      ${badge}
+    </div>
+    <div class="c-card-divider"></div>
+    <div class="c-card-row"><span class="c-card-lbl">Owner</span><span class="c-card-val">${escHtml(c.owner_name||'—')}</span></div>
+    <div class="c-card-row"><span class="c-card-lbl">Phone</span><span class="c-card-val">${escHtml(c.phone||c.email||'—')}</span></div>
+    <div class="c-card-row"><span class="c-card-lbl">Joined</span><span class="c-card-val">${reg}</span></div>
+    <div class="c-card-row"><span class="c-card-lbl">Plan</span><span class="c-card-val">${planBadgeText(c)}</span></div>
+    ${daysBar}
+  </div>`;
+}
+
+function planBadgeText(c) {
+  const t = (c.plan_type||'trial').toLowerCase();
+  if (t==='monthly') return 'Monthly';
+  if (t==='yearly')  return 'Yearly';
+  return 'Trial';
 }
 
 function renderCustomers() {
   const q = document.getElementById('search').value.toLowerCase();
   let list = allCustomers.filter(c => {
-    if (tagFilter === 'client' && !c.is_client) return false;   // only explicitly-tagged clients
-    if (tagFilter === 'tester' && c.is_client) return false;    // everything not explicitly promoted to "client"
     const st = subStatus(c);
-    if (filter === 'switch') return !!c.switch_request && st === 'pending';
     if (filter !== 'all' && st !== filter) return false;
     if (!q) return true;
     return (c.shop_name||'').toLowerCase().includes(q)||(c.owner_name||'').toLowerCase().includes(q)||(c.tenant_id||'').toLowerCase().includes(q);
   });
-  const tbody = document.getElementById('tbody');
-  if (!list.length) { tbody.innerHTML=`<tr><td colspan="6"><div class="empty">No customers found</div></td></tr>`; return; }
-  tbody.innerHTML = list.map(customerRowHtml).join('');
+  const grid = document.getElementById('customers-grid');
+  if (!list.length) { grid.innerHTML=`<div class="empty" style="grid-column:1/-1">No customers found</div>`; return; }
+  grid.innerHTML = list.map(customerCardHtml).join('');
 }
 
 async function exportCSV() {
@@ -1706,43 +1717,63 @@ async function syncRequestAction(tenantId, action) {
 async function loadStaffUserRequests(silentBadge = false) {
   const r = await api('/admin/api/staff-user-requests');
   if (!r.ok) return;
-  const requests = await r.json();
+  const { pending, approved } = await r.json();
 
   const badge = document.getElementById('staffrequests-badge');
-  if (badge) { badge.textContent = requests.length; badge.style.display = requests.length > 0 ? '' : 'none'; }
+  const pendingCount = pending.length;
+  if (badge) { badge.textContent = pendingCount; badge.style.display = pendingCount > 0 ? '' : 'none'; }
 
   if (silentBadge) return;
 
-  const fmtDt = iso => iso ? new Date(iso).toLocaleString('en-IN') : '—';
+  const fmtDt = iso => iso ? new Date(iso).toLocaleString('en-IN', {day:'numeric',month:'short',year:'numeric'}) : '—';
   const listEl = document.getElementById('staffrequests-list');
   if (!listEl) return;
 
-  if (requests.length === 0) {
-    listEl.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:12px 0">No pending staff login requests</div>';
-    return;
-  }
+  let html = '';
 
-  listEl.innerHTML = `<h3 style="font-size:14px;font-weight:700;color:#f59e0b;margin-bottom:10px">⏳ Pending Approval (${requests.length})</h3>` +
-    requests.map(req => `<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-        <div>
-          <div style="font-size:14px;font-weight:700">${ICONS[req.shop_type]||'🏪'} ${escHtml(req.shop_name||'Unknown Shop')}</div>
-          <div style="font-size:11px;color:var(--muted)">Username requested: <strong>${escHtml(req.username)}</strong></div>
-          <div style="font-size:11px;color:var(--muted)">Requested: ${fmtDt(req.requested_at)}</div>
-        </div>
-        <span style="padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(245,158,11,.15);color:#f59e0b">PENDING</span>
+  if (pending.length > 0) {
+    html += `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:10px">⏳ Awaiting Approval (${pending.length})</div>`;
+    html += pending.map(req => `<div style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div>
+        <div style="font-size:13.5px;font-weight:700">${ICONS[req.shop_type]||'🏪'} ${escHtml(req.shop_name||'Unknown')}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:3px">@${escHtml(req.username)} · Requested ${fmtDt(req.requested_at)}</div>
       </div>
-      <div style="display:flex;gap:8px;margin-top:8px">
-        <button onclick="staffUserRequestAction('${req.tenant_id}','${req.request_id}','approve')" style="flex:1;padding:8px;background:rgba(52,211,153,.15);border:1px solid rgba(52,211,153,.3);border-radius:10px;color:#34d399;font-size:12px;font-weight:700;cursor:pointer">✓ Approve</button>
-        <button onclick="staffUserRequestAction('${req.tenant_id}','${req.request_id}','reject')" style="flex:1;padding:8px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:10px;color:#f87171;font-size:12px;font-weight:700;cursor:pointer">✕ Reject</button>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button onclick="staffUserRequestAction('${req.tenant_id}','${req.request_id}','approve')" style="padding:7px 14px;background:#dcfce7;border:1px solid #bbf7d0;border-radius:4px;color:#15803d;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">✓ Approve</button>
+        <button onclick="staffUserRequestAction('${req.tenant_id}','${req.request_id}','reject')" style="padding:7px 14px;background:#fee2e2;border:1px solid #fecaca;border-radius:4px;color:#dc2626;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">✕ Reject</button>
       </div>
     </div>`).join('');
+  }
+
+  if (approved.length > 0) {
+    html += `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:${pending.length?'20px':'0'};margin-bottom:10px">✓ Active Logins (${approved.length})</div>`;
+    html += approved.map(req => `<div style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div>
+        <div style="font-size:13.5px;font-weight:700">${ICONS[req.shop_type]||'🏪'} ${escHtml(req.shop_name||'Unknown')}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:3px">@${escHtml(req.username)} · Approved ${fmtDt(req.approved_at)}</div>
+      </div>
+      <button onclick="deleteStaffUser('${req.tenant_id}','${req.request_id}','${escHtml(req.username)}')" style="padding:7px 14px;background:#fee2e2;border:1px solid #fecaca;border-radius:4px;color:#dc2626;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0">🗑 Delete</button>
+    </div>`).join('');
+  }
+
+  if (!pending.length && !approved.length) {
+    html = '<div style="color:var(--muted);font-size:13px;padding:20px 0">No staff logins yet.</div>';
+  }
+
+  listEl.innerHTML = html;
 }
 
 async function staffUserRequestAction(tenantId, requestId, action) {
   const r = await api(`/admin/api/customers/${tenantId}/${action}-staff-user`, { method:'POST', body: JSON.stringify({ request_id: requestId }) });
-  if (r.ok) { showToast(action === 'approve' ? '👥 Staff login approved — they can now sign in' : 'Request rejected'); loadStaffUserRequests(); }
+  if (r.ok) { showToast(action === 'approve' ? '👥 Staff login approved' : 'Request rejected'); loadStaffUserRequests(); }
   else showToast('Failed', true);
+}
+
+async function deleteStaffUser(tenantId, requestId, username) {
+  if (!confirm(`Delete staff login "@${username}"?\n\nThey will be signed out and must request access again.`)) return;
+  const r = await api(`/admin/api/customers/${tenantId}/delete-staff-user`, { method:'POST', body: JSON.stringify({ request_id: requestId }) });
+  if (r.ok) { showToast(`🗑 @${username} deleted — login revoked`); loadStaffUserRequests(); }
+  else showToast('Failed to delete', true);
 }
 
 // CONTACTS
