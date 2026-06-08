@@ -525,10 +525,7 @@
       <div class="nav-item" id="tab-devices" onclick="switchTab('devices')">
         <span class="nav-icon">📱</span> Devices <span id="devices-badge" style="display:none;background:#f59e0b;color:#111;border-radius:20px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px">0</span>
       </div>
-      <div class="nav-item" id="tab-syncrequests" onclick="switchTab('syncrequests')">
-        <span class="nav-icon">☁️</span> Cloud Sync <span id="syncrequests-badge" style="display:none;background:#f59e0b;color:#111;border-radius:20px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px">0</span>
-      </div>
-      <div class="nav-item" id="tab-staffrequests" onclick="switchTab('staffrequests')">
+<div class="nav-item" id="tab-staffrequests" onclick="switchTab('staffrequests')">
         <span class="nav-icon">👥</span> Staff Logins <span id="staffrequests-badge" style="display:none;background:#f59e0b;color:#111;border-radius:20px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px">0</span>
       </div>
     </nav>
@@ -1845,11 +1842,24 @@ async function clearAllErrors() {
   if (!confirm(`Delete all ${allErrors.length} error reports? This cannot be undone.`)) return;
   try {
     const r = await api('/admin/api/errors/clear-all', { method:'POST' });
-    if (!r.ok) { showToast('Failed to clear errors', true); return; }
+    if (r.status === 403) {
+      alert('Session expired — please reload the page (Cmd+R) and try again.');
+      return;
+    }
+    if (!r.ok) { showToast(`Failed to clear errors (${r.status})`, true); return; }
     allErrors = [];
     renderErrors(); updateBadge();
     showToast('🗑 All errors cleared');
-  } catch { showToast('⚠ Connection error', true); }
+    // re-fetch from server after 800ms to confirm deletion was persisted
+    setTimeout(async () => {
+      try {
+        const re = await api('/admin/api/errors');
+        if (re.ok) { allErrors = await re.json(); renderErrors(); updateBadge(); }
+      } catch {}
+    }, 800);
+  } catch (e) {
+    alert(`Could not reach admin server. Reload the page and try again.\n\n${e.message}`);
+  }
 }
 function toggleStack(id) { document.getElementById('stack-'+id)?.classList.toggle('open'); }
 async function resolveErr(id) {
