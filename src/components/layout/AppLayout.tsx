@@ -410,6 +410,16 @@ const CA_NAV_ITEMS = [
   { to: '/settings',       icon: Settings,        label: 'Settings',    iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
 
+// [crm] [all tenants]
+const CRM_NAV_ITEMS = [
+  { to: '/crm/dashboard',     icon: LayoutDashboard, label: 'Dashboard',     iconBg: '#cffafe', iconColor: '#0891b2' },
+  { to: '/crm/contacts',      icon: Users,           label: 'Contacts',      iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/crm/pipeline',      icon: Target,          label: 'Pipeline',      iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/crm/followups',     icon: Timer,           label: 'Follow-ups',    iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/crm/communications', icon: Radio,          label: 'Comm. Log',     iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/settings',          icon: Settings,        label: 'Settings',      iconBg: '#f1f5f9', iconColor: '#64748b' },
+];
+
 // [events] [all tenants]
 const EVENTS_NAV_ITEMS = [
   { to: '/events/dashboard', icon: LayoutDashboard, label: 'Dashboard', iconBg: '#fce7f3', iconColor: '#db2777' },
@@ -578,6 +588,7 @@ export function AppLayout() {
     config?.shop_type === 'furniture'     ? FURNITURE_NAV_ITEMS :
     config?.shop_type === 'printing'      ? PRINTING_NAV_ITEMS :
     config?.shop_type === 'ca'            ? CA_NAV_ITEMS :
+    config?.shop_type === 'crm'           ? CRM_NAV_ITEMS :
     config?.shop_type === 'events'        ? EVENTS_NAV_ITEMS :
     config?.shop_type === 'travel'        ? TRAVEL_NAV_ITEMS :
     config?.shop_type === 'insurance'     ? INSURANCE_NAV_ITEMS :

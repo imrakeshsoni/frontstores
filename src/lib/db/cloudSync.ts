@@ -1,4 +1,4 @@
-// [all apps] [all tenants] — Cloud Sync: push local SQLite data to FrontStores server
+// [all apps] [all tenants] — Cloud Sync: push/pull local SQLite data to/from the FrontStores server
 import { getDb, now } from './index';
 import { getAppConfig, updateAppConfig } from './config';
 
@@ -6,10 +6,11 @@ const SERVER = 'https://update.frontstores.com';
 
 export interface CloudSyncStatus {
   enabled: boolean;
-  last_synced_at: string | null;
-  sync_code: string | null;
-  dashboard_url: string | null;
-  mobile_pin_set: boolean;
+  requestStatus: 'pending' | 'approved' | 'rejected' | null;
+  lastSyncedAt: string | null;
+  syncCode: string | null;
+  dashboardUrl: string | null;
+  mobilePinSet: boolean;
 }
 
 async function hashPin(pin: string): Promise<string> {
@@ -28,22 +29,88 @@ export function getDeviceId(): string {
   return id;
 }
 
+// ── Generic table discovery ───────────────────────────────────────────────────
+// Per CLAUDE.md DB rules every tenant table has id/tenant_id/updated_at/deleted_at,
+// so we can discover what to sync by introspecting the schema — no per-app config.
+const SYNC_EXCLUDE_TABLES = new Set([
+  'app_config', 'app_auth', 'sync_queue', 'reset_requests', 'unlock_requests',
+]);
+
+async function getSyncableTables(db: Awaited<ReturnType<typeof getDb>>): Promise<string[]> {
+  const tables = await db.select<{ name: string }[]>(
+    `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`
+  );
+  const result: string[] = [];
+  for (const { name } of tables) {
+    if (SYNC_EXCLUDE_TABLES.has(name)) continue;
+    const cols = await db.select<{ name: string }[]>(`PRAGMA table_info(${name})`);
+    const colNames = new Set(cols.map(c => c.name));
+    if (colNames.has('tenant_id') && colNames.has('updated_at') && colNames.has('id')) result.push(name);
+  }
+  return result;
+}
+
+// ── Status ────────────────────────────────────────────────────────────────────
+
 export async function getCloudSyncStatus(): Promise<CloudSyncStatus> {
   const config = await getAppConfig();
   const s = config?.settings as any ?? {};
   return {
     enabled: !!s.cloud_sync_enabled,
-    last_synced_at: s.cloud_sync_last_at ?? null,
-    sync_code: s.cloud_sync_code ?? null,
-    dashboard_url: s.cloud_sync_dashboard_url ?? null,
-    mobile_pin_set: !!s.cloud_sync_pin_set,
+    requestStatus: s.cloud_sync_request_status ?? null,
+    lastSyncedAt: s.cloud_sync_last_at ?? null,
+    syncCode: s.cloud_sync_code ?? null,
+    dashboardUrl: s.cloud_sync_dashboard_url ?? null,
+    mobilePinSet: !!s.cloud_sync_pin_set,
   };
+}
+
+// Ask the server (Mac) for the latest request/approval status and cache it locally
+export async function refreshCloudSyncStatus(tenantId: string): Promise<CloudSyncStatus> {
+  const config = await getAppConfig();
+  const s = config?.settings as any ?? {};
+  try {
+    const res = await fetch(`${SERVER}/sync/status/${tenantId}`, { signal: AbortSignal.timeout(8000) });
+    const data = await res.json();
+    if (data.ok) {
+      await updateAppConfig({
+        settings: {
+          ...s,
+          cloud_sync_enabled: !!data.enabled,
+          cloud_sync_request_status: data.request_status ?? null,
+          cloud_sync_code: data.sync_code ?? s.cloud_sync_code ?? null,
+          cloud_sync_dashboard_url: data.dashboard_url ?? s.cloud_sync_dashboard_url ?? null,
+        },
+      });
+    }
+  } catch { /* offline — fall back to cached local status */ }
+  return getCloudSyncStatus();
+}
+
+// Tenant requests Cloud Sync access — lands in the admin approval queue
+export async function requestCloudSync(tenantId: string): Promise<{ ok: boolean; error?: string }> {
+  const config = await getAppConfig();
+  const s = config?.settings as any ?? {};
+  try {
+    const res = await fetch(`${SERVER}/sync/request`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tenant_id: tenantId }),
+      signal: AbortSignal.timeout(8000),
+    });
+    const data = await res.json();
+    if (!data.ok) return { ok: false, error: data.error ?? 'Request failed' };
+    await updateAppConfig({ settings: { ...s, cloud_sync_request_status: data.status ?? 'pending' } });
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'Could not reach server. Check your internet connection and try again.' };
+  }
 }
 
 export async function setMobilePin(tenantId: string, pin: string): Promise<{ ok: boolean; error?: string }> {
   const config = await getAppConfig();
   const s = config?.settings as any ?? {};
-  if (!s.cloud_sync_enabled || !s.cloud_sync_code) return { ok: false, error: 'Enable Cloud Sync first' };
+  if (!s.cloud_sync_enabled || !s.cloud_sync_code) return { ok: false, error: 'Cloud Sync is not active yet' };
   if (pin.length < 4 || pin.length > 8 || !/^\d+$/.test(pin)) return { ok: false, error: 'PIN must be 4–8 digits' };
   const pin_hash = await hashPin(pin);
   const res = await fetch(`${SERVER}/sync/set-pin`, {
@@ -57,7 +124,7 @@ export async function setMobilePin(tenantId: string, pin: string): Promise<{ ok:
   return { ok: true };
 }
 
-// Used by Android: register device + pull data after approval
+// Used by mobile: register device + pull data after owner approval
 export async function registerDevice(phone: string, pin: string, deviceName: string): Promise<{
   ok: boolean; status?: string; tenant_id?: string; shop_name?: string; shop_type?: string;
   session_token?: string; error?: string;
@@ -70,7 +137,6 @@ export async function registerDevice(phone: string, pin: string, deviceName: str
   });
   const data = await res.json();
   if (!data.ok) return { ok: false, error: data.error ?? 'Registration failed' };
-  // Store session token locally if approved
   if (data.session_token) localStorage.setItem('fs_session_token', data.session_token);
   if (data.tenant_id) localStorage.setItem('fs_remote_tenant_id', data.tenant_id);
   return { ok: true, ...data };
@@ -91,30 +157,10 @@ export async function pullDeviceSyncData(): Promise<{ ok: boolean; data?: any; e
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ device_id, session_token }),
   });
-  const result = await res.json();
-  return result;
+  return res.json();
 }
 
-export async function activateCloudSync(tenantId: string, syncCode: string): Promise<{ ok: boolean; error?: string; dashboard_url?: string }> {
-  const res = await fetch(`${SERVER}/sync/activate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tenant_id: tenantId, sync_code: syncCode.trim().toUpperCase() }),
-  });
-  const data = await res.json();
-  if (!data.ok) return { ok: false, error: data.error ?? 'Invalid code' };
-
-  const config = await getAppConfig();
-  await updateAppConfig({
-    settings: {
-      ...config?.settings ?? {},
-      cloud_sync_enabled: true,
-      cloud_sync_code: syncCode.trim().toUpperCase(),
-      cloud_sync_dashboard_url: data.dashboard_url,
-    },
-  });
-  return { ok: true, dashboard_url: data.dashboard_url };
-}
+// ── Push / pull — fully generic, works for any app's table set ───────────────
 
 // Delta push — only sends records changed since last sync (fast, small payload)
 export async function pushDelta(tenantId: string): Promise<{ ok: boolean; error?: string; synced_at?: string }> {
@@ -124,29 +170,18 @@ export async function pushDelta(tenantId: string): Promise<{ ok: boolean; error?
 
   const db = await getDb();
   const since = s.cloud_sync_last_at ?? '2000-01-01T00:00:00Z';
+  const tables = await getSyncableTables(db);
 
-  // Only fetch records changed after last sync
-  const [jobs, jobItems, customers, vehicles, staff, attendance, services, memberships, inventory, appointments] = await Promise.all([
-    db.select<any[]>(`SELECT * FROM carwash_jobs WHERE tenant_id = ? AND updated_at > ? ORDER BY updated_at DESC LIMIT 500`, [tenantId, since]).catch(() => []),
-    db.select<any[]>(`SELECT * FROM carwash_job_items WHERE tenant_id = ? AND job_id IN (SELECT id FROM carwash_jobs WHERE tenant_id = ? AND updated_at > ?)`, [tenantId, tenantId, since]).catch(() => []),
-    db.select<any[]>(`SELECT * FROM customers WHERE tenant_id = ? AND updated_at > ? LIMIT 500`, [tenantId, since]).catch(() => []),
-    db.select<any[]>(`SELECT * FROM carwash_vehicles WHERE tenant_id = ? AND updated_at > ? LIMIT 200`, [tenantId, since]).catch(() => []),
-    db.select<any[]>(`SELECT id,tenant_id,name,phone,role,monthly_salary,joining_date,is_active,deduct_half_day,deduct_full_day_leave FROM carwash_staff WHERE tenant_id = ? AND updated_at > ?`, [tenantId, since]).catch(() => []),
-    db.select<any[]>(`SELECT * FROM carwash_attendance WHERE tenant_id = ? AND updated_at > ? LIMIT 500`, [tenantId, since]).catch(() => []),
-    db.select<any[]>(`SELECT * FROM carwash_services WHERE tenant_id = ? AND updated_at > ?`, [tenantId, since]).catch(() => []),
-    db.select<any[]>(`SELECT * FROM carwash_memberships WHERE tenant_id = ? AND updated_at > ?`, [tenantId, since]).catch(() => []),
-    db.select<any[]>(`SELECT * FROM carwash_inventory WHERE tenant_id = ? AND updated_at > ?`, [tenantId, since]).catch(() => []),
-    db.select<any[]>(`SELECT * FROM carwash_appointments WHERE tenant_id = ? AND updated_at > ? LIMIT 200`, [tenantId, since]).catch(() => []),
-  ]);
-
-  const totalChanged = jobs.length + customers.length + attendance.length + staff.length + services.length + memberships.length + inventory.length + appointments.length;
-  if (totalChanged === 0 && jobItems.length === 0) return { ok: true, synced_at: since }; // nothing to push
-
-  const payload = {
-    tenant_id: tenantId, sync_code: s.cloud_sync_code, is_delta: true,
-    jobs, job_items: jobItems, customers, vehicles, staff, attendance,
-    services, memberships, inventory, appointments,
-  };
+  const payload: Record<string, unknown> = { tenant_id: tenantId, sync_code: s.cloud_sync_code, is_delta: true };
+  let totalChanged = 0;
+  for (const table of tables) {
+    const rows = await db.select<any[]>(
+      `SELECT * FROM ${table} WHERE tenant_id = ? AND updated_at > ? ORDER BY updated_at DESC LIMIT 1000`,
+      [tenantId, since]
+    ).catch(() => []);
+    if (rows.length) { payload[table] = rows; totalChanged += rows.length; }
+  }
+  if (totalChanged === 0) return { ok: true, synced_at: since };
 
   const res = await fetch(`${SERVER}/sync/push`, {
     method: 'POST',
@@ -159,7 +194,46 @@ export async function pushDelta(tenantId: string): Promise<{ ok: boolean; error?
   return { ok: true, synced_at: result.synced_at };
 }
 
-// Pull delta from server — get records changed on other devices since last pull
+// Full push — sends everything (used for first sync after approval)
+export async function pushSyncData(tenantId: string): Promise<{ ok: boolean; error?: string; synced_at?: string; counts?: Record<string, number> }> {
+  const config = await getAppConfig();
+  const s = config?.settings as any ?? {};
+  if (!s.cloud_sync_enabled || !s.cloud_sync_code) return { ok: false, error: 'Cloud Sync is not active yet' };
+
+  const db = await getDb();
+  const tables = await getSyncableTables(db);
+
+  const payload: Record<string, unknown> = {
+    tenant_id: tenantId,
+    sync_code: s.cloud_sync_code,
+    shop_name: config?.shop_name,
+    shop_type: config?.shop_type,
+  };
+  const counts: Record<string, number> = {};
+  for (const table of tables) {
+    const rows = await db.select<any[]>(
+      `SELECT * FROM ${table} WHERE tenant_id = ? AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT 2000`,
+      [tenantId]
+    ).catch(() => []);
+    payload[table] = rows;
+    counts[table] = rows.length;
+  }
+
+  const res = await fetch(`${SERVER}/sync/push`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    return { ok: false, error: err.error ?? `Server error ${res.status}` };
+  }
+  const result = await res.json();
+  await updateAppConfig({ settings: { ...s, cloud_sync_last_at: result.synced_at ?? now() } });
+  return { ok: true, synced_at: result.synced_at, counts };
+}
+
+// Pull delta from server — apply records changed on other devices since last pull
 export async function pullDelta(tenantId: string): Promise<{ ok: boolean; changes: number; error?: string }> {
   const config = await getAppConfig();
   const s = config?.settings as any ?? {};
@@ -175,99 +249,26 @@ export async function pullDelta(tenantId: string): Promise<{ ok: boolean; change
     return { ok: true, changes: 0 };
   }
 
-  // Apply pulled records to local SQLite
   const db = await getDb();
-  const delta = result.delta;
+  const delta = result.delta as Record<string, any[]>;
   let changes = 0;
 
-  const tableMap: Array<[string, string[]]> = [
-    ['carwash_jobs', ['id','tenant_id','job_number','vehicle_id','reg_number','vehicle_type','make','model','color','customer_name','customer_phone','customer_id','staff_id','staff_name','status','payment_method','payment_status','subtotal','discount','gst_amount','total','membership_id','notes','started_at','completed_at','delivered_at','created_at','updated_at','deleted_at']],
-    ['carwash_job_items', ['id','tenant_id','job_id','service_id','service_name','price','gst_rate','created_at']],
-    ['customers', ['id','tenant_id','name','phone','email','address','city','tags','credit_limit','notes','created_at','updated_at','deleted_at']],
-    ['carwash_vehicles', ['id','tenant_id','customer_id','customer_name','customer_phone','reg_number','vehicle_type','make','model','color','notes','created_at','updated_at','deleted_at']],
-    ['carwash_staff', ['id','tenant_id','name','phone','role','monthly_salary','joining_date','is_active','deduct_half_day','deduct_full_day_leave','created_at','updated_at','deleted_at']],
-    ['carwash_attendance', ['id','tenant_id','staff_id','date','status','note','updated_at','deleted_at']],
-    ['carwash_services', ['id','tenant_id','name','description','price_hatchback','price_sedan','price_suv','price_luxury','duration_minutes','gst_rate','is_active','sort_order','created_at','updated_at','deleted_at']],
-    ['carwash_memberships', ['id','tenant_id','customer_name','customer_phone','customer_id','vehicle_id','reg_number','package_name','total_washes','used_washes','amount_paid','valid_until','is_active','created_at','updated_at','deleted_at']],
-    ['carwash_inventory', ['id','tenant_id','name','category','unit','quantity','min_quantity','cost_per_unit','notes','created_at','updated_at','deleted_at']],
-    ['carwash_appointments', ['id','tenant_id','appointment_date','appointment_time','duration_minutes','reg_number','vehicle_type','make','model','customer_name','customer_phone','staff_id','staff_name','services_note','status','notes','job_id','created_at','updated_at','deleted_at']],
-  ];
-
-  const tableKey: Record<string, string> = { carwash_jobs: 'jobs', carwash_job_items: 'job_items', customers: 'customers', carwash_vehicles: 'vehicles', carwash_staff: 'staff', carwash_attendance: 'attendance', carwash_services: 'services', carwash_memberships: 'memberships', carwash_inventory: 'inventory', carwash_appointments: 'appointments' };
-
-  for (const [table, cols] of tableMap) {
-    const rows: any[] = delta[tableKey[table]] ?? [];
+  for (const table of Object.keys(delta)) {
+    const rows = delta[table] ?? [];
     for (const row of rows) {
-      const vals = cols.map(c => row[c] ?? null);
+      const cols = Object.keys(row);
+      if (!cols.length) continue;
+      const placeholders = cols.map(() => '?').join(', ')
       try {
-        await db.execute(`INSERT OR REPLACE INTO ${table} (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`, vals);
+        await db.execute(
+          `INSERT OR REPLACE INTO ${table} (${cols.join(', ')}) VALUES (${placeholders})`,
+          cols.map(c => row[c] ?? null)
+        );
         changes++;
-      } catch { /* incompatible schema — skip */ }
+      } catch { /* table doesn't exist on this device's schema yet — skip */ }
     }
   }
 
   await updateAppConfig({ settings: { ...s, cloud_sync_last_pull_at: result.server_time } });
   return { ok: true, changes };
-}
-
-export async function pushSyncData(tenantId: string): Promise<{ ok: boolean; error?: string; synced_at?: string; counts?: Record<string, number> }> {
-  const config = await getAppConfig();
-  const s = config?.settings as any ?? {};
-  if (!s.cloud_sync_enabled || !s.cloud_sync_code) return { ok: false, error: 'Cloud sync not activated' };
-
-  const db = await getDb();
-  const shopType = config?.shop_type ?? '';
-
-  // Collect all data
-  const [jobs, jobItems, customers, vehicles, staff, attendance, services, memberships, inventory, appointments] = await Promise.all([
-    db.select<any[]>(`SELECT * FROM carwash_jobs WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 2000`, [tenantId]).catch(() => []),
-    db.select<any[]>(`SELECT * FROM carwash_job_items WHERE tenant_id = ?`, [tenantId]).catch(() => []),
-    db.select<any[]>(`SELECT * FROM customers WHERE tenant_id = ? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 2000`, [tenantId]).catch(() => []),
-    db.select<any[]>(`SELECT * FROM carwash_vehicles WHERE tenant_id = ? AND deleted_at IS NULL`, [tenantId]).catch(() => []),
-    db.select<any[]>(`SELECT id, tenant_id, name, phone, role, monthly_salary, joining_date, is_active, deduct_half_day, deduct_full_day_leave FROM carwash_staff WHERE tenant_id = ? AND deleted_at IS NULL`, [tenantId]).catch(() => []),
-    db.select<any[]>(`SELECT * FROM carwash_attendance WHERE tenant_id = ? AND deleted_at IS NULL`, [tenantId]).catch(() => []),
-    db.select<any[]>(`SELECT * FROM carwash_services WHERE tenant_id = ? AND deleted_at IS NULL`, [tenantId]).catch(() => []),
-    db.select<any[]>(`SELECT * FROM carwash_memberships WHERE tenant_id = ? AND deleted_at IS NULL`, [tenantId]).catch(() => []),
-    db.select<any[]>(`SELECT * FROM carwash_inventory WHERE tenant_id = ? AND deleted_at IS NULL`, [tenantId]).catch(() => []),
-    db.select<any[]>(`SELECT * FROM carwash_appointments WHERE tenant_id = ? AND deleted_at IS NULL ORDER BY appointment_date DESC LIMIT 500`, [tenantId]).catch(() => []),
-  ]);
-
-  const payload = {
-    tenant_id: tenantId,
-    sync_code: s.cloud_sync_code,
-    shop_name: config?.shop_name,
-    shop_type: shopType,
-    jobs, job_items: jobItems, customers, vehicles, staff, attendance,
-    services, memberships, inventory, appointments,
-  };
-
-  const res = await fetch(`${SERVER}/sync/push`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    return { ok: false, error: err.error ?? `Server error ${res.status}` };
-  }
-
-  const result = await res.json();
-
-  // Save last synced time
-  await updateAppConfig({
-    settings: {
-      ...s,
-      cloud_sync_last_at: result.synced_at ?? now(),
-    },
-  });
-
-  return {
-    ok: true,
-    synced_at: result.synced_at,
-    counts: {
-      jobs: jobs.length, customers: customers.length, staff: staff.length,
-      attendance: attendance.length, memberships: memberships.length,
-    },
-  };
 }

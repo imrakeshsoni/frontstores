@@ -122,15 +122,24 @@ function loadNotes()        { try { return JSON.parse(fs.readFileSync(NOTES_FILE
 function saveNotes(d)       { fs.writeFileSync(NOTES_FILE,     JSON.stringify(d, null, 2)); }
 
 // Merge incoming sync data — update existing records by id using last-write-wins on updated_at
+// Non-table keys riding along in the sync payload — every other array-valued key
+// is treated as a synced table, so this works for any app's table set without
+// per-shopType configuration.
+const SYNC_META_KEYS = new Set(['tenant_id', 'sync_code', 'is_delta', 'shop_name', 'shop_type', 'synced_at']);
+function syncTableNames(obj) {
+  return Object.keys(obj || {}).filter(k => !SYNC_META_KEYS.has(k) && Array.isArray(obj[k]));
+}
+
 function mergeSyncData(existing, incoming) {
-  const tables = ['jobs', 'job_items', 'customers', 'vehicles', 'staff', 'attendance', 'services', 'memberships', 'inventory', 'appointments'];
+  const tables = new Set([...syncTableNames(existing), ...syncTableNames(incoming)]);
   const result = {};
   for (const table of tables) {
-    if (!incoming[table]) { result[table] = existing[table] || []; continue; }
+    const incomingRows = incoming[table];
+    if (!Array.isArray(incomingRows)) { result[table] = existing[table] || []; continue; }
     const existingMap = {};
-    for (const r of (existing[table] || [])) if (r.id) existingMap[r.id] = r;
-    for (const r of incoming[table]) {
-      if (!r.id) continue;
+    for (const r of (existing[table] || [])) if (r && r.id) existingMap[r.id] = r;
+    for (const r of incomingRows) {
+      if (!r || !r.id) continue;
       const ex = existingMap[r.id];
       // Last-write-wins: keep whichever has newer updated_at
       if (!ex || !ex.updated_at || !r.updated_at || r.updated_at >= ex.updated_at) {
@@ -1014,8 +1023,8 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
       // No since → return everything (first sync)
       json(res, { ok: true, delta: stored, server_time: new Date().toISOString(), full: true }); return;
     }
-    // Return only records updated after `since`
-    const tables = ['jobs', 'job_items', 'customers', 'vehicles', 'staff', 'attendance', 'services', 'memberships', 'inventory', 'appointments'];
+    // Return only records updated after `since` — table list is whatever this tenant's app actually synced
+    const tables = syncTableNames(stored);
     const delta = {};
     let hasChanges = false;
     for (const table of tables) {
@@ -1023,6 +1032,44 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
       if (changed.length > 0) { delta[table] = changed; hasChanges = true; }
     }
     json(res, { ok: true, delta, server_time: new Date().toISOString(), has_changes: hasChanges }); return;
+  }
+
+  // POST /sync/request — tenant requests Cloud Sync access; lands in admin approval queue
+  if (req.method === 'POST' && pathname === '/sync/request') {
+    if (rateLimit(req, res, 'sync-request', 5, 60 * 60 * 1000)) return;
+    const body = JSON.parse(await readBody(req));
+    const { tenant_id } = body;
+    if (!tenant_id) { json(res, { ok: false, error: 'Missing tenant_id' }, 400); return; }
+    const subs = loadSubs();
+    const sub = subs[tenant_id];
+    if (!sub) { json(res, { ok: false, error: 'Shop not found' }, 404); return; }
+    if (sub.sync_enabled) { json(res, { ok: true, status: 'approved' }); return; }
+    if (sub.sync_request_status !== 'pending') {
+      sub.sync_request_status = 'pending';
+      sub.sync_requested_at = new Date().toISOString();
+      saveSubs(subs);
+      logActivity(tenant_id, sub.shop_name, 'sync_requested', 'Requested Cloud Sync access');
+      console.log(`☁️  ${sub.shop_name} requested Cloud Sync`);
+    }
+    json(res, { ok: true, status: 'pending' });
+    return;
+  }
+
+  // GET /sync/status/:tenant_id — tenant polls request/approval status (tenant_id acts as the bearer, same as /license/:tenant_id)
+  const syncStatusMatch = pathname.match(/^\/sync\/status\/([a-f0-9-]{36})$/);
+  if (req.method === 'GET' && syncStatusMatch) {
+    if (rateLimit(req, res, 'sync-status', 120, 60 * 60 * 1000)) return;
+    const tenantId = syncStatusMatch[1];
+    const sub = loadSubs()[tenantId];
+    if (!sub) { json(res, { ok: false, error: 'Shop not found' }, 404); return; }
+    json(res, {
+      ok: true,
+      enabled: !!sub.sync_enabled,
+      request_status: sub.sync_request_status || null,
+      sync_code: sub.sync_enabled ? sub.sync_code : null,
+      dashboard_url: sub.sync_enabled ? `https://update.frontstores.com/shop/${tenantId}` : null,
+    });
+    return;
   }
 
   // POST /sync/activate — validate sync code, enable cloud sync for tenant
@@ -1284,6 +1331,48 @@ const adminServer = http.createServer(async (req, res) => {
       console.log(`☁️  Sync code generated for ${subs[tenantId].shop_name}: ${body.sync_code}`);
     }
     saveSubs(subs);
+    json(res, { ok: true }); return;
+  }
+
+  // GET /admin/api/sync-requests — pending Cloud Sync requests awaiting approval
+  if (req.method === 'GET' && pathname === '/admin/api/sync-requests') {
+    if (!checkAuth(req)) { res.writeHead(401); res.end(); return; }
+    const subs = loadSubs();
+    const requests = Object.entries(subs)
+      .filter(([, s]) => s.sync_request_status === 'pending')
+      .map(([tenant_id, s]) => ({ tenant_id, shop_name: s.shop_name, shop_type: s.shop_type, requested_at: s.sync_requested_at }));
+    json(res, requests); return;
+  }
+
+  // POST /admin/api/customers/:id/approve-sync — approve a pending request, auto-issue code, enable immediately
+  const approveSyncMatch = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/approve-sync$/);
+  if (req.method === 'POST' && approveSyncMatch) {
+    if (!checkAuth(req)) { res.writeHead(401); res.end(); return; }
+    const tenantId = approveSyncMatch[1];
+    const subs = loadSubs();
+    const sub = subs[tenantId];
+    if (!sub) { json(res, { ok: false, error: 'Not found' }, 404); return; }
+    sub.sync_code = crypto.randomBytes(4).toString('hex').toUpperCase();
+    sub.sync_enabled = true;
+    sub.sync_request_status = 'approved';
+    sub.sync_activated_at = new Date().toISOString();
+    saveSubs(subs);
+    logActivity(tenantId, sub.shop_name, 'sync_approved', 'Cloud Sync request approved by admin');
+    console.log(`☁️  Cloud Sync approved for ${sub.shop_name}`);
+    json(res, { ok: true }); return;
+  }
+
+  // POST /admin/api/customers/:id/reject-sync — reject a pending Cloud Sync request
+  const rejectSyncMatch = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/reject-sync$/);
+  if (req.method === 'POST' && rejectSyncMatch) {
+    if (!checkAuth(req)) { res.writeHead(401); res.end(); return; }
+    const tenantId = rejectSyncMatch[1];
+    const subs = loadSubs();
+    const sub = subs[tenantId];
+    if (!sub) { json(res, { ok: false, error: 'Not found' }, 404); return; }
+    sub.sync_request_status = 'rejected';
+    saveSubs(subs);
+    logActivity(tenantId, sub.shop_name, 'sync_rejected', 'Cloud Sync request rejected by admin');
     json(res, { ok: true }); return;
   }
 

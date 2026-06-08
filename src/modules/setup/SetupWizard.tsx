@@ -36,6 +36,7 @@ const SHOP_TYPES = [
   { value: 'furniture',    label: 'Furniture Store',           icon: '🪑', desc: 'Regular + custom orders, delivery, carpenter assignment' },
   { value: 'printing',     label: 'Printing / Stationery',     icon: '🖨️', desc: 'Print jobs, stationery counter billing, stock management' },
   { value: 'ca',           label: 'CA / Tax Consultant',       icon: '📊', desc: 'Client tasks, ITR/GST filing, document tracker, invoices' },
+  { value: 'crm',          label: 'CRM / Sales Tracker',       icon: '🤝', desc: 'Leads, deal pipeline, follow-up reminders, communication log' },
   { value: 'events',       label: 'Event Planner',             icon: '🎪', desc: 'Weddings, corporate events, vendor management, expenses' },
   { value: 'travel',       label: 'Travel Agency',             icon: '✈️', desc: 'Trip bookings, itinerary, visa tracking, payment collection' },
   { value: 'insurance',    label: 'Insurance Agent',           icon: '🛡️', desc: 'Policies, renewal reminders, claims, commission tracking' },

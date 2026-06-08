@@ -524,6 +524,9 @@
       <div class="nav-item" id="tab-devices" onclick="switchTab('devices')">
         <span class="nav-icon">📱</span> Devices <span id="devices-badge" style="display:none;background:#f59e0b;color:#111;border-radius:20px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px">0</span>
       </div>
+      <div class="nav-item" id="tab-syncrequests" onclick="switchTab('syncrequests')">
+        <span class="nav-icon">☁️</span> Cloud Sync <span id="syncrequests-badge" style="display:none;background:#f59e0b;color:#111;border-radius:20px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px">0</span>
+      </div>
     </nav>
     <div class="sb-footer">
       <div class="sb-time" id="clock"></div>
@@ -764,6 +767,15 @@
         <div id="devices-approved"></div>
       </div>
 
+      <div class="tab-page" id="page-syncrequests">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <h2 style="font-size:18px;font-weight:700">☁️ Cloud Sync Requests</h2>
+          <button onclick="loadSyncRequests()" style="padding:6px 14px;background:var(--accent);color:#111;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer">Refresh</button>
+        </div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Tenants that requested Cloud Sync from Settings. Approve to switch it on for them immediately — no code to issue.</p>
+        <div id="syncrequests-list"></div>
+      </div>
+
       <!-- Customer detail full page -->
       <div id="customer-detail">
         <div class="cd-page-header">
@@ -832,10 +844,11 @@ const PAGE_META = {
   health:    { title:'Health',    sub:'Service status and uptime' },
   activity:  { title:'Activity Log', sub:'Admin actions history' },
   broadcast: { title:'Broadcast', sub:'Messages sent to all users' },
+  syncrequests: { title:'Cloud Sync', sub:'Requests to enable Cloud Sync, awaiting approval' },
 };
 
 function switchTab(t) {
-  ['customers','contacts','errors','analytics','health','activity','broadcast','devices'].forEach(x => {
+  ['customers','contacts','errors','analytics','health','activity','broadcast','devices','syncrequests'].forEach(x => {
     document.getElementById('tab-'+x)?.classList.toggle('active', x===t);
     document.getElementById('page-'+x)?.classList.toggle('active', x===t);
   });
@@ -848,6 +861,7 @@ function switchTab(t) {
   if (t === 'activity')  loadActivity();
   if (t === 'broadcast') loadBroadcast();
   if (t === 'devices')   loadDevices();
+  if (t === 'syncrequests') loadSyncRequests();
 }
 
 function login() {
@@ -894,6 +908,7 @@ async function loadAll(isLogin=false, silent=false) {
     if (openId) { const c = allCustomers.find(x=>x.tenant_id===openId); if (c) renderPanel(c); }
     if (!isLogin && !silent) showToast('✓ Data refreshed');
     loadDevices(true); // silently refresh device badge
+    loadSyncRequests(true); // silently refresh cloud-sync badge
   } catch(e) {
     if (isLogin) document.getElementById('login-error').textContent = 'Cannot connect. Is server running?';
     else showToast('⚠ Could not connect to server', true);
@@ -1571,6 +1586,49 @@ async function loadDevices(silentBadge = false) {
 async function deviceAction(deviceId, action) {
   const r = await api(`/admin/api/devices/${deviceId}/${action}`, { method:'POST' });
   if (r.ok) { showToast(action === 'approve' ? '✓ Device approved — user can now log in' : 'Device revoked'); loadDevices(); }
+  else showToast('Failed', true);
+}
+
+// CLOUD SYNC REQUESTS
+async function loadSyncRequests(silentBadge = false) {
+  const r = await api('/admin/api/sync-requests');
+  if (!r.ok) return;
+  const requests = await r.json();
+
+  const badge = document.getElementById('syncrequests-badge');
+  if (badge) { badge.textContent = requests.length; badge.style.display = requests.length > 0 ? '' : 'none'; }
+
+  if (silentBadge) return;
+
+  const fmtDt = iso => iso ? new Date(iso).toLocaleString('en-IN') : '—';
+  const listEl = document.getElementById('syncrequests-list');
+  if (!listEl) return;
+
+  if (requests.length === 0) {
+    listEl.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:12px 0">No pending Cloud Sync requests</div>';
+    return;
+  }
+
+  listEl.innerHTML = `<h3 style="font-size:14px;font-weight:700;color:#f59e0b;margin-bottom:10px">⏳ Pending Approval (${requests.length})</h3>` +
+    requests.map(req => `<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div>
+          <div style="font-size:14px;font-weight:700">${ICONS[req.shop_type]||'🏪'} ${escHtml(req.shop_name||'Unknown Shop')}</div>
+          <div style="font-size:11px;color:var(--muted)">Type: ${escHtml(LABELS[req.shop_type]||req.shop_type||'—')}</div>
+          <div style="font-size:11px;color:var(--muted)">Requested: ${fmtDt(req.requested_at)}</div>
+        </div>
+        <span style="padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(245,158,11,.15);color:#f59e0b">PENDING</span>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button onclick="syncRequestAction('${req.tenant_id}','approve')" style="flex:1;padding:8px;background:rgba(52,211,153,.15);border:1px solid rgba(52,211,153,.3);border-radius:10px;color:#34d399;font-size:12px;font-weight:700;cursor:pointer">✓ Approve</button>
+        <button onclick="syncRequestAction('${req.tenant_id}','reject')" style="flex:1;padding:8px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:10px;color:#f87171;font-size:12px;font-weight:700;cursor:pointer">✕ Reject</button>
+      </div>
+    </div>`).join('');
+}
+
+async function syncRequestAction(tenantId, action) {
+  const r = await api(`/admin/api/customers/${tenantId}/${action}-sync`, { method:'POST' });
+  if (r.ok) { showToast(action === 'approve' ? '☁️ Cloud Sync approved — switched on for this tenant' : 'Request rejected'); loadSyncRequests(); }
   else showToast('Failed', true);
 }
 

@@ -62,6 +62,7 @@ import migration0061 from '../../../src-tauri/migrations/0061_ca_staff.sql?raw';
 import migration0062 from '../../../src-tauri/migrations/0062_carwash_salary_payments.sql?raw';
 import migration0063 from '../../../src-tauri/migrations/0063_hardware_staff.sql?raw';
 import migration0064 from '../../../src-tauri/migrations/0064_hardware_pro.sql?raw';
+import migration0065 from '../../../src-tauri/migrations/0065_crm.sql?raw';
 
 export interface Migration {
   name: string;
@@ -134,5 +135,6 @@ export async function readMigrations(): Promise<Migration[]> {
     { name: '0062_carwash_salary_payments', sql: migration0062 }, // [carwash] [all tenants]
     { name: '0063_hardware_staff', sql: migration0063 }, // [hardware] [all tenants]
     { name: '0064_hardware_pro', sql: migration0064 }, // [hardware] [all tenants]
+    { name: '0065_crm', sql: migration0065 }, // [crm] [all tenants]
   ];
 }

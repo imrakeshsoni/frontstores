@@ -1,6 +1,6 @@
 import { useAppStore } from '@/app/store/app.store';
 
-export type ShopType = 'medical' | 'restaurant' | 'grocery' | 'carwash' | 'clinic' | 'beauty' | 'study' | 'coaching' | 'gym' | 'jewellery' | 'realestate' | 'hotel' | 'tailor' | 'hardware' | 'repair' | 'drivingschool' | 'laundry' | 'catering' | 'pestcontrol' | 'clothing' | 'bakery' | 'optician' | 'petrolpump' | 'furniture' | 'printing' | 'ca' | 'events' | 'travel' | 'insurance' | 'homeservice' | 'tyrescrap';
+export type ShopType = 'medical' | 'restaurant' | 'grocery' | 'carwash' | 'clinic' | 'beauty' | 'study' | 'coaching' | 'gym' | 'jewellery' | 'realestate' | 'hotel' | 'tailor' | 'hardware' | 'repair' | 'drivingschool' | 'laundry' | 'catering' | 'pestcontrol' | 'clothing' | 'bakery' | 'optician' | 'petrolpump' | 'furniture' | 'printing' | 'ca' | 'events' | 'travel' | 'insurance' | 'homeservice' | 'tyrescrap' | 'crm';
 
 const SHOP_TYPE_LABELS: Record<string, string> = {
   medical: 'Medical Store / Pharmacy', // [medical] [all tenants]
@@ -189,6 +189,7 @@ export const APP_REGISTRY: AppRegistryEntry[] = [
   { type: 'furniture',   label: 'Furniture Store',              icon: '🪑', description: 'Regular + custom orders, delivery, carpenter tracking', color: '#92400e', bgColor: '#fef3c7', dashboardRoute: '/furniture/dashboard' },
   { type: 'printing',    label: 'Printing / Stationery',        icon: '🖨️', description: 'Print jobs, stationery counter billing', color: '#2563eb', bgColor: '#dbeafe', dashboardRoute: '/printing/dashboard' },
   { type: 'ca',          label: 'CA / Tax Consultant',          icon: '📊', description: 'Clients, ITR/GST tasks, documents, invoices', color: '#2563eb', bgColor: '#dbeafe', dashboardRoute: '/ca/dashboard' },
+  { type: 'crm',         label: 'CRM / Sales Tracker',          icon: '🤝', description: 'Leads, deal pipeline, follow-up reminders, communication log', color: '#0891b2', bgColor: '#cffafe', dashboardRoute: '/crm/dashboard' },
   { type: 'events',      label: 'Event Planner',                icon: '🎪', description: 'Events, vendors, task checklists, expenses', color: '#db2777', bgColor: '#fce7f3', dashboardRoute: '/events/dashboard' },
   { type: 'travel',      label: 'Travel Agency',                icon: '✈️', description: 'Trip bookings, itinerary, visa tracking', color: '#0891b2', bgColor: '#cffafe', dashboardRoute: '/travel/dashboard' },
   { type: 'insurance',   label: 'Insurance Agent',              icon: '🛡️', description: 'Policies, renewals, claims, commission tracking', color: '#16a34a', bgColor: '#dcfce7', dashboardRoute: '/insurance/dashboard' },

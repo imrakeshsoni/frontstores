@@ -18,11 +18,6 @@ pub fn run() {
             commands::config::get_or_create_tenant,
             commands::config::get_next_bill_number,
             commands::system::get_system_info,
-            commands::sync::start_wifi_sync_server,
-            commands::sync::stop_wifi_sync_server,
-            commands::sync::drain_pushed_rows,
-            commands::sync::ping_sync_server,
-            commands::sync::push_to_desktop,
         ])
         .run(tauri::generate_context!())
         .expect("error while running FrontStores");

@@ -57,28 +57,29 @@ Which app are you working on?
 24) Travel Agency (travel)
 25) Event Planner (events)
 26) Driving School (drivingschool)
+27) CRM / Sales Tracker (crm)
 
 ── Education ──
-27) StudyMate — Student App (study)
-28) Coaching Institute (coaching)
+28) StudyMate — Student App (study)
+29) Coaching Institute (coaching)
 
 ── Fitness ──
-29) Gym / Fitness Center (gym)
+30) Gym / Fitness Center (gym)
 
 ── Real Estate ──
-30) Real Estate / PropMate (realestate)
+31) Real Estate / PropMate (realestate)
 
 ── System ──
-31) Core / Shared (affects all apps)
-32) 🌐 All Apps (change applies to every app)
-33) Website — frontstores.com
-34) Admin Panel (tools/update-server, admin-app)
-35) ➕ Create new app
-36) ❓ General Question (not tied to any specific app)
+32) Core / Shared (affects all apps)
+33) 🌐 All Apps (change applies to every app)
+34) Website — frontstores.com
+35) Admin Panel (tools/update-server, admin-app)
+36) ➕ Create new app
+37) ❓ General Question (not tied to any specific app)
 ```
 
-If user picks **32 (All Apps)**, tag changes as `// [all apps] [all tenants]` and implement for every shopType.
-If user picks **36 (General Question)**, answer the question directly — no Q2 needed, no app tagging required.
+If user picks **33 (All Apps)**, tag changes as `// [all apps] [all tenants]` and implement for every shopType.
+If user picks **37 (General Question)**, answer the question directly — no Q2 needed, no app tagging required.
 
 ---
 
@@ -128,6 +129,7 @@ frontstores.com hosts multiple separate apps. Each app is a different downloadab
 | Hospital / Clinic | frontstores.com/clinic | `clinic` | ✅ Active |
 | Beauty Parlor / Salon | frontstores.com/beauty | `beauty` | ✅ Active |
 | StudyMate (Student App) | frontstores.com/study | `study` | ✅ Active |
+| CRM / Sales Tracker | frontstores.com/crm | `crm` | ✅ Active |
 
 All apps are built from this single codebase. The `shopType` field in `app_config` controls which features are visible.
 

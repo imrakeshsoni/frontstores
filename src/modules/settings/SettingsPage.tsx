@@ -11,7 +11,7 @@ import { exportBackup } from '@/lib/db/backup';
 import { PageIntro } from '@/components/ui/PageIntro';
 import { useTheme } from '@/lib/theme/useTheme';
 import { reportError } from '@/lib/errorReporter';
-import { getCloudSyncStatus, activateCloudSync, pushSyncData, setMobilePin, pushDelta, pullDelta } from '@/lib/db/cloudSync';
+import { getCloudSyncStatus, refreshCloudSyncStatus, requestCloudSync, pushSyncData, setMobilePin, pushDelta, pullDelta } from '@/lib/db/cloudSync';
 
 type SettingsForm = {
   shop_name: string;
@@ -978,33 +978,28 @@ function SectionPinLockSection() {
 // ── Cloud Sync Section ────────────────────────────────────────────────────────
 function CloudSyncSection() {
   const tenantId = useAppStore(s => s.config?.tenant_id ?? '');
-  const qc = useQueryClient();
-  const [codeInput, setCodeInput] = useState('');
+  const [requesting, setRequesting] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [activating, setActivating] = useState(false);
   const [pinInput, setPinInput] = useState('');
   const [settingPin, setSettingPin] = useState(false);
   const [showPinForm, setShowPinForm] = useState(false);
 
   const { data: syncStatus, refetch: refetchStatus } = useQuery({
-    queryKey: ['cloud-sync-status'],
-    queryFn: () => getCloudSyncStatus(),
+    queryKey: ['cloud-sync-status', tenantId],
+    queryFn: () => refreshCloudSyncStatus(tenantId),
     enabled: !!tenantId,
     refetchInterval: 60_000,
   });
 
-  const handleActivate = async () => {
-    if (!codeInput.trim()) { toast.error('Enter your sync code'); return; }
-    setActivating(true);
+  const handleRequest = async () => {
+    if (!tenantId || requesting) return;
+    setRequesting(true);
     try {
-      const result = await activateCloudSync(tenantId, codeInput.trim());
-      if (!result.ok) { toast.error(result.error ?? 'Invalid code'); return; }
-      toast.success('Cloud Sync activated! 🎉');
-      setCodeInput('');
+      const result = await requestCloudSync(tenantId);
+      if (!result.ok) { toast.error(result.error ?? 'Could not send request'); return; }
+      toast.success('Request sent — we\'ll approve it from our end shortly.');
       refetchStatus();
-    } catch (e: any) {
-      toast.error('Activation failed: ' + (e?.message ?? 'Check internet connection'));
-    } finally { setActivating(false); }
+    } finally { setRequesting(false); }
   };
 
   const handleSync = async () => {
@@ -1013,7 +1008,7 @@ function CloudSyncSection() {
     try {
       // Full sync first time, then delta
       const status = await getCloudSyncStatus();
-      const result = status.last_synced_at
+      const result = status.lastSyncedAt
         ? await pushDelta(tenantId)
         : await pushSyncData(tenantId);
       if (!result.ok) { toast.error(result.error ?? 'Sync failed'); return; }
@@ -1026,9 +1021,9 @@ function CloudSyncSection() {
     } finally { setSyncing(false); }
   };
 
-  const lastSynced = syncStatus?.last_synced_at
+  const lastSynced = syncStatus?.lastSyncedAt
     ? (() => {
-        const diff = Math.round((Date.now() - new Date(syncStatus.last_synced_at).getTime()) / 60000);
+        const diff = Math.round((Date.now() - new Date(syncStatus.lastSyncedAt).getTime()) / 60000);
         if (diff < 1) return 'just now';
         if (diff < 60) return `${diff} min ago`;
         if (diff < 1440) return `${Math.floor(diff / 60)}h ago`;
@@ -1040,42 +1035,50 @@ function CloudSyncSection() {
     <div className="card p-4 border-l-4 border-l-sky-500">
       <div className="flex items-center gap-2 mb-1">
         <Cloud className="h-4 w-4 text-sky-400" />
-        <p className="section-label text-sky-300">☁️ Cloud Sync — Mobile Access</p>
+        <p className="section-label text-sky-300">☁️ Cloud Sync — Access Anywhere</p>
       </div>
       <p className="text-xs text-slate-400 mb-4">
-        Sync your shop data to the cloud so you can view it from your mobile phone from anywhere in India.
+        Sync your shop data to the cloud so you (and your team) can access it from any device, anywhere — your local data stays exactly as-is even when sync is off.
       </p>
 
       {!syncStatus?.enabled ? (
-        /* Not activated */
+        /* Not yet enabled — request → admin approval flow */
         <div className="space-y-3">
           <div className="rounded-xl p-3" style={{ background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)' }}>
             <p className="text-xs text-sky-300 font-semibold mb-1">How it works</p>
-            <p className="text-xs text-slate-400">1. Contact FrontStores to get your sync activation code</p>
-            <p className="text-xs text-slate-400">2. Enter the code below to activate</p>
-            <p className="text-xs text-slate-400">3. Click "Sync Now" whenever you want to update mobile view</p>
-            <p className="text-xs text-slate-400">4. Open your mobile dashboard link on any phone</p>
+            <p className="text-xs text-slate-400">1. Tap "Request Cloud Sync" below</p>
+            <p className="text-xs text-slate-400">2. FrontStores reviews and approves your request</p>
+            <p className="text-xs text-slate-400">3. Once approved, it switches on here automatically — no code to enter</p>
+            <p className="text-xs text-slate-400">4. Then tap "Sync Now" to push your data and get your mobile dashboard link</p>
           </div>
-          <div className="flex gap-2">
-            <input
-              value={codeInput}
-              onChange={e => setCodeInput(e.target.value.toUpperCase())}
-              placeholder="Enter sync code (e.g. SYNC-ABCD)"
-              className="flex-1 rounded-xl border px-3 py-2 text-sm font-mono outline-none uppercase"
-              style={{ borderColor: 'var(--surface-border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }}
-              onKeyDown={e => e.key === 'Enter' && handleActivate()}
-            />
-            <button
-              onClick={handleActivate}
-              disabled={activating || !codeInput.trim()}
-              className="px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-50"
-              style={{ background: '#0ea5e9', color: '#fff' }}>
-              {activating ? 'Activating…' : 'Activate'}
-            </button>
-          </div>
+
+          {syncStatus?.requestStatus === 'pending' && (
+            <div className="rounded-xl p-3 flex items-center gap-3" style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.2)' }}>
+              <div className="h-8 w-8 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0">
+                <Cloud className="h-4 w-4 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-amber-300">Request pending approval</p>
+                <p className="text-xs text-slate-400">We'll switch on Cloud Sync for your account shortly — check back here.</p>
+              </div>
+            </div>
+          )}
+          {syncStatus?.requestStatus === 'rejected' && (
+            <div className="rounded-xl p-3" style={{ background: 'rgba(244,63,94,0.08)', border: '1px solid rgba(244,63,94,0.2)' }}>
+              <p className="text-xs text-rose-300 font-semibold">Your request wasn't approved. Contact FrontStores support, or send a new request.</p>
+            </div>
+          )}
+
+          <button
+            onClick={handleRequest}
+            disabled={requesting || syncStatus?.requestStatus === 'pending'}
+            className="px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-50"
+            style={{ background: '#0ea5e9', color: '#fff' }}>
+            {requesting ? 'Sending request…' : syncStatus?.requestStatus === 'pending' ? 'Request pending…' : syncStatus?.requestStatus === 'rejected' ? 'Send request again' : 'Request Cloud Sync'}
+          </button>
         </div>
       ) : (
-        /* Activated */
+        /* Enabled */
         <div className="space-y-3">
           <div className="rounded-xl p-3 flex items-center gap-3" style={{ background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)' }}>
             <div className="h-8 w-8 rounded-full bg-sky-500 flex items-center justify-center flex-shrink-0">
@@ -1101,12 +1104,12 @@ function CloudSyncSection() {
                   <Smartphone className="h-3.5 w-3.5 text-sky-400" /> Mobile Login PIN
                 </p>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  {syncStatus.mobile_pin_set ? '✓ PIN set — staff can log in from Android app' : 'Set a PIN so you can log in on the Android app'}
+                  {syncStatus.mobilePinSet ? '✓ PIN set — staff can log in from Android app' : 'Set a PIN so you can log in on the Android app'}
                 </p>
               </div>
               <button onClick={() => setShowPinForm(v => !v)}
                 className="text-xs px-3 py-1.5 rounded-lg font-semibold btn-secondary flex-shrink-0">
-                {syncStatus.mobile_pin_set ? 'Change PIN' : 'Set PIN'}
+                {syncStatus.mobilePinSet ? 'Change PIN' : 'Set PIN'}
               </button>
             </div>
             {showPinForm && (
@@ -1138,16 +1141,16 @@ function CloudSyncSection() {
             )}
           </div>
 
-          {syncStatus.dashboard_url && (
+          {syncStatus.dashboardUrl && (
             <div className="rounded-xl p-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-border)' }}>
               <p className="text-xs font-semibold text-slate-300 mb-1 flex items-center gap-1.5">
                 <Smartphone className="h-3.5 w-3.5 text-sky-400" /> Your Mobile Dashboard
               </p>
               <p className="text-xs text-slate-400 mb-2">Open this link on your phone to see live shop data:</p>
               <div className="flex items-center gap-2">
-                <code className="flex-1 text-xs text-sky-300 truncate">{syncStatus.dashboard_url}</code>
+                <code className="flex-1 text-xs text-sky-300 truncate">{syncStatus.dashboardUrl}</code>
                 <button
-                  onClick={() => { navigator.clipboard?.writeText(syncStatus.dashboard_url!); toast.success('Link copied!'); }}
+                  onClick={() => { navigator.clipboard?.writeText(syncStatus.dashboardUrl!); toast.success('Link copied!'); }}
                   className="text-xs px-2 py-1 rounded-lg font-semibold btn-secondary flex-shrink-0">
                   Copy
                 </button>

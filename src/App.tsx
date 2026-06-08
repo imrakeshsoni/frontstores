@@ -275,6 +275,13 @@ const CAInvoicesPage          = lazy(() => import('@/modules/ca/InvoicesPage').t
 const CAComplianceCalendarPage = lazy(() => import('@/modules/ca/ComplianceCalendarPage').then(m => ({ default: m.CAComplianceCalendarPage })));
 const CAStaffPage             = lazy(() => import('@/modules/ca/StaffPage').then(m => ({ default: m.CAStaffPage })));
 
+// [crm] [all tenants]
+const CRMDashboard            = lazy(() => import('@/modules/crm/CRMDashboard').then(m => ({ default: m.CRMDashboard })));
+const CRMContactsPage         = lazy(() => import('@/modules/crm/ContactsPage').then(m => ({ default: m.CRMContactsPage })));
+const CRMPipelinePage         = lazy(() => import('@/modules/crm/PipelinePage').then(m => ({ default: m.CRMPipelinePage })));
+const CRMFollowUpsPage        = lazy(() => import('@/modules/crm/FollowUpsPage').then(m => ({ default: m.CRMFollowUpsPage })));
+const CRMCommunicationLogPage = lazy(() => import('@/modules/crm/CommunicationLogPage').then(m => ({ default: m.CRMCommunicationLogPage })));
+
 // [events] [all tenants]
 const EventsDashboard  = lazy(() => import('@/modules/events/EventsDashboard').then(m => ({ default: m.EventsDashboard })));
 const EventsListPage   = lazy(() => import('@/modules/events/EventsListPage').then(m => ({ default: m.EventsListPage })));
@@ -420,6 +427,7 @@ export default function App() {
               config?.shop_type === 'furniture'    ? '/furniture/dashboard' :
               config?.shop_type === 'printing'     ? '/printing/dashboard' :
               config?.shop_type === 'ca'           ? '/ca/dashboard' :
+              config?.shop_type === 'crm'          ? '/crm/dashboard' :
               config?.shop_type === 'events'       ? '/events/dashboard' :
               config?.shop_type === 'travel'       ? '/travel/dashboard' :
               config?.shop_type === 'insurance'    ? '/insurance/dashboard' :
@@ -645,6 +653,13 @@ export default function App() {
             <Route path="ca/compliance"  element={<CAComplianceCalendarPage />} />
             <Route path="ca/staff"       element={<CAStaffPage />} />
             <Route path="ca/reports"     element={<CAReportsPage />} />
+
+            {/* [crm] [all tenants] */}
+            <Route path="crm/dashboard"      element={<CRMDashboard />} />
+            <Route path="crm/contacts"       element={<CRMContactsPage />} />
+            <Route path="crm/pipeline"       element={<CRMPipelinePage />} />
+            <Route path="crm/followups"      element={<CRMFollowUpsPage />} />
+            <Route path="crm/communications" element={<CRMCommunicationLogPage />} />
 
             {/* [catering] [all tenants] */}
             <Route path="catering/dashboard"    element={<CateringDashboard />} />
