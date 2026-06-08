@@ -7,6 +7,7 @@ import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { useAppStore } from '@/app/store/app.store';
 import { updateAppConfig } from '@/lib/db/config';
 import { changePassword, changeUsername, getAuthUsername, getExportLogs, logExport } from '@/lib/db/auth';
+import { listStaffUsers, requestStaffUser, removeStaffUser, refreshStaffUserApprovals, type StaffUser } from '@/lib/db/staffUsers';
 import { exportBackup } from '@/lib/db/backup';
 import { PageIntro } from '@/components/ui/PageIntro';
 import { useTheme } from '@/lib/theme/useTheme';
@@ -706,6 +707,11 @@ export function SettingsPage() {
         </div>
       </div>
 
+      {/* Staff Logins — owner only; staff accounts don't see this section */}
+      {(sessionStorage.getItem('fs_logged_in_username') || 'owner') === 'owner' && (
+        <StaffLoginsSection tenantId={tenantId} />
+      )}
+
       {/* Export Audit Log */}
       <div className="card p-4 border-l-4 border-l-teal-500">
         <p className="section-label mb-1 text-teal-300">📋 Export Audit Log</p>
@@ -823,6 +829,108 @@ function WhatsAppBusinessSection() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// [core] [all apps] [all tenants] — Owner adds staff logins (e.g. a biller); each
+// request needs admin approval before that username/password can sign in. The
+// password is hashed locally and never sent anywhere — only the username + a
+// request id go up for approval.
+function StaffLoginsSection({ tenantId }: { tenantId: string }) {
+  const [staffUsername, setStaffUsername] = useState('');
+  const [staffPassword, setStaffPassword] = useState('');
+  const [staffConfirm, setStaffConfirm]   = useState('');
+  const [submitting, setSubmitting]       = useState(false);
+
+  const queryClient = useQueryClient();
+  const { data: staffUsers } = useQuery({
+    queryKey: ['staff-users', tenantId],
+    queryFn: () => listStaffUsers(tenantId),
+    enabled: !!tenantId,
+  });
+
+  // Reconcile pending requests with the server whenever this section is open
+  useEffect(() => {
+    if (!tenantId) return;
+    refreshStaffUserApprovals(tenantId).then(() => {
+      queryClient.invalidateQueries({ queryKey: ['staff-users', tenantId] });
+    });
+  }, [tenantId, queryClient]);
+
+  async function handleAddStaffUser() {
+    if (staffPassword !== staffConfirm) { toast.error('Passwords do not match'); return; }
+    setSubmitting(true);
+    try {
+      const result = await requestStaffUser(tenantId, staffUsername, staffPassword);
+      if (result.ok) {
+        toast.success('Request sent — the login will work once FrontStores approves it');
+        setStaffUsername(''); setStaffPassword(''); setStaffConfirm('');
+        queryClient.invalidateQueries({ queryKey: ['staff-users', tenantId] });
+      } else {
+        toast.error(result.error ?? 'Could not create staff login request');
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleRemove(staff: StaffUser) {
+    if (!confirm(`Remove staff login "${staff.username}"? They won't be able to sign in anymore.`)) return;
+    await removeStaffUser(tenantId, staff.id);
+    queryClient.invalidateQueries({ queryKey: ['staff-users', tenantId] });
+    toast.success('Staff login removed');
+  }
+
+  function statusPill(status: StaffUser['status']) {
+    if (status === 'approved') return <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">✓ Active</span>;
+    if (status === 'rejected') return <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-800">✕ Rejected</span>;
+    return <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800">⏳ Pending approval</span>;
+  }
+
+  return (
+    <div className="card p-4 border-l-4 border-l-violet-500">
+      <p className="section-label mb-1 text-violet-300">👥 Staff Logins</p>
+      <p className="text-xs text-slate-400 mb-4">
+        Add a username + password for staff (e.g. a biller). Each request is sent to FrontStores for approval —
+        once approved, that person can sign in on this device with their own credentials and works on the same shop data.
+        Their password stays on this device, just like yours.
+      </p>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+        <input className="input" placeholder="Username (min 3 chars)" value={staffUsername} onChange={e => setStaffUsername(e.target.value)} />
+        <input className="input" type="password" placeholder="Password (min 4 chars)" value={staffPassword} onChange={e => setStaffPassword(e.target.value)} />
+        <input className="input" type="password" placeholder="Confirm password" value={staffConfirm} onChange={e => setStaffConfirm(e.target.value)} />
+      </div>
+      <button
+        onClick={handleAddStaffUser}
+        disabled={submitting || staffUsername.trim().length < 3 || staffPassword.length < 4}
+        className="btn-secondary disabled:opacity-40"
+      >
+        {submitting ? 'Sending request…' : '➕ Request Staff Login'}
+      </button>
+
+      {(staffUsers?.length ?? 0) > 0 && (
+        <div className="space-y-2 mt-5">
+          {staffUsers!.map(staff => (
+            <div key={staff.id} className="card-strong flex items-center justify-between gap-4 p-3 text-sm">
+              <div>
+                <p className="font-medium text-slate-200">{staff.username}</p>
+                <p className="text-xs text-slate-500">
+                  Requested {new Date(staff.requested_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                  {staff.approved_at ? ` · approved ${new Date(staff.approved_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}
+                </p>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                {statusPill(staff.status)}
+                {staff.status !== 'rejected' && (
+                  <button onClick={() => handleRemove(staff)} className="text-xs text-rose-400 hover:text-rose-300">Remove</button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

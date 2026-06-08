@@ -23,6 +23,7 @@ const SuppliersPage = lazy(() => import('@/modules/suppliers/SuppliersPage').the
 const ReportsPage   = lazy(() => import('@/modules/reports/ReportsPage').then(m => ({ default: m.ReportsPage })));
 const SettingsPage  = lazy(() => import('@/modules/settings/SettingsPage').then(m => ({ default: m.SettingsPage })));
 const SyncPage      = lazy(() => import('@/modules/sync/SyncPage'));
+const AnnouncementsPage = lazy(() => import('@/modules/announcements/AnnouncementsPage'));
 const KhataPage           = lazy(() => import('@/modules/khata/KhataPage').then(m => ({ default: m.KhataPage })));
 const ExpensesPage        = lazy(() => import('@/modules/expenses/ExpensesPage').then(m => ({ default: m.ExpensesPage })));
 const PurchaseOrdersPage  = lazy(() => import('@/modules/purchase-orders/PurchaseOrdersPage').then(m => ({ default: m.PurchaseOrdersPage })));
@@ -387,8 +388,10 @@ export default function App() {
       if (exists) {
         // [all apps] [all tenants] — claim/renew this device's single-session slot;
         // if another device holds it, fall through to AppLoginScreen, which will
-        // re-claim on submit and surface the "already logged in elsewhere" message
-        const claim = await claimSession(tenantId);
+        // re-claim on submit and surface the "already logged in elsewhere" message.
+        // Each login (owner or staff) holds its own slot, keyed by username.
+        const loggedInUsername = sessionStorage.getItem('fs_logged_in_username') || 'owner';
+        const claim = await claimSession(tenantId, loggedInUsername);
         if (!claim.blocked) {
           if (claim.sessionId) sessionStorage.setItem('fs_session_id', claim.sessionId);
           setAuthenticated(true);
@@ -401,16 +404,18 @@ export default function App() {
   // [all apps] [all tenants] — best-effort single-session enforcement: keep this
   // device's session alive while logged in, and release it on logout/app-switch
   // so another device can claim it without waiting for the TTL to expire.
-  const sessionRef = useRef<{ tenantId: string; sessionId: string } | null>(null);
+  const sessionRef = useRef<{ tenantId: string; sessionId: string; username: string } | null>(null);
   useEffect(() => {
     if (isAuthenticated && config?.tenant_id) {
       const sessionId = sessionStorage.getItem('fs_session_id');
-      if (sessionId) sessionRef.current = { tenantId: config.tenant_id, sessionId };
+      const username = sessionStorage.getItem('fs_logged_in_username') || 'owner';
+      if (sessionId) sessionRef.current = { tenantId: config.tenant_id, sessionId, username };
     } else if (!isAuthenticated && sessionRef.current) {
-      const { tenantId, sessionId } = sessionRef.current;
+      const { tenantId, sessionId, username } = sessionRef.current;
       sessionRef.current = null;
       sessionStorage.removeItem('fs_session_id');
-      releaseSession(tenantId, sessionId);
+      sessionStorage.removeItem('fs_logged_in_username');
+      releaseSession(tenantId, sessionId, username);
     }
   }, [isAuthenticated, config?.tenant_id]);
 
@@ -418,8 +423,9 @@ export default function App() {
     if (!isAuthenticated || !config?.tenant_id) return;
     const sessionId = sessionStorage.getItem('fs_session_id');
     if (!sessionId) return;
+    const username = sessionStorage.getItem('fs_logged_in_username') || 'owner';
     const tenantId = config.tenant_id;
-    const interval = setInterval(() => { heartbeatSession(tenantId, sessionId); }, 5 * 60 * 1000);
+    const interval = setInterval(() => { heartbeatSession(tenantId, sessionId, username); }, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [isAuthenticated, config?.tenant_id]);
 
@@ -484,6 +490,7 @@ export default function App() {
             <Route path="reports"    element={<ReportsPage />} />
             <Route path="settings"   element={<SettingsPage />} />
             <Route path="sync"       element={<SyncPage />} />
+            <Route path="announcements" element={<AnnouncementsPage />} />
             {/* [medical] [all tenants] — Pharmacy */}
             <Route path="pharmacy/batches"  element={<BatchManagerPage />} />
             <Route path="pharmacy/rx"       element={<PrescriptionsPage />} />

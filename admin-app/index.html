@@ -521,11 +521,17 @@
       <div class="nav-item" id="tab-broadcast" onclick="switchTab('broadcast')">
         <span class="nav-icon">📢</span> Broadcast
       </div>
+      <div class="nav-item" id="tab-announcements" onclick="switchTab('announcements')">
+        <span class="nav-icon">📣</span> Announcements
+      </div>
       <div class="nav-item" id="tab-devices" onclick="switchTab('devices')">
         <span class="nav-icon">📱</span> Devices <span id="devices-badge" style="display:none;background:#f59e0b;color:#111;border-radius:20px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px">0</span>
       </div>
       <div class="nav-item" id="tab-syncrequests" onclick="switchTab('syncrequests')">
         <span class="nav-icon">☁️</span> Cloud Sync <span id="syncrequests-badge" style="display:none;background:#f59e0b;color:#111;border-radius:20px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px">0</span>
+      </div>
+      <div class="nav-item" id="tab-staffrequests" onclick="switchTab('staffrequests')">
+        <span class="nav-icon">👥</span> Staff Logins <span id="staffrequests-badge" style="display:none;background:#f59e0b;color:#111;border-radius:20px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px">0</span>
       </div>
     </nav>
     <div class="sb-footer">
@@ -757,6 +763,18 @@
         <div id="broadcast-list"></div>
       </div>
 
+      <!-- ANNOUNCEMENTS TAB -->
+      <div class="tab-page" id="page-announcements">
+        <div class="broadcast-form">
+          <h3>📣 New Announcement</h3>
+          <input class="bc-input" id="an-title" placeholder="Title (e.g. Cloud Sync maintenance)" />
+          <textarea class="bc-textarea" id="an-message" placeholder="Message — e.g. Cloud facility will not be available this Sunday…"></textarea>
+          <button class="bc-submit" onclick="confirmPushAnnouncement()">Push Announcement</button>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:16px">Pushed instantly and silently to every tenant's app — no update click needed. Users see a glowing Announcements tab and a one-time popup.</div>
+        <div id="announcements-list"></div>
+      </div>
+
       <!-- Devices tab -->
       <div class="tab-page" id="page-devices">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
@@ -774,6 +792,15 @@
         </div>
         <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Tenants that requested Cloud Sync from Settings. Approve to switch it on for them immediately — no code to issue.</p>
         <div id="syncrequests-list"></div>
+      </div>
+
+      <div class="tab-page" id="page-staffrequests">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <h2 style="font-size:18px;font-weight:700">👥 Staff Login Requests</h2>
+          <button onclick="loadStaffUserRequests()" style="padding:6px 14px;background:var(--accent);color:#111;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer">Refresh</button>
+        </div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Owners requested these staff logins from Settings (username only — passwords never leave their device). Approve to let that username sign in on the shop's app.</p>
+        <div id="staffrequests-list"></div>
       </div>
 
       <!-- Customer detail full page -->
@@ -844,11 +871,13 @@ const PAGE_META = {
   health:    { title:'Health',    sub:'Service status and uptime' },
   activity:  { title:'Activity Log', sub:'Admin actions history' },
   broadcast: { title:'Broadcast', sub:'Messages sent to all users' },
+  announcements: { title:'Announcements', sub:'Silent push notices shown to every tenant, instantly' },
   syncrequests: { title:'Cloud Sync', sub:'Requests to enable Cloud Sync, awaiting approval' },
+  staffrequests: { title:'Staff Logins', sub:'Staff login requests from owners, awaiting approval' },
 };
 
 function switchTab(t) {
-  ['customers','contacts','errors','analytics','health','activity','broadcast','devices','syncrequests'].forEach(x => {
+  ['customers','contacts','errors','analytics','health','activity','broadcast','announcements','devices','syncrequests','staffrequests'].forEach(x => {
     document.getElementById('tab-'+x)?.classList.toggle('active', x===t);
     document.getElementById('page-'+x)?.classList.toggle('active', x===t);
   });
@@ -860,8 +889,10 @@ function switchTab(t) {
   else                   { if (healthInterval) { clearInterval(healthInterval); healthInterval = null; } }
   if (t === 'activity')  loadActivity();
   if (t === 'broadcast') loadBroadcast();
+  if (t === 'announcements') loadAnnouncements();
   if (t === 'devices')   loadDevices();
   if (t === 'syncrequests') loadSyncRequests();
+  if (t === 'staffrequests') loadStaffUserRequests();
 }
 
 function login() {
@@ -909,6 +940,7 @@ async function loadAll(isLogin=false, silent=false) {
     if (!isLogin && !silent) showToast('✓ Data refreshed');
     loadDevices(true); // silently refresh device badge
     loadSyncRequests(true); // silently refresh cloud-sync badge
+    loadStaffUserRequests(true); // silently refresh staff-login badge
   } catch(e) {
     if (isLogin) document.getElementById('login-error').textContent = 'Cannot connect. Is server running?';
     else showToast('⚠ Could not connect to server', true);
@@ -1632,6 +1664,49 @@ async function syncRequestAction(tenantId, action) {
   else showToast('Failed', true);
 }
 
+// STAFF LOGIN REQUESTS
+async function loadStaffUserRequests(silentBadge = false) {
+  const r = await api('/admin/api/staff-user-requests');
+  if (!r.ok) return;
+  const requests = await r.json();
+
+  const badge = document.getElementById('staffrequests-badge');
+  if (badge) { badge.textContent = requests.length; badge.style.display = requests.length > 0 ? '' : 'none'; }
+
+  if (silentBadge) return;
+
+  const fmtDt = iso => iso ? new Date(iso).toLocaleString('en-IN') : '—';
+  const listEl = document.getElementById('staffrequests-list');
+  if (!listEl) return;
+
+  if (requests.length === 0) {
+    listEl.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:12px 0">No pending staff login requests</div>';
+    return;
+  }
+
+  listEl.innerHTML = `<h3 style="font-size:14px;font-weight:700;color:#f59e0b;margin-bottom:10px">⏳ Pending Approval (${requests.length})</h3>` +
+    requests.map(req => `<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div>
+          <div style="font-size:14px;font-weight:700">${ICONS[req.shop_type]||'🏪'} ${escHtml(req.shop_name||'Unknown Shop')}</div>
+          <div style="font-size:11px;color:var(--muted)">Username requested: <strong>${escHtml(req.username)}</strong></div>
+          <div style="font-size:11px;color:var(--muted)">Requested: ${fmtDt(req.requested_at)}</div>
+        </div>
+        <span style="padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(245,158,11,.15);color:#f59e0b">PENDING</span>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button onclick="staffUserRequestAction('${req.tenant_id}','${req.request_id}','approve')" style="flex:1;padding:8px;background:rgba(52,211,153,.15);border:1px solid rgba(52,211,153,.3);border-radius:10px;color:#34d399;font-size:12px;font-weight:700;cursor:pointer">✓ Approve</button>
+        <button onclick="staffUserRequestAction('${req.tenant_id}','${req.request_id}','reject')" style="flex:1;padding:8px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:10px;color:#f87171;font-size:12px;font-weight:700;cursor:pointer">✕ Reject</button>
+      </div>
+    </div>`).join('');
+}
+
+async function staffUserRequestAction(tenantId, requestId, action) {
+  const r = await api(`/admin/api/customers/${tenantId}/${action}-staff-user`, { method:'POST', body: JSON.stringify({ request_id: requestId }) });
+  if (r.ok) { showToast(action === 'approve' ? '👥 Staff login approved — they can now sign in' : 'Request rejected'); loadStaffUserRequests(); }
+  else showToast('Failed', true);
+}
+
 // CONTACTS
 function setCFilter(f) {
   cFilter = f;
@@ -1865,6 +1940,53 @@ async function deactivateBroadcast(id) {
     await api(`/admin/api/broadcast/${id}/deactivate`, { method:'POST' });
     showToast('Broadcast deactivated');
     await loadBroadcast();
+  } catch { showToast('⚠ Connection error', true); }
+}
+
+// ANNOUNCEMENTS — pushed silently + instantly to every tenant's app (no manual update click)
+async function loadAnnouncements() {
+  try {
+    const r = await api('/admin/api/announcements');
+    if (!r.ok) return;
+    const list = await r.json();
+    const el = document.getElementById('announcements-list');
+    if (!list.length) { el.innerHTML = `<div class="empty">No announcements yet.</div>`; return; }
+    el.innerHTML = list.map(a => `
+      <div class="bc-card ${a.active?'':'inactive'}">
+        <div class="bc-card-top">
+          <div class="bc-title">${escHtml(a.title)}</div>
+          <span class="${a.active?'bc-active-badge':'bc-inactive-badge'}">${a.active?'Active':'Inactive'}</span>
+        </div>
+        <div class="bc-msg">${escHtml(a.message)}</div>
+        <div class="bc-meta">Pushed ${new Date(a.created_at).toLocaleString('en-IN')}</div>
+        ${a.active ? `<div style="margin-top:10px"><button class="btn-sm" onclick="deactivateAnnouncement('${escHtml(a.id)}')">Deactivate</button></div>` : ''}
+      </div>
+    `).join('');
+  } catch(e) { console.error('announcements error', e); }
+}
+function confirmPushAnnouncement() {
+  const title   = document.getElementById('an-title').value.trim();
+  const message = document.getElementById('an-message').value.trim();
+  if (!title || !message) { showToast('Enter title and message', true); return; }
+  if (!confirm(`You really want to push this announcement to ALL tenants now?\n\n"${title}"\n\n${message}`)) return;
+  pushAnnouncement(title, message);
+}
+async function pushAnnouncement(title, message) {
+  try {
+    const r = await api('/admin/api/announcements', { method:'POST', body: JSON.stringify({ title, message }) });
+    if (r.ok) {
+      showToast('✅ Announcement pushed to all tenants');
+      document.getElementById('an-title').value = '';
+      document.getElementById('an-message').value = '';
+      await loadAnnouncements();
+    } else showToast('Failed to push announcement', true);
+  } catch { showToast('⚠ Connection error', true); }
+}
+async function deactivateAnnouncement(id) {
+  try {
+    await api(`/admin/api/announcements/${id}/deactivate`, { method:'POST' });
+    showToast('Announcement deactivated');
+    await loadAnnouncements();
   } catch { showToast('⚠ Connection error', true); }
 }
 

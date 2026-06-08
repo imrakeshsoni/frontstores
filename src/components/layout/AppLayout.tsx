@@ -28,6 +28,7 @@ import {
   ClipboardCheck,
   Wrench,
   UserCheck,
+  Megaphone,
   ShoppingBasket,
   Stethoscope,
   CalendarDays,
@@ -79,11 +80,14 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '@/app/store/app.store';
 import { verifyAuth } from '@/lib/db/auth';
 import { getShopTypeLabel } from '@/lib/shop/shopType';
 import { VoiceAssistant } from '@/components/voice/VoiceAssistant';
 import { StudyVoiceAssistant } from '@/modules/study/StudyVoiceAssistant';
+import { AnnouncementPopup } from '@/components/announcements/AnnouncementPopup';
+import { pollAnnouncements, getUnreadCount } from '@/lib/db/announcements';
 import { MobileNav } from './MobileNav';
 
 export const NAV_ITEMS = [
@@ -600,6 +604,26 @@ export function AppLayout() {
     setAINavigator((path) => navigate(path));
   }, [navigate]);
 
+  // [core] [all apps] [all tenants] — silently poll for new announcements (no manual "update" needed)
+  const tenantId = config?.tenant_id ?? '';
+  const queryClient = useQueryClient();
+  const { data: unreadAnnouncements } = useQuery({
+    queryKey: ['announcements-unread-count', tenantId],
+    queryFn: () => getUnreadCount(tenantId),
+    enabled: !!tenantId,
+    refetchInterval: 60_000,
+  });
+  useEffect(() => {
+    if (!tenantId) return;
+    const poll = () => pollAnnouncements(tenantId).then(() => {
+      queryClient.invalidateQueries({ queryKey: ['announcements-unread-count', tenantId] });
+      queryClient.invalidateQueries({ queryKey: ['announcements-unnotified', tenantId] });
+    });
+    poll();
+    const id = setInterval(poll, 5 * 60_000);
+    return () => clearInterval(id);
+  }, [tenantId, queryClient]);
+
   // [study] [all tenants] — apply saved theme on mount, remove on shop type change
   useEffect(() => {
     if (config?.shop_type === 'study') {
@@ -659,6 +683,37 @@ export function AppLayout() {
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
+          {/* [core] [all apps] [all tenants] — pinned Announcements link, glows when there's something unread */}
+          <NavLink
+            to="/announcements"
+            className={({ isActive }) => `sidebar-nav-item relative flex items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-all ${isActive ? 'active' : ''} ${unreadAnnouncements ? 'fs-announcement-glow' : ''}`}
+            style={({ isActive }) => ({
+              background: isActive ? 'var(--accent-soft)' : 'transparent',
+              ['--nav-tint' as any]: '#ede9fe',
+              ['--nav-glow' as any]: '#7c3aed4d',
+            })}
+          >
+            {({ isActive }) => (
+              <>
+                <span className="nav-icon-badge relative flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg" style={{ background: '#ede9fe' }}>
+                  <Megaphone className="h-3.5 w-3.5" style={{ color: isActive ? 'var(--accent)' : '#7c3aed' }} />
+                  {!!unreadAnnouncements && (
+                    <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold text-white" style={{ background: '#ef4444' }}>
+                      {unreadAnnouncements > 9 ? '9+' : unreadAnnouncements}
+                    </span>
+                  )}
+                </span>
+                <span style={{ color: isActive ? 'var(--accent)' : 'var(--text-secondary)', fontWeight: isActive || unreadAnnouncements ? 600 : 500 }}>
+                  Announcements
+                </span>
+              </>
+            )}
+          </NavLink>
+          <style>{`
+            @keyframes fs-announcement-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(124,58,237,.35); } 50% { box-shadow: 0 0 0 6px rgba(124,58,237,0); } }
+            .fs-announcement-glow { animation: fs-announcement-pulse 1.8s ease-in-out infinite; }
+          `}</style>
+
           {activeNavItems.map(({ to, icon: Icon, label, iconBg, iconColor }) => (
             <NavLink
               key={to}
@@ -840,6 +895,8 @@ export function AppLayout() {
       </div>
       {/* [core] [all tenants] — Switch App modal */}
       {showSwitchModal && <SwitchAppModal onClose={() => setShowSwitchModal(false)} />}
+      {/* [core] [all apps] [all tenants] — silent announcement popup, shown once per new message */}
+      <AnnouncementPopup />
 
       {/* [carwash] [all tenants] — Owner login modal (used to exit employee mode) */}
       {showOwnerLogin && (

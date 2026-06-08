@@ -42,14 +42,15 @@ export interface ExportLog {
   exported_at: string;
 }
 
-async function hashPassword(password: string, salt: string): Promise<string> {
+// Exported so other local-login tables (e.g. staff_users) can reuse the same scheme
+export async function hashPassword(password: string, salt: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(salt + password);
   const hash = await crypto.subtle.digest('SHA-256', data);
   return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-function randomSalt(): string {
+export function randomSalt(): string {
   return Array.from(crypto.getRandomValues(new Uint8Array(16)))
     .map(b => b.toString(16).padStart(2, '0')).join('');
 }

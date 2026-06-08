@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from '@/app/store/app.store';
 import { verifyAuth, resetPasswordWithCode, resetPasswordWithPhonePin, unlockWithCode, getAuthUsername } from '@/lib/db/auth';
+import { verifyStaffAuth } from '@/lib/db/staffUsers';
 import { claimSession } from '@/lib/db/session';
 import { enqueue } from '@/lib/syncQueue';
 import { uuid, now } from '@/lib/db/index';
@@ -147,27 +148,53 @@ export function AppLoginScreen() {
     return () => clearInterval(t);
   }, [screen, lockedUntil]);
 
+  // Completes login for either the owner or an approved staff login — each
+  // holds its own single-session slot, keyed by username, so they don't block
+  // each other across devices.
+  async function completeLogin(loggedInUsername: string) {
+    const claim = await claimSession(tenantId, loggedInUsername);
+    if (claim.blocked) {
+      toast.error(claim.error || `Already logged in on ${claim.activeDevice || 'another device'}. Log out there first.`);
+      return;
+    }
+    if (claim.sessionId) sessionStorage.setItem('fs_session_id', claim.sessionId);
+    sessionStorage.setItem('fs_logged_in_username', loggedInUsername);
+    setAuthenticated(true);
+  }
+
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     if (!username || !password) return;
     setLoading(true);
     try {
-      const result = await verifyAuth(tenantId, username, password, maxAttempts);
-      if (result.ok) {
-        const claim = await claimSession(tenantId);
-        if (claim.blocked) {
-          toast.error(claim.error || `Already logged in on ${claim.activeDevice || 'another device'}. Log out there first.`);
-          return;
-        }
-        if (claim.sessionId) sessionStorage.setItem('fs_session_id', claim.sessionId);
-        setAuthenticated(true);
-      } else if (result.locked) {
-        setLockedUntil(result.lockedUntil!);
+      const ownerResult = await verifyAuth(tenantId, username, password, maxAttempts);
+      if (ownerResult.ok) {
+        await completeLogin('owner');
+        return;
+      }
+      if (ownerResult.locked) {
+        setLockedUntil(ownerResult.lockedUntil!);
         setScreen('locked');
-      } else if (result.attemptsLeft !== undefined && result.attemptsLeft <= 0) {
+        return;
+      }
+
+      // Not the owner login — check approved staff logins for this tenant
+      const staffResult = await verifyStaffAuth(tenantId, username, password, maxAttempts);
+      if (staffResult.ok) {
+        await completeLogin(username.trim().toLowerCase());
+        return;
+      }
+      if (staffResult.locked) {
+        setLockedUntil(staffResult.lockedUntil!);
+        setScreen('locked');
+        return;
+      }
+
+      const attemptsLeft = staffResult.attemptsLeft ?? ownerResult.attemptsLeft;
+      if (attemptsLeft !== undefined && attemptsLeft <= 0) {
         toast.error('Too many failed attempts. Account locked for 30 minutes.');
-      } else if (result.attemptsLeft !== undefined) {
-        toast.error(`Incorrect credentials. ${result.attemptsLeft} attempt${result.attemptsLeft !== 1 ? 's' : ''} left.`);
+      } else if (attemptsLeft !== undefined) {
+        toast.error(`Incorrect credentials. ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} left.`);
       } else {
         toast.error('Incorrect username or password');
       }

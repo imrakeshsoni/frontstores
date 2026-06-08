@@ -21,13 +21,16 @@ function deviceLabel(): string {
   return 'Desktop';
 }
 
-export async function claimSession(tenantId: string): Promise<SessionClaimResult> {
+// `username` separates session slots so the owner and each staff login can each
+// hold their own slot under the same tenant — only the SAME login is blocked
+// from running on two devices at once. Defaults to 'owner' for the main login.
+export async function claimSession(tenantId: string, username: string = 'owner'): Promise<SessionClaimResult> {
   const device_id = getDeviceId();
   try {
     const res = await fetch(`${SERVER}/session/claim`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tenant_id: tenantId, device_id, device_name: deviceLabel() }),
+      body: JSON.stringify({ tenant_id: tenantId, username, device_id, device_name: deviceLabel() }),
       signal: AbortSignal.timeout(6000),
     });
     const data = await res.json();
@@ -38,25 +41,25 @@ export async function claimSession(tenantId: string): Promise<SessionClaimResult
   }
 }
 
-export async function heartbeatSession(tenantId: string, sessionId: string): Promise<void> {
+export async function heartbeatSession(tenantId: string, sessionId: string, username: string = 'owner'): Promise<void> {
   const device_id = getDeviceId();
   try {
     await fetch(`${SERVER}/session/heartbeat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tenant_id: tenantId, device_id, session_id: sessionId }),
+      body: JSON.stringify({ tenant_id: tenantId, username, device_id, session_id: sessionId }),
       signal: AbortSignal.timeout(6000),
     });
   } catch { /* offline — heartbeat will resume next time we're online */ }
 }
 
-export async function releaseSession(tenantId: string, sessionId: string): Promise<void> {
+export async function releaseSession(tenantId: string, sessionId: string, username: string = 'owner'): Promise<void> {
   const device_id = getDeviceId();
   try {
     await fetch(`${SERVER}/session/release`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tenant_id: tenantId, device_id, session_id: sessionId }),
+      body: JSON.stringify({ tenant_id: tenantId, username, device_id, session_id: sessionId }),
       signal: AbortSignal.timeout(6000),
     });
   } catch { /* offline — session will expire via TTL on the server */ }

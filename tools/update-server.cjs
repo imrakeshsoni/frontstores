@@ -80,6 +80,7 @@ const ERRORS_FILE   = path.join(DATA_DIR, 'errors.json');
 const CONTACTS_FILE = path.join(DATA_DIR, 'contacts.json');
 const ACTIVITY_FILE  = path.join(DATA_DIR, 'activity.json');
 const BROADCAST_FILE = path.join(DATA_DIR, 'broadcast.json');
+const ANNOUNCEMENTS_FILE = path.join(DATA_DIR, 'announcements.json'); // [core] [all apps] [all tenants]
 const NOTES_FILE     = path.join(DATA_DIR, 'notes.json');
 const SYNC_DIR      = path.join(DATA_DIR, 'sync');
 const DEVICES_FILE  = path.join(DATA_DIR, 'devices.json');
@@ -125,6 +126,9 @@ function loadActivity()     { try { return JSON.parse(fs.readFileSync(ACTIVITY_F
 function saveActivity(d)    { fs.writeFileSync(ACTIVITY_FILE,  JSON.stringify(d, null, 2)); }
 function loadBroadcast()    { try { return JSON.parse(fs.readFileSync(BROADCAST_FILE, 'utf8')); } catch { return []; } }
 function saveBroadcast(d)   { fs.writeFileSync(BROADCAST_FILE, JSON.stringify(d, null, 2)); }
+// [core] [all apps] [all tenants] — announcements silently polled by every desktop app
+function loadAnnouncements()  { try { return JSON.parse(fs.readFileSync(ANNOUNCEMENTS_FILE, 'utf8')); } catch { return []; } }
+function saveAnnouncements(d) { fs.writeFileSync(ANNOUNCEMENTS_FILE, JSON.stringify(d, null, 2)); }
 function loadNotes()        { try { return JSON.parse(fs.readFileSync(NOTES_FILE,     'utf8')); } catch { return {}; } }
 function saveNotes(d)       { fs.writeFileSync(NOTES_FILE,     JSON.stringify(d, null, 2)); }
 
@@ -405,14 +409,20 @@ const publicServer = http.createServer(async (req, res) => {
   // another device can claim it. This is advisory, not a hard lock — the app
   // must keep working fully offline even if the server can't be reached.
 
-  // POST /session/claim — { tenant_id, device_id, device_name }
+  // Session slots are keyed by `tenant_id::username` so the owner and each
+  // staff login (each their own username under the same tenant) hold separate
+  // slots — only the SAME login is blocked from running on two devices at once.
+  const sessionKey = (tenant_id, username) => `${tenant_id}::${username || 'owner'}`;
+
+  // POST /session/claim — { tenant_id, username, device_id, device_name }
   if (req.method === 'POST' && pathname === '/session/claim') {
     if (rateLimit(req, res, 'session-claim', 60, 60 * 60 * 1000)) return;
     try {
-      const { tenant_id, device_id, device_name } = JSON.parse(await readBody(req));
+      const { tenant_id, username, device_id, device_name } = JSON.parse(await readBody(req));
       if (!tenant_id || !device_id) { json(res, { ok: false, error: 'Missing fields' }, 400); return; }
+      const key = sessionKey(tenant_id, username);
       const sessions = loadSessions();
-      const existing = sessions[tenant_id];
+      const existing = sessions[key];
       const isStale = existing && (Date.now() - new Date(existing.last_heartbeat).getTime()) > SESSION_TTL_MS;
       if (existing && existing.device_id !== device_id && !isStale) {
         json(res, {
@@ -424,7 +434,7 @@ const publicServer = http.createServer(async (req, res) => {
         return;
       }
       const session_id = crypto.randomBytes(16).toString('hex');
-      sessions[tenant_id] = {
+      sessions[key] = {
         session_id,
         device_id,
         device_name: sanitize(device_name, 60) || 'Unknown device',
@@ -439,13 +449,14 @@ const publicServer = http.createServer(async (req, res) => {
     return;
   }
 
-  // POST /session/heartbeat — { tenant_id, device_id, session_id }
+  // POST /session/heartbeat — { tenant_id, username, device_id, session_id }
   if (req.method === 'POST' && pathname === '/session/heartbeat') {
     if (rateLimit(req, res, 'session-heartbeat', 240, 60 * 60 * 1000)) return;
     try {
-      const { tenant_id, device_id, session_id } = JSON.parse(await readBody(req));
+      const { tenant_id, username, device_id, session_id } = JSON.parse(await readBody(req));
+      const key = sessionKey(tenant_id, username);
       const sessions = loadSessions();
-      const existing = sessions[tenant_id];
+      const existing = sessions[key];
       if (!existing || existing.session_id !== session_id || existing.device_id !== device_id) {
         json(res, { ok: false, error: 'Session no longer active on this device' }, 409);
         return;
@@ -459,15 +470,16 @@ const publicServer = http.createServer(async (req, res) => {
     return;
   }
 
-  // POST /session/release — { tenant_id, device_id, session_id } — called on logout
+  // POST /session/release — { tenant_id, username, device_id, session_id } — called on logout
   if (req.method === 'POST' && pathname === '/session/release') {
     if (rateLimit(req, res, 'session-release', 60, 60 * 60 * 1000)) return;
     try {
-      const { tenant_id, device_id, session_id } = JSON.parse(await readBody(req));
+      const { tenant_id, username, device_id, session_id } = JSON.parse(await readBody(req));
+      const key = sessionKey(tenant_id, username);
       const sessions = loadSessions();
-      const existing = sessions[tenant_id];
+      const existing = sessions[key];
       if (existing && existing.session_id === session_id && existing.device_id === device_id) {
-        delete sessions[tenant_id];
+        delete sessions[key];
         saveSessions(sessions);
       }
       json(res, { ok: true });
@@ -1203,6 +1215,48 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
     return;
   }
 
+  // ── Staff logins (admin-approved sub-users under a tenant) ──────────────────
+  // Owner creates username+password locally (password never leaves the device);
+  // only {request_id, username} is sent here to land in the admin approval queue.
+  // Mirrors the Cloud Sync request/status pattern above.
+
+  // POST /staff-user-request — { tenant_id, request_id, username }
+  if (req.method === 'POST' && pathname === '/staff-user-request') {
+    if (rateLimit(req, res, 'staff-user-request', 20, 60 * 60 * 1000)) return;
+    const body = await readBody(req);
+    try {
+      const { tenant_id, request_id, username } = JSON.parse(body);
+      if (!tenant_id || !request_id || !username) { json(res, { ok: false, error: 'Missing fields' }, 400); return; }
+      const subs = loadSubs();
+      const sub = subs[tenant_id];
+      if (!sub) { json(res, { ok: false, error: 'Shop not found' }, 404); return; }
+      if (!sub.pending_staff_users) sub.pending_staff_users = {};
+      if (!sub.pending_staff_users[request_id]) {
+        sub.pending_staff_users[request_id] = {
+          username: sanitize(username, 60),
+          status: 'pending',
+          requested_at: new Date().toISOString(),
+        };
+        saveSubs(subs);
+        logActivity(tenant_id, sub.shop_name, 'staff_user_requested', `Requested staff login "${sanitize(username, 60)}"`);
+        console.log(`👥 ${sub.shop_name || tenant_id.substring(0, 8)} requested staff login "${sanitize(username, 60)}"`);
+      }
+      json(res, { ok: true });
+    } catch { json(res, { ok: false, error: 'Invalid request' }, 400); }
+    return;
+  }
+
+  // GET /staff-user-status/:tenant_id — local app polls for approval/rejection
+  const staffUserStatusMatch = pathname.match(/^\/staff-user-status\/([a-f0-9-]{36})$/);
+  if (req.method === 'GET' && staffUserStatusMatch) {
+    if (rateLimit(req, res, 'staff-user-status', 120, 60 * 60 * 1000)) return;
+    const tenantId = staffUserStatusMatch[1];
+    const sub = loadSubs()[tenantId];
+    if (!sub) { json(res, { ok: false, error: 'Shop not found' }, 404); return; }
+    json(res, { ok: true, requests: sub.pending_staff_users || {} });
+    return;
+  }
+
   // POST /sync/activate — validate sync code, enable cloud sync for tenant
   if (req.method === 'POST' && pathname === '/sync/activate') {
     if (rateLimit(req, res, 'sync-activate', 5, 60 * 60 * 1000)) return;
@@ -1475,6 +1529,21 @@ const adminServer = http.createServer(async (req, res) => {
     json(res, requests); return;
   }
 
+  // GET /admin/api/staff-user-requests — pending staff-login requests across all tenants
+  if (req.method === 'GET' && pathname === '/admin/api/staff-user-requests') {
+    if (!checkAuth(req)) { res.writeHead(401); res.end(); return; }
+    const subs = loadSubs();
+    const requests = [];
+    for (const [tenant_id, s] of Object.entries(subs)) {
+      for (const [request_id, r] of Object.entries(s.pending_staff_users || {})) {
+        if (r.status === 'pending') {
+          requests.push({ tenant_id, request_id, shop_name: s.shop_name, shop_type: s.shop_type, username: r.username, requested_at: r.requested_at });
+        }
+      }
+    }
+    json(res, requests); return;
+  }
+
   // POST /admin/api/customers/:id/approve-sync — approve a pending request, auto-issue code, enable immediately
   const approveSyncMatch = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/approve-sync$/);
   if (req.method === 'POST' && approveSyncMatch) {
@@ -1505,6 +1574,46 @@ const adminServer = http.createServer(async (req, res) => {
     saveSubs(subs);
     logActivity(tenantId, sub.shop_name, 'sync_rejected', 'Cloud Sync request rejected by admin');
     json(res, { ok: true }); return;
+  }
+
+  // POST /admin/api/customers/:id/approve-staff-user — { request_id }
+  const approveStaffUserMatch = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/approve-staff-user$/);
+  if (req.method === 'POST' && approveStaffUserMatch) {
+    if (!checkAuth(req)) { res.writeHead(401); res.end(); return; }
+    const tenantId = approveStaffUserMatch[1];
+    try {
+      const { request_id } = JSON.parse(await readBody(req));
+      const subs = loadSubs();
+      const sub = subs[tenantId];
+      if (!sub) { json(res, { ok: false, error: 'Not found' }, 404); return; }
+      const pending = sub.pending_staff_users?.[request_id];
+      if (!pending) { json(res, { ok: false, error: 'Request not found' }, 404); return; }
+      pending.status = 'approved';
+      pending.approved_at = new Date().toISOString();
+      saveSubs(subs);
+      logActivity(tenantId, sub.shop_name, 'staff_user_approved', `Approved staff login "${pending.username}"`);
+      console.log(`👥 Staff login "${pending.username}" approved for ${sub.shop_name}`);
+      json(res, { ok: true }); return;
+    } catch { json(res, { ok: false, error: 'Invalid request' }, 400); return; }
+  }
+
+  // POST /admin/api/customers/:id/reject-staff-user — { request_id }
+  const rejectStaffUserMatch = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/reject-staff-user$/);
+  if (req.method === 'POST' && rejectStaffUserMatch) {
+    if (!checkAuth(req)) { res.writeHead(401); res.end(); return; }
+    const tenantId = rejectStaffUserMatch[1];
+    try {
+      const { request_id } = JSON.parse(await readBody(req));
+      const subs = loadSubs();
+      const sub = subs[tenantId];
+      if (!sub) { json(res, { ok: false, error: 'Not found' }, 404); return; }
+      const pending = sub.pending_staff_users?.[request_id];
+      if (!pending) { json(res, { ok: false, error: 'Request not found' }, 404); return; }
+      pending.status = 'rejected';
+      saveSubs(subs);
+      logActivity(tenantId, sub.shop_name, 'staff_user_rejected', `Rejected staff login "${pending.username}"`);
+      json(res, { ok: true }); return;
+    } catch { json(res, { ok: false, error: 'Invalid request' }, 400); return; }
   }
 
   // GET /admin/api/errors
@@ -1815,6 +1924,45 @@ const adminServer = http.createServer(async (req, res) => {
     let log = loadActivity();
     if (filterTenant) log = log.filter(e => e.tenant_id === filterTenant);
     json(res, log.slice(0, 200)); return;
+  }
+
+  // GET /announcements — polled silently by every desktop app (no admin auth; read-only, active only)
+  if (req.method === 'GET' && pathname === '/announcements') {
+    const list = loadAnnouncements().filter(a => a.active).map(a => ({ id: a.id, title: a.title, message: a.message, created_at: a.created_at }));
+    json(res, list); return;
+  }
+
+  // GET /admin/api/announcements
+  if (req.method === 'GET' && pathname === '/admin/api/announcements') {
+    if (!checkAuth(req)) { res.writeHead(401); res.end(); return; }
+    json(res, loadAnnouncements()); return;
+  }
+
+  // POST /admin/api/announcements — create + push to all tenants immediately
+  if (req.method === 'POST' && pathname === '/admin/api/announcements') {
+    if (!checkAuth(req)) { res.writeHead(401); res.end(); return; }
+    const body = await readBody(req);
+    try {
+      const { title, message } = JSON.parse(body);
+      if (!title || !message) { res.writeHead(400); res.end('Missing title or message'); return; }
+      const list = loadAnnouncements();
+      const entry = { id: crypto.randomUUID(), title: sanitize(title, 200), message: sanitize(message, 2000), created_at: new Date().toISOString(), active: true };
+      list.unshift(entry);
+      saveAnnouncements(list);
+      json(res, { ok: true, announcement: entry });
+    } catch { res.writeHead(400); res.end('Bad request'); }
+    return;
+  }
+
+  // POST /admin/api/announcements/:id/deactivate
+  const announcementDeact = pathname.match(/^\/admin\/api\/announcements\/([^/]+)\/deactivate$/);
+  if (req.method === 'POST' && announcementDeact) {
+    if (!checkAuth(req)) { res.writeHead(401); res.end(); return; }
+    const list = loadAnnouncements();
+    const idx = list.findIndex(a => a.id === announcementDeact[1]);
+    if (idx !== -1) list[idx].active = false;
+    saveAnnouncements(list);
+    json(res, { ok: true }); return;
   }
 
   // GET /admin/api/broadcast
