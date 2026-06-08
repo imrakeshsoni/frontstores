@@ -487,13 +487,6 @@
   <!-- SIDEBAR -->
   <div class="sidebar">
     <div class="sb-brand">
-      <div class="sb-logo" style="background:none;box-shadow:none;padding:0;overflow:hidden">
-        <svg width="44" height="44" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <defs><linearGradient id="sbl" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fda4af"/><stop offset="50%" stop-color="#f43f5e"/><stop offset="100%" stop-color="#9f1239"/></linearGradient></defs>
-          <rect width="256" height="256" rx="64" fill="url(#sbl)"/>
-          <text x="128" y="162" font-family="Arial Rounded MT Bold,Arial,sans-serif" font-weight="900" font-size="98" fill="white" text-anchor="middle" letter-spacing="-4">fsa</text>
-        </svg>
-      </div>
       <div class="sb-brand-name">Front<span>Stores</span></div>
       <div class="sb-brand-sub">Admin Console</div>
     </div>
@@ -797,7 +790,6 @@
 
 <script>
 const API = '';
-const CSRF_TOKEN = window.__CSRF_TOKEN__ || '';
 
 const ICONS = { medical:'💊', restaurant:'🍽️', grocery:'🛒', carwash:'🚗', clinic:'🏥', beauty:'💅', study:'📚' };
 const LABELS = { medical:'Medical Store', restaurant:'Restaurant / Café', grocery:'Grocery Store', carwash:'Car Wash', clinic:'Hospital / Clinic', beauty:'Beauty Parlor', study:'StudyMate' };
@@ -893,7 +885,6 @@ async function api(path, opts={}) {
     headers: {
       'Authorization': `Basic ${btoa(':'+password)}`,
       'Content-Type': 'application/json',
-      'x-csrf-token': CSRF_TOKEN,
       ...(opts.headers||{})
     }
   });
@@ -1842,10 +1833,6 @@ async function clearAllErrors() {
   if (!confirm(`Delete all ${allErrors.length} error reports? This cannot be undone.`)) return;
   try {
     const r = await api('/admin/api/errors/clear-all', { method:'POST' });
-    if (r.status === 403) {
-      alert('Session expired — please reload the page (Cmd+R) and try again.');
-      return;
-    }
     if (!r.ok) { showToast(`Failed to clear errors (${r.status})`, true); return; }
     allErrors = [];
     renderErrors(); updateBadge();

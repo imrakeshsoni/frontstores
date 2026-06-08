@@ -312,16 +312,9 @@ function json(res, data, status=200) {
   res.writeHead(status, {'Content-Type':'application/json'});
   res.end(JSON.stringify(data));
 }
-// Per-session CSRF token — regenerated on each server start
-const CSRF_TOKEN = crypto.randomBytes(32).toString('hex');
-
 function checkAuth(req) {
   const auth = req.headers['authorization'] || '';
   return auth === `Basic ${Buffer.from(`:${ADMIN_PASSWORD}`).toString('base64')}`;
-}
-
-function checkCsrf(req) {
-  return req.headers['x-csrf-token'] === CSRF_TOKEN;
 }
 
 // ── PUBLIC SERVER — port 3001 — tunneled to update.frontstores.com ──────────
@@ -1378,7 +1371,7 @@ async function handleAdminRequest(req, res) {
   if (req.method === 'GET' && (pathname === '/' || pathname === '/admin' || pathname === '/index.html')) {
     if (fs.existsSync(ADMIN_HTML)) {
       const html = fs.readFileSync(ADMIN_HTML, 'utf8')
-        .replace('</head>', `<script>window.__CSRF_TOKEN__="${CSRF_TOKEN}";</script></head>`);
+        ;
       res.writeHead(200, {'Content-Type':'text/html'});
       res.end(html);
     } else {
@@ -1394,11 +1387,6 @@ async function handleAdminRequest(req, res) {
   if (!checkAuth(req)) {
     res.writeHead(401);
     res.end('Unauthorized'); return;
-  }
-
-  // CSRF check on all state-changing requests
-  if (req.method === 'POST' && !checkCsrf(req)) {
-    res.writeHead(403); res.end('Invalid CSRF token'); return;
   }
 
   // GET /admin/api/customers
