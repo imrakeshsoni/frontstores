@@ -1,30 +1,42 @@
-// [all apps] [all tenants] — Auto-sync: push on events, pull every 3 minutes
-import { pushDelta, pullDelta } from './db/cloudSync';
+// [all apps] [all tenants] — Auto-sync: push on events, SSE real-time pull, 3-min fallback
+import { pushDelta, pullDelta, refreshCloudSyncStatus } from './db/cloudSync';
 import { getAppConfig } from './db/config';
+
+const SERVER = 'https://update.frontstores.com';
 
 let _tenantId = '';
 let _pushTimer: ReturnType<typeof setTimeout> | null = null;
 let _pullInterval: ReturnType<typeof setInterval> | null = null;
 let _lastPushAt = 0;
+let _sse: EventSource | null = null;
+let _sseReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let _sseReconnectDelay = 5000;
 
-const PUSH_DEBOUNCE_MS = 15_000;  // 15s after last change before pushing
-const PULL_INTERVAL_MS = 3 * 60 * 1000; // pull every 3 minutes
+const PUSH_DEBOUNCE_MS = 5_000;   // 5s after last change — faster for real-time feel
+const PULL_INTERVAL_MS = 3 * 60 * 1000; // 3-min fallback poll when SSE is healthy
 
 export function initAutoSync(tenantId: string) {
   _tenantId = tenantId;
-  // Start background pull interval
+  // Refresh sync status from server — picks up auto-enabled sync after approval
+  refreshCloudSyncStatus(tenantId).then(() => {
+    connectSSE();
+    silentPull(); // immediate pull on startup
+  }).catch(() => {
+    connectSSE();
+    silentPull();
+  });
+  // Fallback poll in case SSE drops
   if (_pullInterval) clearInterval(_pullInterval);
   _pullInterval = setInterval(() => silentPull(), PULL_INTERVAL_MS);
-  // Do an immediate pull on startup to catch anything missed while offline
-  setTimeout(() => silentPull(), 5000);
 }
 
 export function stopAutoSync() {
   if (_pullInterval) { clearInterval(_pullInterval); _pullInterval = null; }
   if (_pushTimer) { clearTimeout(_pushTimer); _pushTimer = null; }
+  disconnectSSE();
 }
 
-// Call this after any significant data change — it debounces and pushes
+// Call this after any significant data change — debounces and pushes
 export function triggerAutoSync(immediate = false) {
   if (!_tenantId) return;
   if (_pushTimer) clearTimeout(_pushTimer);
@@ -34,7 +46,7 @@ export function triggerAutoSync(immediate = false) {
     const s = config?.settings as any ?? {};
     if (!s.cloud_sync_enabled) return;
     const now = Date.now();
-    if (now - _lastPushAt < 2000) return; // guard against double-fire
+    if (now - _lastPushAt < 2000) return;
     _lastPushAt = now;
     try { await pushDelta(_tenantId); } catch { /* non-critical */ }
   }, delay);
@@ -46,4 +58,44 @@ async function silentPull() {
   const s = config?.settings as any ?? {};
   if (!s.cloud_sync_enabled) return;
   try { await pullDelta(_tenantId); } catch { /* non-critical */ }
+}
+
+function disconnectSSE() {
+  if (_sseReconnectTimer) { clearTimeout(_sseReconnectTimer); _sseReconnectTimer = null; }
+  if (_sse) { _sse.close(); _sse = null; }
+}
+
+async function connectSSE() {
+  if (!_tenantId) return;
+  disconnectSSE();
+
+  const config = await getAppConfig().catch(() => null);
+  const s = config?.settings as any ?? {};
+  if (!s.cloud_sync_enabled || !s.cloud_sync_code) return; // not activated yet
+
+  const url = `${SERVER}/sync/events/${_tenantId}?sync_code=${encodeURIComponent(s.cloud_sync_code)}`;
+  try {
+    const es = new EventSource(url);
+    _sse = es;
+
+    es.addEventListener('connected', () => {
+      _sseReconnectDelay = 5000; // reset backoff on successful connect
+    });
+
+    es.addEventListener('data-changed', () => {
+      silentPull();
+    });
+
+    es.onerror = () => {
+      es.close();
+      _sse = null;
+      // Reconnect with exponential backoff, cap at 2 minutes
+      _sseReconnectTimer = setTimeout(() => {
+        _sseReconnectDelay = Math.min(_sseReconnectDelay * 2, 120_000);
+        connectSSE();
+      }, _sseReconnectDelay);
+    };
+  } catch {
+    // EventSource not available (e.g. test env) — fallback polling covers it
+  }
 }

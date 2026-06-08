@@ -105,6 +105,30 @@ async function hashPin(pin) {
   return Buffer.from(buf).toString('hex');
 }
 
+// ── Real-time SSE clients — Map<tenantId, Set<res>> ──────────────────────────
+// [all apps] [all tenants] — tracks open SSE connections per tenant for instant push notifications
+const sseClients = new Map();
+function sseAdd(tenantId, res) {
+  if (!sseClients.has(tenantId)) sseClients.set(tenantId, new Set());
+  sseClients.get(tenantId).add(res);
+}
+function sseRemove(tenantId, res) {
+  sseClients.get(tenantId)?.delete(res);
+}
+function sseBroadcast(tenantId, event, data) {
+  const clients = sseClients.get(tenantId);
+  if (!clients || clients.size === 0) return;
+  const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const client of clients) {
+    try { client.write(msg); } catch { sseRemove(tenantId, client); }
+  }
+}
+
+function generateSyncCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from(crypto.getRandomValues(new Uint8Array(6))).map(b => chars[b % chars.length]).join('');
+}
+
 // ── Sync helpers ─────────────────────────────────────────────────────────────
 function syncFile(tenantId) { return path.join(SYNC_DIR, `${tenantId}.json`); }
 function loadSync(tenantId) {
@@ -1268,6 +1292,31 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
     return;
   }
 
+  // GET /sync/events/:tenant_id?sync_code=CODE — SSE stream for real-time change notifications
+  // [all apps] [all tenants] — desktop app connects here; server pushes "data-changed" when any peer pushes
+  const sseMatch = pathname.match(/^\/sync\/events\/([a-f0-9-]{36})$/);
+  if (req.method === 'GET' && sseMatch) {
+    const tenantId = sseMatch[1];
+    const syncCode = url.searchParams.get('sync_code') ?? '';
+    const subs = loadSubs();
+    const sub = subs[tenantId];
+    if (!sub || !sub.sync_enabled || sub.sync_code !== syncCode.trim().toUpperCase()) {
+      res.writeHead(401); res.end(); return;
+    }
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+    });
+    res.write('event: connected\ndata: {}\n\n');
+    sseAdd(tenantId, res);
+    // Heartbeat every 25s to keep the tunnel alive
+    const hb = setInterval(() => { try { res.write(': ping\n\n'); } catch { clearInterval(hb); sseRemove(tenantId, res); } }, 25000);
+    req.on('close', () => { clearInterval(hb); sseRemove(tenantId, res); });
+    return;
+  }
+
   // POST /sync/push — receive shop data from tenant app
   if (req.method === 'POST' && pathname === '/sync/push') {
     if (rateLimit(req, res, 'sync-push', 60, 60 * 60 * 1000)) return;
@@ -1296,6 +1345,8 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
     const counts = {jobs: body.jobs?.length||0, customers: body.customers?.length||0, attendance: body.attendance?.length||0};
     if (!isDelta || Object.values(counts).some(c => c > 0))
       console.log(`☁️  ${isDelta?'Delta':'Full'} sync from ${sub.shop_name} — ${JSON.stringify(counts)}`);
+    // [all apps] [all tenants] — notify all other connected devices of this tenant to pull immediately
+    sseBroadcast(tenant_id, 'data-changed', { synced_at: merged.synced_at });
     json(res, { ok: true, synced_at: merged.synced_at });
     return;
   }
@@ -1432,7 +1483,10 @@ async function handleAdminRequest(req, res) {
       subs[tenantId].account_status = 'active';
       subs[tenantId].expires_at = addMonths(new Date().toISOString(), months);
       subs[tenantId].approved_at = new Date().toISOString();
-      console.log(`✅ Approved: ${subs[tenantId].shop_name} → ${months}-month trial starts now`);
+      // [all apps] [all tenants] — auto-enable cloud sync on approval so no manual step needed
+      if (!subs[tenantId].sync_code) subs[tenantId].sync_code = generateSyncCode();
+      subs[tenantId].sync_enabled = true;
+      console.log(`✅ Approved: ${subs[tenantId].shop_name} → ${months}-month trial starts now (sync: ${subs[tenantId].sync_code})`);
     }
     saveSubs(subs);
     const actionLabels = { extend: '+30 days', freeze: 'Frozen', unfreeze: 'Unfrozen', revoke: 'Revoked', approve: 'Approved — trial started' };
