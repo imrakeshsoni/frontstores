@@ -1,4 +1,5 @@
 import { getDb, uuid, now } from './index';
+import { hashPin } from './cloudSync';
 
 // In-memory lockout tracking — survives DB edits within a session.
 // A user editing SQLite to clear locked_until or reset failed_attempts
@@ -188,6 +189,36 @@ export async function resetPasswordWithCode(
     });
     const data = await res.json() as { ok: boolean; error?: string };
     if (!data.ok) return { ok: false, error: data.error || 'Invalid or expired code' };
+    const db = await getDb();
+    const salt = randomSalt();
+    const hash = await hashPassword(newPassword, salt);
+    await db.execute(
+      'UPDATE app_auth SET password_hash = ?, salt = ?, failed_attempts = 0, locked_until = NULL, updated_at = ? WHERE tenant_id = ?',
+      [hash, salt, now(), tenantId]
+    );
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'Cannot reach server. Check your internet connection.' };
+  }
+}
+
+// Self-service reset — verifies phone + Cloud Sync PIN with the server (no admin code needed),
+// then resets the local password directly. Only works if the tenant has Cloud Sync + a PIN set.
+export async function resetPasswordWithPhonePin(
+  tenantId: string, phone: string, pin: string, newPassword: string
+): Promise<{ ok: boolean; error?: string }> {
+  if (newPassword.length < 4) return { ok: false, error: 'Password must be at least 4 characters' };
+  const SERVER = 'https://update.frontstores.com';
+  try {
+    const pin_hash = await hashPin(pin);
+    const res = await fetch(`${SERVER}/verify-pin-reset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, pin_hash }),
+    });
+    const data = await res.json() as { ok: boolean; tenant_id?: string; error?: string };
+    if (!data.ok) return { ok: false, error: data.error || 'Could not verify your phone + PIN' };
+    if (data.tenant_id !== tenantId) return { ok: false, error: 'That phone number belongs to a different shop on this device' };
     const db = await getDb();
     const salt = randomSalt();
     const hash = await hashPassword(newPassword, salt);

@@ -362,6 +362,35 @@ const publicServer = http.createServer(async (req, res) => {
     return;
   }
 
+  // POST /verify-pin-reset — self-service password reset using phone + Cloud Sync PIN
+  // Only works for tenants who've enabled Cloud Sync and set a mobile PIN — no admin involvement needed.
+  if (req.method === 'POST' && pathname === '/verify-pin-reset') {
+    if (rateLimit(req, res, 'verify-pin-reset', 5, 60 * 60 * 1000)) return;
+    try {
+      const { phone, pin_hash } = JSON.parse(await readBody(req));
+      if (!phone || !pin_hash) { json(res, { ok: false, error: 'Missing fields' }, 400); return; }
+      const p = String(phone).replace(/\D/g, '');
+      if (p.length < 10) { json(res, { ok: false, error: 'Enter a valid mobile number' }, 400); return; }
+      const subs = loadSubs();
+      const entry = Object.entries(subs).find(([, s]) => {
+        const sp = String(s.phone || '').replace(/\D/g, '');
+        return sp.length >= 10 && sp.slice(-10) === p.slice(-10);
+      });
+      if (!entry) { json(res, { ok: false, error: 'No account found with that mobile number' }, 404); return; }
+      const [tenantId, sub] = entry;
+      if (!sub.sync_enabled || !sub.mobile_pin_hash) {
+        json(res, { ok: false, error: 'Self-service reset needs Cloud Sync + a PIN set up first. Use the support reset code instead, or set up Cloud Sync from Settings.' }, 403);
+        return;
+      }
+      if (sub.mobile_pin_hash !== pin_hash) { json(res, { ok: false, error: 'Incorrect PIN' }, 401); return; }
+      logActivity(tenantId, sub.shop_name, 'pin_password_reset', 'Password reset via phone + Cloud Sync PIN (self-service)');
+      json(res, { ok: true, tenant_id: tenantId });
+    } catch {
+      json(res, { ok: false, error: 'Invalid request' }, 400);
+    }
+    return;
+  }
+
   // POST /register — max 10 per IP per hour
   if (req.method === 'POST' && pathname === '/register') {
     if (rateLimit(req, res, 'register', 10, 60 * 60 * 1000)) return;

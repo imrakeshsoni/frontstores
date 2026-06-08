@@ -13,7 +13,7 @@ export interface CloudSyncStatus {
   mobilePinSet: boolean;
 }
 
-async function hashPin(pin: string): Promise<string> {
+export async function hashPin(pin: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode('frontstores-mobile-' + pin);
   const buf = await crypto.subtle.digest('SHA-256', data);

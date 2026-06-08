@@ -1,12 +1,12 @@
 // [core] [all tenants] — App login screen with per-shop-type theming
 import { useEffect, useState } from 'react';
 import { useAppStore } from '@/app/store/app.store';
-import { verifyAuth, resetPasswordWithCode, unlockWithCode, getAuthUsername } from '@/lib/db/auth';
+import { verifyAuth, resetPasswordWithCode, resetPasswordWithPhonePin, unlockWithCode, getAuthUsername } from '@/lib/db/auth';
 import { enqueue } from '@/lib/syncQueue';
 import { uuid, now } from '@/lib/db/index';
 import { toast } from 'sonner';
 
-type Screen = 'login' | 'forgot' | 'reset-code' | 'locked' | 'unlock-code';
+type Screen = 'login' | 'forgot' | 'reset-code' | 'pin-reset' | 'locked' | 'unlock-code';
 
 function minutesLeft(lockedUntil: string): number {
   return Math.max(1, Math.ceil((new Date(lockedUntil).getTime() - Date.now()) / 60_000));
@@ -132,6 +132,8 @@ export function AppLoginScreen() {
   const [newPassword, setNewPassword]     = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [unlockCode, setUnlockCode] = useState('');
+  const [pinPhone, setPinPhone] = useState('');
+  const [pinCode, setPinCode] = useState('');
 
   useEffect(() => {
     if (screen !== 'locked' || !lockedUntil) return;
@@ -197,6 +199,22 @@ export function AppLoginScreen() {
       const result = await resetPasswordWithCode(tenantId, resetCode.trim(), newPassword);
       if (result.ok) { toast.success('Password reset. Please log in.'); setScreen('login'); setPassword(''); setResetCode(''); setNewPassword(''); setConfirmPassword(''); }
       else toast.error(result.error ?? 'Reset failed');
+    } finally { setLoading(false); }
+  }
+
+  async function handlePinReset(e: React.FormEvent) {
+    e.preventDefault();
+    if (!pinPhone.trim()) { toast.error('Enter your mobile number'); return; }
+    if (!/^\d{4,8}$/.test(pinCode)) { toast.error('Enter your 4–8 digit Cloud Sync PIN'); return; }
+    if (newPassword.length < 4) { toast.error('Password must be at least 4 characters'); return; }
+    if (newPassword !== confirmPassword) { toast.error('Passwords do not match'); return; }
+    setLoading(true);
+    try {
+      const result = await resetPasswordWithPhonePin(tenantId, pinPhone.trim(), pinCode, newPassword);
+      if (result.ok) {
+        toast.success('Password reset. Please log in.');
+        setScreen('login'); setPassword(''); setPinPhone(''); setPinCode(''); setNewPassword(''); setConfirmPassword('');
+      } else toast.error(result.error ?? 'Reset failed');
     } finally { setLoading(false); }
   }
 
@@ -361,9 +379,43 @@ export function AppLoginScreen() {
             <button onClick={handleForgotRequest} disabled={loading} style={{ ...btnPrimary, opacity: loading ? 0.5 : 1 }}>
               {loading ? 'Sending…' : 'Send Reset Request'}
             </button>
+            <div className="rounded-xl p-3 text-center" style={{ background: `${theme.accent}15`, border: `1px solid ${theme.accent}30` }}>
+              <p className="text-xs" style={{ color: theme.labelColor }}>Set up Cloud Sync? Skip the wait —</p>
+              <button onClick={() => setScreen('pin-reset')} className="text-xs font-bold mt-1" style={{ color: theme.accentLight }}>
+                Reset instantly with phone + Cloud Sync PIN →
+              </button>
+            </div>
             <button onClick={() => setScreen('reset-code')} className="w-full text-center text-xs" style={{ color: theme.labelColor, opacity: 0.7 }}>Already have a code? Enter it here</button>
             <button onClick={() => setScreen('login')} className="w-full text-center text-xs" style={{ color: theme.labelColor, opacity: 0.7 }}>← Back to login</button>
           </div>
+        )}
+
+        {/* ── PIN RESET (self-service via phone + Cloud Sync PIN) ── */}
+        {screen === 'pin-reset' && (
+          <form onSubmit={handlePinReset} style={cardStyle} className="space-y-4">
+            <h2 className="text-white font-bold text-center text-lg">Reset with Phone + PIN</h2>
+            <p className="text-sm text-center" style={{ color: theme.labelColor }}>Enter the mobile number and Cloud Sync PIN you set up in Settings → Cloud Sync. No need to wait for support.</p>
+            <div>
+              <label style={labelStyle}>Mobile Number</label>
+              <input style={inputStyle} type="tel" placeholder="98765 43210" value={pinPhone} onChange={e => setPinPhone(e.target.value)} autoFocus />
+            </div>
+            <div>
+              <label style={labelStyle}>Cloud Sync PIN</label>
+              <input style={{ ...inputStyle, textAlign: 'center', letterSpacing: '0.3em', fontSize: '20px' }} type="password" placeholder="••••" maxLength={8} value={pinCode} onChange={e => setPinCode(e.target.value.replace(/\D/g, ''))} />
+            </div>
+            <div>
+              <label style={labelStyle}>New Password</label>
+              <input style={inputStyle} type="password" placeholder="New password" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+            </div>
+            <div>
+              <label style={labelStyle}>Confirm Password</label>
+              <input style={inputStyle} type="password" placeholder="Confirm new password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
+            </div>
+            <button type="submit" disabled={loading} style={{ ...btnPrimary, opacity: loading ? 0.5 : 1 }}>
+              {loading ? 'Verifying…' : 'Reset Password'}
+            </button>
+            <button type="button" onClick={() => setScreen('forgot')} className="w-full text-center text-xs" style={{ color: theme.labelColor, opacity: 0.7 }}>← Back</button>
+          </form>
         )}
 
         {/* ── RESET CODE ── */}
