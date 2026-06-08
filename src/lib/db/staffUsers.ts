@@ -53,18 +53,27 @@ export async function listStaffUsers(tenantId: string): Promise<StaffUser[]> {
   );
 }
 
-// Owner creates a staff login request — stored locally as 'pending' and queued
-// for admin approval. Becomes usable for login only once approved.
+// Owner creates a staff login request.
+// Rules:
+//   1. Internet must be up at submit time — we attempt an immediate POST so the
+//      admin sees it right away, no waiting for the 5-minute queue tick.
+//   2. Cloud Sync must be enabled — staff credentials travel to other devices
+//      through the sync snapshot; without it they'd be stranded on this machine.
+//   3. If the server is momentarily unavailable (but internet is up), the request
+//      stays queued and retries on reconnect / server restart automatically.
 export async function requestStaffUser(
   tenantId: string, username: string, password: string
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; queued?: boolean; error?: string }> {
   const cleanUsername = username.trim().toLowerCase();
   if (cleanUsername.length < 3) return { ok: false, error: 'Username must be at least 3 characters' };
   if (password.length < 4) return { ok: false, error: 'Password must be at least 4 characters' };
 
-  // Staff logins ride on Cloud Sync to reach other devices (the credential row
-  // syncs down via the generic table sync) — without it, a staff member could
-  // never log in from anywhere but the owner's own machine.
+  // Require internet at submit time — owner must be online so the request
+  // reaches the admin immediately, not silently stuck in a local queue.
+  if (!navigator.onLine) {
+    return { ok: false, error: 'No internet connection — connect to the internet and try again' };
+  }
+
   const syncStatus = await getCloudSyncStatus();
   if (!syncStatus.enabled) {
     return { ok: false, error: 'Enable Cloud Sync first (Settings → Cloud Sync) so staff can also log in from other devices' };
@@ -92,9 +101,30 @@ export async function requestStaffUser(
     [id, tenantId, cleanUsername, hash, salt, requestId, now(), now()]
   );
 
+  // Always enqueue as safety-net backup in case the direct POST below fails.
   await enqueue('staff_user_request', tenantId, { tenant_id: tenantId, request_id: requestId, username: cleanUsername });
 
-  return { ok: true };
+  // Attempt immediate direct delivery — internet is confirmed up.
+  // On success, mark the queue item as already synced so it won't double-send.
+  // On failure (server temporarily down), the queue item retries automatically
+  // when internet reconnects or the server starts.
+  try {
+    const res = await fetch(`${SERVER}/staff-user-request`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tenant_id: tenantId, request_id: requestId, username: cleanUsername }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (res.ok) {
+      await db.execute(
+        `UPDATE sync_queue SET synced_at = ? WHERE tenant_id = ? AND type = 'staff_user_request' AND payload LIKE ?`,
+        [now(), tenantId, `%"${requestId}"%`]
+      );
+      return { ok: true };
+    }
+  } catch { /* server temporarily unreachable — queue will retry */ }
+
+  return { ok: true, queued: true };
 }
 
 // Owner removes/revokes a staff login (soft — keeps the row for history)
@@ -106,7 +136,10 @@ export async function removeStaffUser(tenantId: string, id: string): Promise<voi
   );
 }
 
-// Ask the server which pending requests have been approved/rejected and update locally
+// Ask the server which pending requests have been approved/rejected and update locally.
+// If any were just approved, trigger a Cloud Sync push so the updated staff_users rows
+// land in the snapshot — staff members joining on a new device will get the approved
+// status directly instead of having to wait for the next periodic sync.
 export async function refreshStaffUserApprovals(tenantId: string): Promise<void> {
   const db = await getDb();
   const pending = await db.select<{ id: string; request_id: string | null }[]>(
@@ -120,6 +153,7 @@ export async function refreshStaffUserApprovals(tenantId: string): Promise<void>
     const data = await res.json() as { ok: boolean; requests?: Record<string, { status: string }> };
     if (!data.ok || !data.requests) return;
 
+    let anyApproved = false;
     for (const row of pending) {
       const remote = row.request_id ? data.requests[row.request_id] : null;
       if (!remote) continue;
@@ -128,12 +162,19 @@ export async function refreshStaffUserApprovals(tenantId: string): Promise<void>
           `UPDATE staff_users SET status = 'approved', approved_at = ?, updated_at = ? WHERE id = ?`,
           [now(), now(), row.id]
         );
+        anyApproved = true;
       } else if (remote.status === 'rejected') {
         await db.execute(
           `UPDATE staff_users SET status = 'rejected', updated_at = ? WHERE id = ?`,
           [now(), row.id]
         );
       }
+    }
+
+    // Push updated rows to snapshot so any new device joining gets the approved status.
+    if (anyApproved) {
+      const { pushDelta } = await import('./cloudSync');
+      pushDelta(tenantId).catch(() => {});
     }
   } catch { /* offline — try again next time */ }
 }

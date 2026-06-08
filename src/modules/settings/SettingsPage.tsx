@@ -856,12 +856,16 @@ function StaffLoginsSection({ tenantId }: { tenantId: string }) {
   });
   const cloudSyncEnabled = !!cloudSync?.enabled;
 
-  // Reconcile pending requests with the server whenever this section is open
+  // Poll for approval status while this section is visible — so "⏳ Pending"
+  // flips to "✓ Active" without the owner needing to reload.
   useEffect(() => {
     if (!tenantId) return;
-    refreshStaffUserApprovals(tenantId).then(() => {
+    const refresh = () => refreshStaffUserApprovals(tenantId).then(() => {
       queryClient.invalidateQueries({ queryKey: ['staff-users', tenantId] });
     });
+    refresh();
+    const t = setInterval(refresh, 15_000);
+    return () => clearInterval(t);
   }, [tenantId, queryClient]);
 
   async function handleAddStaffUser() {
@@ -870,7 +874,11 @@ function StaffLoginsSection({ tenantId }: { tenantId: string }) {
     try {
       const result = await requestStaffUser(tenantId, staffUsername, staffPassword);
       if (result.ok) {
-        toast.success('Request sent — the login will work once FrontStores approves it');
+        if (result.queued) {
+          toast.success('Request saved — the server was unreachable but it will be sent automatically once available');
+        } else {
+          toast.success('✅ Request sent to admin — the login will work once approved');
+        }
         setStaffUsername(''); setStaffPassword(''); setStaffConfirm('');
         queryClient.invalidateQueries({ queryKey: ['staff-users', tenantId] });
       } else {

@@ -172,15 +172,21 @@ export function AppLoginScreen() {
         await completeLogin('owner');
         return;
       }
+
+      // If the owner account is locked, only stop here if the entered username IS
+      // the owner's username — a staff member logging in with a different username
+      // must still be able to try their own credentials.
       if (ownerResult.locked) {
-        setLockedUntil(ownerResult.lockedUntil!);
-        setScreen('locked');
-        return;
+        const ownerUsername = await getAuthUsername(tenantId);
+        if (!ownerUsername || ownerUsername === username.trim().toLowerCase()) {
+          setLockedUntil(ownerResult.lockedUntil!);
+          setScreen('locked');
+          return;
+        }
       }
 
-      // Not the owner login — a newly-approved staff user has no other way to trigger
-      // the local pending→approved sync (they can't reach Settings until they can log in),
-      // so refresh approvals here, right before checking staff credentials.
+      // Staff login path — refresh approval status from server first so a
+      // newly-approved staff member can log in immediately without Settings access.
       await refreshStaffUserApprovals(tenantId);
       const staffResult = await verifyStaffAuth(tenantId, username, password, maxAttempts);
       if (staffResult.ok) {
