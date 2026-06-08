@@ -1,11 +1,12 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useAppStore } from '@/app/store/app.store';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { SetupWizard } from '@/modules/setup/SetupWizard';
 import { AppLoginScreen } from '@/modules/auth/AppLoginScreen';
 import { CreatePasswordScreen } from '@/modules/auth/CreatePasswordScreen';
 import { hasAuth } from '@/lib/db/auth';
+import { claimSession, heartbeatSession, releaseSession } from '@/lib/db/session';
 import { SubscriptionGate } from '@/modules/subscription/SubscriptionGate';
 import { useIdleTimer } from '@/lib/hooks/useIdleTimer';
 import { PinLockGate } from '@/components/ui/PinLockGate';
@@ -380,12 +381,47 @@ export default function App() {
     // instead of the wrong screen while the async check runs (e.g. after app switch)
     setAuthChecked(false);
     setAuthExists(false);
-    hasAuth(config.tenant_id).then(exists => {
+    const tenantId = config.tenant_id;
+    hasAuth(tenantId).then(async exists => {
       setAuthExists(exists);
-      if (exists) setAuthenticated(true);
+      if (exists) {
+        // [all apps] [all tenants] — claim/renew this device's single-session slot;
+        // if another device holds it, fall through to AppLoginScreen, which will
+        // re-claim on submit and surface the "already logged in elsewhere" message
+        const claim = await claimSession(tenantId);
+        if (!claim.blocked) {
+          if (claim.sessionId) sessionStorage.setItem('fs_session_id', claim.sessionId);
+          setAuthenticated(true);
+        }
+      }
       setAuthChecked(true);
     });
   }, [isSetupComplete, config?.tenant_id]);
+
+  // [all apps] [all tenants] — best-effort single-session enforcement: keep this
+  // device's session alive while logged in, and release it on logout/app-switch
+  // so another device can claim it without waiting for the TTL to expire.
+  const sessionRef = useRef<{ tenantId: string; sessionId: string } | null>(null);
+  useEffect(() => {
+    if (isAuthenticated && config?.tenant_id) {
+      const sessionId = sessionStorage.getItem('fs_session_id');
+      if (sessionId) sessionRef.current = { tenantId: config.tenant_id, sessionId };
+    } else if (!isAuthenticated && sessionRef.current) {
+      const { tenantId, sessionId } = sessionRef.current;
+      sessionRef.current = null;
+      sessionStorage.removeItem('fs_session_id');
+      releaseSession(tenantId, sessionId);
+    }
+  }, [isAuthenticated, config?.tenant_id]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !config?.tenant_id) return;
+    const sessionId = sessionStorage.getItem('fs_session_id');
+    if (!sessionId) return;
+    const tenantId = config.tenant_id;
+    const interval = setInterval(() => { heartbeatSession(tenantId, sessionId); }, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, config?.tenant_id]);
 
   if (isLoading) return <Loading />;
   if (!isSetupComplete) return <SetupWizard />;

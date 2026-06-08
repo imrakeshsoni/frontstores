@@ -83,6 +83,7 @@ const BROADCAST_FILE = path.join(DATA_DIR, 'broadcast.json');
 const NOTES_FILE     = path.join(DATA_DIR, 'notes.json');
 const SYNC_DIR      = path.join(DATA_DIR, 'sync');
 const DEVICES_FILE  = path.join(DATA_DIR, 'devices.json');
+const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
 
 // Ensure data dirs exist
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -91,6 +92,12 @@ if (!fs.existsSync(SYNC_DIR)) fs.mkdirSync(SYNC_DIR, { recursive: true });
 // ── Device helpers ────────────────────────────────────────────────────────────
 function loadDevices() { try { return JSON.parse(fs.readFileSync(DEVICES_FILE, 'utf8')); } catch { return {}; } }
 function saveDevices(d) { fs.writeFileSync(DEVICES_FILE, JSON.stringify(d, null, 2)); }
+
+function loadSessions() { try { return JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf8')); } catch { return {}; } }
+function saveSessions(d) { fs.writeFileSync(SESSIONS_FILE, JSON.stringify(d, null, 2)); }
+// A session is considered abandoned (crashed app, force-quit, etc.) if no heartbeat for this long —
+// after which another device may claim it. Heartbeats should run well inside this window.
+const SESSION_TTL_MS = 15 * 60 * 1000;
 async function hashPin(pin) {
   const encoder = new TextEncoder ? new TextEncoder() : { encode: s => Buffer.from(s, 'utf8') };
   const data = encoder.encode('frontstores-mobile-' + pin);
@@ -385,6 +392,85 @@ const publicServer = http.createServer(async (req, res) => {
       if (sub.mobile_pin_hash !== pin_hash) { json(res, { ok: false, error: 'Incorrect PIN' }, 401); return; }
       logActivity(tenantId, sub.shop_name, 'pin_password_reset', 'Password reset via phone + Cloud Sync PIN (self-service)');
       json(res, { ok: true, tenant_id: tenantId });
+    } catch {
+      json(res, { ok: false, error: 'Invalid request' }, 400);
+    }
+    return;
+  }
+
+  // ── Single-session enforcement (best-effort — only when online) ─────────────
+  // One tenant_id should only be "active" on one device at a time. Each login
+  // claims a session; the owning device renews it via heartbeat. If a device goes
+  // offline/crashes, its session naturally expires after SESSION_TTL_MS and
+  // another device can claim it. This is advisory, not a hard lock — the app
+  // must keep working fully offline even if the server can't be reached.
+
+  // POST /session/claim — { tenant_id, device_id, device_name }
+  if (req.method === 'POST' && pathname === '/session/claim') {
+    if (rateLimit(req, res, 'session-claim', 60, 60 * 60 * 1000)) return;
+    try {
+      const { tenant_id, device_id, device_name } = JSON.parse(await readBody(req));
+      if (!tenant_id || !device_id) { json(res, { ok: false, error: 'Missing fields' }, 400); return; }
+      const sessions = loadSessions();
+      const existing = sessions[tenant_id];
+      const isStale = existing && (Date.now() - new Date(existing.last_heartbeat).getTime()) > SESSION_TTL_MS;
+      if (existing && existing.device_id !== device_id && !isStale) {
+        json(res, {
+          ok: false,
+          error: `Already logged in on ${existing.device_name || 'another device'}`,
+          active_device: existing.device_name || 'another device',
+          active_since: existing.claimed_at,
+        }, 409);
+        return;
+      }
+      const session_id = crypto.randomBytes(16).toString('hex');
+      sessions[tenant_id] = {
+        session_id,
+        device_id,
+        device_name: sanitize(device_name, 60) || 'Unknown device',
+        claimed_at: existing && existing.device_id === device_id ? existing.claimed_at : new Date().toISOString(),
+        last_heartbeat: new Date().toISOString(),
+      };
+      saveSessions(sessions);
+      json(res, { ok: true, session_id });
+    } catch {
+      json(res, { ok: false, error: 'Invalid request' }, 400);
+    }
+    return;
+  }
+
+  // POST /session/heartbeat — { tenant_id, device_id, session_id }
+  if (req.method === 'POST' && pathname === '/session/heartbeat') {
+    if (rateLimit(req, res, 'session-heartbeat', 240, 60 * 60 * 1000)) return;
+    try {
+      const { tenant_id, device_id, session_id } = JSON.parse(await readBody(req));
+      const sessions = loadSessions();
+      const existing = sessions[tenant_id];
+      if (!existing || existing.session_id !== session_id || existing.device_id !== device_id) {
+        json(res, { ok: false, error: 'Session no longer active on this device' }, 409);
+        return;
+      }
+      existing.last_heartbeat = new Date().toISOString();
+      saveSessions(sessions);
+      json(res, { ok: true });
+    } catch {
+      json(res, { ok: false, error: 'Invalid request' }, 400);
+    }
+    return;
+  }
+
+  // POST /session/release — { tenant_id, device_id, session_id } — called on logout
+  if (req.method === 'POST' && pathname === '/session/release') {
+    if (rateLimit(req, res, 'session-release', 60, 60 * 60 * 1000)) return;
+    try {
+      const { tenant_id, device_id, session_id } = JSON.parse(await readBody(req));
+      const sessions = loadSessions();
+      const existing = sessions[tenant_id];
+      if (existing && existing.session_id === session_id && existing.device_id === device_id) {
+        delete sessions[tenant_id];
+        saveSessions(sessions);
+      }
+      json(res, { ok: true });
     } catch {
       json(res, { ok: false, error: 'Invalid request' }, 400);
     }

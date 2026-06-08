@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from '@/app/store/app.store';
 import { verifyAuth, resetPasswordWithCode, resetPasswordWithPhonePin, unlockWithCode, getAuthUsername } from '@/lib/db/auth';
+import { claimSession } from '@/lib/db/session';
 import { enqueue } from '@/lib/syncQueue';
 import { uuid, now } from '@/lib/db/index';
 import { toast } from 'sonner';
@@ -153,6 +154,12 @@ export function AppLoginScreen() {
     try {
       const result = await verifyAuth(tenantId, username, password, maxAttempts);
       if (result.ok) {
+        const claim = await claimSession(tenantId);
+        if (claim.blocked) {
+          toast.error(claim.error || `Already logged in on ${claim.activeDevice || 'another device'}. Log out there first.`);
+          return;
+        }
+        if (claim.sessionId) sessionStorage.setItem('fs_session_id', claim.sessionId);
         setAuthenticated(true);
       } else if (result.locked) {
         setLockedUntil(result.lockedUntil!);
