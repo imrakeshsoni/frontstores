@@ -151,7 +151,6 @@
     /* TOOLBAR / FILTERS */
     .toolbar { margin-bottom: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     .type-filter-row { margin-bottom: 16px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-    .bulk-bar { margin-bottom: 16px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
     .search-input {
       background: #fff; border: 1.5px solid var(--border);
       color: var(--text); border-radius: 12px; padding: 10px 16px;
@@ -172,12 +171,6 @@
       border-color: transparent; color: #fff;
       box-shadow: 0 3px 12px rgba(124,58,237,.3);
     }
-    .bulk-btn {
-      background: #fff; border: 1.5px solid var(--border);
-      color: var(--muted); padding: 8px 14px; border-radius: 10px;
-      font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all .15s;
-    }
-    .bulk-btn:hover { color: var(--text); border-color: var(--border2); }
     .export-btn {
       background: linear-gradient(135deg, #7c3aed, #9333ea); border: none;
       color: #fff; padding: 8px 16px; border-radius: 10px;
@@ -578,24 +571,6 @@
           <button class="filter-btn"        id="tag-tester" onclick="setTagFilter('tester')">🧪 Testers</button>
         </div>
 
-        <div class="type-filter-row">
-          <span style="font-size:12px;color:var(--muted);font-weight:600">App:</span>
-          <button class="filter-btn active" id="ft-all"        onclick="setTypeFilter('all')">All Types</button>
-          <button class="filter-btn"        id="ft-medical"    onclick="setTypeFilter('medical')">💊 Medical</button>
-          <button class="filter-btn"        id="ft-restaurant" onclick="setTypeFilter('restaurant')">🍽️ Restaurant</button>
-          <button class="filter-btn"        id="ft-grocery"    onclick="setTypeFilter('grocery')">🛒 Grocery</button>
-          <button class="filter-btn"        id="ft-carwash"    onclick="setTypeFilter('carwash')">🚗 Car Wash</button>
-          <button class="filter-btn"        id="ft-clinic"     onclick="setTypeFilter('clinic')">🏥 Clinic</button>
-          <button class="filter-btn"        id="ft-beauty"     onclick="setTypeFilter('beauty')">💅 Beauty</button>
-          <button class="filter-btn"        id="ft-study"      onclick="setTypeFilter('study')">📚 StudyMate</button>
-        </div>
-
-        <div class="bulk-bar">
-          <span style="font-size:12px;color:var(--muted);font-weight:600">Bulk:</span>
-          <button class="bulk-btn" id="bulk-approve-btn" onclick="bulkAction('approve-pending')">✅ Approve All Pending (<span id="bulk-pending-count">0</span>)</button>
-          <button class="bulk-btn" id="bulk-expiring-btn" onclick="bulkAction('extend-expiring')">⚡ Extend All Expiring (<span id="bulk-expiring-count">0</span>)</button>
-          <button class="bulk-btn" id="bulk-expired-btn" onclick="bulkAction('extend-expired')">↩ Extend All Expired (<span id="bulk-expired-count">0</span>)</button>
-        </div>
 
         <div class="table-wrap">
           <table>
@@ -824,7 +799,7 @@ const LABELS = { medical:'Medical Store', restaurant:'Restaurant / Café', groce
 const TYPE_COLORS = ['#8b5cf6','#06b6d4','#10b981','#f59e0b','#f43f5e','#3b82f6','#ec4899','#a78bfa'];
 
 let password = '', allCustomers = [], allErrors = [], allContacts = [], allActivity = [];
-let filter = 'all', typeFilter = 'all', tagFilter = 'all', eFilter = 'all', cFilter = 'all', openId = null;
+let filter = 'all', tagFilter = 'all', eFilter = 'all', cFilter = 'all', openId = null;
 let healthInterval = null;
 
 // [core] — Native admin app on this Mac passes the password as `local_token` so
@@ -939,7 +914,7 @@ async function loadAll(isLogin=false, silent=false) {
       resetIdleTimer();
       setTimeout(checkAutofixResume, 500);
     }
-    updateStats(); renderCustomers(); renderErrors(); renderContacts(); updateBadge(); updateBulkCounts();
+    updateStats(); renderCustomers(); renderErrors(); renderContacts(); updateBadge();
     if (openId) { const c = allCustomers.find(x=>x.tenant_id===openId); if (c) renderPanel(c); }
     if (!isLogin && !silent) showToast('✓ Data refreshed');
     loadDevices(true); // silently refresh device badge
@@ -984,20 +959,9 @@ function updateBadge() {
   const bp = document.getElementById('pending-badge');
   bp.textContent = np; bp.classList.toggle('show', np>0);
 }
-function updateBulkCounts() {
-  document.getElementById('bulk-pending-count').textContent  = allCustomers.filter(c=>subStatus(c)==='pending').length;
-  document.getElementById('bulk-expiring-count').textContent = allCustomers.filter(c=>subStatus(c)==='expiring').length;
-  document.getElementById('bulk-expired-count').textContent  = allCustomers.filter(c=>subStatus(c)==='expired').length;
-}
-
 function setFilter(f) {
   filter = f;
   ['all','pending','active','expiring','expired','frozen'].forEach(x=>document.getElementById('f-'+x).classList.toggle('active',x===f));
-  renderCustomers();
-}
-function setTypeFilter(t) {
-  typeFilter = t;
-  ['all','medical','restaurant','grocery','carwash','clinic','beauty','study'].forEach(x=>document.getElementById('ft-'+x).classList.toggle('active',x===t));
   renderCustomers();
 }
 function setTagFilter(t) {
@@ -1049,7 +1013,6 @@ function renderCustomers() {
     const st = subStatus(c);
     if (filter === 'switch') return !!c.switch_request && st === 'pending';
     if (filter !== 'all' && st !== filter) return false;
-    if (typeFilter !== 'all' && c.shop_type !== typeFilter) return false;
     if (!q) return true;
     return (c.shop_name||'').toLowerCase().includes(q)||(c.owner_name||'').toLowerCase().includes(q)||(c.tenant_id||'').toLowerCase().includes(q);
   });
@@ -1060,18 +1023,6 @@ function renderCustomers() {
 
 async function exportCSV() {
   window.location.href = API + '/admin/api/customers/export.csv';
-}
-
-async function bulkAction(action) {
-  const labels = { 'approve-pending':'Approve all pending?', 'extend-expiring':'Extend all expiring (7d) by 30 days?', 'extend-expired':'Extend all expired by 30 days?' };
-  if (!confirm(labels[action])) return;
-  try {
-    const r = await api('/admin/api/bulk', { method:'POST', body: JSON.stringify({ action, days: 30 }) });
-    if (!r.ok) { showToast('Bulk action failed', true); return; }
-    const d = await r.json();
-    showToast(`✅ Done — ${d.count} customers updated`);
-    await loadAll();
-  } catch { showToast('⚠ Connection error', true); }
 }
 
 function openPanel(id) {
