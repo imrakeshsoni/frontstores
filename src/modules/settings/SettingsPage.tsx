@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Sun, Moon, Cloud } from 'lucide-react';
@@ -637,13 +638,13 @@ export function SettingsPage() {
         {renderRow('audit', '📋', 'Export Audit Log', `${exportLogs?.length ?? 0} export${exportLogs?.length === 1 ? '' : 's'}`, undefined, true)}
       </>)}
 
-      {/* ── Slide-over panel ─────────────────────────────────────────────────── */}
-      {activePanel && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', justifyContent: 'flex-end' }}>
+      {/* ── Slide-over panel — rendered via portal so it escapes any overflow:auto ancestor ── */}
+      {activePanel && createPortal(
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', justifyContent: 'flex-end' }}>
           {/* Backdrop */}
-          <div onClick={closePanel} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)' }} />
+          <div onClick={closePanel} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }} />
           {/* Panel */}
-          <div style={{ position: 'relative', width: '80vw', height: '100%', background: 'var(--surface)', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 40px rgba(0,0,0,0.4)' }}>
+          <div style={{ position: 'relative', width: '80vw', height: '100%', background: 'var(--surface)', display: 'flex', flexDirection: 'column', boxShadow: '-12px 0 48px rgba(0,0,0,0.5)' }}>
             {/* Sticky header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px 16px', borderBottom: '1px solid var(--surface-border)', flexShrink: 0 }}>
               <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>{panelTitles[activePanel] ?? 'Settings'}</h2>
@@ -654,7 +655,8 @@ export function SettingsPage() {
               {renderPanelContent()}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
     </div>
@@ -970,27 +972,25 @@ function StaffLoginsSection({ tenantId }: { tenantId: string }) {
               <button
                 key={tab.key}
                 onClick={() => toggleTab(tab.key)}
-                className={`text-xs px-3 py-1 rounded-full border transition-all ${
-                  tabAccess.includes(tab.key)
-                    ? 'bg-violet-700 border-violet-500 text-white'
-                    : 'bg-transparent border-slate-700 text-slate-400 hover:border-slate-500'
-                }`}
+                style={{
+                  fontSize: '11px', padding: '3px 10px', borderRadius: '999px', border: '1px solid',
+                  cursor: 'pointer', transition: 'all .15s',
+                  background:   tabAccess.includes(tab.key) ? '#7c3aed' : 'transparent',
+                  borderColor:  tabAccess.includes(tab.key) ? '#7c3aed' : 'var(--surface-border)',
+                  color:        tabAccess.includes(tab.key) ? '#ffffff' : 'var(--text-secondary)',
+                }}
               >
                 {tab.label}
               </button>
             ))}
             <button
               onClick={() => setTabAccess(ALL_TABS.map(t => t.key))}
-              className="text-xs px-3 py-1 rounded-full border border-slate-600 text-slate-400 hover:text-slate-200"
-            >
-              All
-            </button>
+              style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '999px', border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}
+            >All</button>
             <button
               onClick={() => setTabAccess([])}
-              className="text-xs px-3 py-1 rounded-full border border-slate-600 text-slate-400 hover:text-slate-200"
-            >
-              None
-            </button>
+              style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '999px', border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}
+            >None</button>
           </div>
         </div>
 
@@ -1321,9 +1321,9 @@ function CloudSyncSection() {
       )}
 
       {/* Activate confirmation modal */}
-      {showConfirm && fee !== null && (
+      {showConfirm && fee !== null && createPortal(
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: 'var(--surface-card)', borderRadius: '18px', padding: '28px', maxWidth: '380px', width: '90%', border: '1px solid var(--surface-border)' }}>
+          <div style={{ background: 'var(--surface)', borderRadius: '18px', padding: '28px', maxWidth: '380px', width: '90%', border: '1px solid var(--surface-border)' }}>
             <p style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>Enable Cloud Sync?</p>
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px', lineHeight: 1.5 }}>
               Your data will be synced across all your devices in real time.
@@ -1346,13 +1346,14 @@ function CloudSyncSection() {
               <button onClick={handleConfirmActivate} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: '#0ea5e9', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>Activate · ₹{prorated}</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Deactivate confirmation modal */}
-      {showDeactivateConfirm && (
+      {showDeactivateConfirm && createPortal(
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: 'var(--surface-card)', borderRadius: '18px', padding: '28px', maxWidth: '360px', width: '90%', border: '1px solid var(--surface-border)' }}>
+          <div style={{ background: 'var(--surface)', borderRadius: '18px', padding: '28px', maxWidth: '360px', width: '90%', border: '1px solid var(--surface-border)' }}>
             <p style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>Deactivate Cloud Sync?</p>
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px', lineHeight: 1.5 }}>
               Current billing cycle charge will still apply. Cloud Sync will stop at the end of this cycle and you won't be charged from next month.
@@ -1362,7 +1363,8 @@ function CloudSyncSection() {
               <button onClick={handleDeactivate} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: '#ef4444', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>Deactivate</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
