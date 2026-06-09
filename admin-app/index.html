@@ -935,7 +935,8 @@ async function loadAll(isLogin=false, silent=false) {
       setTimeout(checkAutofixResume, 500);
     }
     updateStats(); renderCustomers(); renderErrors(); renderContacts(); updateBadge(isLogin);
-    if (openId) { const c = allCustomers.find(x=>x.tenant_id===openId); if (c) renderPanel(c); }
+    // Only re-render open panel on manual refresh — silent background refresh must not overwrite unsaved input changes
+    if (openId && !silent) { const c = allCustomers.find(x=>x.tenant_id===openId); if (c) renderPanel(c); }
     if (!isLogin && !silent) showToast('✓ Data refreshed');
     loadDevices(true); // silently refresh device badge
     loadSyncRequests(true); // silently refresh cloud-sync badge
