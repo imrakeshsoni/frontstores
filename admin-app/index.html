@@ -153,7 +153,7 @@
     .sc-blocked  { border-top: 3px solid #6b7280; }
 
     /* CUSTOMER CARDS */
-    #customers-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    #customers-grid { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
     .c-card {
       background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
       padding: 18px 20px; cursor: pointer; transition: box-shadow .15s, transform .15s;
@@ -986,7 +986,7 @@ function planBadge(c) {
   return '';
 }
 
-function customerCardHtml(c) {
+function customerCardHtml(c, idx) {
   const st = subStatus(c);
   const d = daysLeft(c.expires_at);
   const icon = ICONS[c.shop_type]||'🏪';
@@ -999,28 +999,19 @@ function customerCardHtml(c) {
   else if (st==='expired')  badge=`<span class="badge badge-expired">Expired</span>`;
   else if (st==='frozen')   badge=`<span class="badge badge-frozen">Frozen</span>`;
   else if (st==='revoked')  badge=`<span class="badge badge-revoked">Revoked</span>`;
-  const cardClass = `c-card${st==='frozen'?' frozen-row':st==='revoked'?' revoked-row':''}`;
-  const testerDot = !c.is_client ? `<span style="font-size:10px;font-weight:700;background:#ede9fe;color:#6d28d9;padding:2px 7px;border-radius:2px;margin-left:6px">Tester</span>` : '';
-  let daysBar = '';
-  if (st==='active'||st==='expiring') {
-    const pct = Math.min(100, (d/30)*100);
-    const color = st==='active' ? '#16a34a' : '#d97706';
-    daysBar = `<div style="height:3px;background:var(--border);border-radius:99px;margin-top:10px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${color};border-radius:99px"></div></div>`;
-  }
-  return `<div class="${cardClass}" onclick="openPanel('${tid}')">
-    <div class="c-card-top">
-      <div>
-        <div class="c-card-name">${icon} ${escHtml(c.shop_name||'Unknown')}${testerDot}</div>
-        <div class="c-card-type">${escHtml(LABELS[c.shop_type]||c.shop_type||'—')}</div>
-      </div>
-      ${badge}
+  const testerDot = !c.is_client ? `<span style="font-size:10px;font-weight:700;background:#ede9fe;color:#6d28d9;padding:2px 6px;border-radius:4px;margin-left:5px">Tester</span>` : '';
+  const rowBg = st==='frozen' ? 'rgba(147,197,253,.06)' : st==='revoked' ? 'rgba(251,113,133,.06)' : idx%2===0 ? 'transparent' : 'rgba(255,255,255,.02)';
+  return `<div onclick="openPanel('${tid}')" style="display:flex;align-items:center;gap:14px;padding:11px 16px;background:${rowBg};border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.06)'" onmouseout="this.style.background='${rowBg}'">
+    <div style="font-size:20px;width:28px;text-align:center;flex-shrink:0">${icon}</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:13px;font-weight:700;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(c.shop_name||'Unknown')}${testerDot}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:1px">${escHtml(c.owner_name||'—')} · ${escHtml(c.phone||c.email||'—')} · ${escHtml(LABELS[c.shop_type]||c.shop_type||'—')}</div>
     </div>
-    <div class="c-card-divider"></div>
-    <div class="c-card-row"><span class="c-card-lbl">Owner</span><span class="c-card-val">${escHtml(c.owner_name||'—')}</span></div>
-    <div class="c-card-row"><span class="c-card-lbl">Phone</span><span class="c-card-val">${escHtml(c.phone||c.email||'—')}</span></div>
-    <div class="c-card-row"><span class="c-card-lbl">Joined</span><span class="c-card-val">${reg}</span></div>
-    <div class="c-card-row"><span class="c-card-lbl">Plan</span><span class="c-card-val">${planBadgeText(c)}</span></div>
-    ${daysBar}
+    <div style="font-size:11px;color:var(--muted);flex-shrink:0;text-align:right">
+      <div>${reg}</div>
+      <div style="margin-top:2px">${planBadgeText(c)}</div>
+    </div>
+    <div style="flex-shrink:0">${badge}</div>
   </div>`;
 }
 
@@ -1040,8 +1031,8 @@ function renderCustomers() {
     return (c.shop_name||'').toLowerCase().includes(q)||(c.owner_name||'').toLowerCase().includes(q)||(c.tenant_id||'').toLowerCase().includes(q);
   });
   const grid = document.getElementById('customers-grid');
-  if (!list.length) { grid.innerHTML=`<div class="empty" style="grid-column:1/-1">No customers found</div>`; return; }
-  grid.innerHTML = list.map(customerCardHtml).join('');
+  if (!list.length) { grid.innerHTML=`<div class="empty">No customers found</div>`; return; }
+  grid.innerHTML = list.map((c,i) => customerCardHtml(c,i)).join('');
 }
 
 async function exportCSV() {
@@ -2111,7 +2102,6 @@ function confirmPushAnnouncement() {
   const title   = document.getElementById('an-title').value.trim();
   const message = document.getElementById('an-message').value.trim();
   if (!title || !message) { showToast('Enter title and message', true); return; }
-  if (!confirm(`You really want to push this announcement to ALL tenants now?\n\n"${title}"\n\n${message}`)) return;
   pushAnnouncement(title, message);
 }
 async function pushAnnouncement(title, message) {
