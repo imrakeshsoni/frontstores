@@ -1,11 +1,12 @@
 // [core] [all tenants]
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, CheckCircle2, Clock, AlertCircle, ArrowRight, RefreshCw } from 'lucide-react';
+import { X, CheckCircle2, Clock, AlertCircle, ArrowRight, RefreshCw, Users } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { APP_REGISTRY } from '@/lib/shop/shopType';
 import {
   getLinkedAccounts, upsertLinkedAccount, switchActiveApp, createLinkedAppConfig,
+  hydrateFromJoinSnapshot,
   type LinkedAccount,
 } from '@/lib/db/linkedAccounts';
 import { copyAuth } from '@/lib/db/auth';
@@ -23,12 +24,20 @@ export function SwitchAppModal({ onClose }: SwitchAppModalProps) {
   const setAuthenticated = useAppStore(s => s.setAuthenticated);
 
   const [linked, setLinked]       = useState<LinkedAccount[]>([]);
-  const [registering, setRegistering] = useState<string | null>(null); // shop_type being registered
+  const [registering, setRegistering] = useState<string | null>(null);
   const [shopName, setShopName]   = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [syncing, setSyncing]     = useState(false);
   const [switchingTo, setSwitchingTo] = useState<string | null>(null);
   const [error, setError]         = useState('');
+
+  // Join as team member flow
+  const [showJoin, setShowJoin]   = useState(false);
+  const [joinCode, setJoinCode]   = useState('');
+  const [joinPin, setJoinPin]     = useState('');
+  const [joining, setJoining]     = useState(false);
+  const [joinError, setJoinError] = useState('');
+  const [joinSuccess, setJoinSuccess] = useState<{ shopName: string; username: string } | null>(null);
 
   useEffect(() => {
     getLinkedAccounts().then(setLinked);
@@ -145,6 +154,39 @@ export function SwitchAppModal({ onClose }: SwitchAppModalProps) {
     } catch {
       setSwitchingTo(null);
     }
+  };
+
+  const handleJoin = async () => {
+    const code = joinCode.trim().toUpperCase();
+    const pin  = joinPin.replace(/-/g, '').trim();
+    if (!code || pin.length < 6) { setJoinError('Enter a valid shop code and PIN'); return; }
+    setJoining(true); setJoinError('');
+    try {
+      const res = await fetch(`${SERVER}/join/verify-pin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shop_code: code, pin }),
+        signal: AbortSignal.timeout(15000),
+      });
+      const data = await res.json();
+      if (!data.ok) { setJoinError(data.error ?? 'Invalid shop code or PIN'); setJoining(false); return; }
+
+      // Hydrate local DB with snapshot
+      await hydrateFromJoinSnapshot(data);
+      await loadConfig();
+      setJoinSuccess({ shopName: data.shop_name ?? 'Shop', username: data.username ?? '' });
+    } catch (e: unknown) {
+      setJoinError(e instanceof Error && e.message.includes('timed out')
+        ? 'Could not reach server. Check internet connection.'
+        : 'Something went wrong. Please try again.');
+      setJoining(false);
+    }
+  };
+
+  const handleSwitchAfterJoin = () => {
+    setAuthenticated(false);
+    onClose();
+    navigate('/');
   };
 
   const linkedMap = new Map(linked.map(a => [a.shop_type, a]));
@@ -282,6 +324,85 @@ export function SwitchAppModal({ onClose }: SwitchAppModalProps) {
           <p className="text-xs text-center mt-4" style={{ color: 'var(--text-tertiary)' }}>
             Each app requires admin approval before activation · Your data is separate per app
           </p>
+
+          {/* ── Join as team member ── */}
+          <div className="mt-5 rounded-2xl overflow-hidden border" style={{ borderColor: 'var(--surface-border)' }}>
+            <button
+              onClick={() => { setShowJoin(v => !v); setJoinError(''); setJoinSuccess(null); }}
+              className="w-full flex items-center justify-between px-5 py-4 text-left"
+              style={{ background: 'var(--surface)' }}>
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-xl flex items-center justify-center" style={{ background: '#ede9fe' }}>
+                  <Users className="h-4 w-4" style={{ color: '#6d28d9' }} />
+                </div>
+                <div>
+                  <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Join as team member</p>
+                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Your manager shares a Shop Code + one-time PIN</p>
+                </div>
+              </div>
+              <span style={{ color: 'var(--text-tertiary)', fontSize: '18px' }}>{showJoin ? '−' : '+'}</span>
+            </button>
+
+            {showJoin && (
+              <div className="px-5 pb-5 pt-1" style={{ background: 'var(--surface-2)', borderTop: '1px solid var(--surface-border)' }}>
+                {joinSuccess ? (
+                  <div className="text-center py-4 space-y-3">
+                    <div className="text-4xl">🎉</div>
+                    <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>
+                      Joined <span style={{ color: '#6d28d9' }}>{joinSuccess.shopName}</span>!
+                    </p>
+                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                      Log in with username <strong>{joinSuccess.username}</strong> and your password.
+                    </p>
+                    <button
+                      onClick={handleSwitchAfterJoin}
+                      className="w-full py-2.5 rounded-xl text-sm font-bold text-white"
+                      style={{ background: '#6d28d9' }}>
+                      Go to Login →
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3 pt-3">
+                    <div>
+                      <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--text-secondary)' }}>Shop Code</label>
+                      <input
+                        value={joinCode}
+                        onChange={e => setJoinCode(e.target.value.toUpperCase())}
+                        placeholder="e.g. FS-ABC123"
+                        className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none font-mono tracking-wider"
+                        style={{ background: 'var(--surface)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }}
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--text-secondary)' }}>One-time PIN</label>
+                      <input
+                        value={joinPin}
+                        onChange={e => {
+                          const v = e.target.value.replace(/[^0-9]/g, '');
+                          setJoinPin(v.length > 4 ? v.slice(0, 4) + '-' + v.slice(4, 8) : v);
+                        }}
+                        placeholder="1234-5678"
+                        maxLength={9}
+                        className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none font-mono tracking-widest"
+                        style={{ background: 'var(--surface)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }}
+                        autoComplete="off"
+                      />
+                      <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>PIN expires in 48 hours · Works only once · Requires Cloud Sync on owner's app</p>
+                    </div>
+                    {joinError && <p className="text-xs font-semibold" style={{ color: '#dc2626' }}>⚠ {joinError}</p>}
+                    <button
+                      onClick={handleJoin}
+                      disabled={joining || !joinCode.trim() || joinPin.replace(/-/g, '').length < 6}
+                      className="w-full py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50"
+                      style={{ background: '#6d28d9' }}>
+                      {joining ? 'Verifying…' : 'Join Shop'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

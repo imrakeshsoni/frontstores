@@ -62,6 +62,69 @@ export async function updateLinkedAccountStatus(
   );
 }
 
+// Hydrate local SQLite from a join snapshot returned by /join/verify-pin
+// Used when a staff member joins their manager's app on a new device via Cloud Sync
+export async function hydrateFromJoinSnapshot(snapshot: any): Promise<void> {
+  const db = await getDb();
+  const { tenant_id, shop_name, shop_type } = snapshot;
+
+  // Create app_config if not already present
+  const existing = await db.select<{ id: string }[]>(
+    `SELECT id FROM app_config WHERE tenant_id=? LIMIT 1`, [tenant_id]
+  );
+  if (existing.length === 0) {
+    const cfgRow = (snapshot.app_config || []).find((r: any) => r.tenant_id === tenant_id);
+    if (cfgRow) {
+      const cols = Object.keys(cfgRow);
+      await db.execute(
+        `INSERT OR REPLACE INTO app_config (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`,
+        cols.map((c: string) => cfgRow[c] ?? null)
+      ).catch(() => {});
+    } else {
+      await db.execute(
+        `INSERT OR IGNORE INTO app_config (id, tenant_id, shop_type, shop_name, is_setup_complete, updated_at)
+         VALUES (?,?,?,?,1,?)`,
+        [uuid(), tenant_id, shop_type ?? 'crm', shop_name ?? 'Shared App', now()]
+      );
+    }
+    // Ensure bill_sequences row exists
+    await db.execute(
+      `INSERT OR IGNORE INTO bill_sequences (id, tenant_id, sequence_type, prefix, current_number)
+       VALUES (?,?,'invoice','INV',0)`,
+      [uuid(), tenant_id]
+    ).catch(() => {});
+  }
+
+  // Activate this tenant
+  await db.execute(`UPDATE app_config SET is_active=0`);
+  await db.execute(`UPDATE app_config SET is_active=1 WHERE tenant_id=?`, [tenant_id]);
+
+  // Import all table data from snapshot (same pattern as pullFromCloudDb)
+  const SKIP = new Set(['tenant_id', 'cloud_db_code', 'shop_name', 'shop_type', 'snapshot_at', 'has_data', 'ok', 'staff_id', 'username']);
+  for (const [table, rows] of Object.entries(snapshot)) {
+    if (SKIP.has(table) || !Array.isArray(rows) || !rows.length) continue;
+    for (const row of rows as any[]) {
+      const cols = Object.keys(row);
+      if (!cols.length) continue;
+      try {
+        await db.execute(
+          `INSERT OR REPLACE INTO ${table} (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`,
+          cols.map((c: string) => row[c] ?? null)
+        );
+      } catch { /* table doesn't exist on this device yet — skip */ }
+    }
+  }
+
+  // Register as linked account
+  await upsertLinkedAccount({
+    tenant_id,
+    shop_type: shop_type ?? 'unknown',
+    shop_name: shop_name ?? 'Shared App',
+    owner_name: (snapshot.app_config || [])[0]?.owner_name ?? '',
+    status: 'active',
+  });
+}
+
 // Switch the active app — updates app_config is_active flags
 export async function switchActiveApp(tenantId: string): Promise<void> {
   const db = await getDb();
