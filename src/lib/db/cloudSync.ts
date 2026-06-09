@@ -87,24 +87,74 @@ export async function refreshCloudSyncStatus(tenantId: string): Promise<CloudSyn
   return getCloudSyncStatus();
 }
 
-// Tenant requests Cloud Sync access — lands in the admin approval queue
-export async function requestCloudSync(tenantId: string): Promise<{ ok: boolean; error?: string }> {
+// [all apps] [all tenants] — Fetch cloud sync fee from server before showing confirmation
+export async function getCloudSyncFee(tenantId: string): Promise<{ fee: number; currency: string }> {
+  try {
+    const res = await fetch(`${SERVER}/cloud-sync/fee/${tenantId}`, { signal: AbortSignal.timeout(6000) });
+    const data = await res.json() as { fee?: number; currency?: string };
+    return { fee: data.fee ?? 299, currency: data.currency ?? 'INR' };
+  } catch {
+    return { fee: 299, currency: 'INR' };
+  }
+}
+
+// [all apps] [all tenants] — Auto-activate cloud sync (no admin approval needed)
+export async function activateCloudSync(tenantId: string): Promise<{ ok: boolean; error?: string }> {
   const config = await getAppConfig();
   const s = config?.settings as any ?? {};
   try {
-    const res = await fetch(`${SERVER}/sync/request`, {
+    const res = await fetch(`${SERVER}/cloud-sync/self-activate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tenant_id: tenantId }),
-      signal: AbortSignal.timeout(8000),
+      body: JSON.stringify({ tenant_id: tenantId, activated_at: new Date().toISOString() }),
+      signal: AbortSignal.timeout(10000),
     });
-    const data = await res.json();
-    if (!data.ok) return { ok: false, error: data.error ?? 'Request failed' };
-    await updateAppConfig({ settings: { ...s, cloud_sync_request_status: data.status ?? 'pending' } });
+    const data = await res.json() as { ok: boolean; sync_code?: string; error?: string };
+    if (!data.ok) return { ok: false, error: data.error ?? 'Activation failed' };
+    await updateAppConfig({
+      settings: {
+        ...s,
+        cloud_sync_enabled: true,
+        cloud_sync_request_status: 'approved',
+        cloud_sync_code: data.sync_code,
+        cloud_sync_dashboard_url: `https://update.frontstores.com/shop/${tenantId}`,
+        cloud_sync_activated_at: new Date().toISOString(),
+      },
+    });
     return { ok: true };
   } catch {
-    return { ok: false, error: 'Could not reach server. Check your internet connection and try again.' };
+    return { ok: false, error: 'Could not reach server. Check your internet connection.' };
   }
+}
+
+// [all apps] [all tenants] — Deactivate cloud sync; charge for current cycle still applies
+export async function deactivateCloudSync(tenantId: string): Promise<{ ok: boolean; error?: string }> {
+  const config = await getAppConfig();
+  const s = config?.settings as any ?? {};
+  if (!s.cloud_sync_enabled || !s.cloud_sync_code) return { ok: false, error: 'Cloud Sync is not active' };
+  try {
+    await fetch(`${SERVER}/cloud-sync/self-deactivate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tenant_id: tenantId, sync_code: s.cloud_sync_code, deactivated_at: new Date().toISOString() }),
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch { /* fire-and-forget — local state is source of truth */ }
+  await updateAppConfig({
+    settings: {
+      ...s,
+      cloud_sync_enabled: false,
+      cloud_sync_request_status: null,
+      cloud_sync_code: null,
+      cloud_sync_deactivated_at: new Date().toISOString(),
+    },
+  });
+  return { ok: true };
+}
+
+// Legacy — kept for backward compat; replaced by activateCloudSync
+export async function requestCloudSync(tenantId: string): Promise<{ ok: boolean; error?: string }> {
+  return activateCloudSync(tenantId);
 }
 
 export async function setMobilePin(tenantId: string, pin: string): Promise<{ ok: boolean; error?: string }> {

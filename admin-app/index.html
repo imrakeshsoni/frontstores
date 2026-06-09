@@ -762,17 +762,11 @@
 
       <div class="tab-page" id="page-syncrequests">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-          <h2 style="font-size:18px;font-weight:700">☁️ Cloud Requests</h2>
+          <h2 style="font-size:18px;font-weight:700">☁️ Cloud Sync</h2>
           <button onclick="loadSyncRequests()" style="padding:6px 14px;background:var(--accent);color:#111;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer">Refresh</button>
         </div>
-
-        <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Cloud Sync Requests</div>
-        <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Approve to switch on real-time multi-device sync for this tenant.</p>
-        <div id="syncrequests-list" style="margin-bottom:24px"></div>
-
-        <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">🗄️ Cloud Storage Requests</div>
-        <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Approve to enable full cloud database backup for this tenant. All their data will be stored on this server and auto-synced.</p>
-        <div id="clouddb-requests-list"></div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Tenants self-activate Cloud Sync — no approval needed. Set per-tenant fee, view full event history.</p>
+        <div id="syncrequests-list"></div>
       </div>
 
       <div class="tab-page" id="page-staffrequests">
@@ -1694,64 +1688,79 @@ async function deviceAction(deviceId, action) {
   else showToast('Failed', true);
 }
 
-// CLOUD SYNC + CLOUD DB REQUESTS — [admin] [all tenants]
+// [all apps] [all tenants] — Cloud Sync admin view: self-service status, fee config, event history
 async function loadSyncRequests(silentBadge = false) {
-  const [sr, dbr] = await Promise.allSettled([
-    api('/admin/api/sync-requests').then(r => r.ok ? r.json() : []),
-    api('/admin/api/cloud-db-requests').then(r => r.ok ? r.json() : []),
-  ]);
-  const syncReqs  = sr.status  === 'fulfilled' ? sr.value  : [];
-  const cloudDbReqs = dbr.status === 'fulfilled' ? dbr.value : [];
-  const totalPending = syncReqs.length + cloudDbReqs.length;
-
   const badge = document.getElementById('syncrequests-badge');
-  if (badge) { badge.textContent = totalPending; badge.style.display = totalPending > 0 ? '' : 'none'; }
-
+  if (badge) { badge.style.display = 'none'; }
   if (silentBadge) return;
 
+  const r = await api('/admin/api/customers');
+  if (!r.ok) return;
+  const customers = await r.json();
+
   const fmtDt = iso => iso ? new Date(iso).toLocaleString('en-IN') : '—';
-  const requestRow = (req, approveAction, rejectAction) => `
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-        <div>
-          <div style="font-size:14px;font-weight:700">${ICONS[req.shop_type]||'🏪'} ${escHtml(req.shop_name||'Unknown Shop')}</div>
-          <div style="font-size:11px;color:var(--muted)">Type: ${escHtml(LABELS[req.shop_type]||req.shop_type||'—')}</div>
-          <div style="font-size:11px;color:var(--muted)">Requested: ${fmtDt(req.requested_at)}</div>
-        </div>
-        <span style="padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(245,158,11,.15);color:#f59e0b">PENDING</span>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:8px">
-        <button onclick="${approveAction}" style="flex:1;padding:8px;background:rgba(52,211,153,.15);border:1px solid rgba(52,211,153,.3);border-radius:10px;color:#34d399;font-size:12px;font-weight:700;cursor:pointer">✓ Approve</button>
-        <button onclick="${rejectAction}" style="flex:1;padding:8px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:10px;color:#f87171;font-size:12px;font-weight:700;cursor:pointer">✕ Reject</button>
-      </div>
+  const enabled = customers.filter(c => c.sync_enabled);
+  const disabled = customers.filter(c => !c.sync_enabled && c.cloud_sync_events?.length > 0);
+
+  const eventRow = (ev) => {
+    const color = ev.type === 'activated' ? '#34d399' : '#f87171';
+    const label = ev.type === 'activated' ? '▶ Activated' : '■ Deactivated';
+    const feeStr = ev.fee ? ` · ₹${ev.fee}/mo` : '';
+    return `<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid var(--border)">
+      <span style="color:${color};font-weight:600">${label}${feeStr}</span>
+      <span style="color:var(--muted)">${fmtDt(ev.at)}</span>
     </div>`;
+  };
 
-  const syncListEl = document.getElementById('syncrequests-list');
-  if (syncListEl) {
-    syncListEl.innerHTML = syncReqs.length
-      ? syncReqs.map(req => requestRow(req, `syncRequestAction('${req.tenant_id}','approve')`, `syncRequestAction('${req.tenant_id}','reject')`)).join('')
-      : '<div style="color:var(--muted);font-size:13px;padding:10px 0">No pending Cloud Sync requests</div>';
-  }
+  const customerCard = (c) => {
+    const tid = c.tenant_id;
+    const events = (c.cloud_sync_events || []).slice().reverse();
+    return `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+        <div>
+          <div style="font-size:14px;font-weight:700">${ICONS[c.shop_type]||'🏪'} ${escHtml(c.shop_name||'Unknown')}</div>
+          <div style="font-size:11px;color:var(--muted)">Activated: ${fmtDt(c.cloud_sync_activated_at)}</div>
+        </div>
+        <span style="padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;background:${c.sync_enabled?'rgba(52,211,153,.15)':'rgba(239,68,68,.1)'};color:${c.sync_enabled?'#34d399':'#f87171'}">${c.sync_enabled?'ACTIVE':'INACTIVE'}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <span style="font-size:12px;color:var(--muted)">Fee:</span>
+        <input id="fee-${tid}" type="number" value="${c.cloud_sync_fee??299}" min="0" style="width:70px;padding:4px 8px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--fg);font-size:12px" />
+        <span style="font-size:12px;color:var(--muted)">₹/month</span>
+        <button onclick="setCloudSyncFee('${tid}')" style="padding:4px 10px;background:rgba(14,165,233,.15);border:1px solid rgba(14,165,233,.3);border-radius:8px;color:#38bdf8;font-size:11px;font-weight:700;cursor:pointer">Save</button>
+      </div>
+      ${events.length ? `<div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Event History</div>
+      <div>${events.slice(0,10).map(eventRow).join('')}</div>` : ''}
+    </div>`;
+  };
 
-  const dbListEl = document.getElementById('clouddb-requests-list');
-  if (dbListEl) {
-    dbListEl.innerHTML = cloudDbReqs.length
-      ? cloudDbReqs.map(req => requestRow(req, `cloudDbRequestAction('${req.tenant_id}','approve')`, `cloudDbRequestAction('${req.tenant_id}','reject')`)).join('')
-      : '<div style="color:var(--muted);font-size:13px;padding:10px 0">No pending Cloud Storage requests</div>';
-  }
+  const listEl = document.getElementById('syncrequests-list');
+  if (!listEl) return;
+  const html = [
+    enabled.length ? `<div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Active (${enabled.length})</div>` + enabled.map(customerCard).join('') : '',
+    disabled.length ? `<div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin:16px 0 8px">Previously Used (${disabled.length})</div>` + disabled.map(customerCard).join('') : '',
+    (!enabled.length && !disabled.length) ? '<div style="color:var(--muted);font-size:13px;padding:10px 0">No tenants have used Cloud Sync yet</div>' : '',
+  ].join('');
+  listEl.innerHTML = html;
+}
+
+async function setCloudSyncFee(tenantId) {
+  const val = parseInt(document.getElementById('fee-' + tenantId)?.value ?? '299', 10);
+  if (isNaN(val) || val < 0) { showToast('Invalid fee', true); return; }
+  const r = await api(`/admin/api/customers/${tenantId}/cloud-sync-fee`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ fee: val }) });
+  if (r.ok) showToast(`☁️ Fee set to ₹${val}/month`); else showToast('Failed', true);
 }
 
 async function cloudDbRequestAction(tenantId, action) {
   const r = await api(`/admin/api/customers/${tenantId}/${action}-cloud-db`, { method:'POST' });
-  if (r.ok) {
-    showToast(action === 'approve' ? '🗄️ Cloud Storage approved — tenant notified instantly' : 'Cloud Storage request rejected');
-    loadSyncRequests();
-  } else showToast('Failed', true);
+  if (r.ok) showToast(action === 'approve' ? '🗄️ Cloud Storage approved' : 'Request rejected');
+  else showToast('Failed', true);
 }
 
 async function syncRequestAction(tenantId, action) {
   const r = await api(`/admin/api/customers/${tenantId}/${action}-sync`, { method:'POST' });
-  if (r.ok) { showToast(action === 'approve' ? '☁️ Cloud Sync approved — switched on for this tenant' : 'Request rejected'); loadSyncRequests(); }
+  if (r.ok) showToast(action === 'approve' ? '☁️ Cloud Sync approved' : 'Request rejected');
   else showToast('Failed', true);
 }
 

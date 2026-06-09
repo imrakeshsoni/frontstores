@@ -1541,6 +1541,60 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
     json(res, { ok: true, requests: {} }); return;
   }
 
+  // [all apps] [all tenants] — GET /cloud-sync/fee/:tenant_id — return fee for this tenant (admin can override)
+  const cloudSyncFeeMatch = pathname.match(/^\/cloud-sync\/fee\/([a-f0-9-]{36})$/);
+  if (req.method === 'GET' && cloudSyncFeeMatch) {
+    const tenantId = cloudSyncFeeMatch[1];
+    const subs = loadSubs();
+    const sub = subs[tenantId];
+    const fee = sub?.cloud_sync_fee ?? 299;
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    json(res, { ok: true, fee, currency: 'INR' }); return;
+  }
+
+  // [all apps] [all tenants] — POST /cloud-sync/self-activate — auto-activate (no admin approval)
+  if (req.method === 'POST' && pathname === '/cloud-sync/self-activate') {
+    if (rateLimit(req, res, 'cloud-sync-activate', 5, 60 * 60 * 1000)) return;
+    const body = JSON.parse(await readBody(req));
+    const { tenant_id, activated_at } = body;
+    if (!tenant_id) { json(res, { ok: false, error: 'Missing tenant_id' }, 400); return; }
+    const subs = loadSubs();
+    const sub = subs[tenant_id];
+    if (!sub) { json(res, { ok: false, error: 'Shop not found' }, 404); return; }
+    // Generate sync_code if not already set
+    if (!sub.sync_code) {
+      sub.sync_code = Math.random().toString(36).slice(2, 8).toUpperCase() + Math.random().toString(36).slice(2, 8).toUpperCase();
+    }
+    sub.sync_enabled = true;
+    sub.cloud_sync_self_activated = true;
+    sub.cloud_sync_activated_at = activated_at ?? new Date().toISOString();
+    // Log event
+    if (!sub.cloud_sync_events) sub.cloud_sync_events = [];
+    sub.cloud_sync_events.push({ type: 'activated', at: activated_at ?? new Date().toISOString(), fee: sub.cloud_sync_fee ?? 299 });
+    saveSubs(subs);
+    logActivity(tenant_id, sub.shop_name, 'cloud_sync_self_activated', `Cloud Sync self-activated`);
+    console.log(`☁️  Cloud Sync self-activated for ${sub.shop_name}`);
+    json(res, { ok: true, sync_code: sub.sync_code, shop_name: sub.shop_name }); return;
+  }
+
+  // [all apps] [all tenants] — POST /cloud-sync/self-deactivate — deactivate cloud sync
+  if (req.method === 'POST' && pathname === '/cloud-sync/self-deactivate') {
+    const body = JSON.parse(await readBody(req));
+    const { tenant_id, sync_code, deactivated_at } = body;
+    if (!tenant_id) { json(res, { ok: false, error: 'Missing tenant_id' }, 400); return; }
+    const subs = loadSubs();
+    const sub = subs[tenant_id];
+    if (!sub) { json(res, { ok: false, error: 'Shop not found' }, 404); return; }
+    sub.sync_enabled = false;
+    sub.cloud_sync_deactivated_at = deactivated_at ?? new Date().toISOString();
+    if (!sub.cloud_sync_events) sub.cloud_sync_events = [];
+    sub.cloud_sync_events.push({ type: 'deactivated', at: deactivated_at ?? new Date().toISOString() });
+    saveSubs(subs);
+    logActivity(tenant_id, sub.shop_name, 'cloud_sync_deactivated', 'Cloud Sync deactivated by owner');
+    console.log(`☁️  Cloud Sync deactivated for ${sub.shop_name}`);
+    json(res, { ok: true }); return;
+  }
+
   // POST /sync/activate — validate sync code, enable cloud sync for tenant
   if (req.method === 'POST' && pathname === '/sync/activate') {
     if (rateLimit(req, res, 'sync-activate', 5, 60 * 60 * 1000)) return;
@@ -2052,6 +2106,23 @@ async function handleAdminRequest(req, res) {
     logActivity(tenantId, sub.shop_name, 'sync_approved', 'Cloud Sync request approved by admin');
     console.log(`☁️  Cloud Sync approved for ${sub.shop_name}`);
     json(res, { ok: true }); return;
+  }
+
+  // [all apps] [all tenants] — POST /admin/api/customers/:id/cloud-sync-fee — admin sets per-tenant fee
+  const cloudSyncFeeAdminMatch = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/cloud-sync-fee$/);
+  if (req.method === 'POST' && cloudSyncFeeAdminMatch) {
+    if (!checkAuth(req)) { res.writeHead(401); res.end(); return; }
+    const tenantId = cloudSyncFeeAdminMatch[1];
+    const body = JSON.parse(await readBody(req));
+    const fee = parseInt(body.fee, 10);
+    if (isNaN(fee) || fee < 0) { json(res, { ok: false, error: 'Invalid fee' }, 400); return; }
+    const subs = loadSubs();
+    const sub = subs[tenantId];
+    if (!sub) { json(res, { ok: false, error: 'Not found' }, 404); return; }
+    sub.cloud_sync_fee = fee;
+    saveSubs(subs);
+    logActivity(tenantId, sub.shop_name, 'cloud_sync_fee_updated', `Cloud Sync fee set to ₹${fee}/month`);
+    json(res, { ok: true, fee }); return;
   }
 
   // POST /admin/api/customers/:id/reject-sync — reject a pending Cloud Sync request

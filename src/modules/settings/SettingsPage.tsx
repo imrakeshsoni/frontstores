@@ -12,7 +12,7 @@ import { exportBackup } from '@/lib/db/backup';
 import { PageIntro } from '@/components/ui/PageIntro';
 import { useTheme } from '@/lib/theme/useTheme';
 import { reportError } from '@/lib/errorReporter';
-import { getCloudSyncStatus, refreshCloudSyncStatus, requestCloudSync } from '@/lib/db/cloudSync';
+import { getCloudSyncStatus, refreshCloudSyncStatus, activateCloudSync, deactivateCloudSync, getCloudSyncFee } from '@/lib/db/cloudSync';
 
 type SettingsForm = {
   shop_name: string;
@@ -1197,9 +1197,15 @@ function SectionPinLockSection() {
 
 // ── Cloud Sync Section ────────────────────────────────────────────────────────
 // [all apps] [all tenants] — simple Cloud Sync toggle: request → admin approval → silent auto-sync
+// [all apps] [all tenants] — Cloud Sync section: self-activate/deactivate with pro-rated billing confirmation
 function CloudSyncSection() {
   const tenantId = useAppStore(s => s.config?.tenant_id ?? '');
-  const [requesting, setRequesting] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [fee, setFee] = useState<number | null>(null);
+  const [prorated, setProrated] = useState<number | null>(null);
+  const [nextCycleFee, setNextCycleFee] = useState<number | null>(null);
+  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
 
   const { data: syncStatus, refetch: refetchStatus } = useQuery({
     queryKey: ['cloud-sync-status', tenantId],
@@ -1208,9 +1214,7 @@ function CloudSyncSection() {
     refetchInterval: 60_000,
   });
 
-  const enabled  = !!syncStatus?.enabled;
-  const pending  = syncStatus?.requestStatus === 'pending';
-  const rejected = syncStatus?.requestStatus === 'rejected';
+  const enabled = !!syncStatus?.enabled;
 
   const lastSynced = syncStatus?.lastSyncedAt
     ? (() => {
@@ -1222,20 +1226,48 @@ function CloudSyncSection() {
       })()
     : null;
 
-  const handleToggle = async () => {
-    if (enabled || requesting || pending) return;
-    setRequesting(true);
-    try {
-      const result = await requestCloudSync(tenantId);
-      if (!result.ok) { toast.error(result.error ?? 'Could not send request'); return; }
-      toast.success('Request sent — we\'ll enable Cloud Sync for you shortly.');
-      refetchStatus();
-    } finally { setRequesting(false); }
+  const calcProrated = (fullFee: number) => {
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const daysRemaining = daysInMonth - now.getDate() + 1;
+    return Math.round(fullFee * daysRemaining / daysInMonth);
   };
 
-  // Toggle appearance
-  const toggleOn = enabled || pending;
-  const toggleColor = enabled ? '#16a34a' : pending ? '#d97706' : '#cbd5e1';
+  const handleToggleOn = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { fee: f } = await getCloudSyncFee(tenantId);
+      setFee(f);
+      setProrated(calcProrated(f));
+      setNextCycleFee(f);
+      setShowConfirm(true);
+    } finally { setBusy(false); }
+  };
+
+  const handleConfirmActivate = async () => {
+    setShowConfirm(false);
+    setBusy(true);
+    try {
+      const result = await activateCloudSync(tenantId);
+      if (!result.ok) { toast.error(result.error ?? 'Could not activate Cloud Sync'); return; }
+      toast.success('☁️ Cloud Sync activated!');
+      refetchStatus();
+    } finally { setBusy(false); }
+  };
+
+  const handleDeactivate = async () => {
+    setShowDeactivateConfirm(false);
+    setBusy(true);
+    try {
+      const result = await deactivateCloudSync(tenantId);
+      if (!result.ok) { toast.error(result.error ?? 'Could not deactivate'); return; }
+      toast.success('Cloud Sync deactivated. Current billing cycle charge still applies.');
+      refetchStatus();
+    } finally { setBusy(false); }
+  };
+
+  const toggleColor = enabled ? '#16a34a' : '#cbd5e1';
 
   return (
     <div className="card p-4">
@@ -1246,34 +1278,27 @@ function CloudSyncSection() {
             <Cloud className="h-4 w-4" style={{ color: enabled ? '#16a34a' : '#0ea5e9' }} />
           </div>
           <div>
-            <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-              ☁️ Cloud Sync
-            </p>
+            <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>☁️ Cloud Sync</p>
             <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
               {enabled
                 ? lastSynced ? `Active · last synced ${lastSynced}` : 'Active · syncing your data'
-                : pending
-                  ? 'Pending approval — we\'ll enable it shortly'
-                  : rejected
-                    ? 'Request not approved — tap to try again'
-                    : 'Enable to sync data across all devices seamlessly'}
+                : 'Sync data across devices · ₹299/month'}
             </p>
           </div>
         </div>
-        {/* Toggle switch */}
         <button
-          onClick={handleToggle}
-          disabled={enabled || requesting}
+          onClick={enabled ? () => setShowDeactivateConfirm(true) : handleToggleOn}
+          disabled={busy}
           style={{
             width: '44px', height: '24px', borderRadius: '999px',
             background: toggleColor,
-            border: 'none', cursor: enabled ? 'default' : 'pointer',
+            border: 'none', cursor: busy ? 'default' : 'pointer',
             position: 'relative', transition: 'background 0.2s', flexShrink: 0,
-            opacity: requesting ? 0.6 : 1,
+            opacity: busy ? 0.6 : 1,
           }}>
           <span style={{
             position: 'absolute', top: '3px',
-            left: toggleOn ? '23px' : '3px',
+            left: enabled ? '23px' : '3px',
             width: '18px', height: '18px', borderRadius: '50%',
             background: '#fff', transition: 'left 0.2s',
             boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
@@ -1281,10 +1306,55 @@ function CloudSyncSection() {
         </button>
       </div>
 
-      {!enabled && !pending && (
+      {!enabled && (
         <p className="text-xs mt-3 pt-3" style={{ color: 'var(--text-tertiary)', borderTop: '1px solid var(--surface-border)' }}>
-          Your data stays on your device at all times. Cloud Sync adds a silent background backup — if the internet or server goes down, your app keeps working locally and syncs automatically when the connection comes back.
+          Your data stays on your device. Cloud Sync adds silent backup and multi-device access — works offline, syncs when connection returns.
         </p>
+      )}
+
+      {/* Activate confirmation modal */}
+      {showConfirm && fee !== null && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'var(--surface-card)', borderRadius: '18px', padding: '28px', maxWidth: '380px', width: '90%', border: '1px solid var(--surface-border)' }}>
+            <p style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>Enable Cloud Sync?</p>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px', lineHeight: 1.5 }}>
+              Your data will be synced across all your devices in real time.
+            </p>
+            <div style={{ background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)', borderRadius: '12px', padding: '14px', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>This billing cycle (pro-rated)</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>₹{prorated}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>From next billing cycle</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>₹{nextCycleFee}/month</span>
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--surface-border)' }}>
+                Billing on 1st of every month. You can deactivate anytime — current cycle charge still applies. No refund for mid-cycle cancellation.
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setShowConfirm(false)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={handleConfirmActivate} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: '#0ea5e9', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>Activate · ₹{prorated}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Deactivate confirmation modal */}
+      {showDeactivateConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'var(--surface-card)', borderRadius: '18px', padding: '28px', maxWidth: '360px', width: '90%', border: '1px solid var(--surface-border)' }}>
+            <p style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>Deactivate Cloud Sync?</p>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px', lineHeight: 1.5 }}>
+              Current billing cycle charge will still apply. Cloud Sync will stop at the end of this cycle and you won't be charged from next month.
+            </p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setShowDeactivateConfirm(false)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>Keep Active</button>
+              <button onClick={handleDeactivate} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: '#ef4444', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>Deactivate</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
