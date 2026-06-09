@@ -79,6 +79,10 @@ import {
   UserMinus,
   Eye,
   EyeOff,
+  Zap,
+  MessageSquare,
+  DollarSign,
+  UserCog,
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '@/app/store/app.store';
@@ -417,12 +421,15 @@ const CA_NAV_ITEMS = [
 
 // [crm] [all tenants]
 const CRM_NAV_ITEMS = [
-  { to: '/crm/dashboard',     icon: LayoutDashboard, label: 'Dashboard',     iconBg: '#cffafe', iconColor: '#0891b2' },
-  { to: '/crm/contacts',      icon: Users,           label: 'Contacts',      iconBg: '#dbeafe', iconColor: '#2563eb' },
-  { to: '/crm/pipeline',      icon: Target,          label: 'Pipeline',      iconBg: '#ede9fe', iconColor: '#7c3aed' },
-  { to: '/crm/followups',     icon: Timer,           label: 'Follow-ups',    iconBg: '#fef3c7', iconColor: '#d97706' },
-  { to: '/crm/communications', icon: Radio,          label: 'Comm. Log',     iconBg: '#dcfce7', iconColor: '#16a34a' },
-  { to: '/settings',          icon: Settings,        label: 'Settings',      iconBg: '#f1f5f9', iconColor: '#64748b' },
+  { to: '/crm/dashboard',      icon: LayoutDashboard, label: 'Dashboard',   iconBg: '#cffafe', iconColor: '#0891b2' },
+  { to: '/crm/leads',          icon: Zap,             label: 'Leads',       iconBg: '#fef9c3', iconColor: '#ca8a04' },
+  { to: '/crm/wa-inbox',       icon: MessageSquare,   label: 'WA Inbox',    iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/crm/contacts',       icon: Users,           label: 'Contacts',    iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/crm/pipeline',       icon: Target,          label: 'Pipeline',    iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/crm/followups',      icon: Timer,           label: 'Follow-ups',  iconBg: '#fef3c7', iconColor: '#d97706' },
+  { to: '/crm/communications', icon: Radio,           label: 'Comm. Log',   iconBg: '#e0f2fe', iconColor: '#0369a1' },
+  { to: '/crm/commissions',    icon: DollarSign,      label: 'Commissions', iconBg: '#fef9c3', iconColor: '#ca8a04' },
+  { to: '/crm/team',           icon: UserCog,         label: 'Team',        iconBg: '#f0fdf4', iconColor: '#15803d' },
 ];
 
 // [events] [all tenants]
@@ -654,6 +661,124 @@ export function AppLayout() {
       return () => { document.title = 'FrontStores'; };
     }
   }, [config?.shop_type]);
+
+  // [crm] [all tenants] — admin-panel design: dark navy sidebar/nav + warm cream bg
+  if (config?.shop_type === 'crm') {
+    const C = {
+      bg: '#f0ece4',
+      nav: '#0f1523',
+      nav2: '#171f30',
+      navBorder: 'rgba(255,255,255,0.07)',
+      surface: '#ffffff',
+      surface2: '#f8f5f0',
+      border: '#e5dfd3',
+      text: '#111520',
+      muted: '#7c7869',
+      accent: '#b8922a',
+      accent2: '#d4aa44',
+    };
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: C.bg, fontFamily: "'Inter', -apple-system, sans-serif" }}>
+        {/* Top nav — same dark navy as admin sidebar */}
+        <header style={{ background: C.nav, flexShrink: 0, zIndex: 20, boxShadow: '0 2px 16px rgba(0,0,0,0.25)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', padding: '0 24px', height: '54px', gap: '4px' }}>
+            {/* Brand */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginRight: '24px', flexShrink: 0, borderRight: `1px solid ${C.navBorder}`, paddingRight: '24px' }}>
+              <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '8px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Store style={{ width: '16px', height: '16px', color: C.accent2 }} />
+              </div>
+              <div>
+                <div style={{ color: '#ffffff', fontWeight: 800, fontSize: '14px', letterSpacing: '-0.03em' }}>
+                  {config?.shop_name || 'FrontStores'}
+                </div>
+                <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '10px', fontWeight: 500, letterSpacing: '0.08em', textTransform: 'uppercase' }}>CRM</div>
+              </div>
+            </div>
+            {/* Nav items */}
+            <nav style={{ display: 'flex', alignItems: 'center', gap: '2px', flex: 1, overflowX: 'auto' }}>
+              {activeNavItems.map(({ to, icon: Icon, label }) => (
+                <NavLink key={to} to={to}
+                  style={({ isActive }) => ({
+                    display: 'flex', alignItems: 'center', gap: '7px',
+                    padding: '7px 13px', borderRadius: '5px', fontSize: '13px', fontWeight: 500,
+                    textDecoration: 'none', whiteSpace: 'nowrap', transition: 'all 0.12s',
+                    borderLeft: isActive ? `2px solid ${C.accent2}` : '2px solid transparent',
+                    background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
+                    color: isActive ? '#ffffff' : 'rgba(255,255,255,0.45)',
+                  })}>
+                  <Icon style={{ width: '13px', height: '13px', flexShrink: 0 }} />
+                  {label}
+                </NavLink>
+              ))}
+              <NavLink to="/announcements"
+                style={({ isActive }) => ({
+                  display: 'flex', alignItems: 'center', gap: '7px',
+                  padding: '7px 13px', borderRadius: '5px', fontSize: '13px', fontWeight: 500,
+                  textDecoration: 'none', whiteSpace: 'nowrap', transition: 'all 0.12s',
+                  borderLeft: isActive ? `2px solid ${C.accent2}` : '2px solid transparent',
+                  background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
+                  color: isActive ? '#ffffff' : 'rgba(255,255,255,0.45)',
+                  position: 'relative',
+                })}>
+                {({ isActive }) => (
+                  <>
+                    <Megaphone style={{ width: '13px', height: '13px', flexShrink: 0 }} />
+                    Announcements
+                    {!!unreadAnnouncements && (
+                      <span style={{ background: '#dc2626', color: 'white', borderRadius: '999px', padding: '0 5px', fontSize: '10px', fontWeight: 700, minWidth: '16px', height: '16px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {unreadAnnouncements > 9 ? '9+' : unreadAnnouncements}
+                      </span>
+                    )}
+                  </>
+                )}
+              </NavLink>
+            </nav>
+            {/* User menu */}
+            <div style={{ position: 'relative', flexShrink: 0, marginLeft: '12px', borderLeft: `1px solid ${C.navBorder}`, paddingLeft: '16px' }}>
+              <button onClick={() => setShowUserMenu(v => !v)}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0' }}>
+                <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '12px', flexShrink: 0 }}>
+                  {(config?.owner_name ?? 'O')[0].toUpperCase()}
+                </div>
+                <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', fontWeight: 500 }}>{config?.owner_name ?? 'Owner'}</span>
+                <ChevronUp style={{ width: '12px', height: '12px', color: 'rgba(255,255,255,0.3)', transform: showUserMenu ? 'rotate(0deg)' : 'rotate(180deg)', transition: 'transform 0.2s' }} />
+              </button>
+              {showUserMenu && (
+                <>
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setShowUserMenu(false)} />
+                  <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, minWidth: '190px', background: C.nav2, border: `1px solid ${C.navBorder}`, borderRadius: '6px', overflow: 'hidden', zIndex: 50, boxShadow: '0 16px 40px rgba(0,0,0,0.4)' }}>
+                    {[
+                      { to: '/sync', icon: RefreshCw, label: 'Sync' },
+                      { to: '/settings', icon: Settings, label: 'Settings & Updates' },
+                    ].map(({ to, icon: Icon, label }) => (
+                      <NavLink key={to} to={to} onClick={() => setShowUserMenu(false)}
+                        style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', color: 'rgba(255,255,255,0.6)', textDecoration: 'none', fontSize: '13px', fontWeight: 500, borderBottom: `1px solid ${C.navBorder}`, transition: 'color 0.1s' }}>
+                        <Icon style={{ width: '13px', height: '13px' }} /> {label}
+                      </NavLink>
+                    ))}
+                    <button onClick={() => { setShowUserMenu(false); setShowSwitchModal(true); }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', color: 'rgba(255,255,255,0.6)', background: 'none', border: 'none', borderBottom: `1px solid ${C.navBorder}`, width: '100%', fontSize: '13px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      <ArrowLeftRight style={{ width: '13px', height: '13px' }} /> Switch App
+                    </button>
+                    <button onClick={() => { setShowUserMenu(false); setAuthenticated(false); }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', color: '#f87171', background: 'none', border: 'none', width: '100%', fontSize: '13px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      <LogOut style={{ width: '13px', height: '13px' }} /> Logout
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </header>
+        {/* Main content */}
+        <main style={{ flex: 1, overflowY: 'auto', background: C.bg }}>
+          <Outlet />
+        </main>
+        {showSwitchModal && <SwitchAppModal onClose={() => setShowSwitchModal(false)} />}
+        <AnnouncementPopup />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ backgroundColor: 'var(--bg)' }}>

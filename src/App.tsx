@@ -279,10 +279,14 @@ const CAStaffPage             = lazy(() => import('@/modules/ca/StaffPage').then
 
 // [crm] [all tenants]
 const CRMDashboard            = lazy(() => import('@/modules/crm/CRMDashboard').then(m => ({ default: m.CRMDashboard })));
+const CRMLeadsPage            = lazy(() => import('@/modules/crm/LeadsPage').then(m => ({ default: m.CRMLeadsPage })));
 const CRMContactsPage         = lazy(() => import('@/modules/crm/ContactsPage').then(m => ({ default: m.CRMContactsPage })));
 const CRMPipelinePage         = lazy(() => import('@/modules/crm/PipelinePage').then(m => ({ default: m.CRMPipelinePage })));
 const CRMFollowUpsPage        = lazy(() => import('@/modules/crm/FollowUpsPage').then(m => ({ default: m.CRMFollowUpsPage })));
 const CRMCommunicationLogPage = lazy(() => import('@/modules/crm/CommunicationLogPage').then(m => ({ default: m.CRMCommunicationLogPage })));
+const CRMWhatsAppInboxPage    = lazy(() => import('@/modules/crm/WhatsAppInboxPage').then(m => ({ default: m.WhatsAppInboxPage })));
+const CRMCommissionsPage      = lazy(() => import('@/modules/crm/CommissionsPage').then(m => ({ default: m.CommissionsPage })));
+const CRMTeamPage             = lazy(() => import('@/modules/crm/TeamPage').then(m => ({ default: m.TeamPage })));
 
 // [events] [all tenants]
 const EventsDashboard  = lazy(() => import('@/modules/events/EventsDashboard').then(m => ({ default: m.EventsDashboard })));
@@ -385,6 +389,13 @@ export default function App() {
     const tenantId = config.tenant_id;
     hasAuth(tenantId).then(async exists => {
       setAuthExists(exists);
+      // [all apps] [all tenants] — dev mode: skip login entirely
+      if (import.meta.env.DEV) {
+        sessionStorage.setItem('fs_logged_in_username', 'owner');
+        setAuthenticated(true);
+        setAuthChecked(true);
+        return;
+      }
       if (exists) {
         // [all apps] [all tenants] — claim/renew this device's single-session slot;
         // if another device holds it, fall through to AppLoginScreen, which will
@@ -699,10 +710,14 @@ export default function App() {
 
             {/* [crm] [all tenants] */}
             <Route path="crm/dashboard"      element={<CRMDashboard />} />
+            <Route path="crm/leads"          element={<CRMLeadsPage />} />
+            <Route path="crm/wa-inbox"       element={<CRMWhatsAppInboxPage />} />
             <Route path="crm/contacts"       element={<CRMContactsPage />} />
             <Route path="crm/pipeline"       element={<CRMPipelinePage />} />
             <Route path="crm/followups"      element={<CRMFollowUpsPage />} />
             <Route path="crm/communications" element={<CRMCommunicationLogPage />} />
+            <Route path="crm/commissions"    element={<CRMCommissionsPage />} />
+            <Route path="crm/team"           element={<CRMTeamPage />} />
 
             {/* [catering] [all tenants] */}
             <Route path="catering/dashboard"    element={<CateringDashboard />} />

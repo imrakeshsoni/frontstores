@@ -85,6 +85,10 @@ const SYNC_DIR      = path.join(DATA_DIR, 'sync');
 const CLOUD_DB_DIR  = path.join(DATA_DIR, 'cloud-db'); // [all apps] [all tenants] — full DB snapshots for Cloud Database mode
 const DEVICES_FILE  = path.join(DATA_DIR, 'devices.json');
 const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
+// [crm] [all tenants] — WhatsApp bot & lead capture
+const WA_CONVOS_FILE = path.join(DATA_DIR, 'wa-conversations.json');
+const WA_LEADS_FILE  = path.join(DATA_DIR, 'wa-leads.json');
+const WA_CREDS_FILE  = path.join(DATA_DIR, 'wa-credentials.json');
 
 // Ensure data dirs exist
 if (!fs.existsSync(DATA_DIR))     fs.mkdirSync(DATA_DIR,     { recursive: true });
@@ -102,6 +106,102 @@ function saveDevices(d) { fs.writeFileSync(DEVICES_FILE, JSON.stringify(d, null,
 
 function loadSessions() { try { return JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf8')); } catch { return {}; } }
 function saveSessions(d) { fs.writeFileSync(SESSIONS_FILE, JSON.stringify(d, null, 2)); }
+
+// [crm] [all tenants] — WhatsApp bot helpers
+function loadWaConvos() { try { return JSON.parse(fs.readFileSync(WA_CONVOS_FILE, 'utf8')); } catch { return {}; } }
+function saveWaConvos(d) { fs.writeFileSync(WA_CONVOS_FILE, JSON.stringify(d, null, 2)); }
+function loadWaLeads()  { try { return JSON.parse(fs.readFileSync(WA_LEADS_FILE,  'utf8')); } catch { return []; } }
+function saveWaLeads(d)  { fs.writeFileSync(WA_LEADS_FILE,  JSON.stringify(d, null, 2)); }
+function loadWaCreds()  { try { return JSON.parse(fs.readFileSync(WA_CREDS_FILE,  'utf8')); } catch { return {}; } }
+function saveWaCreds(d)  { fs.writeFileSync(WA_CREDS_FILE,  JSON.stringify(d, null, 2)); }
+
+// Send a WhatsApp message via Meta Graph API
+async function sendWaMessage(phoneId, token, to, text) {
+  const https = require('https');
+  const body = JSON.stringify({
+    messaging_product: 'whatsapp',
+    to,
+    type: 'text',
+    text: { body: text },
+  });
+  return new Promise((resolve) => {
+    const req = https.request({
+      hostname: 'graph.facebook.com',
+      path: `/v18.0/${phoneId}/messages`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'Content-Length': Buffer.byteLength(body) },
+    }, (res) => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => { resolve({ status: res.statusCode, body: data }); });
+    });
+    req.on('error', (e) => { console.error('WA send error:', e.message); resolve({ status: 0, error: e.message }); });
+    req.write(body);
+    req.end();
+  });
+}
+
+// Bot conversation step logic
+async function handleWaBotStep(from, text, tenantId) {
+  const convos = loadWaConvos();
+  const key = `${tenantId}:${from}`;
+  const creds = loadWaCreds()[tenantId];
+  if (!creds) return; // no WA credentials registered for this tenant
+
+  let c = convos[key] || { step: 0, from_phone: from, tenant_id: tenantId, started_at: new Date().toISOString() };
+
+  const reply = async (msg) => {
+    await sendWaMessage(creds.phone_id, creds.token, from, msg);
+  };
+
+  if (c.step === 0) {
+    // First contact — greet and ask name
+    c.step = 1;
+    await reply(`👋 Hello! Welcome to FrontStores.\n\nI'm here to help you find the right software for your business.\n\nCould you please tell me *your name*?`);
+  } else if (c.step === 1) {
+    c.name = text.trim();
+    c.step = 2;
+    await reply(`Nice to meet you, ${c.name}! 😊\n\nWhat is the *name of your business or company*?`);
+  } else if (c.step === 2) {
+    c.company = text.trim();
+    c.step = 3;
+    await reply(`Got it — *${c.company}*.\n\nWhat *type of business* do you run? (e.g. Medical Store, Restaurant, Grocery, Salon, etc.)`);
+  } else if (c.step === 3) {
+    c.business_type = text.trim();
+    c.step = 4;
+    await reply(`Interesting! And what kind of *software solution* are you looking for from FrontStores?\n\n(e.g. billing, inventory, customer management, CRM, etc.)`);
+  } else if (c.step === 4) {
+    c.software_interest = text.trim();
+    c.step = 5;
+    c.completed_at = new Date().toISOString();
+
+    // Save as pending lead
+    const leads = loadWaLeads();
+    const existing = leads.findIndex(l => l.from_phone === from && l.tenant_id === tenantId && !l.imported);
+    const lead = {
+      id: crypto.randomUUID(),
+      tenant_id: tenantId,
+      from_phone: from,
+      from_name: c.name || '',
+      company: c.company || '',
+      business_type: c.business_type || '',
+      software_interest: c.software_interest || '',
+      message_preview: `Business: ${c.business_type}. Needs: ${c.software_interest}`,
+      received_at: c.started_at,
+      imported: false,
+    };
+    if (existing >= 0) leads[existing] = lead; else leads.push(lead);
+    saveWaLeads(leads);
+
+    await reply(`Thank you, ${c.name}! 🙏\n\nOur team is reviewing your information and will get back to you shortly.\n\nWe look forward to helping *${c.company}* with their ${c.business_type} software needs!`);
+  } else {
+    // Already captured
+    await reply(`Hi ${c.name || 'there'}! We already have your information. Our team will be in touch with you soon. 😊`);
+  }
+
+  convos[key] = c;
+  saveWaConvos(convos);
+}
 // A session is considered abandoned (crashed app, force-quit, etc.) if no heartbeat for this long —
 // after which another device may claim it. Heartbeats should run well inside this window.
 const SESSION_TTL_MS = 15 * 60 * 1000;
@@ -1507,6 +1607,95 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
       json(res, { attendance: att, staff: data.staff || [] }); return;
     }
     json(res, { error: 'Unknown endpoint' }, 404); return;
+  }
+
+  // [crm] [all tenants] — WhatsApp webhook (Meta verification + incoming messages)
+  if (req.method === 'GET' && pathname === '/webhook/whatsapp') {
+    const mode      = url.searchParams.get('hub.mode');
+    const token     = url.searchParams.get('hub.verify_token');
+    const challenge = url.searchParams.get('hub.challenge');
+    // Accept if verify_token matches any registered tenant_id or the env WA_VERIFY_TOKEN
+    const expectedToken = process.env.WA_VERIFY_TOKEN || 'frontstores-wa-verify';
+    const creds = loadWaCreds();
+    const validTenant = Object.entries(creds).find(([, c]) => c.verify_token === token);
+    if (mode === 'subscribe' && (token === expectedToken || validTenant)) {
+      res.writeHead(200); res.end(challenge); return;
+    }
+    res.writeHead(403); res.end('Forbidden'); return;
+  }
+
+  if (req.method === 'POST' && pathname === '/webhook/whatsapp') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const payload = JSON.parse(body);
+        const entry = payload.entry?.[0];
+        const change = entry?.changes?.[0];
+        const messages = change?.value?.messages;
+        if (!messages || messages.length === 0) { res.writeHead(200); res.end('ok'); return; }
+
+        const msg = messages[0];
+        const from = msg.from; // sender phone
+        const text = msg.text?.body || '';
+        if (!text) { res.writeHead(200); res.end('ok'); return; }
+
+        // Match tenant by the business phone number ID that received the message
+        const businessPhoneId = change?.value?.metadata?.phone_number_id || '';
+        const creds = loadWaCreds();
+        const tenantEntry = Object.entries(creds).find(([, c]) => c.phone_id === businessPhoneId);
+        const tenantId = tenantEntry ? tenantEntry[0] : 'default';
+
+        await handleWaBotStep(from, text, tenantId);
+      } catch (e) {
+        console.error('WA webhook error:', e.message);
+      }
+      res.writeHead(200); res.end('ok');
+    });
+    return;
+  }
+
+  // [crm] [all tenants] — Register WA credentials from the app
+  if (req.method === 'POST' && pathname.startsWith('/api/wa-credentials/')) {
+    const tenantId = pathname.split('/')[3];
+    if (!tenantId) { res.writeHead(400); res.end('bad request'); return; }
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { phone_id, token, verify_token } = JSON.parse(body);
+        if (!phone_id || !token) { json(res, { error: 'phone_id and token required' }, 400); return; }
+        const creds = loadWaCreds();
+        creds[tenantId] = { phone_id, token, verify_token: verify_token || 'frontstores-wa-verify', updated_at: new Date().toISOString() };
+        saveWaCreds(creds);
+        json(res, { ok: true }); return;
+      } catch (e) { json(res, { error: 'invalid json' }, 400); }
+    });
+    return;
+  }
+
+  // [crm] [all tenants] — Get pending WA leads for the app to sync
+  if (req.method === 'GET' && pathname.startsWith('/api/wa-leads/')) {
+    const tenantId = pathname.split('/')[3];
+    if (!tenantId) { res.writeHead(400); res.end('bad request'); return; }
+    const leads = loadWaLeads().filter(l => l.tenant_id === tenantId);
+    json(res, { leads }); return;
+  }
+
+  // [crm] [all tenants] — Mark a WA lead as imported (called by app after inserting into SQLite)
+  if (req.method === 'POST' && pathname.startsWith('/api/wa-leads/') && pathname.endsWith('/mark-imported')) {
+    const parts = pathname.split('/');
+    const tenantId = parts[3];
+    const leadId   = parts[4];
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      const leads = loadWaLeads();
+      const idx = leads.findIndex(l => l.id === leadId && l.tenant_id === tenantId);
+      if (idx >= 0) { leads[idx].imported = true; saveWaLeads(leads); }
+      json(res, { ok: true }); return;
+    });
+    return;
   }
 
   res.writeHead(404); res.end('Not found');

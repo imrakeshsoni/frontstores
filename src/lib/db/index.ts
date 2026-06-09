@@ -1,4 +1,6 @@
 import Database from '@tauri-apps/plugin-sql';
+import { exists, remove, stat } from '@tauri-apps/plugin-fs';
+import { appLocalDataDir, join } from '@tauri-apps/api/path';
 import { readMigrations } from './migrations';
 import { reportError } from '../errorReporter';
 
@@ -12,8 +14,31 @@ export async function getDb(): Promise<Database> {
   return _dbPromise;
 }
 
+// Stale WAL/SHM files from a deleted DB cause SQLITE_IOERR_SHORT_READ (code 522).
+// Clean them up whenever the main DB is tiny (empty/new) but WAL/SHM exist.
+async function _cleanStaleWal() {
+  try {
+    const dir = await appLocalDataDir();
+    const dbPath  = await join(dir, 'frontstores.db');
+    const shmPath = dbPath + '-shm';
+    const walPath = dbPath + '-wal';
+    const shmExists = await exists(shmPath);
+    const walExists = await exists(walPath);
+    if (!shmExists && !walExists) return;
+    // Under 8KB = fresh/empty DB
+    let dbTiny = false;
+    try { const info = await stat(dbPath); dbTiny = (info.size ?? 0) < 8192; }
+    catch { dbTiny = true; }
+    if (dbTiny) {
+      if (shmExists) await remove(shmPath);
+      if (walExists) await remove(walPath);
+    }
+  } catch { /* non-fatal */ }
+}
+
 async function _initDb(): Promise<Database> {
   try {
+    await _cleanStaleWal();
     _db = await Database.load('sqlite:frontstores.db');
     await _db.execute('PRAGMA journal_mode = WAL');
     await _db.execute('PRAGMA busy_timeout = 10000');
