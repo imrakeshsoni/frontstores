@@ -1,15 +1,14 @@
 // [core] [all apps] [all tenants]
-// Staff logins under the same tenant — the owner creates a username+password
-// from Settings, we approve from the admin panel, and only then can that login
-// sign in locally. Same hash/salt scheme as app_auth — the password never
-// leaves the device; only the username + a request id are sent for approval.
+// Staff users v2 — owner creates staff from Settings, auto-approved (no admin needed).
+// Server is notified of every create/deactivate for billing & audit tracking.
+// Users can never be deleted — only deactivated. Password hash never leaves the device.
 import { getDb, uuid, now } from './index';
 import { hashPassword, randomSalt, hasAuth, getAuthUsername } from './auth';
-import { getCloudSyncStatus } from './cloudSync';
-import { enqueue } from '../syncQueue';
+import { getOrCreateShopCode } from './config';
 
 const SERVER = 'https://update.frontstores.com';
 
+// ── In-memory brute-force protection ────────────────────────────────────────
 const _memLock = new Map<string, { count: number; lockedUntil: number }>();
 
 function _lockKey(tenantId: string, username: string) { return `${tenantId}::${username}`; }
@@ -30,21 +29,30 @@ function _recordMemAttempt(key: string, max: number): { locked: boolean; lockedU
 
 function _clearMem(key: string) { _memLock.delete(key); }
 
+// ── Types ────────────────────────────────────────────────────────────────────
 export interface StaffUser {
   id: string;
   tenant_id: string;
   username: string;
   password_hash: string;
   salt: string;
+  display_name: string;
+  role: string;
+  tab_access: string; // JSON array string
+  join_pin_hash: string | null;
+  pin_salt: string | null;
+  pin_expires_at: string | null;
+  pin_used_at: string | null;
   status: 'pending' | 'approved' | 'rejected';
-  request_id: string | null;
   failed_attempts: number;
   locked_until: string | null;
   requested_at: string;
   approved_at: string | null;
+  deactivated_at: string | null;
   updated_at: string;
 }
 
+// ── Read ─────────────────────────────────────────────────────────────────────
 export async function listStaffUsers(tenantId: string): Promise<StaffUser[]> {
   const db = await getDb();
   return db.select<StaffUser[]>(
@@ -53,39 +61,35 @@ export async function listStaffUsers(tenantId: string): Promise<StaffUser[]> {
   );
 }
 
-// Owner creates a staff login request.
-// Rules:
-//   1. Internet must be up at submit time — we attempt an immediate POST so the
-//      admin sees it right away, no waiting for the 5-minute queue tick.
-//   2. Cloud Sync must be enabled — staff credentials travel to other devices
-//      through the sync snapshot; without it they'd be stranded on this machine.
-//   3. If the server is momentarily unavailable (but internet is up), the request
-//      stays queued and retries on reconnect / server restart automatically.
-export async function requestStaffUser(
-  tenantId: string, username: string, password: string
-): Promise<{ ok: boolean; queued?: boolean; error?: string }> {
+export async function countActiveStaffUsers(tenantId: string): Promise<number> {
+  const db = await getDb();
+  const rows = await db.select<{ count: number }[]>(
+    `SELECT COUNT(*) as count FROM staff_users WHERE tenant_id = ? AND deactivated_at IS NULL`,
+    [tenantId]
+  );
+  return rows[0]?.count ?? 0;
+}
+
+// ── Create ───────────────────────────────────────────────────────────────────
+export async function createStaffUser(
+  tenantId: string,
+  displayName: string,
+  username: string,
+  password: string,
+  role: string,
+  tabAccess: string[]
+): Promise<{ ok: boolean; joinPin?: string; error?: string }> {
   const cleanUsername = username.trim().toLowerCase();
+  if (displayName.trim().length < 2) return { ok: false, error: 'Display name must be at least 2 characters' };
   if (cleanUsername.length < 3) return { ok: false, error: 'Username must be at least 3 characters' };
   if (password.length < 4) return { ok: false, error: 'Password must be at least 4 characters' };
-
-  // Require internet at submit time — owner must be online so the request
-  // reaches the admin immediately, not silently stuck in a local queue.
-  if (!navigator.onLine) {
-    return { ok: false, error: 'No internet connection — connect to the internet and try again' };
-  }
-
-  const syncStatus = await getCloudSyncStatus();
-  if (!syncStatus.enabled) {
-    return { ok: false, error: 'Enable Cloud Sync first (Settings → Cloud Sync) so staff can also log in from other devices' };
-  }
-
-  const db = await getDb();
 
   const ownerUsername = await getAuthUsername(tenantId);
   if (ownerUsername === cleanUsername) return { ok: false, error: 'That username is already in use' };
 
+  const db = await getDb();
   const dupes = await db.select<{ count: number }[]>(
-    `SELECT COUNT(*) as count FROM staff_users WHERE tenant_id = ? AND username = ? AND status != 'rejected'`,
+    `SELECT COUNT(*) as count FROM staff_users WHERE tenant_id = ? AND username = ? AND deactivated_at IS NULL`,
     [tenantId, cleanUsername]
   );
   if ((dupes[0]?.count ?? 0) > 0) return { ok: false, error: 'That username is already in use' };
@@ -93,92 +97,99 @@ export async function requestStaffUser(
   const salt = randomSalt();
   const hash = await hashPassword(password, salt);
   const id = uuid();
-  const requestId = uuid();
+
+  const { pinHash, pinSalt, plainPin } = await _generatePin();
+  const pinExpiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
 
   await db.execute(
-    `INSERT INTO staff_users (id, tenant_id, username, password_hash, salt, status, request_id, failed_attempts, requested_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, 'pending', ?, 0, ?, ?)`,
-    [id, tenantId, cleanUsername, hash, salt, requestId, now(), now()]
+    `INSERT INTO staff_users
+      (id, tenant_id, username, password_hash, salt, display_name, role, tab_access,
+       join_pin_hash, pin_salt, pin_expires_at, status, failed_attempts, requested_at, approved_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved', 0, ?, ?, ?)`,
+    [id, tenantId, cleanUsername, hash, salt,
+     displayName.trim(), role.trim(), JSON.stringify(tabAccess),
+     pinHash, pinSalt, pinExpiresAt,
+     now(), now(), now()]
   );
 
-  // Always enqueue as safety-net backup in case the direct POST below fails.
-  await enqueue('staff_user_request', tenantId, { tenant_id: tenantId, request_id: requestId, username: cleanUsername });
+  // Notify server for billing/audit — fire-and-forget (include shop_code for join flow)
+  const db2 = await getDb();
+  const cfgRows = await db2.select<{ shop_type: string; shop_code: string | null }[]>(
+    `SELECT shop_type, shop_code FROM app_config WHERE tenant_id = ? LIMIT 1`, [tenantId]
+  );
+  const shopType = cfgRows[0]?.shop_type ?? '';
+  const shopCode = cfgRows[0]?.shop_code ?? await getOrCreateShopCode(tenantId, shopType);
+  _notifyCreate(tenantId, id, displayName.trim(), cleanUsername, role.trim(), tabAccess, shopCode).catch(() => {});
 
-  // Attempt immediate direct delivery — internet is confirmed up.
-  // On success, mark the queue item as already synced so it won't double-send.
-  // On failure (server temporarily down), the queue item retries automatically
-  // when internet reconnects or the server starts.
-  try {
-    const res = await fetch(`${SERVER}/staff-user-request`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tenant_id: tenantId, request_id: requestId, username: cleanUsername }),
-      signal: AbortSignal.timeout(8000),
-    });
-    if (res.ok) {
-      await db.execute(
-        `UPDATE sync_queue SET synced_at = ? WHERE tenant_id = ? AND type = 'staff_user_request' AND payload LIKE ?`,
-        [now(), tenantId, `%"${requestId}"%`]
-      );
-      return { ok: true };
-    }
-  } catch { /* server temporarily unreachable — queue will retry */ }
-
-  return { ok: true, queued: true };
+  return { ok: true, joinPin: plainPin };
 }
 
-// Owner removes/revokes a staff login (soft — keeps the row for history)
-export async function removeStaffUser(tenantId: string, id: string): Promise<void> {
+// ── Generate / Refresh Join PIN ───────────────────────────────────────────────
+export async function generateJoinPin(tenantId: string, staffId: string): Promise<{ ok: boolean; joinPin?: string; error?: string }> {
   const db = await getDb();
+  const rows = await db.select<{ id: string }[]>(
+    `SELECT id FROM staff_users WHERE id = ? AND tenant_id = ? AND deactivated_at IS NULL`,
+    [staffId, tenantId]
+  );
+  if (!rows[0]) return { ok: false, error: 'Staff user not found' };
+
+  const { pinHash, pinSalt, plainPin } = await _generatePin();
+  const pinExpiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+
   await db.execute(
-    `UPDATE staff_users SET status = 'rejected', updated_at = ? WHERE id = ? AND tenant_id = ?`,
-    [now(), id, tenantId]
+    `UPDATE staff_users SET join_pin_hash = ?, pin_salt = ?, pin_expires_at = ?, pin_used_at = NULL, updated_at = ?
+     WHERE id = ? AND tenant_id = ?`,
+    [pinHash, pinSalt, pinExpiresAt, now(), staffId, tenantId]
   );
+  return { ok: true, joinPin: plainPin };
 }
 
-// Ask the server which pending requests have been approved/rejected and update locally.
-// If any were just approved, trigger a Cloud Sync push so the updated staff_users rows
-// land in the snapshot — staff members joining on a new device will get the approved
-// status directly instead of having to wait for the next periodic sync.
-export async function refreshStaffUserApprovals(tenantId: string): Promise<void> {
+// ── Deactivate (no delete) ────────────────────────────────────────────────────
+export async function deactivateStaffUser(tenantId: string, staffId: string): Promise<{ ok: boolean; error?: string }> {
   const db = await getDb();
-  const pending = await db.select<{ id: string; request_id: string | null }[]>(
-    `SELECT id, request_id FROM staff_users WHERE tenant_id = ? AND status = 'pending' AND request_id IS NOT NULL`,
+  const rows = await db.select<{ id: string; display_name: string; username: string }[]>(
+    `SELECT id, display_name, username FROM staff_users WHERE id = ? AND tenant_id = ? AND deactivated_at IS NULL`,
+    [staffId, tenantId]
+  );
+  if (!rows[0]) return { ok: false, error: 'Staff user not found or already deactivated' };
+
+  await db.execute(
+    `UPDATE staff_users SET deactivated_at = ?, status = 'rejected', updated_at = ? WHERE id = ? AND tenant_id = ?`,
+    [now(), now(), staffId, tenantId]
+  );
+
+  _notifyDeactivate(tenantId, staffId, rows[0].display_name, rows[0].username).catch(() => {});
+  return { ok: true };
+}
+
+// ── Join PIN verification (used when staff joins on a new device) ─────────────
+export async function verifyJoinPin(
+  tenantId: string,
+  pin: string
+): Promise<{ ok: boolean; staffId?: string; username?: string; error?: string }> {
+  const db = await getDb();
+  const rows = await db.select<StaffUser[]>(
+    `SELECT * FROM staff_users
+     WHERE tenant_id = ? AND pin_used_at IS NULL AND deactivated_at IS NULL
+       AND pin_expires_at > datetime('now')`,
     [tenantId]
   );
-  if (pending.length === 0) return;
 
-  try {
-    const res = await fetch(`${SERVER}/staff-user-status/${tenantId}`, { signal: AbortSignal.timeout(8000) });
-    const data = await res.json() as { ok: boolean; requests?: Record<string, { status: string }> };
-    if (!data.ok || !data.requests) return;
-
-    let anyApproved = false;
-    for (const row of pending) {
-      const remote = row.request_id ? data.requests[row.request_id] : null;
-      if (!remote) continue;
-      if (remote.status === 'approved') {
-        await db.execute(
-          `UPDATE staff_users SET status = 'approved', approved_at = ?, updated_at = ? WHERE id = ?`,
-          [now(), now(), row.id]
-        );
-        anyApproved = true;
-      } else if (remote.status === 'rejected') {
-        await db.execute(
-          `UPDATE staff_users SET status = 'rejected', updated_at = ? WHERE id = ?`,
-          [now(), row.id]
-        );
-      }
+  for (const staff of rows) {
+    if (!staff.join_pin_hash || !staff.pin_salt) continue;
+    const hash = await hashPassword(pin, staff.pin_salt);
+    if (hash === staff.join_pin_hash) {
+      await db.execute(
+        `UPDATE staff_users SET pin_used_at = ?, updated_at = ? WHERE id = ?`,
+        [now(), now(), staff.id]
+      );
+      return { ok: true, staffId: staff.id, username: staff.username };
     }
-
-    // Push updated rows to snapshot so any new device joining gets the approved status.
-    if (anyApproved) {
-      const { pushDelta } = await import('./cloudSync');
-      pushDelta(tenantId).catch(() => {});
-    }
-  } catch { /* offline — try again next time */ }
+  }
+  return { ok: false, error: 'Invalid or expired PIN' };
 }
 
+// ── Verify login ─────────────────────────────────────────────────────────────
 export async function verifyStaffAuth(
   tenantId: string,
   username: string,
@@ -189,7 +200,7 @@ export async function verifyStaffAuth(
   const key = _lockKey(tenantId, cleanUsername);
   const db = await getDb();
   const rows = await db.select<StaffUser[]>(
-    `SELECT * FROM staff_users WHERE tenant_id = ? AND username = ? AND status = 'approved' LIMIT 1`,
+    `SELECT * FROM staff_users WHERE tenant_id = ? AND username = ? AND status = 'approved' AND deactivated_at IS NULL LIMIT 1`,
     [tenantId, cleanUsername]
   );
   const staff = rows[0];
@@ -231,8 +242,23 @@ export async function verifyStaffAuth(
   return { ok: true };
 }
 
-// True if `username` is a staff login (not the owner) for this tenant — used to
-// hide owner-only sections (e.g. "Staff Logins" management) from staff accounts
+// Returns allowed tabs for the logged-in staff user (empty array = all tabs for owner)
+export async function getStaffTabAccess(tenantId: string, username: string): Promise<string[] | null> {
+  const cleanUsername = username.trim().toLowerCase();
+  if (await hasAuth(tenantId)) {
+    const ownerUsername = await getAuthUsername(tenantId);
+    if (ownerUsername === cleanUsername) return null; // null = owner, no restrictions
+  }
+  const db = await getDb();
+  const rows = await db.select<{ tab_access: string }[]>(
+    `SELECT tab_access FROM staff_users WHERE tenant_id = ? AND username = ? AND status = 'approved' AND deactivated_at IS NULL LIMIT 1`,
+    [tenantId, cleanUsername]
+  );
+  if (!rows[0]) return [];
+  try { return JSON.parse(rows[0].tab_access) as string[]; } catch { return []; }
+}
+
+// True if username belongs to a staff account (not the owner)
 export async function isStaffUsername(tenantId: string, username: string): Promise<boolean> {
   if (await hasAuth(tenantId)) {
     const ownerUsername = await getAuthUsername(tenantId);
@@ -240,8 +266,43 @@ export async function isStaffUsername(tenantId: string, username: string): Promi
   }
   const db = await getDb();
   const rows = await db.select<{ count: number }[]>(
-    `SELECT COUNT(*) as count FROM staff_users WHERE tenant_id = ? AND username = ? AND status = 'approved'`,
+    `SELECT COUNT(*) as count FROM staff_users WHERE tenant_id = ? AND username = ? AND status = 'approved' AND deactivated_at IS NULL`,
     [tenantId, username.trim().toLowerCase()]
   );
   return (rows[0]?.count ?? 0) > 0;
+}
+
+// ── Internal helpers ──────────────────────────────────────────────────────────
+async function _generatePin(): Promise<{ pinHash: string; pinSalt: string; plainPin: string }> {
+  const digits = Array.from(crypto.getRandomValues(new Uint8Array(8))).map(b => b % 10).join('');
+  const plainPin = `${digits.slice(0, 4)}-${digits.slice(4)}`;
+  const pinSalt = randomSalt();
+  const pinHash = await hashPassword(plainPin.replace('-', ''), pinSalt);
+  return { pinHash, pinSalt, plainPin };
+}
+
+async function _notifyCreate(
+  tenantId: string, staffId: string, displayName: string, username: string, role: string, tabAccess: string[], shopCode: string
+): Promise<void> {
+  try {
+    await fetch(`${SERVER}/staff-user-create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tenant_id: tenantId, shop_code: shopCode, staff_id: staffId, display_name: displayName, username, role, tab_access: tabAccess, created_at: now() }),
+      signal: AbortSignal.timeout(8000),
+    });
+  } catch { /* offline — server will see it on next cloud sync push */ }
+}
+
+async function _notifyDeactivate(
+  tenantId: string, staffId: string, displayName: string, username: string
+): Promise<void> {
+  try {
+    await fetch(`${SERVER}/staff-user-deactivate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tenant_id: tenantId, staff_id: staffId, display_name: displayName, username, deactivated_at: now() }),
+      signal: AbortSignal.timeout(8000),
+    });
+  } catch { /* offline — server will see it on next cloud sync push */ }
 }

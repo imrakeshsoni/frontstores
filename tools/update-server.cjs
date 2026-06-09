@@ -1424,46 +1424,121 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
     json(res, { ok: true, has_data: true, ...snapshot }); return;
   }
 
-  // ── Staff logins (admin-approved sub-users under a tenant) ──────────────────
-  // Owner creates username+password locally (password never leaves the device);
-  // only {request_id, username} is sent here to land in the admin approval queue.
-  // Mirrors the Cloud Sync request/status pattern above.
+  // ── Staff users v2 — auto-approved, no admin needed, server tracks for billing ────
 
-  // POST /staff-user-request — { tenant_id, request_id, username }
-  if (req.method === 'POST' && pathname === '/staff-user-request') {
-    if (rateLimit(req, res, 'staff-user-request', 20, 60 * 60 * 1000)) return;
+  // POST /staff-user-create — { tenant_id, shop_code, staff_id, display_name, username, role, tab_access, created_at }
+  if (req.method === 'POST' && pathname === '/staff-user-create') {
+    if (rateLimit(req, res, 'staff-user-create', 30, 60 * 60 * 1000)) return;
     const body = await readBody(req);
     try {
-      const { tenant_id, request_id, username } = JSON.parse(body);
-      if (!tenant_id || !request_id || !username) { json(res, { ok: false, error: 'Missing fields' }, 400); return; }
+      const { tenant_id, shop_code, staff_id, display_name, username, role, tab_access, created_at } = JSON.parse(body);
+      if (!tenant_id || !staff_id || !username) { json(res, { ok: false, error: 'Missing fields' }, 400); return; }
       const subs = loadSubs();
       const sub = subs[tenant_id];
       if (!sub) { json(res, { ok: false, error: 'Shop not found' }, 404); return; }
-      if (!sub.pending_staff_users) sub.pending_staff_users = {};
-      if (!sub.pending_staff_users[request_id]) {
-        sub.pending_staff_users[request_id] = {
+      if (!sub.staff_users) sub.staff_users = {};
+      if (!sub.staff_users[staff_id]) {
+        sub.staff_users[staff_id] = {
+          display_name: sanitize(display_name || username, 80),
           username: sanitize(username, 60),
-          status: 'pending',
-          requested_at: new Date().toISOString(),
+          role: sanitize(role || '', 60),
+          tab_access: Array.isArray(tab_access) ? tab_access : [],
+          status: 'active',
+          created_at: created_at || new Date().toISOString(),
         };
+        // Register shop code if provided (used for multi-device join flow)
+        if (shop_code && !sub.shop_code) sub.shop_code = sanitize(shop_code, 20);
         saveSubs(subs);
-        logActivity(tenant_id, sub.shop_name, 'staff_user_requested', `Requested staff login "${sanitize(username, 60)}"`);
-        console.log(`👥 ${sub.shop_name || tenant_id.substring(0, 8)} requested staff login "${sanitize(username, 60)}"`);
+        logActivity(tenant_id, sub.shop_name, 'staff_user_created', `Created staff login "${sanitize(username, 60)}" (${sanitize(role || 'No role', 40)})`);
+        console.log(`👥 ${sub.shop_name || tenant_id.substring(0, 8)}: staff "${sanitize(display_name || username, 40)}" created`);
       }
       json(res, { ok: true });
     } catch { json(res, { ok: false, error: 'Invalid request' }, 400); }
     return;
   }
 
-  // GET /staff-user-status/:tenant_id — local app polls for approval/rejection
+  // POST /staff-user-deactivate — { tenant_id, staff_id, display_name, username, deactivated_at }
+  if (req.method === 'POST' && pathname === '/staff-user-deactivate') {
+    if (rateLimit(req, res, 'staff-user-deactivate', 30, 60 * 60 * 1000)) return;
+    const body = await readBody(req);
+    try {
+      const { tenant_id, staff_id, display_name, username, deactivated_at } = JSON.parse(body);
+      if (!tenant_id || !staff_id) { json(res, { ok: false, error: 'Missing fields' }, 400); return; }
+      const subs = loadSubs();
+      const sub = subs[tenant_id];
+      if (!sub) { json(res, { ok: false, error: 'Shop not found' }, 404); return; }
+      if (sub.staff_users?.[staff_id]) {
+        sub.staff_users[staff_id].status = 'deactivated';
+        sub.staff_users[staff_id].deactivated_at = deactivated_at || new Date().toISOString();
+        saveSubs(subs);
+        logActivity(tenant_id, sub.shop_name, 'staff_user_deactivated', `Deactivated staff login "${sanitize(username || '', 60)}"`);
+        console.log(`👥 ${sub.shop_name || tenant_id.substring(0, 8)}: staff "${sanitize(display_name || username || '', 40)}" deactivated`);
+      }
+      json(res, { ok: true });
+    } catch { json(res, { ok: false, error: 'Invalid request' }, 400); }
+    return;
+  }
+
+  // GET /shop-code/:code — lookup tenant_id by shop code (for multi-device join)
+  const shopCodeMatch = pathname.match(/^\/shop-code\/([A-Z0-9\-]{4,12})$/i);
+  if (req.method === 'GET' && shopCodeMatch) {
+    if (rateLimit(req, res, 'shop-code-lookup', 20, 60 * 60 * 1000)) return;
+    const code = shopCodeMatch[1].toUpperCase();
+    const subs = loadSubs();
+    const entry = Object.entries(subs).find(([, s]) => s.shop_code === code);
+    if (!entry) { json(res, { ok: false, error: 'Shop code not found' }, 404); return; }
+    const [tenantId, sub] = entry;
+    if (!sub.cloud_db_enabled) { json(res, { ok: false, error: 'Cloud Sync not enabled for this shop' }, 403); return; }
+    json(res, { ok: true, tenant_id: tenantId, shop_name: sub.shop_name, shop_type: sub.shop_type });
+    return;
+  }
+
+  // POST /join/verify-pin — { shop_code, pin } — verifies one-time join PIN, returns cloud snapshot
+  if (req.method === 'POST' && pathname === '/join/verify-pin') {
+    if (rateLimit(req, res, 'join-verify-pin', 10, 60 * 60 * 1000)) return;
+    const body = await readBody(req);
+    try {
+      const { shop_code, pin } = JSON.parse(body);
+      if (!shop_code || !pin) { json(res, { ok: false, error: 'Missing fields' }, 400); return; }
+      const subs = loadSubs();
+      const entry = Object.entries(subs).find(([, s]) => s.shop_code === shop_code.toUpperCase());
+      if (!entry) { json(res, { ok: false, error: 'Invalid shop code' }, 404); return; }
+      const [tenantId, sub] = entry;
+      if (!sub.cloud_db_enabled) { json(res, { ok: false, error: 'Cloud Sync not enabled for this shop' }, 403); return; }
+      const snapshot = loadCloudDb(tenantId);
+      if (!snapshot) { json(res, { ok: false, error: 'No data on server — ask owner to open the app first' }, 404); return; }
+
+      // Find matching staff user with valid, unused, unexpired PIN
+      const staffRows = snapshot.staff_users || [];
+      const pinClean = pin.replace(/-/g, '').trim();
+      let matched = null;
+      for (const row of staffRows) {
+        if (!row.join_pin_hash || !row.pin_salt || row.pin_used_at || row.deactivated_at) continue;
+        if (row.pin_expires_at && new Date(row.pin_expires_at) < new Date()) continue;
+        const hash = require('crypto').createHash('sha256').update(row.pin_salt + pinClean).digest('hex');
+        if (hash === row.join_pin_hash) { matched = row; break; }
+      }
+      if (!matched) { json(res, { ok: false, error: 'Invalid or expired PIN' }, 401); return; }
+
+      // Mark PIN as used in snapshot
+      for (const row of staffRows) {
+        if (row.id === matched.id) { row.pin_used_at = new Date().toISOString(); break; }
+      }
+      saveCloudDb(tenantId, snapshot);
+      logActivity(tenantId, sub.shop_name, 'staff_joined_new_device', `Staff "${matched.username}" joined on a new device`);
+      console.log(`📱 ${sub.shop_name}: staff "${matched.username}" joined on new device via PIN`);
+      json(res, { ok: true, tenant_id: tenantId, staff_id: matched.id, username: matched.username, ...snapshot });
+    } catch (e) { json(res, { ok: false, error: 'Server error' }, 500); return; }
+    return;
+  }
+
+  // Legacy stubs — kept for older app versions that still send these (no-op now)
+  if (req.method === 'POST' && pathname === '/staff-user-request') {
+    json(res, { ok: true }); return;
+  }
   const staffUserStatusMatch = pathname.match(/^\/staff-user-status\/([a-f0-9-]{36})$/);
   if (req.method === 'GET' && staffUserStatusMatch) {
-    if (rateLimit(req, res, 'staff-user-status', 120, 60 * 60 * 1000)) return;
-    const tenantId = staffUserStatusMatch[1];
-    const sub = loadSubs()[tenantId];
-    if (!sub) { json(res, { ok: false, error: 'Shop not found' }, 404); return; }
-    json(res, { ok: true, requests: sub.pending_staff_users || {} });
-    return;
+    json(res, { ok: true, requests: {} }); return;
   }
 
   // POST /sync/activate — validate sync code, enable cloud sync for tenant
@@ -1934,39 +2009,31 @@ async function handleAdminRequest(req, res) {
     json(res, requests); return;
   }
 
-  // GET /admin/api/staff-user-requests — all staff logins across all tenants (pending + approved)
+  // GET /admin/api/staff-user-requests — all staff users across all tenants (v2: active + deactivated)
   if (req.method === 'GET' && pathname === '/admin/api/staff-user-requests') {
     if (!checkAuth(req)) { res.writeHead(401); res.end(); return; }
     const subs = loadSubs();
-    const pending = [], approved = [];
+    const active = [], deactivated = [];
     for (const [tenant_id, s] of Object.entries(subs)) {
-      for (const [request_id, r] of Object.entries(s.pending_staff_users || {})) {
-        if (r.status === 'rejected') continue;
-        const entry = { tenant_id, request_id, shop_name: s.shop_name, shop_type: s.shop_type, username: r.username, requested_at: r.requested_at, approved_at: r.approved_at || null };
-        if (r.status === 'pending') pending.push(entry);
-        else if (r.status === 'approved') approved.push(entry);
+      for (const [staff_id, r] of Object.entries(s.staff_users || {})) {
+        const entry = {
+          tenant_id, staff_id, shop_name: s.shop_name, shop_type: s.shop_type,
+          display_name: r.display_name || r.username, username: r.username, role: r.role || '',
+          tab_access: r.tab_access || [], created_at: r.created_at,
+          deactivated_at: r.deactivated_at || null,
+        };
+        if (r.status === 'deactivated') deactivated.push(entry);
+        else active.push(entry);
       }
     }
-    json(res, { pending, approved }); return;
+    json(res, { active, deactivated }); return;
   }
 
-  // POST /admin/api/customers/:id/delete-staff-user — { request_id } — revokes login, forces re-request
+  // Legacy stub — no-op now (old app versions may still call this)
   const deleteStaffUserMatch = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/delete-staff-user$/);
   if (req.method === 'POST' && deleteStaffUserMatch) {
     if (!checkAuth(req)) { res.writeHead(401); res.end(); return; }
-    const tenantId = deleteStaffUserMatch[1];
-    try {
-      const { request_id } = JSON.parse(await readBody(req));
-      const subs = loadSubs();
-      const sub = subs[tenantId];
-      if (!sub || !sub.pending_staff_users?.[request_id]) { json(res, { ok: false, error: 'Not found' }, 404); return; }
-      const username = sub.pending_staff_users[request_id].username;
-      sub.pending_staff_users[request_id].status = 'rejected';
-      saveSubs(subs);
-      logActivity(tenantId, sub.shop_name, 'staff_user_deleted', `Deleted staff login "${username}" — user must re-request`);
-      console.log(`🗑  Staff login "${username}" deleted for ${sub.shop_name}`);
-      json(res, { ok: true }); return;
-    } catch { json(res, { ok: false, error: 'Invalid request' }, 400); return; }
+    json(res, { ok: true }); return;
   }
 
   // POST /admin/api/customers/:id/approve-sync — approve a pending request, auto-issue code, enable immediately
@@ -2041,44 +2108,16 @@ async function handleAdminRequest(req, res) {
     json(res, { ok: true }); return;
   }
 
-  // POST /admin/api/customers/:id/approve-staff-user — { request_id }
+  // Legacy stubs — approve/reject no longer used (staff auto-approved from v2)
   const approveStaffUserMatch = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/approve-staff-user$/);
   if (req.method === 'POST' && approveStaffUserMatch) {
     if (!checkAuth(req)) { res.writeHead(401); res.end(); return; }
-    const tenantId = approveStaffUserMatch[1];
-    try {
-      const { request_id } = JSON.parse(await readBody(req));
-      const subs = loadSubs();
-      const sub = subs[tenantId];
-      if (!sub) { json(res, { ok: false, error: 'Not found' }, 404); return; }
-      const pending = sub.pending_staff_users?.[request_id];
-      if (!pending) { json(res, { ok: false, error: 'Request not found' }, 404); return; }
-      pending.status = 'approved';
-      pending.approved_at = new Date().toISOString();
-      saveSubs(subs);
-      logActivity(tenantId, sub.shop_name, 'staff_user_approved', `Approved staff login "${pending.username}"`);
-      console.log(`👥 Staff login "${pending.username}" approved for ${sub.shop_name}`);
-      json(res, { ok: true }); return;
-    } catch { json(res, { ok: false, error: 'Invalid request' }, 400); return; }
+    json(res, { ok: true }); return;
   }
-
-  // POST /admin/api/customers/:id/reject-staff-user — { request_id }
   const rejectStaffUserMatch = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/reject-staff-user$/);
   if (req.method === 'POST' && rejectStaffUserMatch) {
     if (!checkAuth(req)) { res.writeHead(401); res.end(); return; }
-    const tenantId = rejectStaffUserMatch[1];
-    try {
-      const { request_id } = JSON.parse(await readBody(req));
-      const subs = loadSubs();
-      const sub = subs[tenantId];
-      if (!sub) { json(res, { ok: false, error: 'Not found' }, 404); return; }
-      const pending = sub.pending_staff_users?.[request_id];
-      if (!pending) { json(res, { ok: false, error: 'Request not found' }, 404); return; }
-      pending.status = 'rejected';
-      saveSubs(subs);
-      logActivity(tenantId, sub.shop_name, 'staff_user_rejected', `Rejected staff login "${pending.username}"`);
-      json(res, { ok: true }); return;
-    } catch { json(res, { ok: false, error: 'Invalid request' }, 400); return; }
+    json(res, { ok: true }); return;
   }
 
   // GET /admin/api/errors

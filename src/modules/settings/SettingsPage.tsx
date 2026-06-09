@@ -5,9 +5,9 @@ import { Sun, Moon, Cloud } from 'lucide-react';
 import { shareWhatsApp, testWaCredentials } from '@/lib/whatsapp';
 import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { useAppStore } from '@/app/store/app.store';
-import { updateAppConfig } from '@/lib/db/config';
+import { updateAppConfig, getOrCreateShopCode } from '@/lib/db/config';
 import { changePassword, changeUsername, getAuthUsername, getExportLogs, logExport } from '@/lib/db/auth';
-import { listStaffUsers, requestStaffUser, removeStaffUser, refreshStaffUserApprovals, type StaffUser } from '@/lib/db/staffUsers';
+import { listStaffUsers, createStaffUser, deactivateStaffUser, generateJoinPin, countActiveStaffUsers, type StaffUser } from '@/lib/db/staffUsers';
 import { exportBackup } from '@/lib/db/backup';
 import { PageIntro } from '@/components/ui/PageIntro';
 import { useTheme } from '@/lib/theme/useTheme';
@@ -125,8 +125,12 @@ export function SettingsPage() {
   const [exportLoading, setExportLoading] = useState(false);
   const exportPassRef = useRef<HTMLInputElement>(null);
 
+  const [activeCount, setActiveCount] = useState(0);
   useEffect(() => {
-    if (tenantId) getAuthUsername(tenantId).then(u => { if (u) setCurrentUsername(u); });
+    if (tenantId) {
+      getAuthUsername(tenantId).then(u => { if (u) setCurrentUsername(u); });
+      countActiveStaffUsers(tenantId).then(setActiveCount).catch(() => {});
+    }
   }, [tenantId]);
 
   async function handleChangePassword() {
@@ -621,7 +625,7 @@ export function SettingsPage() {
       {renderGroup('Security', <>
         {renderRow('autolock', '🔒', 'Auto-Lock', idleLabel)}
         {renderRow('password', '🔑', 'Login & Password', `User: ${currentUsername || 'owner'}`)}
-        {isOwner && renderRow('staff', '👥', 'Staff Logins', 'Manage staff accounts')}
+        {isOwner && renderRow('staff', '👥', 'Staff Logins', `${activeCount ?? 0} active · ₹200/user/month`)}
         {config?.shop_type === 'carwash' && renderRow('pinlock', '🔐', 'Section PIN Lock', 'Restrict sections with PIN', undefined, true)}
       </>)}
 
@@ -637,7 +641,7 @@ export function SettingsPage() {
           {/* Backdrop */}
           <div onClick={closePanel} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)' }} />
           {/* Panel */}
-          <div style={{ position: 'relative', width: '660px', maxWidth: '90vw', height: '100%', background: 'var(--surface)', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 40px rgba(0,0,0,0.4)' }}>
+          <div style={{ position: 'relative', width: '80vw', height: '100%', background: 'var(--surface)', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 40px rgba(0,0,0,0.4)' }}>
             {/* Sticky header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px 16px', borderBottom: '1px solid var(--surface-border)', flexShrink: 0 }}>
               <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>{panelTitles[activePanel] ?? 'Settings'}</h2>
@@ -751,123 +755,292 @@ function WhatsAppBusinessSection() {
   );
 }
 
-// [core] [all apps] [all tenants] — Owner adds staff logins (e.g. a biller); each
-// request needs admin approval before that username/password can sign in. The
-// password is hashed locally and never sent anywhere — only the username + a
-// request id go up for approval.
-function StaffLoginsSection({ tenantId }: { tenantId: string }) {
-  const [staffUsername, setStaffUsername] = useState('');
-  const [staffPassword, setStaffPassword] = useState('');
-  const [staffConfirm, setStaffConfirm]   = useState('');
-  const [submitting, setSubmitting]       = useState(false);
+// [core] [all apps] [all tenants] — Owner creates staff logins; auto-approved, no admin needed.
+// Server is notified of every create/deactivate for billing & audit. No hard delete ever.
+const ALL_TABS = [
+  { key: 'dashboard',       label: 'Dashboard' },
+  { key: 'pos',             label: 'POS / Billing' },
+  { key: 'products',        label: 'Products' },
+  { key: 'inventory',       label: 'Inventory' },
+  { key: 'orders',          label: 'Orders / Bills' },
+  { key: 'customers',       label: 'Customers' },
+  { key: 'khata',           label: 'Khata' },
+  { key: 'expenses',        label: 'Expenses' },
+  { key: 'suppliers',       label: 'Suppliers' },
+  { key: 'reports',         label: 'Reports' },
+];
 
+function StaffLoginsSection({ tenantId }: { tenantId: string }) {
+  const config = useAppStore((s) => s.config);
   const queryClient = useQueryClient();
+
+  // Form state
+  const [displayName, setDisplayName] = useState('');
+  const [username, setUsername]       = useState('');
+  const [password, setPassword]       = useState('');
+  const [confirmPwd, setConfirmPwd]   = useState('');
+  const [role, setRole]               = useState('');
+  const [tabAccess, setTabAccess]     = useState<string[]>([]);
+  const [submitting, setSubmitting]   = useState(false);
+
+  // Share card shown after creation
+  const [shareCard, setShareCard] = useState<{ shopCode: string; joinPin: string; displayName: string } | null>(null);
+
+  // Shop code (permanent, loaded once)
+  const [shopCode, setShopCode] = useState('');
+  useEffect(() => {
+    if (tenantId && config?.shop_type) {
+      getOrCreateShopCode(tenantId, config.shop_type).then(setShopCode).catch(() => {});
+    }
+  }, [tenantId, config?.shop_type]);
+
   const { data: staffUsers } = useQuery({
     queryKey: ['staff-users', tenantId],
     queryFn: () => listStaffUsers(tenantId),
     enabled: !!tenantId,
   });
-  const { data: cloudSync } = useQuery({
-    queryKey: ['cloud-sync-status', tenantId],
-    queryFn: () => getCloudSyncStatus(),
+  const { data: activeCount } = useQuery({
+    queryKey: ['staff-active-count', tenantId],
+    queryFn: () => countActiveStaffUsers(tenantId),
     enabled: !!tenantId,
   });
-  const cloudSyncEnabled = !!cloudSync?.enabled;
 
-  // Poll for approval status while this section is visible — so "⏳ Pending"
-  // flips to "✓ Active" without the owner needing to reload.
-  useEffect(() => {
-    if (!tenantId) return;
-    const refresh = () => refreshStaffUserApprovals(tenantId).then(() => {
-      queryClient.invalidateQueries({ queryKey: ['staff-users', tenantId] });
-    });
-    refresh();
-    const t = setInterval(refresh, 15_000);
-    return () => clearInterval(t);
-  }, [tenantId, queryClient]);
+  function toggleTab(key: string) {
+    setTabAccess(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+  }
 
-  async function handleAddStaffUser() {
-    if (staffPassword !== staffConfirm) { toast.error('Passwords do not match'); return; }
+  async function handleCreate() {
+    if (password !== confirmPwd) { toast.error('Passwords do not match'); return; }
     setSubmitting(true);
     try {
-      const result = await requestStaffUser(tenantId, staffUsername, staffPassword);
-      if (result.ok) {
-        if (result.queued) {
-          toast.success('Request saved — the server was unreachable but it will be sent automatically once available');
-        } else {
-          toast.success('✅ Request sent to admin — the login will work once approved');
-        }
-        setStaffUsername(''); setStaffPassword(''); setStaffConfirm('');
+      const result = await createStaffUser(tenantId, displayName, username, password, role, tabAccess);
+      if (result.ok && result.joinPin) {
         queryClient.invalidateQueries({ queryKey: ['staff-users', tenantId] });
+        queryClient.invalidateQueries({ queryKey: ['staff-active-count', tenantId] });
+        setShareCard({ shopCode, joinPin: result.joinPin, displayName: displayName.trim() });
+        setDisplayName(''); setUsername(''); setPassword(''); setConfirmPwd(''); setRole(''); setTabAccess([]);
+        toast.success(`${displayName.trim()} added — share the code and PIN below`);
       } else {
-        toast.error(result.error ?? 'Could not create staff login request');
+        toast.error(result.error ?? 'Could not create staff login');
       }
     } finally {
       setSubmitting(false);
     }
   }
 
-  async function handleRemove(staff: StaffUser) {
-    if (!confirm(`Remove staff login "${staff.username}"? They won't be able to sign in anymore.`)) return;
-    await removeStaffUser(tenantId, staff.id);
-    queryClient.invalidateQueries({ queryKey: ['staff-users', tenantId] });
-    toast.success('Staff login removed');
+  async function handleDeactivate(staff: StaffUser) {
+    if (!window.confirm(`Deactivate "${staff.display_name || staff.username}"? They won't be able to sign in. This cannot be undone.`)) return;
+    const result = await deactivateStaffUser(tenantId, staff.id);
+    if (result.ok) {
+      queryClient.invalidateQueries({ queryKey: ['staff-users', tenantId] });
+      queryClient.invalidateQueries({ queryKey: ['staff-active-count', tenantId] });
+      toast.success('Staff account deactivated');
+    } else {
+      toast.error(result.error ?? 'Could not deactivate');
+    }
   }
 
-  function statusPill(status: StaffUser['status']) {
-    if (status === 'approved') return <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">✓ Active</span>;
-    if (status === 'rejected') return <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-800">✕ Rejected</span>;
-    return <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800">⏳ Pending approval</span>;
+  async function handleGeneratePin(staff: StaffUser) {
+    const result = await generateJoinPin(tenantId, staff.id);
+    if (result.ok && result.joinPin) {
+      setShareCard({ shopCode, joinPin: result.joinPin, displayName: staff.display_name || staff.username });
+      toast.success('New join PIN generated');
+    } else {
+      toast.error(result.error ?? 'Could not generate PIN');
+    }
   }
+
+  function copyText(text: string, label: string) {
+    navigator.clipboard.writeText(text).then(() => toast.success(`${label} copied`)).catch(() => toast.error('Copy failed'));
+  }
+
+  function shareWhatsAppStaff(shopCode: string, pin: string, name: string) {
+    const msg = encodeURIComponent(
+      `Hi ${name},\n\nHere are your login details for FrontStores:\n\n📱 Shop Code: ${shopCode}\n🔑 Join PIN: ${pin}\n\nSteps:\n1. Download FrontStores app\n2. Tap "Join existing shop"\n3. Enter the shop code and PIN\n4. Set your password\n\nThis PIN works only once and expires in 48 hours.`
+    );
+    window.open(`https://wa.me/?text=${msg}`, '_blank');
+  }
+
+  const activeStaff = staffUsers?.filter(s => !s.deactivated_at) ?? [];
+  const deactivatedStaff = staffUsers?.filter(s => !!s.deactivated_at) ?? [];
+  const extraUserCharge = (activeCount ?? 0) * 200;
+
+  const canCreate = displayName.trim().length >= 2 && username.trim().length >= 3 && password.length >= 4 && !submitting;
 
   return (
-    <div className="card p-4 border-l-4 border-l-violet-500">
-      <p className="section-label mb-1 text-violet-300">👥 Staff Logins</p>
-      <p className="text-xs text-slate-400 mb-4">
-        Add a username + password for staff (e.g. a biller). Each request is sent to FrontStores for approval —
-        once approved, that person can sign in with their own credentials, including on a brand-new device
-        (their login travels there via Cloud Sync). Their password stays local, just like yours.
-      </p>
+    <div className="space-y-5">
+      {/* Billing summary */}
+      <div className="card p-4 border-l-4 border-l-emerald-500">
+        <p className="section-label mb-2 text-emerald-300">💰 Staff Billing</p>
+        <div className="flex flex-col gap-1 text-sm">
+          <div className="flex justify-between">
+            <span style={{ color: 'var(--text-secondary)' }}>Active staff users</span>
+            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{activeCount ?? 0}</span>
+          </div>
+          <div className="flex justify-between">
+            <span style={{ color: 'var(--text-secondary)' }}>Extra user charges</span>
+            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{activeCount ?? 0} × ₹200 = ₹{extraUserCharge}/month</span>
+          </div>
+          <div className="flex justify-between">
+            <span style={{ color: 'var(--text-secondary)' }}>Billing date</span>
+            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>1st of every month</span>
+          </div>
+          {shopCode && (
+            <div className="flex justify-between items-center mt-1 pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>Your shop code</span>
+              <div className="flex items-center gap-2">
+                <span className="font-mono font-bold tracking-widest text-emerald-400">{shopCode}</span>
+                <button onClick={() => copyText(shopCode, 'Shop code')} className="text-xs text-emerald-500 hover:text-emerald-300">Copy</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
-      {!cloudSyncEnabled && (
-        <div className="card-strong border border-amber-800/50 bg-amber-950/30 p-3 mb-4 text-xs text-amber-300">
-          ⚠️ Enable <span className="font-semibold">Cloud Sync</span> first (in the Cloud Sync card below) so staff logins
-          can also work on other devices — that's how their credentials travel safely from this device to a new one.
+      {/* Share card (shown after create or generate PIN) */}
+      {shareCard && (
+        <div className="card p-4 border border-violet-500/50 bg-violet-950/30">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-bold text-violet-300">📤 Share with {shareCard.displayName}</p>
+            <button onClick={() => setShareCard(null)} className="text-xs text-slate-500 hover:text-slate-300">✕ Dismiss</button>
+          </div>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between bg-slate-900/60 rounded-lg px-3 py-2">
+              <div>
+                <p className="text-xs text-slate-400 mb-0.5">Shop Code</p>
+                <p className="font-mono font-bold text-slate-100 tracking-widest">{shareCard.shopCode}</p>
+              </div>
+              <button onClick={() => copyText(shareCard.shopCode, 'Shop code')} className="text-xs text-violet-400 hover:text-violet-200 border border-violet-700 px-2 py-1 rounded">Copy</button>
+            </div>
+            <div className="flex items-center justify-between bg-slate-900/60 rounded-lg px-3 py-2">
+              <div>
+                <p className="text-xs text-slate-400 mb-0.5">Join PIN <span className="text-amber-400">(one-time · expires in 48h)</span></p>
+                <p className="font-mono font-bold text-2xl text-slate-100 tracking-[0.3em]">{shareCard.joinPin}</p>
+              </div>
+              <button onClick={() => copyText(shareCard.joinPin, 'Join PIN')} className="text-xs text-violet-400 hover:text-violet-200 border border-violet-700 px-2 py-1 rounded">Copy</button>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => copyText(`Shop Code: ${shareCard.shopCode}\nJoin PIN: ${shareCard.joinPin}`, 'Login details')}
+                className="btn-secondary text-sm flex-1"
+              >
+                📋 Copy Both
+              </button>
+              <button
+                onClick={() => shareWhatsAppStaff(shareCard.shopCode, shareCard.joinPin, shareCard.displayName)}
+                className="btn-secondary text-sm flex-1 text-green-400 border-green-700"
+              >
+                📱 Send via WhatsApp
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
-        <input className="input" placeholder="Username (min 3 chars)" value={staffUsername} onChange={e => setStaffUsername(e.target.value)} disabled={!cloudSyncEnabled} />
-        <input className="input" type="password" placeholder="Password (min 4 chars)" value={staffPassword} onChange={e => setStaffPassword(e.target.value)} disabled={!cloudSyncEnabled} />
-        <input className="input" type="password" placeholder="Confirm password" value={staffConfirm} onChange={e => setStaffConfirm(e.target.value)} disabled={!cloudSyncEnabled} />
-      </div>
-      <button
-        onClick={handleAddStaffUser}
-        disabled={!cloudSyncEnabled || submitting || staffUsername.trim().length < 3 || staffPassword.length < 4}
-        className="btn-secondary disabled:opacity-40"
-      >
-        {submitting ? 'Sending request…' : '➕ Request Staff Login'}
-      </button>
+      {/* Add staff form */}
+      <div className="card p-4 border-l-4 border-l-violet-500">
+        <p className="section-label mb-1 text-violet-300">➕ Add Staff Login</p>
+        <p className="text-xs text-slate-400 mb-4">
+          Create a login for a staff member. They get a one-time join PIN to activate their account on any device.
+          Each active staff login adds ₹200 to your monthly plan.
+        </p>
 
-      {(staffUsers?.length ?? 0) > 0 && (
-        <div className="space-y-2 mt-5">
-          {staffUsers!.map(staff => (
-            <div key={staff.id} className="card-strong flex items-center justify-between gap-4 p-3 text-sm">
-              <div>
-                <p className="font-medium text-slate-200">{staff.username}</p>
-                <p className="text-xs text-slate-500">
-                  Requested {new Date(staff.requested_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                  {staff.approved_at ? ` · approved ${new Date(staff.approved_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}
-                </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+          <input className="input" placeholder="Full name (e.g. Ramesh)" value={displayName} onChange={e => setDisplayName(e.target.value)} />
+          <input className="input" placeholder="Role (e.g. Cashier, Manager)" value={role} onChange={e => setRole(e.target.value)} />
+          <input className="input" placeholder="Username (min 3 chars)" value={username} onChange={e => setUsername(e.target.value)} />
+          <div className="grid grid-cols-2 gap-3">
+            <input className="input" type="password" placeholder="Password (min 4)" value={password} onChange={e => setPassword(e.target.value)} />
+            <input className="input" type="password" placeholder="Confirm" value={confirmPwd} onChange={e => setConfirmPwd(e.target.value)} />
+          </div>
+        </div>
+
+        <div className="mb-4">
+          <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>Tab Access <span className="font-normal text-slate-500">(tick all they can see)</span></p>
+          <div className="flex flex-wrap gap-2">
+            {ALL_TABS.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => toggleTab(tab.key)}
+                className={`text-xs px-3 py-1 rounded-full border transition-all ${
+                  tabAccess.includes(tab.key)
+                    ? 'bg-violet-700 border-violet-500 text-white'
+                    : 'bg-transparent border-slate-700 text-slate-400 hover:border-slate-500'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+            <button
+              onClick={() => setTabAccess(ALL_TABS.map(t => t.key))}
+              className="text-xs px-3 py-1 rounded-full border border-slate-600 text-slate-400 hover:text-slate-200"
+            >
+              All
+            </button>
+            <button
+              onClick={() => setTabAccess([])}
+              className="text-xs px-3 py-1 rounded-full border border-slate-600 text-slate-400 hover:text-slate-200"
+            >
+              None
+            </button>
+          </div>
+        </div>
+
+        <button onClick={handleCreate} disabled={!canCreate} className="btn-secondary disabled:opacity-40">
+          {submitting ? 'Creating…' : '➕ Create Staff Login'}
+        </button>
+      </div>
+
+      {/* Active staff list */}
+      {activeStaff.length > 0 && (
+        <div className="card p-4">
+          <p className="section-label mb-3 text-slate-300">👥 Active Staff ({activeStaff.length})</p>
+          <div className="space-y-2">
+            {activeStaff.map(staff => {
+              const tabs: string[] = (() => { try { return JSON.parse(staff.tab_access || '[]'); } catch { return []; } })();
+              return (
+                <div key={staff.id} className="card-strong p-3 text-sm">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-slate-100">{staff.display_name || staff.username}</p>
+                      <p className="text-xs text-slate-400">{staff.role || 'No role'} · @{staff.username}</p>
+                      {tabs.length > 0 && (
+                        <p className="text-xs text-slate-500 mt-1">
+                          Tabs: {tabs.map(k => ALL_TABS.find(t => t.key === k)?.label ?? k).join(', ')}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button onClick={() => handleGeneratePin(staff)} className="text-xs text-violet-400 hover:text-violet-200 border border-violet-800 px-2 py-1 rounded">
+                        New PIN
+                      </button>
+                      <button onClick={() => handleDeactivate(staff)} className="text-xs text-rose-400 hover:text-rose-300 border border-rose-900 px-2 py-1 rounded">
+                        Deactivate
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Deactivated staff (read-only history) */}
+      {deactivatedStaff.length > 0 && (
+        <div className="card p-4 opacity-60">
+          <p className="section-label mb-3 text-slate-500">🚫 Deactivated ({deactivatedStaff.length})</p>
+          <div className="space-y-1">
+            {deactivatedStaff.map(staff => (
+              <div key={staff.id} className="flex items-center gap-3 px-2 py-1.5 text-xs text-slate-500">
+                <span className="font-medium">{staff.display_name || staff.username}</span>
+                <span>·</span>
+                <span>{staff.role || 'No role'}</span>
+                <span>·</span>
+                <span>deactivated {staff.deactivated_at ? new Date(staff.deactivated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}</span>
               </div>
-              <div className="flex items-center gap-3 shrink-0">
-                {statusPill(staff.status)}
-                {staff.status !== 'rejected' && (
-                  <button onClick={() => handleRemove(staff)} className="text-xs text-rose-400 hover:text-rose-300">Remove</button>
-                )}
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
     </div>

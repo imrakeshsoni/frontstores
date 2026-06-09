@@ -22,6 +22,26 @@ export interface AppConfig {
   tc_agreed_at: string | null;
   last_verified_at: string | null;
   last_server_time: string | null;
+  shop_code: string | null;
+}
+
+// Generates a short unique shop code (e.g. MED-4521) and persists it to app_config.
+// Returns the existing code if already set — it never changes after generation.
+export async function getOrCreateShopCode(tenantId: string, shopType: string): Promise<string> {
+  const db = await getDb();
+  const rows = await db.select<{ shop_code: string | null }[]>(
+    `SELECT shop_code FROM app_config WHERE tenant_id = ? LIMIT 1`, [tenantId]
+  );
+  if (rows[0]?.shop_code) return rows[0].shop_code;
+  const prefix = shopType.slice(0, 3).toUpperCase();
+  const suffix = Array.from(crypto.getRandomValues(new Uint8Array(3)))
+    .map(b => b % 10).join('');
+  const code = `${prefix}-${suffix}${String(Date.now()).slice(-1)}`;
+  await db.execute(
+    `UPDATE app_config SET shop_code = ?, updated_at = ? WHERE tenant_id = ?`,
+    [code, now(), tenantId]
+  );
+  return code;
 }
 
 export async function getAppConfig(): Promise<AppConfig | null> {

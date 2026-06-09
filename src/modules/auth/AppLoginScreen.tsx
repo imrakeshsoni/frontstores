@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from '@/app/store/app.store';
 import { verifyAuth, resetPasswordWithCode, resetPasswordWithPhonePin, unlockWithCode, getAuthUsername } from '@/lib/db/auth';
-import { verifyStaffAuth, refreshStaffUserApprovals } from '@/lib/db/staffUsers';
+import { verifyStaffAuth } from '@/lib/db/staffUsers';
 import { claimSession } from '@/lib/db/session';
 import { enqueue } from '@/lib/syncQueue';
 import { uuid, now } from '@/lib/db/index';
@@ -185,9 +185,7 @@ export function AppLoginScreen() {
         }
       }
 
-      // Staff login path — refresh approval status from server first so a
-      // newly-approved staff member can log in immediately without Settings access.
-      await refreshStaffUserApprovals(tenantId);
+      // Staff login path
       const staffResult = await verifyStaffAuth(tenantId, username, password, maxAttempts);
       if (staffResult.ok) {
         await completeLogin(username.trim().toLowerCase());

@@ -81,6 +81,14 @@ export function SetupWizard() {
   const [mlStatus, setMlStatus] = useState<'idle' | 'pending' | 'pulling' | 'done'>('idle');
   const [mlTenantInfo, setMlTenantInfo] = useState<{ tenant_id: string; shop_name: string; shop_type: string; session_token: string } | null>(null);
   const [mlError, setMlError] = useState('');
+
+  // Staff join flow — enter shop code + one-time PIN to join on a new device
+  const [joinFlow, setJoinFlow] = useState(false);
+  const [joinShopCode, setJoinShopCode] = useState('');
+  const [joinPin, setJoinPin] = useState('');
+  const [joinLoading, setJoinLoading] = useState(false);
+  const [joinStatus, setJoinStatus] = useState<'idle' | 'loading' | 'done'>('idle');
+  const [joinError, setJoinError] = useState('');
   const [tcAgreed, setTcAgreed] = useState(false);
   const [form, setForm] = useState<FormData>({
     shop_type: '', shop_name: '', owner_name: '', phone: '',
@@ -231,6 +239,55 @@ export function SetupWizard() {
     password.length >= 4 &&
     password === confirmPassword;
 
+  // [core] [all apps] [all tenants] — Staff joins on a new device using shop code + one-time PIN
+  async function handleJoinShop() {
+    const code = joinShopCode.trim().toUpperCase();
+    const pin  = joinPin.trim();
+    if (!code || !pin) { setJoinError('Enter the shop code and your join PIN'); return; }
+    setJoinLoading(true);
+    setJoinError('');
+    setJoinStatus('loading');
+    try {
+      const res = await fetch(`${SERVER}/join/verify-pin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shop_code: code, pin }),
+        signal: AbortSignal.timeout(15000),
+      });
+      const data = await res.json() as { ok: boolean; error?: string; tenant_id?: string } & Record<string, unknown>;
+      if (!data.ok) { setJoinError(data.error || 'Invalid shop code or PIN'); setJoinStatus('idle'); return; }
+
+      // Server returned the full snapshot — load it into local SQLite
+      const { getDb } = await import('@/lib/db/index');
+      const sqliteDb = await getDb();
+      for (const [table, rows] of Object.entries(data)) {
+        if (!Array.isArray(rows) || rows.length === 0) continue;
+        if (['ok','tenant_id','staff_id','username','snapshot_at'].includes(table)) continue;
+        try {
+          const cols = Object.keys(rows[0]);
+          const placeholders = cols.map(() => '?').join(',');
+          for (const row of rows) {
+            await sqliteDb.execute(
+              `INSERT OR REPLACE INTO ${table} (${cols.join(',')}) VALUES (${placeholders})`,
+              cols.map(c => row[c] ?? null)
+            );
+          }
+        } catch { /* skip unknown tables */ }
+      }
+
+      setJoinStatus('done');
+      // Refresh app config so App.tsx recognises setup is complete
+      const { loadConfig } = (await import('@/app/store/app.store')).useAppStore.getState();
+      loadConfig();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setJoinError(msg.includes('timeout') ? 'Could not reach the server — check your internet and try again' : 'Something went wrong. Try again.');
+      setJoinStatus('idle');
+    } finally {
+      setJoinLoading(false);
+    }
+  }
+
   // [core] [all tenants] — Look up existing account by email, re-create local DB
   async function handleReinstall() {
     const phone = reinstallPhone.trim();
@@ -358,6 +415,72 @@ export function SetupWizard() {
 
         <div className="bg-white rounded-3xl p-8 shadow-2xl">
 
+          {/* Staff Join Flow — shop code + one-time PIN */}
+          {joinFlow && (
+            <div>
+              <button onClick={() => { setJoinFlow(false); setJoinStatus('idle'); setJoinError(''); }} className="text-sm text-slate-500 mb-4 flex items-center gap-1">← Back</button>
+              <h2 className="text-xl font-semibold text-slate-800 mb-1">👥 Join existing shop</h2>
+              <p className="text-slate-500 text-sm mb-6">Your owner shared a shop code and a one-time join PIN. Enter both below to set up this device.</p>
+
+              {joinStatus === 'idle' && (
+                <div className="space-y-4">
+                  {joinError && <div className="rounded-xl p-3 text-sm font-medium" style={{ background: '#fee2e2', color: '#dc2626' }}>{joinError}</div>}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Shop Code</label>
+                    <input
+                      value={joinShopCode}
+                      onChange={e => setJoinShopCode(e.target.value.toUpperCase())}
+                      placeholder="e.g. MED-4521"
+                      className="w-full rounded-xl border-2 px-4 py-3 text-base outline-none focus:border-violet-500 font-mono tracking-widest uppercase"
+                      style={{ borderColor: '#e2e8f0' }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Join PIN <span className="text-slate-400 font-normal">(one-time, expires in 48h)</span></label>
+                    <input
+                      value={joinPin}
+                      onChange={e => setJoinPin(e.target.value)}
+                      placeholder="e.g. 7483-2916"
+                      className="w-full rounded-xl border-2 px-4 py-3 text-base outline-none focus:border-violet-500 font-mono tracking-widest"
+                      style={{ borderColor: '#e2e8f0' }}
+                    />
+                  </div>
+                  <button
+                    onClick={handleJoinShop}
+                    disabled={joinLoading || !joinShopCode.trim() || !joinPin.trim()}
+                    className="w-full py-3 rounded-xl font-bold text-white text-sm disabled:opacity-60"
+                    style={{ background: '#7c3aed' }}
+                  >
+                    {joinLoading ? 'Connecting…' : 'Join Shop →'}
+                  </button>
+                </div>
+              )}
+
+              {joinStatus === 'loading' && (
+                <div className="text-center py-8">
+                  <div className="text-4xl mb-4">☁️</div>
+                  <h3 className="font-bold text-slate-800 mb-2">Downloading shop data…</h3>
+                  <p className="text-sm text-slate-500">This may take a moment.</p>
+                </div>
+              )}
+
+              {joinStatus === 'done' && (
+                <div className="text-center py-8">
+                  <div className="text-4xl mb-4">🎉</div>
+                  <h3 className="font-bold text-slate-800 mb-2">You're in!</h3>
+                  <p className="text-sm text-slate-500 mb-5">Shop data is on this device. Log in with the username and password your owner set for you.</p>
+                  <button
+                    onClick={() => { setJoinFlow(false); setJoinStatus('idle'); setJoinError(''); }}
+                    className="px-5 py-2.5 rounded-xl font-medium text-white text-sm"
+                    style={{ background: '#7c3aed' }}
+                  >
+                    Continue →
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Step 0: New setup vs Restore */}
           {/* Mobile Cloud Login Screen */}
           {mobileLogin && (
@@ -430,7 +553,7 @@ export function SetupWizard() {
             </div>
           )}
 
-          {!mobileLogin && step === 0 && (
+          {!mobileLogin && !joinFlow && step === 0 && (
             <div>
               <h2 className="text-xl font-semibold text-slate-800 mb-1">Is this a new setup?</h2>
               <p className="text-slate-500 text-sm mb-6">If you're moving from another computer, restore your backup file instead.</p>
@@ -465,7 +588,15 @@ export function SetupWizard() {
                 >
                   <div className="text-2xl mb-1">📱</div>
                   <div className="font-medium text-slate-800 text-sm">Log in with Cloud Sync</div>
-                  <div className="text-slate-500 text-xs mt-0.5">Bring your shop's data to this device — owner's phone number + Sync PIN. Staff can then log in here too.</div>
+                  <div className="text-slate-500 text-xs mt-0.5">Bring your shop's data to this device — owner's phone number + Sync PIN.</div>
+                </button>
+                <button
+                  onClick={() => setJoinFlow(true)}
+                  className="text-left p-4 rounded-2xl border-2 border-slate-200 hover:border-violet-400 hover:bg-violet-50 transition-all"
+                >
+                  <div className="text-2xl mb-1">👥</div>
+                  <div className="font-medium text-slate-800 text-sm">Join existing shop (Staff)</div>
+                  <div className="text-slate-500 text-xs mt-0.5">Owner gave you a shop code and a one-time PIN — enter them here.</div>
                 </button>
               </div>
 

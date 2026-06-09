@@ -67,6 +67,7 @@ import migration0066 from '../../../src-tauri/migrations/0066_staff_users.sql?ra
 import migration0067 from '../../../src-tauri/migrations/0067_announcements.sql?raw';
 import migration0068 from '../../../src-tauri/migrations/0068_crm_leads_accounts.sql?raw';
 import migration0069 from '../../../src-tauri/migrations/0069_crm_ownership.sql?raw';
+import migration0070 from '../../../src-tauri/migrations/0070_staff_users_v2.sql?raw';
 
 export interface Migration {
   name: string;
@@ -144,5 +145,6 @@ export async function readMigrations(): Promise<Migration[]> {
     { name: '0067_announcements', sql: migration0067 }, // [core] [all apps] [all tenants]
     { name: '0068_crm_leads_accounts', sql: migration0068 }, // [crm] [all tenants]
     { name: '0069_crm_ownership', sql: migration0069 }, // [crm] [all tenants]
+    { name: '0070_staff_users_v2', sql: migration0070 }, // [core] [all apps] [all tenants]
   ];
 }
