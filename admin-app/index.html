@@ -1379,9 +1379,23 @@ function renderPanel(c) {
       <div style="border-top:1px solid var(--border);margin:12px 0"></div>
       ${c.sync_enabled ? `
       <div style="background:rgba(14,165,233,.08);border:1px solid rgba(14,165,233,.2);border-radius:12px;padding:14px;margin-bottom:10px">
-        <div style="font-size:13px;font-weight:700;color:#38bdf8;margin-bottom:6px">☁️ Cloud Sync Active</div>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:4px">Code: <b style="color:#f1f5f9;font-family:monospace">${c.sync_code||'—'}</b></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-size:13px;font-weight:700;color:#38bdf8">☁️ Cloud Sync Active</div>
+          ${c.cloud_sync_self_activated ? `<span style="font-size:10px;background:rgba(52,211,153,.1);color:#34d399;border:1px solid rgba(52,211,153,.25);border-radius:20px;padding:2px 8px;font-weight:700">Self-Activated</span>` : `<span style="font-size:10px;background:rgba(14,165,233,.1);color:#38bdf8;border:1px solid rgba(14,165,233,.3);border-radius:20px;padding:2px 8px;font-weight:700">Admin-Granted</span>`}
+        </div>
+        ${c.cloud_sync_activated_at ? `<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Activated: ${new Date(c.cloud_sync_activated_at).toLocaleString('en-IN',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}</div>` : ''}
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px">Sync Code: <b style="color:#f1f5f9;font-family:monospace">${c.sync_code||'—'}</b></div>
+        ${c.cloud_db_code ? `<div style="font-size:12px;color:var(--muted);margin-bottom:4px">DB Code: <b style="color:#f1f5f9;font-family:monospace">${c.cloud_db_code}</b></div>` : ''}
         ${c.last_synced_at ? `<div style="font-size:11px;color:var(--muted)">Last synced: ${new Date(c.last_synced_at).toLocaleString('en-IN')}</div>` : '<div style="font-size:11px;color:#f87171">Not yet synced</div>'}
+        ${c.cloud_sync_fee ? `<div style="font-size:11px;color:#86efac;margin-top:4px">Fee: ₹${c.cloud_sync_fee}/month</div>` : ''}
+        ${(() => {
+          const evts = c.cloud_sync_events || [];
+          if (!evts.length) return '';
+          return `<div style="margin-top:8px;border-top:1px solid rgba(14,165,233,.15);padding-top:8px">
+            <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:5px">Activity</div>
+            ${evts.slice(-5).reverse().map(e => `<div style="font-size:11px;color:var(--muted);padding:2px 0">${e.type==='activated'?'✅':'⛔'} ${escHtml(e.type)} — ${new Date(e.at).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${e.fee?` · ₹${e.fee}/mo`:''}</div>`).join('')}
+          </div>`;
+        })()}
         <div style="display:flex;gap:8px;margin-top:10px">
           <a href="https://update.frontstores.com/shop/${tid}" target="_blank" style="flex:1;text-align:center;padding:8px;background:rgba(14,165,233,.15);border:1px solid rgba(14,165,233,.3);border-radius:10px;color:#38bdf8;font-size:12px;font-weight:600;text-decoration:none">📱 View Dashboard</a>
           <button onclick="disableSync('${tid}')" style="flex:1;padding:8px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:10px;color:#f87171;font-size:12px;font-weight:600;cursor:pointer">Disable Sync</button>

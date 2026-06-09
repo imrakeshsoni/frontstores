@@ -124,7 +124,7 @@ export async function activateCloudSync(tenantId: string): Promise<{ ok: boolean
       body: JSON.stringify({ tenant_id: tenantId, activated_at: new Date().toISOString() }),
       signal: AbortSignal.timeout(10000),
     });
-    const data = await res.json() as { ok: boolean; sync_code?: string; error?: string };
+    const data = await res.json() as { ok: boolean; sync_code?: string; cloud_db_code?: string; error?: string };
     if (!data.ok) return { ok: false, error: data.error ?? 'Activation failed' };
     await updateAppConfig({
       settings: {
@@ -132,6 +132,8 @@ export async function activateCloudSync(tenantId: string): Promise<{ ok: boolean
         cloud_sync_enabled: true,
         cloud_sync_request_status: 'approved',
         cloud_sync_code: data.sync_code,
+        cloud_db_enabled: true,
+        cloud_db_code: data.cloud_db_code ?? s.cloud_db_code,
         cloud_sync_dashboard_url: `https://update.frontstores.com/shop/${tenantId}`,
         cloud_sync_activated_at: new Date().toISOString(),
       },

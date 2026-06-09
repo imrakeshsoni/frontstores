@@ -1565,6 +1565,11 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
     if (!sub.sync_code) {
       sub.sync_code = Math.random().toString(36).slice(2, 8).toUpperCase() + Math.random().toString(36).slice(2, 8).toUpperCase();
     }
+    // Also enable cloud_db (required for /join/verify-pin and DB snapshot push/pull)
+    if (!sub.cloud_db_code) {
+      sub.cloud_db_code = crypto.randomBytes(6).toString('hex').toUpperCase();
+    }
+    sub.cloud_db_enabled = true;
     sub.sync_enabled = true;
     sub.cloud_sync_self_activated = true;
     sub.cloud_sync_activated_at = activated_at ?? new Date().toISOString();
@@ -1574,7 +1579,7 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
     saveSubs(subs);
     logActivity(tenant_id, sub.shop_name, 'cloud_sync_self_activated', `Cloud Sync self-activated`);
     console.log(`☁️  Cloud Sync self-activated for ${sub.shop_name}`);
-    json(res, { ok: true, sync_code: sub.sync_code, shop_name: sub.shop_name }); return;
+    json(res, { ok: true, sync_code: sub.sync_code, cloud_db_code: sub.cloud_db_code, shop_name: sub.shop_name }); return;
   }
 
   // [all apps] [all tenants] — POST /cloud-sync/self-deactivate — deactivate cloud sync
