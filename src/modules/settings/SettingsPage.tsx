@@ -697,7 +697,7 @@ export function SettingsPage() {
           {/* Backdrop */}
           <div onClick={closePanel} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }} />
           {/* Centered landscape popup */}
-          <div style={{ position: 'relative', width: '80vw', maxHeight: '82vh', background: 'var(--surface)', borderRadius: '18px', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 80px rgba(0,0,0,0.5)', overflow: 'hidden' }}>
+          <div style={{ position: 'relative', width: 'min(620px, 92vw)', maxHeight: '82vh', background: 'var(--surface)', borderRadius: '18px', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 80px rgba(0,0,0,0.5)', overflow: 'hidden' }}>
             {/* Sticky header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--surface-border)', flexShrink: 0 }}>
               <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>{panelTitles[activePanel] ?? 'Settings'}</h2>
