@@ -679,15 +679,15 @@ export function SettingsPage() {
 
       {/* ── Slide-over panel — rendered via portal so it escapes any overflow:auto ancestor ── */}
       {activePanel && createPortal(
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', justifyContent: 'flex-end' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {/* Backdrop */}
           <div onClick={closePanel} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }} />
-          {/* Panel */}
-          <div style={{ position: 'relative', width: '80vw', height: '100%', background: 'var(--surface)', display: 'flex', flexDirection: 'column', boxShadow: '-12px 0 48px rgba(0,0,0,0.5)' }}>
+          {/* Centered landscape popup */}
+          <div style={{ position: 'relative', width: '80vw', maxHeight: '82vh', background: 'var(--surface)', borderRadius: '18px', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 80px rgba(0,0,0,0.5)', overflow: 'hidden' }}>
             {/* Sticky header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px 16px', borderBottom: '1px solid var(--surface-border)', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--surface-border)', flexShrink: 0 }}>
               <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>{panelTitles[activePanel] ?? 'Settings'}</h2>
-              <button onClick={closePanel} style={{ width: '28px', height: '28px', borderRadius: '50%', border: 'none', background: 'var(--surface-2)', cursor: 'pointer', fontSize: '16px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>×</button>
+              <button onClick={closePanel} style={{ width: '28px', height: '28px', borderRadius: '50%', border: 'none', background: 'var(--surface-2)', cursor: 'pointer', fontSize: '16px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
             </div>
             {/* Scrollable content */}
             <div style={{ flex: 1, overflowY: 'auto' }}>
