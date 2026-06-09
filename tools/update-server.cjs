@@ -131,6 +131,17 @@ function sseBroadcast(tenantId, event, data) {
   }
 }
 
+// [all apps] [all tenants] — dedicated announcement SSE (no auth, works for ALL tenants incl. non-Cloud-Sync)
+const announceClients = new Set();
+function announceSseAdd(res) { announceClients.add(res); }
+function announceSseRemove(res) { announceClients.delete(res); }
+function announceBroadcast(data) {
+  const msg = `event: announcement-new\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const client of announceClients) {
+    try { client.write(msg); } catch { announceSseRemove(client); }
+  }
+}
+
 function generateSyncCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   return Array.from(crypto.getRandomValues(new Uint8Array(6))).map(b => chars[b % chars.length]).join('');
@@ -1401,6 +1412,22 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
     return;
   }
 
+  // GET /announce/events — lightweight SSE for announcements, no auth required, works for ALL tenants
+  // [all apps] [all tenants] — every desktop app connects here so announcements reach everyone instantly
+  if (req.method === 'GET' && pathname === '/announce/events') {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+    });
+    res.write('event: connected\ndata: {}\n\n');
+    announceSseAdd(res);
+    const hb = setInterval(() => { try { res.write(': ping\n\n'); } catch { clearInterval(hb); announceSseRemove(res); } }, 25000);
+    req.on('close', () => { clearInterval(hb); announceSseRemove(res); });
+    return;
+  }
+
   // POST /sync/push — receive shop data from tenant app
   if (req.method === 'POST' && pathname === '/sync/push') {
     if (rateLimit(req, res, 'sync-push', 60, 60 * 60 * 1000)) return;
@@ -2213,10 +2240,11 @@ async function handleAdminRequest(req, res) {
       const entry = { id: crypto.randomUUID(), title: sanitize(title, 200), message: sanitize(message, 2000), created_at: new Date().toISOString(), active: true };
       list.unshift(entry);
       saveAnnouncements(list);
-      // [admin] [all tenants] — push to all connected SSE clients so apps get it instantly
+      // [admin] [all tenants] — push to Cloud Sync SSE clients + dedicated announce SSE (covers all tenants)
       for (const [tenantId] of sseClients) {
         sseBroadcast(tenantId, 'announcement-new', { id: entry.id, title: entry.title, created_at: entry.created_at });
       }
+      announceBroadcast({ id: entry.id, title: entry.title, created_at: entry.created_at });
       json(res, { ok: true, announcement: entry });
     } catch { res.writeHead(400); res.end('Bad request'); }
     return;

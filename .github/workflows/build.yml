@@ -412,7 +412,7 @@ jobs:
 
       - name: Initialize Android project (if not already done)
         run: |
-          if [ ! -f "src-tauri/gen/android/app/build.gradle" ]; then
+          if [ ! -f "src-tauri/gen/android/app/build.gradle.kts" ]; then
             echo "Running tauri android init..."
             npx tauri android init
           else
@@ -422,23 +422,33 @@ jobs:
           ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
           NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/27.0.11902837
 
-      - name: Build Android APK
-        run: npx tauri android build --apk
+      - name: Decode release keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > /tmp/frontstores-release.keystore
+
+      - name: Build Android APK (release + signed)
+        run: npx tauri android build --apk --release
         env:
           ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
           NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/27.0.11902837
+          ANDROID_KEYSTORE_PATH: /tmp/frontstores-release.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
       - name: Upload Android APK to release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
         run: |
-          APK=$(find src-tauri/gen/android -name "*.apk" | head -1)
+          # prefer arm64 APK (covers 95%+ of modern Android phones), fallback to any release APK
+          APK=$(find src-tauri/gen/android -path "*/release/*.apk" -name "*arm64*" | head -1)
+          [ -z "$APK" ] && APK=$(find src-tauri/gen/android -path "*/release/*.apk" | head -1)
           if [ -n "$APK" ]; then
             cp "$APK" "FrontStores_android.apk"
             gh release upload "$TAG" "FrontStores_android.apk" --clobber
-            echo "✅ Android APK uploaded"
+            echo "✅ Android APK uploaded: $(du -h FrontStores_android.apk | cut -f1)"
           else
-            echo "⚠️ No APK found — build may have failed"
+            echo "⚠️ No release APK found"
             find src-tauri/gen/android -name "*.apk" || true
           fi

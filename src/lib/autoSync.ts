@@ -16,6 +16,9 @@ let _lastPushAt = 0;
 let _sse: EventSource | null = null;
 let _sseReconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let _sseReconnectDelay = 5000;
+// [all apps] [all tenants] — dedicated announcement SSE, no Cloud Sync required
+let _announceSSE: EventSource | null = null;
+let _announceReconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
 const PUSH_DEBOUNCE_MS = 5_000;   // 5s after last change — faster for real-time feel
 const PULL_INTERVAL_MS = 3 * 60 * 1000; // 3-min fallback poll when SSE is healthy
@@ -32,10 +35,12 @@ export function initAutoSync(tenantId: string) {
     refreshCloudDbStatus(tenantId),
   ]).then(() => {
     connectSSE();
+    connectAnnounceSSE(); // [all apps] [all tenants] — works without Cloud Sync
     silentPull();
     silentCloudDbPush(); // push to cloud DB if enabled
   }).catch(() => {
     connectSSE();
+    connectAnnounceSSE();
     silentPull();
   });
   // Fallback poll in case SSE drops
@@ -47,6 +52,8 @@ export function stopAutoSync() {
   if (_pullInterval) { clearInterval(_pullInterval); _pullInterval = null; }
   if (_pushTimer) { clearTimeout(_pushTimer); _pushTimer = null; }
   disconnectSSE();
+  if (_announceReconnectTimer) { clearTimeout(_announceReconnectTimer); _announceReconnectTimer = null; }
+  if (_announceSSE) { _announceSSE.close(); _announceSSE = null; }
 }
 
 // Call this after any significant data change — debounces and pushes to Cloud Sync + Cloud DB
@@ -84,6 +91,25 @@ async function silentCloudDbPush() {
   const s = config?.settings as any ?? {};
   if (!s.cloud_db_enabled || !s.cloud_db_code) return;
   try { await pushToCloudDb(_tenantId); } catch { /* non-critical */ }
+}
+
+// [all apps] [all tenants] — connect to announcement SSE regardless of Cloud Sync status
+function connectAnnounceSSE() {
+  if (!_tenantId) return;
+  if (_announceReconnectTimer) { clearTimeout(_announceReconnectTimer); _announceReconnectTimer = null; }
+  if (_announceSSE) { _announceSSE.close(); _announceSSE = null; }
+  try {
+    const es = new EventSource(`${SERVER}/announce/events`);
+    _announceSSE = es;
+    es.addEventListener('announcement-new', () => {
+      pollAnnouncements(_tenantId).then(() => _onAnnouncementNew?.());
+    });
+    es.onerror = () => {
+      es.close();
+      _announceSSE = null;
+      _announceReconnectTimer = setTimeout(() => connectAnnounceSSE(), 15000);
+    };
+  } catch { /* EventSource unavailable */ }
 }
 
 function disconnectSSE() {

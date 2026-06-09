@@ -36,3 +36,4 @@ tools/models/
 # Tauri Android generated files
 src-tauri/gen/
 .claude/worktrees/
+frontstores-release.keystore
