@@ -258,6 +258,19 @@ export async function getStaffTabAccess(tenantId: string, username: string): Pro
   try { return JSON.parse(rows[0].tab_access) as string[]; } catch { return []; }
 }
 
+// Returns display name of the currently logged-in user.
+// Returns null if the owner is logged in (owner sees everything, no filter needed).
+export async function getCurrentStaffDisplayName(tenantId: string): Promise<string | null> {
+  const username = sessionStorage.getItem('fs_logged_in_username');
+  if (!username || username === 'owner') return null;
+  const db = await getDb();
+  const rows = await db.select<{ display_name: string }[]>(
+    `SELECT display_name FROM staff_users WHERE tenant_id = ? AND username = ? AND status = 'approved' AND deactivated_at IS NULL LIMIT 1`,
+    [tenantId, username.trim().toLowerCase()]
+  );
+  return rows[0]?.display_name ?? username;
+}
+
 // True if username belongs to a staff account (not the owner)
 export async function isStaffUsername(tenantId: string, username: string): Promise<boolean> {
   if (await hasAuth(tenantId)) {

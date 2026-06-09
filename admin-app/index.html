@@ -814,6 +814,8 @@ let filter = 'all', tagFilter = 'all', eFilter = 'all', cFilter = 'all', openId 
 let healthInterval = null;
 // Track "seen" counts per tab so badges only show NEW items since last visit
 let seenCounts = { errors: null, contacts: null, customers: null, devices: null, staffrequests: null };
+// Customer table sort state
+let sortCol = 'joined', sortDir = 'desc';
 
 // [core] — Native admin app on this Mac passes the password as `local_token` so
 // the admin never has to type it. Strip it from the URL immediately so it never
@@ -1051,26 +1053,52 @@ function planBadgeText(c) {
   return 'Trial';
 }
 
+function sortCustomers(col) {
+  if (sortCol === col) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+  else { sortCol = col; sortDir = col === 'joined' ? 'desc' : 'asc'; }
+  renderCustomers();
+}
+
 function renderCustomers() {
   const q = document.getElementById('search').value.toLowerCase();
   let list = allCustomers.filter(c => {
+    if (filter !== 'all' && subStatus(c) !== filter) return false;
     if (tagFilter === 'client' && !c.is_client) return false;
     if (tagFilter === 'tester' && c.is_client) return false;
     if (!q) return true;
     return (c.shop_name||'').toLowerCase().includes(q)||(c.owner_name||'').toLowerCase().includes(q)||(c.tenant_id||'').toLowerCase().includes(q);
   });
+
+  // Sort
+  list.sort((a, b) => {
+    let va, vb;
+    if (sortCol === 'shop')   { va = (a.shop_name||'').toLowerCase(); vb = (b.shop_name||'').toLowerCase(); }
+    else if (sortCol === 'app')    { va = (a.shop_type||'').toLowerCase(); vb = (b.shop_type||'').toLowerCase(); }
+    else if (sortCol === 'owner')  { va = (a.owner_name||'').toLowerCase(); vb = (b.owner_name||'').toLowerCase(); }
+    else if (sortCol === 'plan')   { va = (a.plan_type||'').toLowerCase(); vb = (b.plan_type||'').toLowerCase(); }
+    else if (sortCol === 'joined') { va = a.registered_at||''; vb = b.registered_at||''; }
+    else if (sortCol === 'status') { va = subStatus(a); vb = subStatus(b); }
+    else { va = ''; vb = ''; }
+    if (va < vb) return sortDir === 'asc' ? -1 : 1;
+    if (va > vb) return sortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
   const grid = document.getElementById('customers-grid');
   if (!list.length) { grid.innerHTML=`<tr><td colspan="9" class="empty" style="text-align:center;padding:24px">No customers found</td></tr>`; return; }
+
+  const thStyle = 'padding:9px 14px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border);white-space:nowrap;text-align:left;cursor:pointer;user-select:none';
+  const arrow = (col) => sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
   const header = `<thead><tr style="background:rgba(255,255,255,.04)">
-    <th style="padding:9px 14px 9px 16px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border);white-space:nowrap;text-align:left">#</th>
-    <th style="padding:9px 14px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border);white-space:nowrap;text-align:left">Shop</th>
-    <th style="padding:9px 14px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border);white-space:nowrap;text-align:left">App</th>
-    <th style="padding:9px 14px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border);white-space:nowrap;text-align:left">Owner</th>
-    <th style="padding:9px 14px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border);white-space:nowrap;text-align:left">Phone</th>
-    <th style="padding:9px 14px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border);white-space:nowrap;text-align:left">Plan</th>
-    <th style="padding:9px 14px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border);white-space:nowrap;text-align:left">Joined</th>
-    <th style="padding:9px 14px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border);white-space:nowrap;text-align:left">Add-ons</th>
-    <th style="padding:9px 14px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border);white-space:nowrap;text-align:left">Status</th>
+    <th style="${thStyle};padding-left:16px">#</th>
+    <th style="${thStyle}" onclick="sortCustomers('shop')">Shop${arrow('shop')}</th>
+    <th style="${thStyle}" onclick="sortCustomers('app')">App${arrow('app')}</th>
+    <th style="${thStyle}" onclick="sortCustomers('owner')">Owner${arrow('owner')}</th>
+    <th style="${thStyle}">Phone</th>
+    <th style="${thStyle}" onclick="sortCustomers('plan')">Plan${arrow('plan')}</th>
+    <th style="${thStyle}" onclick="sortCustomers('joined')">Joined${arrow('joined')}</th>
+    <th style="${thStyle}">Add-ons</th>
+    <th style="${thStyle}" onclick="sortCustomers('status')">Status${arrow('status')}</th>
   </tr></thead>`;
   grid.innerHTML = header + list.map((c,i) => customerCardHtml(c,i)).join('');
 }
@@ -2230,7 +2258,7 @@ function showToast(msg, err=false) {
 }
 
 // Auto-refresh every 2 minutes
-setInterval(()=>{ if (password) loadAll(false, true); }, 120000);
+setInterval(()=>{ if (password) loadAll(false, true); }, 15000);
 
 // ── Auto-Fix & Deploy ────────────────────────────────────────────────────────
 

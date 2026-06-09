@@ -3,7 +3,8 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, GripVertical } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
-import { listCRMDeals, createCRMDeal, updateCRMDeal, deleteCRMDeal, listCRMContacts } from '@/lib/db/crm';
+import { listCRMDeals, createCRMDeal, updateCRMDeal, deleteCRMDeal, listCRMContacts, createDealCommissions } from '@/lib/db/crm';
+import { getCurrentStaffDisplayName } from '@/lib/db/staffUsers';
 import { toast } from 'sonner';
 
 const C = {
@@ -30,15 +31,24 @@ const inp = (extra?: React.CSSProperties): React.CSSProperties => ({
 
 export function CRMPipelinePage() {
   const tenantId = useAppStore(s => s.config?.tenant_id ?? '');
+  const ownerName = useAppStore(s => s.config?.owner_name ?? s.config?.shop_name ?? 'Owner');
   const qc = useQueryClient();
+
+  const { data: currentStaff } = useQuery({
+    queryKey: ['current-staff', tenantId],
+    queryFn: () => getCurrentStaffDisplayName(tenantId),
+    enabled: !!tenantId,
+    staleTime: Infinity,
+  });
+  const isStaff = currentStaff !== null && currentStaff !== undefined;
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ contact_id: '', title: '', value: '', expected_close_date: '', notes: '', stage: 'new' });
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
 
   const { data: deals = [] } = useQuery({
-    queryKey: ['crm-deals', tenantId],
-    queryFn: () => listCRMDeals(tenantId),
+    queryKey: ['crm-deals', tenantId, currentStaff],
+    queryFn: () => listCRMDeals(tenantId, { ownerFilter: currentStaff ?? null }),
     enabled: !!tenantId,
   });
 
@@ -55,6 +65,8 @@ export function CRMPipelinePage() {
       contact_id: form.contact_id, title: form.title,
       value: Number(form.value) || 0, stage: form.stage,
       expected_close_date: form.expected_close_date || null, notes: form.notes,
+      owner: isStaff ? currentStaff! : ownerName,
+      referred_by: '',
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['crm-deals'] });
@@ -68,9 +80,17 @@ export function CRMPipelinePage() {
 
   const moveStage = useMutation({
     mutationFn: ({ id, stage }: { id: string; stage: string }) => updateCRMDeal(tenantId, id, { stage }),
-    onSuccess: () => {
+    onSuccess: async (_, { id, stage }) => {
       qc.invalidateQueries({ queryKey: ['crm-deals'] });
       qc.invalidateQueries({ queryKey: ['crm-stats'] });
+      if (stage === 'won') {
+        const deal = deals.find(d => d.id === id);
+        if (deal) {
+          await createDealCommissions(tenantId, { id: deal.id, title: deal.title, value: deal.value, owner: deal.owner ?? '', referred_by: deal.referred_by ?? '' }, ownerName);
+          qc.invalidateQueries({ queryKey: ['crm-commissions'] });
+          toast.success('🎉 Deal won! Commission created.');
+        }
+      }
     },
   });
 

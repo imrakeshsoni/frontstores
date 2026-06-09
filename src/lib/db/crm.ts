@@ -13,6 +13,7 @@ export interface CRMDeal {
   id: string; tenant_id: string; contact_id: string;
   title: string; value: number; stage: string;
   expected_close_date: string | null; notes: string;
+  owner: string; referred_by: string;
   updated_at: string; deleted_at: string | null;
 }
 
@@ -77,12 +78,13 @@ export async function deleteCRMContact(tenantId: string, id: string): Promise<vo
 
 // ── Deals / Pipeline ─────────────────────────────────────────────────────────
 
-export async function listCRMDeals(tenantId: string, opts: { contactId?: string; stage?: string } = {}): Promise<CRMDeal[]> {
+export async function listCRMDeals(tenantId: string, opts: { contactId?: string; stage?: string; ownerFilter?: string | null } = {}): Promise<CRMDeal[]> {
   const db = await getDb();
   const conds = ['tenant_id = ?', 'deleted_at IS NULL'];
   const params: unknown[] = [tenantId];
   if (opts.contactId) { conds.push('contact_id = ?'); params.push(opts.contactId); }
   if (opts.stage) { conds.push('stage = ?'); params.push(opts.stage); }
+  if (opts.ownerFilter) { conds.push('owner = ?'); params.push(opts.ownerFilter); }
   return db.select<CRMDeal[]>(`SELECT * FROM crm_deals WHERE ${conds.join(' AND ')} ORDER BY updated_at DESC`, params);
 }
 
@@ -90,8 +92,8 @@ export async function createCRMDeal(tenantId: string, data: Omit<CRMDeal, 'id' |
   const db = await getDb();
   const id = uuid();
   await db.execute(
-    `INSERT INTO crm_deals (id,tenant_id,contact_id,title,value,stage,expected_close_date,notes,updated_at) VALUES (?,?,?,?,?,?,?,?,?)`,
-    [id, tenantId, data.contact_id, data.title, data.value ?? 0, data.stage || 'new', data.expected_close_date ?? null, data.notes ?? '', now()]
+    `INSERT INTO crm_deals (id,tenant_id,contact_id,title,value,stage,expected_close_date,notes,owner,referred_by,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+    [id, tenantId, data.contact_id, data.title, data.value ?? 0, data.stage || 'new', data.expected_close_date ?? null, data.notes ?? '', data.owner ?? '', data.referred_by ?? '', now()]
   );
   return id;
 }
@@ -258,12 +260,13 @@ export interface CRMWaInbox {
   updated_at: string; deleted_at: string | null;
 }
 
-export async function listCRMLeads(tenantId: string, opts: { status?: string; search?: string } = {}): Promise<CRMLead[]> {
+export async function listCRMLeads(tenantId: string, opts: { status?: string; search?: string; ownerFilter?: string | null } = {}): Promise<CRMLead[]> {
   const db = await getDb();
   const conds = ['tenant_id = ?', 'deleted_at IS NULL'];
   const params: unknown[] = [tenantId];
   if (opts.status && opts.status !== 'all') { conds.push('status = ?'); params.push(opts.status); }
   if (opts.search) { conds.push('(name LIKE ? OR company LIKE ? OR email LIKE ?)'); const q = `%${opts.search}%`; params.push(q, q, q); }
+  if (opts.ownerFilter) { conds.push('owner = ?'); params.push(opts.ownerFilter); }
   return db.select<CRMLead[]>(`SELECT * FROM crm_leads WHERE ${conds.join(' AND ')} ORDER BY updated_at DESC`, params);
 }
 
@@ -394,6 +397,9 @@ export async function listCRMCommissions(tenantId: string, dealId?: string): Pro
 
 export async function createDealCommissions(tenantId: string, deal: { id: string; title: string; value: number; owner: string; referred_by: string }, ownerName: string): Promise<void> {
   const db = await getDb();
+  // Idempotent — skip if commissions already exist for this deal
+  const existing = await db.select<{ c: number }[]>(`SELECT COUNT(*) as c FROM crm_commissions WHERE tenant_id = ? AND deal_id = ? AND deleted_at IS NULL`, [tenantId, deal.id]);
+  if ((existing[0]?.c ?? 0) > 0) return;
   const half = (deal.value ?? 0) / 2;
   // Owner always gets 50%
   const ownerId = uuid();

@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Zap, CheckCircle2, ArrowRightCircle, Trash2 } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { listCRMLeads, createCRMLead, updateCRMLead, deleteCRMLead, convertCRMLead, listCRMTeamMembers, type CRMLead } from '@/lib/db/crm';
+import { getCurrentStaffDisplayName } from '@/lib/db/staffUsers';
 import { toast } from 'sonner';
 
 const C = {
@@ -30,6 +31,7 @@ const inp = (extra?: React.CSSProperties): React.CSSProperties => ({
 
 export function CRMLeadsPage() {
   const tenantId = useAppStore(s => s.config?.tenant_id ?? '');
+  const ownerName = useAppStore(s => s.config?.owner_name ?? '');
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -38,9 +40,18 @@ export function CRMLeadsPage() {
   const [convertOpts, setConvertOpts] = useState({ createAccount: true, createContact: true, createDeal: true, dealValue: 0 });
   const [form, setForm] = useState({ name: '', company: '', email: '', phone: '', source: '', status: 'new', lead_value: '', notes: '', owner: '', referred_by: '' });
 
+  // Current logged-in user: null = tenant owner (sees all), string = staff (sees own leads only)
+  const { data: currentStaff } = useQuery({
+    queryKey: ['current-staff', tenantId],
+    queryFn: () => getCurrentStaffDisplayName(tenantId),
+    enabled: !!tenantId,
+    staleTime: Infinity,
+  });
+  const isStaff = currentStaff !== null && currentStaff !== undefined;
+
   const { data: leads = [], isLoading } = useQuery({
-    queryKey: ['crm-leads', tenantId, search, filterStatus],
-    queryFn: () => listCRMLeads(tenantId, { search, status: filterStatus }),
+    queryKey: ['crm-leads', tenantId, search, filterStatus, currentStaff],
+    queryFn: () => listCRMLeads(tenantId, { search, status: filterStatus, ownerFilter: currentStaff ?? null }),
     enabled: !!tenantId,
   });
 
@@ -49,12 +60,21 @@ export function CRMLeadsPage() {
     queryFn: () => listCRMTeamMembers(tenantId),
     enabled: !!tenantId,
   });
-  const ownerName = useAppStore(s => s.config?.owner_name ?? '');
   const allOwners = [ownerName, ...teamMembers.map(m => m.name)].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
 
   const add = useMutation({
-    mutationFn: () => createCRMLead(tenantId, { ...form, lead_value: parseFloat(form.lead_value) || 0 }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['crm-leads'] }); qc.invalidateQueries({ queryKey: ['crm-stats'] }); setShowAdd(false); setForm({ name: '', company: '', email: '', phone: '', source: '', status: 'new', lead_value: '', notes: '', owner: '', referred_by: '' }); toast.success('Lead added'); },
+    mutationFn: () => createCRMLead(tenantId, {
+      ...form,
+      lead_value: parseFloat(form.lead_value) || 0,
+      owner: form.owner || (isStaff ? currentStaff! : ownerName),
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['crm-leads'] });
+      qc.invalidateQueries({ queryKey: ['crm-stats'] });
+      setShowAdd(false);
+      setForm({ name: '', company: '', email: '', phone: '', source: '', status: 'new', lead_value: '', notes: '', owner: '', referred_by: '' });
+      toast.success('Lead added');
+    },
     onError: (e) => toast.error(String(e)),
   });
 
