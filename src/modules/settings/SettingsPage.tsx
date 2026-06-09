@@ -13,7 +13,7 @@ import { exportBackup } from '@/lib/db/backup';
 import { PageIntro } from '@/components/ui/PageIntro';
 import { useTheme } from '@/lib/theme/useTheme';
 import { reportError } from '@/lib/errorReporter';
-import { getCloudSyncStatus, refreshCloudSyncStatus, activateCloudSync, deactivateCloudSync, getCloudSyncFee } from '@/lib/db/cloudSync';
+import { getCloudSyncStatus, refreshCloudSyncStatus, activateCloudSync, deactivateCloudSync, getCloudSyncFee, getPricing } from '@/lib/db/cloudSync';
 
 type SettingsForm = {
   shop_name: string;
@@ -128,11 +128,14 @@ export function SettingsPage() {
 
   const [activeCount, setActiveCount] = useState(0);
   const [staffFee, setStaffFee] = useState(200);
+  const [planFee, setPlanFee] = useState(999);
+  const [syncFee, setSyncFee] = useState(299);
   useEffect(() => {
     if (tenantId) {
       getAuthUsername(tenantId).then(u => { if (u) setCurrentUsername(u); });
       countActiveStaffUsers(tenantId).then(setActiveCount).catch(() => {});
-      getStaffUserFee(tenantId).then(setStaffFee).catch(() => {});
+      // Always fetch latest pricing from server on every mount — no caching
+      getPricing(tenantId).then(p => { setPlanFee(p.plan_fee); setStaffFee(p.staff_user_fee); setSyncFee(p.cloud_sync_fee); }).catch(() => {});
     }
   }, [tenantId]);
 
@@ -307,6 +310,38 @@ export function SettingsPage() {
           }
         </div>
       );
+
+      case 'billing-summary': {
+        const syncStatus = (config?.settings as any)?.cloud_sync_enabled;
+        const total = planFee + (activeCount * staffFee) + (syncStatus ? syncFee : 0);
+        const nextBilling = (() => { const d = new Date(); d.setMonth(d.getMonth() + 1); d.setDate(1); return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }); })();
+        return (
+          <div className="p-5 space-y-4">
+            <div className="card p-4 space-y-3">
+              <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--text-tertiary)' }}>Monthly Charges</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Base plan</span>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>₹{planFee}/month</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Staff logins ({activeCount} active × ₹{staffFee})</span>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>₹{activeCount * staffFee}/month</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Cloud Sync</span>
+                <span style={{ fontWeight: 600, color: syncStatus ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>{syncStatus ? `₹${syncFee}/month` : 'Off'}</span>
+              </div>
+              <div style={{ borderTop: '1px solid var(--surface-border)', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', fontSize: '15px' }}>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Total</span>
+                <span style={{ fontWeight: 700, color: '#16a34a', fontSize: '17px' }}>₹{total}/month</span>
+              </div>
+            </div>
+            <p className="text-xs rounded-xl p-3" style={{ background: 'var(--surface-2)', color: 'var(--text-tertiary)' }}>
+              Next billing date: <strong style={{ color: 'var(--text-secondary)' }}>{nextBilling}</strong>. Billed on the 1st of every month.
+            </p>
+          </div>
+        );
+      }
 
       case 'cloudsync': return <div className="p-5"><CloudSyncSection /></div>;
 
@@ -585,7 +620,7 @@ export function SettingsPage() {
   };
 
   const panelTitles: Record<string, string> = {
-    updates: '🔄 App Updates', cloudsync: '☁️ Cloud Sync', appearance: '🎨 Appearance',
+    'billing-summary': '💳 Your Plan', updates: '🔄 App Updates', cloudsync: '☁️ Cloud Sync', appearance: '🎨 Appearance',
     shop: '🏪 Shop Details', logo: '🖼️ Business Logo', invoice: '🧾 Invoice Template',
     billing: '⌨️ Billing Preferences', gst: '🧾 Tax / GST', whatsapp: '📱 WhatsApp Business',
     pinlock: '🔐 Section PIN Lock', autolock: '🔒 Auto-Lock', password: '🔑 Login & Password',
@@ -609,6 +644,10 @@ export function SettingsPage() {
         {renderRow('updates', '🔄', 'App Updates', currentVersion ? `v${currentVersion}${updateStatus === 'found' ? ' · Update available' : ''}` : 'Check for updates',
           updateStatus === 'found' ? badge('Update', 'blue') : undefined)}
         {renderRow('cloudsync', '☁️', 'Cloud Sync', undefined, undefined)}
+        {isOwner && renderRow('billing-summary', '💳', 'Your Plan', (() => {
+          const total = planFee + (activeCount * staffFee) + (syncFee > 0 ? 0 : 0);
+          return `₹${planFee}/mo plan · ${activeCount > 0 ? `${activeCount} staff +₹${activeCount * staffFee} · ` : ''}₹${planFee + activeCount * staffFee}/month`;
+        })())}
         {renderRow('appearance', '🎨', 'Appearance', theme === 'dark' ? 'Dark Mode' : 'Light Mode', undefined, true)}
       </>)}
 
@@ -808,12 +847,13 @@ function StaffLoginsSection({ tenantId }: { tenantId: string }) {
     queryFn: () => countActiveStaffUsers(tenantId),
     enabled: !!tenantId,
   });
-  const { data: staffFee = 200 } = useQuery({
-    queryKey: ['staff-user-fee', tenantId],
-    queryFn: () => getStaffUserFee(tenantId),
+  const { data: pricing } = useQuery({
+    queryKey: ['pricing', tenantId],
+    queryFn: () => getPricing(tenantId),
     enabled: !!tenantId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
   });
+  const staffFee = pricing?.staff_user_fee ?? 200;
 
   function toggleTab(key: string) {
     setTabAccess(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
@@ -1222,6 +1262,15 @@ function CloudSyncSection() {
     refetchInterval: 60_000,
   });
 
+  // Always fetch latest pricing on mount — staleTime: 0 so admin changes are immediately visible
+  const { data: pricing } = useQuery({
+    queryKey: ['pricing', tenantId],
+    queryFn: () => getPricing(tenantId),
+    enabled: !!tenantId,
+    staleTime: 0,
+  });
+  const cloudSyncFee = pricing?.cloud_sync_fee ?? 299;
+
   const enabled = !!syncStatus?.enabled;
 
   const lastSynced = syncStatus?.lastSyncedAt
@@ -1241,16 +1290,13 @@ function CloudSyncSection() {
     return Math.round(fullFee * daysRemaining / daysInMonth);
   };
 
-  const handleToggleOn = async () => {
+  const handleToggleOn = () => {
     if (busy) return;
-    setBusy(true);
-    try {
-      const { fee: f } = await getCloudSyncFee(tenantId);
-      setFee(f);
-      setProrated(calcProrated(f));
-      setNextCycleFee(f);
-      setShowConfirm(true);
-    } finally { setBusy(false); }
+    const f = cloudSyncFee;
+    setFee(f);
+    setProrated(calcProrated(f));
+    setNextCycleFee(f);
+    setShowConfirm(true);
   };
 
   const handleConfirmActivate = async () => {
@@ -1290,7 +1336,7 @@ function CloudSyncSection() {
             <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
               {enabled
                 ? lastSynced ? `Active · last synced ${lastSynced}` : 'Active · syncing your data'
-                : 'Sync data across devices · ₹299/month'}
+                : `Sync data across devices · ₹${cloudSyncFee}/month`}
             </p>
           </div>
         </div>

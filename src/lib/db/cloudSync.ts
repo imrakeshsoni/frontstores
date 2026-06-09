@@ -87,6 +87,21 @@ export async function refreshCloudSyncStatus(tenantId: string): Promise<CloudSyn
   return getCloudSyncStatus();
 }
 
+// [all apps] [all tenants] — Fetch all pricing fees for this tenant at once (always live, no cache)
+export async function getPricing(tenantId: string): Promise<{ plan_fee: number; staff_user_fee: number; cloud_sync_fee: number }> {
+  try {
+    const res = await fetch(`${SERVER}/pricing/${tenantId}`, { signal: AbortSignal.timeout(6000) });
+    const data = await res.json() as { plan_fee?: number; staff_user_fee?: number; cloud_sync_fee?: number };
+    return {
+      plan_fee:       data.plan_fee       ?? 999,
+      staff_user_fee: data.staff_user_fee ?? 200,
+      cloud_sync_fee: data.cloud_sync_fee ?? 299,
+    };
+  } catch {
+    return { plan_fee: 999, staff_user_fee: 200, cloud_sync_fee: 299 };
+  }
+}
+
 // [all apps] [all tenants] — Fetch cloud sync fee from server before showing confirmation
 export async function getCloudSyncFee(tenantId: string): Promise<{ fee: number; currency: string }> {
   try {

@@ -2108,6 +2108,22 @@ async function handleAdminRequest(req, res) {
     json(res, { ok: true }); return;
   }
 
+  // [all apps] [all tenants] — GET /pricing/:tenant_id — return all fees for this tenant at once
+  const pricingGetMatch = pathname.match(/^\/pricing\/([a-f0-9-]{36})$/);
+  if (req.method === 'GET' && pricingGetMatch) {
+    const tenantId = pricingGetMatch[1];
+    const subs = loadSubs();
+    const sub = subs[tenantId];
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    json(res, {
+      ok: true,
+      plan_fee:       sub?.plan_fee       ?? 999,
+      staff_user_fee: sub?.staff_user_fee ?? 200,
+      cloud_sync_fee: sub?.cloud_sync_fee ?? 299,
+      currency: 'INR',
+    }); return;
+  }
+
   // [all apps] [all tenants] — GET /staff-user-fee/:tenant_id — return per-user fee for this tenant
   const staffUserFeeMatch = pathname.match(/^\/staff-user-fee\/([a-f0-9-]{36})$/);
   if (req.method === 'GET' && staffUserFeeMatch) {
