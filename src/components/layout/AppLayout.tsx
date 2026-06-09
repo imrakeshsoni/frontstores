@@ -748,7 +748,6 @@ export function AppLayout() {
                   <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setShowUserMenu(false)} />
                   <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, minWidth: '190px', background: C.nav2, border: `1px solid ${C.navBorder}`, borderRadius: '6px', overflow: 'hidden', zIndex: 50, boxShadow: '0 16px 40px rgba(0,0,0,0.4)' }}>
                     {[
-                      { to: '/sync', icon: RefreshCw, label: 'Sync' },
                       { to: '/settings', icon: Settings, label: 'Settings & Updates' },
                     ].map(({ to, icon: Icon, label }) => (
                       <NavLink key={to} to={to} onClick={() => setShowUserMenu(false)}
@@ -892,12 +891,6 @@ export function AppLayout() {
                   </button>
                 ) : (
                   <>
-                    <NavLink to="/sync" onClick={() => setShowUserMenu(false)}
-                      className="flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors hover:opacity-80"
-                      style={{ color: 'var(--text-primary)', borderBottom: '1px solid var(--surface-border)' }}>
-                      <RefreshCw className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--text-tertiary)' }} />
-                      Sync
-                    </NavLink>
                     <NavLink to="/settings" onClick={() => setShowUserMenu(false)}
                       className="flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors hover:opacity-80"
                       style={{ color: 'var(--text-primary)', borderBottom: '1px solid var(--surface-border)' }}>

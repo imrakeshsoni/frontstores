@@ -22,7 +22,6 @@ const CustomersPage = lazy(() => import('@/modules/customers/CustomersPage').the
 const SuppliersPage = lazy(() => import('@/modules/suppliers/SuppliersPage').then(m => ({ default: m.SuppliersPage })));
 const ReportsPage   = lazy(() => import('@/modules/reports/ReportsPage').then(m => ({ default: m.ReportsPage })));
 const SettingsPage  = lazy(() => import('@/modules/settings/SettingsPage').then(m => ({ default: m.SettingsPage })));
-const SyncPage      = lazy(() => import('@/modules/sync/SyncPage'));
 const AnnouncementsPage = lazy(() => import('@/modules/announcements/AnnouncementsPage'));
 const KhataPage           = lazy(() => import('@/modules/khata/KhataPage').then(m => ({ default: m.KhataPage })));
 const ExpensesPage        = lazy(() => import('@/modules/expenses/ExpensesPage').then(m => ({ default: m.ExpensesPage })));
@@ -500,7 +499,6 @@ export default function App() {
             <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
             <Route path="reports"    element={<ReportsPage />} />
             <Route path="settings"   element={<SettingsPage />} />
-            <Route path="sync"       element={<SyncPage />} />
             <Route path="announcements" element={<AnnouncementsPage />} />
             {/* [medical] [all tenants] — Pharmacy */}
             <Route path="pharmacy/batches"  element={<BatchManagerPage />} />
