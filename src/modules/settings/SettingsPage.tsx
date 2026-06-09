@@ -282,7 +282,7 @@ export function SettingsPage() {
     switch (activePanel) {
 
       case 'updates': return (
-        <div className="space-y-3 p-5">
+        <div className="space-y-3 p-4">
           {currentVersion && <p className="text-xs font-mono" style={{ color: 'var(--text-tertiary)' }}>Current version: v{currentVersion}</p>}
           {updateStatus === 'found' && (
             <div className="rounded-xl p-3" style={{ background: '#1e1b4b', border: '1px solid #4338ca' }}>
@@ -322,7 +322,7 @@ export function SettingsPage() {
         const total = planFee + (activeCount * staffFee) + (syncStatus ? syncFee : 0);
         const nextBilling = (() => { const d = new Date(); d.setMonth(d.getMonth() + 1); d.setDate(1); return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }); })();
         return (
-          <div className="p-5 space-y-4">
+          <div className="p-4 space-y-3">
             <div className="card p-4 space-y-3">
               <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--text-tertiary)' }}>Monthly Charges</p>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
@@ -349,10 +349,10 @@ export function SettingsPage() {
         );
       }
 
-      case 'cloudsync': return <div className="p-5"><CloudSyncSection /></div>;
+      case 'cloudsync': return <div className="p-4"><CloudSyncSection /></div>;
 
       case 'appearance': return (
-        <div className="p-5 space-y-4">
+        <div className="p-4 space-y-3">
           <div className="card p-4 flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{theme === 'dark' ? '🌙 Dark Mode' : '☀️ Light Mode'}</p>
@@ -367,7 +367,7 @@ export function SettingsPage() {
       );
 
       case 'shop': return (
-        <div className="p-5 space-y-4">
+        <div className="p-4 space-y-3">
           <div className="grid gap-3 grid-cols-2">
             {([
               { label: 'Shop Name *', key: 'shop_name' },
@@ -392,7 +392,7 @@ export function SettingsPage() {
       );
 
       case 'logo': return (
-        <div className="p-5 space-y-4">
+        <div className="p-4 space-y-3">
           <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Logo appears on invoices, salary slips, and printed documents.</p>
           {(config?.settings as any)?.logo_base64 ? (
             <div className="flex items-center gap-4">
@@ -416,7 +416,7 @@ export function SettingsPage() {
       );
 
       case 'invoice': return (
-        <div className="p-5 space-y-4">
+        <div className="p-4 space-y-3">
           <div className="grid gap-3 grid-cols-2">
             {([
               { label: 'Store Display Name', key: 'invoiceStoreDisplayName' },
@@ -440,7 +440,7 @@ export function SettingsPage() {
       );
 
       case 'billing': return (
-        <div className="p-5 space-y-4">
+        <div className="p-4 space-y-3">
           <div className="card p-4 flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Keyboard Billing Mode</p>
@@ -458,7 +458,7 @@ export function SettingsPage() {
       );
 
       case 'gst': return (
-        <div className="p-5 space-y-4">
+        <div className="p-4 space-y-3">
           <div className="card p-4 flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{config?.settings?.enable_gst !== false ? '✅ GST Enabled' : '❌ GST Disabled'}</p>
@@ -472,12 +472,12 @@ export function SettingsPage() {
         </div>
       );
 
-      case 'whatsapp': return <div className="p-5"><WhatsAppBusinessSection /></div>;
+      case 'whatsapp': return <div className="p-4"><WhatsAppBusinessSection /></div>;
 
-      case 'pinlock': return <div className="p-5"><SectionPinLockSection /></div>;
+      case 'pinlock': return <div className="p-4"><SectionPinLockSection /></div>;
 
       case 'autolock': return (
-        <div className="p-5 space-y-4">
+        <div className="p-4 space-y-3">
           <div className="grid grid-cols-1 gap-4">
             <div>
               <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Auto-lock after idle</p>
@@ -508,7 +508,7 @@ export function SettingsPage() {
       );
 
       case 'password': return (
-        <div className="p-5 space-y-5">
+        <div className="p-4 space-y-3">
           <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Current username: <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{currentUsername || '—'}</span></p>
           <div className="space-y-3">
             <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Change Username</p>
@@ -525,10 +525,10 @@ export function SettingsPage() {
         </div>
       );
 
-      case 'staff': return <div className="p-5"><StaffLoginsSection tenantId={tenantId} /></div>;
+      case 'staff': return <div className="p-4"><StaffLoginsSection tenantId={tenantId} /></div>;
 
       case 'backup': return (
-        <div className="p-5 space-y-3">
+        <div className="p-4 space-y-3">
           <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Export all your data. Store it on a USB drive or Google Drive.</p>
           <div className="grid grid-cols-1 gap-2">
             <button className="btn-secondary text-left" onClick={async () => {
@@ -583,7 +583,7 @@ export function SettingsPage() {
       );
 
       case 'migrate': return (
-        <div className="p-5 space-y-4">
+        <div className="p-4 space-y-3">
           <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Moving to a new computer? Download a secure backup file (.fsbak) and copy it to your new machine. When you install FrontStores there, choose <strong>"Restore from backup"</strong> — all data will be restored instantly.</p>
           <div>
             <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Enter your login password to secure the file</label>
@@ -603,7 +603,7 @@ export function SettingsPage() {
       );
 
       case 'audit': return (
-        <div className="p-5">
+        <div className="p-4">
           {(exportLogs?.length ?? 0) === 0
             ? <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No exports yet.</p>
             : <div className="space-y-2">
@@ -696,7 +696,7 @@ export function SettingsPage() {
               <button onClick={closePanel} style={{ width: '28px', height: '28px', borderRadius: '50%', border: 'none', background: 'var(--surface-2)', cursor: 'pointer', fontSize: '16px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
             </div>
             {/* Scrollable content */}
-            <div style={{ flex: 1, overflowY: 'auto' }}>
+            <div style={{ flex: '0 1 auto', overflowY: 'auto' }}>
               {renderPanelContent()}
             </div>
           </div>

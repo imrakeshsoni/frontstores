@@ -812,6 +812,8 @@ const TYPE_COLORS = ['#8b5cf6','#06b6d4','#10b981','#f59e0b','#f43f5e','#3b82f6'
 let password = '', allCustomers = [], allErrors = [], allContacts = [], allActivity = [];
 let filter = 'all', tagFilter = 'all', eFilter = 'all', cFilter = 'all', openId = null;
 let healthInterval = null;
+// Track "seen" counts per tab so badges only show NEW items since last visit
+let seenCounts = { errors: null, contacts: null, customers: null, devices: null, staffrequests: null };
 
 // [core] — Native admin app on this Mac passes the password as `local_token` so
 // the admin never has to type it. Strip it from the URL immediately so it never
@@ -875,6 +877,12 @@ function switchTab(t) {
   const m = PAGE_META[t] || {};
   document.getElementById('page-title').textContent = m.title || t;
   document.getElementById('page-sub').textContent   = m.sub   || '';
+  // Mark badge as seen for the visited tab — badge clears immediately
+  if (t === 'errors')    { seenCounts.errors   = allErrors.filter(e=>!e.resolved).length;   updateBadge(); }
+  if (t === 'contacts')  { seenCounts.contacts = allContacts.filter(c=>!c.resolved).length;  updateBadge(); }
+  if (t === 'customers') { seenCounts.customers= allCustomers.filter(c=>subStatus(c)==='pending').length; updateBadge(); }
+  if (t === 'devices')   { seenCounts.devices  = -1; }  // flag: loadDevices will skip badge on this visit
+  if (t === 'staffrequests') { seenCounts.staffrequests = -1; } // flag: loadStaffUserRequests will skip badge
   if (t === 'analytics') loadAnalytics();
   if (t === 'health')    { loadHealth(); if (!healthInterval) healthInterval = setInterval(loadHealth, 30000); }
   else                   { if (healthInterval) { clearInterval(healthInterval); healthInterval = null; } }
@@ -924,7 +932,7 @@ async function loadAll(isLogin=false, silent=false) {
       resetIdleTimer();
       setTimeout(checkAutofixResume, 500);
     }
-    updateStats(); renderCustomers(); renderErrors(); renderContacts(); updateBadge();
+    updateStats(); renderCustomers(); renderErrors(); renderContacts(); updateBadge(isLogin);
     if (openId) { const c = allCustomers.find(x=>x.tenant_id===openId); if (c) renderPanel(c); }
     if (!isLogin && !silent) showToast('✓ Data refreshed');
     loadDevices(true); // silently refresh device badge
@@ -960,16 +968,25 @@ function updateStats() {
   set('s-expired',  allCustomers.filter(c=>subStatus(c)==='expired').length);
   set('s-blocked',  allCustomers.filter(c=>['frozen','revoked'].includes(subStatus(c))).length);
 }
-function updateBadge() {
+function updateBadge(isFirstLoad = false) {
   const ne = allErrors.filter(e=>!e.resolved).length;
-  const be = document.getElementById('error-badge');
-  be.textContent = ne; be.classList.toggle('show', ne>0);
   const nc = allContacts.filter(c=>!c.resolved).length;
-  const bc = document.getElementById('contact-badge');
-  bc.textContent = nc; bc.classList.toggle('show', nc>0);
   const np = allCustomers.filter(c=>subStatus(c)==='pending').length;
+  // On first load, seed seenCounts so existing items don't all flash as "new"
+  if (isFirstLoad) {
+    if (seenCounts.errors   === null) seenCounts.errors   = ne;
+    if (seenCounts.contacts === null) seenCounts.contacts = nc;
+    if (seenCounts.customers=== null) seenCounts.customers= np;
+  }
+  const errNew  = Math.max(0, ne - (seenCounts.errors   ?? ne));
+  const conNew  = Math.max(0, nc - (seenCounts.contacts ?? nc));
+  const custNew = Math.max(0, np - (seenCounts.customers?? np));
+  const be = document.getElementById('error-badge');
+  be.textContent = errNew;  be.classList.toggle('show', errNew  > 0);
+  const bc = document.getElementById('contact-badge');
+  bc.textContent = conNew;  bc.classList.toggle('show', conNew  > 0);
   const bp = document.getElementById('pending-badge');
-  bp.textContent = np; bp.classList.toggle('show', np>0);
+  bp.textContent = custNew; bp.classList.toggle('show', custNew > 0);
 }
 function setFilter(f) {
   filter = f;
@@ -1687,9 +1704,13 @@ async function loadDevices(silentBadge = false) {
   const approved = devices.filter(d => d.status === 'approved');
   const revoked  = devices.filter(d => d.status === 'revoked');
 
-  // Update badge
+  // Update badge — skip if tab is currently active (user is looking at it)
   const badge = document.getElementById('devices-badge');
-  if (badge) { badge.textContent = pending.length; badge.style.display = pending.length > 0 ? '' : 'none'; }
+  if (badge) {
+    if (seenCounts.devices === -1) seenCounts.devices = pending.length; // seed on first visit
+    const newDevices = Math.max(0, pending.length - (seenCounts.devices ?? pending.length));
+    badge.textContent = newDevices; badge.style.display = newDevices > 0 ? '' : 'none';
+  }
 
   if (silentBadge) return;
 
@@ -1832,7 +1853,11 @@ async function loadStaffUserRequests(silentBadge = false) {
   const { active, deactivated } = await r.json();
 
   const badge = document.getElementById('staffrequests-badge');
-  if (badge) { badge.textContent = active.length; badge.style.display = active.length > 0 ? '' : 'none'; }
+  if (badge) {
+    if (seenCounts.staffrequests === -1) seenCounts.staffrequests = active.length; // seed on first visit
+    const newStaff = Math.max(0, active.length - (seenCounts.staffrequests ?? active.length));
+    badge.textContent = newStaff; badge.style.display = newStaff > 0 ? '' : 'none';
+  }
 
   if (silentBadge) return;
 
