@@ -375,7 +375,7 @@ export function SettingsPage() {
               { label: 'Phone', key: 'phone' },
               { label: 'Email', key: 'email' },
               { label: 'GSTIN', key: 'gstin' },
-              { label: 'Drug License No', key: 'drug_license_no' },
+              ...(config?.shop_type === 'medical' ? [{ label: 'Drug License No', key: 'drug_license_no' as keyof SettingsForm }] : []),
               { label: 'Address', key: 'address_line1' },
               { label: 'City', key: 'city' },
             ] as { label: string; key: keyof SettingsForm }[]).map(({ label, key }) => (
@@ -385,9 +385,11 @@ export function SettingsPage() {
               </div>
             ))}
           </div>
-          <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="btn-primary w-full">
-            {saveMutation.isPending ? 'Saving…' : '💾 Save'}
-          </button>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="btn-primary" style={{ minWidth: '120px' }}>
+              {saveMutation.isPending ? 'Saving…' : '💾 Save'}
+            </button>
+          </div>
         </div>
       );
 
@@ -433,9 +435,11 @@ export function SettingsPage() {
               </div>
             ))}
           </div>
-          <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="btn-primary w-full">
-            {saveMutation.isPending ? 'Saving…' : '💾 Save'}
-          </button>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="btn-primary" style={{ minWidth: '120px' }}>
+              {saveMutation.isPending ? 'Saving…' : '💾 Save'}
+            </button>
+          </div>
         </div>
       );
 
@@ -451,9 +455,11 @@ export function SettingsPage() {
               <span style={{ position: 'absolute', top: '3px', left: form.enableKeyboardBillingMode ? '23px' : '3px', width: '18px', height: '18px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
             </button>
           </div>
-          <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="btn-primary w-full">
-            {saveMutation.isPending ? 'Saving…' : '💾 Save'}
-          </button>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="btn-primary" style={{ minWidth: '120px' }}>
+              {saveMutation.isPending ? 'Saving…' : '💾 Save'}
+            </button>
+          </div>
         </div>
       );
 
@@ -478,7 +484,7 @@ export function SettingsPage() {
 
       case 'autolock': return (
         <div className="p-4 space-y-3">
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Auto-lock after idle</p>
               <p className="text-xs mb-2" style={{ color: 'var(--text-tertiary)' }}>App will lock itself after this much inactivity. 0 = disabled.</p>
@@ -501,9 +507,11 @@ export function SettingsPage() {
             </div>
           </div>
           <p className="text-xs rounded-xl p-3" style={{ background: 'var(--surface-2)', color: 'var(--text-tertiary)' }}>🔒 When locked: app shows login screen. Your data stays safe on disk and is never deleted. If locked out, contact FrontStores support.</p>
-          <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="btn-primary w-full">
-            {saveMutation.isPending ? 'Saving…' : '💾 Save'}
-          </button>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="btn-primary" style={{ minWidth: '120px' }}>
+              {saveMutation.isPending ? 'Saving…' : '💾 Save'}
+            </button>
+          </div>
         </div>
       );
 
