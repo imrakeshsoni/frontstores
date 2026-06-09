@@ -88,6 +88,7 @@ import { VoiceAssistant } from '@/components/voice/VoiceAssistant';
 import { StudyVoiceAssistant } from '@/modules/study/StudyVoiceAssistant';
 import { AnnouncementPopup } from '@/components/announcements/AnnouncementPopup';
 import { pollAnnouncements, getUnreadCount } from '@/lib/db/announcements';
+import { setAnnouncementNewHandler } from '@/lib/autoSync';
 import { MobileNav } from './MobileNav';
 
 export const NAV_ITEMS = [
@@ -619,9 +620,11 @@ export function AppLayout() {
       queryClient.invalidateQueries({ queryKey: ['announcements-unread-count', tenantId] });
       queryClient.invalidateQueries({ queryKey: ['announcements-unnotified', tenantId] });
     });
+    // [all apps] [all tenants] — re-poll immediately when server pushes announcement-new via SSE
+    setAnnouncementNewHandler(poll);
     poll();
     const id = setInterval(poll, 5 * 60_000);
-    return () => clearInterval(id);
+    return () => { clearInterval(id); setAnnouncementNewHandler(() => {}); };
   }, [tenantId, queryClient]);
 
   // [study] [all tenants] — apply saved theme on mount, remove on shop type change

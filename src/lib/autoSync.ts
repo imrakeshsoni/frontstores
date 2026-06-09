@@ -1,6 +1,11 @@
 // [all apps] [all tenants] — Auto-sync: push on events, SSE real-time pull, 3-min fallback
-import { pushDelta, pullDelta, refreshCloudSyncStatus } from './db/cloudSync';
+import { pushDelta, pullDelta, refreshCloudSyncStatus, pushToCloudDb, refreshCloudDbStatus } from './db/cloudSync';
+import { pollAnnouncements } from './db/announcements';
 import { getAppConfig } from './db/config';
+
+// Callback registered by AppLayout to refresh announcement UI on SSE push
+let _onAnnouncementNew: (() => void) | null = null;
+export function setAnnouncementNewHandler(cb: () => void) { _onAnnouncementNew = cb; }
 
 const SERVER = 'https://update.frontstores.com';
 
@@ -15,12 +20,20 @@ let _sseReconnectDelay = 5000;
 const PUSH_DEBOUNCE_MS = 5_000;   // 5s after last change — faster for real-time feel
 const PULL_INTERVAL_MS = 3 * 60 * 1000; // 3-min fallback poll when SSE is healthy
 
+// Callback registered by SyncPage to refresh Cloud DB status after SSE approval
+let _onCloudDbApproved: (() => void) | null = null;
+export function setCloudDbApprovedHandler(cb: () => void) { _onCloudDbApproved = cb; }
+
 export function initAutoSync(tenantId: string) {
   _tenantId = tenantId;
-  // Refresh sync status from server — picks up auto-enabled sync after approval
-  refreshCloudSyncStatus(tenantId).then(() => {
+  // Refresh both sync and cloud-db status on startup
+  Promise.allSettled([
+    refreshCloudSyncStatus(tenantId),
+    refreshCloudDbStatus(tenantId),
+  ]).then(() => {
     connectSSE();
-    silentPull(); // immediate pull on startup
+    silentPull();
+    silentCloudDbPush(); // push to cloud DB if enabled
   }).catch(() => {
     connectSSE();
     silentPull();
@@ -36,7 +49,7 @@ export function stopAutoSync() {
   disconnectSSE();
 }
 
-// Call this after any significant data change — debounces and pushes
+// Call this after any significant data change — debounces and pushes to Cloud Sync + Cloud DB
 export function triggerAutoSync(immediate = false) {
   if (!_tenantId) return;
   if (_pushTimer) clearTimeout(_pushTimer);
@@ -44,11 +57,16 @@ export function triggerAutoSync(immediate = false) {
   _pushTimer = setTimeout(async () => {
     const config = await getAppConfig();
     const s = config?.settings as any ?? {};
-    if (!s.cloud_sync_enabled) return;
     const now = Date.now();
     if (now - _lastPushAt < 2000) return;
     _lastPushAt = now;
-    try { await pushDelta(_tenantId); } catch { /* non-critical */ }
+    if (s.cloud_sync_enabled) {
+      try { await pushDelta(_tenantId); } catch { /* non-critical */ }
+    }
+    // [all apps] [all tenants] — also push to Cloud Database if enabled
+    if (s.cloud_db_enabled) {
+      try { await pushToCloudDb(_tenantId); } catch { /* non-critical */ }
+    }
   }, delay);
 }
 
@@ -58,6 +76,14 @@ async function silentPull() {
   const s = config?.settings as any ?? {};
   if (!s.cloud_sync_enabled) return;
   try { await pullDelta(_tenantId); } catch { /* non-critical */ }
+}
+
+async function silentCloudDbPush() {
+  if (!_tenantId) return;
+  const config = await getAppConfig();
+  const s = config?.settings as any ?? {};
+  if (!s.cloud_db_enabled || !s.cloud_db_code) return;
+  try { await pushToCloudDb(_tenantId); } catch { /* non-critical */ }
 }
 
 function disconnectSSE() {
@@ -84,6 +110,19 @@ async function connectSSE() {
 
     es.addEventListener('data-changed', () => {
       silentPull();
+    });
+
+    // [all apps] [all tenants] — instantly fetch new announcements when admin pushes one
+    es.addEventListener('announcement-new', () => {
+      pollAnnouncements(_tenantId).then(() => _onAnnouncementNew?.());
+    });
+
+    // [all apps] [all tenants] — instantly enable Cloud DB when admin approves (no polling delay)
+    es.addEventListener('cloud-db-approved', () => {
+      refreshCloudDbStatus(_tenantId).then(() => {
+        silentCloudDbPush(); // push immediately after approval
+        _onCloudDbApproved?.();
+      });
     });
 
     es.onerror = () => {

@@ -666,7 +666,10 @@
       <div class="tab-page" id="page-health">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
           <div style="font-size:13px;color:var(--muted)">Auto-refreshes every 30s</div>
-          <button class="export-btn" onclick="loadHealth()">↻ Refresh Now</button>
+          <div style="display:flex;gap:8px">
+            <button class="export-btn" style="background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:#34d399" onclick="startAllServices()">▶ Start All</button>
+            <button class="export-btn" onclick="loadHealth()">↻ Refresh Now</button>
+          </div>
         </div>
         <div class="health-grid">
           <div class="health-card" id="hc-ollama">
@@ -676,6 +679,10 @@
             </div>
             <div id="hs-ollama" class="health-status-bad">Checking…</div>
             <div id="hm-ollama" class="health-detail"></div>
+            <div style="margin-top:12px;display:flex;gap:8px" id="ha-ollama">
+              <button class="action-btn" style="font-size:12px;padding:5px 12px;background:rgba(52,211,153,.1);border-color:rgba(52,211,153,.3);color:#34d399" onclick="serviceAction('ollama','start')">▶ Start</button>
+              <button class="action-btn" style="font-size:12px;padding:5px 12px;background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.25);color:#f87171" onclick="serviceAction('ollama','stop')">■ Stop</button>
+            </div>
           </div>
           <div class="health-card" id="hc-cloudflare">
             <div class="health-header">
@@ -684,6 +691,10 @@
             </div>
             <div id="hs-cloudflare" class="health-status-bad">Checking…</div>
             <div class="health-detail">cloudflared process</div>
+            <div style="margin-top:12px;display:flex;gap:8px" id="ha-cloudflare">
+              <button class="action-btn" style="font-size:12px;padding:5px 12px;background:rgba(52,211,153,.1);border-color:rgba(52,211,153,.3);color:#34d399" onclick="serviceAction('cloudflare','start')">▶ Start</button>
+              <button class="action-btn" style="font-size:12px;padding:5px 12px;background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.25);color:#f87171" onclick="serviceAction('cloudflare','stop')">■ Stop</button>
+            </div>
           </div>
           <div class="health-card" id="hc-tts">
             <div class="health-header">
@@ -692,6 +703,10 @@
             </div>
             <div id="hs-tts" class="health-status-bad">Checking…</div>
             <div class="health-detail">Port 8880</div>
+            <div style="margin-top:12px;display:flex;gap:8px" id="ha-tts">
+              <button class="action-btn" style="font-size:12px;padding:5px 12px;background:rgba(52,211,153,.1);border-color:rgba(52,211,153,.3);color:#34d399" onclick="serviceAction('tts','start')">▶ Start</button>
+              <button class="action-btn" style="font-size:12px;padding:5px 12px;background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.25);color:#f87171" onclick="serviceAction('tts','stop')">■ Stop</button>
+            </div>
           </div>
           <div class="health-card uptime-card">
             <div class="health-header">
@@ -699,7 +714,7 @@
               <div class="health-dot health-dot-ok"></div>
             </div>
             <div id="hs-uptime" class="health-status-ok">—</div>
-            <div class="health-detail">FrontStores update server</div>
+            <div class="health-detail">FrontStores update server (this process)</div>
           </div>
         </div>
       </div>
@@ -745,11 +760,17 @@
 
       <div class="tab-page" id="page-syncrequests">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-          <h2 style="font-size:18px;font-weight:700">☁️ Cloud Sync Requests</h2>
+          <h2 style="font-size:18px;font-weight:700">☁️ Cloud Requests</h2>
           <button onclick="loadSyncRequests()" style="padding:6px 14px;background:var(--accent);color:#111;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer">Refresh</button>
         </div>
-        <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Tenants that requested Cloud Sync from Settings. Approve to switch it on for them immediately — no code to issue.</p>
-        <div id="syncrequests-list"></div>
+
+        <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Cloud Sync Requests</div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Approve to switch on real-time multi-device sync for this tenant.</p>
+        <div id="syncrequests-list" style="margin-bottom:24px"></div>
+
+        <div style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">🗄️ Cloud Storage Requests</div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Approve to enable full cloud database backup for this tenant. All their data will be stored on this server and auto-synced.</p>
+        <div id="clouddb-requests-list"></div>
       </div>
 
       <div class="tab-page" id="page-staffrequests">
@@ -840,7 +861,7 @@ const PAGE_META = {
   health:    { title:'Health',    sub:'Service status and uptime' },
   activity:  { title:'Activity Log', sub:'Admin actions history' },
   announcements: { title:'Announcements', sub:'Silent push notices shown to every tenant, instantly' },
-  syncrequests: { title:'Cloud Sync', sub:'Requests to enable Cloud Sync, awaiting approval' },
+  syncrequests: { title:'Cloud Requests', sub:'Cloud Sync and Cloud Storage requests awaiting approval' },
   staffrequests: { title:'Staff Logins', sub:'Staff login requests from owners, awaiting approval' },
 };
 
@@ -929,12 +950,14 @@ function subStatus(c) {
 }
 
 function updateStats() {
-  document.getElementById('s-total').textContent    = allCustomers.length;
-  document.getElementById('s-pending').textContent  = allCustomers.filter(c=>subStatus(c)==='pending').length;
-  document.getElementById('s-active').textContent   = allCustomers.filter(c=>subStatus(c)==='active').length;
-  document.getElementById('s-expiring').textContent = allCustomers.filter(c=>subStatus(c)==='expiring').length;
-  document.getElementById('s-expired').textContent  = allCustomers.filter(c=>subStatus(c)==='expired').length;
-  document.getElementById('s-blocked').textContent  = allCustomers.filter(c=>['frozen','revoked'].includes(subStatus(c))).length;
+  // [admin] [all tenants] — null-safe: stat elements may not be present in all UI variants
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  set('s-total',    allCustomers.length);
+  set('s-pending',  allCustomers.filter(c=>subStatus(c)==='pending').length);
+  set('s-active',   allCustomers.filter(c=>subStatus(c)==='active').length);
+  set('s-expiring', allCustomers.filter(c=>subStatus(c)==='expiring').length);
+  set('s-expired',  allCustomers.filter(c=>subStatus(c)==='expired').length);
+  set('s-blocked',  allCustomers.filter(c=>['frozen','revoked'].includes(subStatus(c))).length);
 }
 function updateBadge() {
   const ne = allErrors.filter(e=>!e.resolved).length;
@@ -1629,7 +1652,8 @@ async function loadDevices(silentBadge = false) {
   if (silentBadge) return;
 
   const fmtDt = iso => iso ? new Date(iso).toLocaleString('en-IN') : '—';
-  const platformIcon = p => p === 'android' ? '🤖' : p === 'ios' ? '🍎' : '💻';
+  // [admin] [all tenants] — platform icons for device cards
+  const platformIcon = p => ({ android:'🤖', ios:'🍎', windows:'🪟', mac:'🍎', linux:'🐧', desktop:'💻' }[p] || '💻');
 
   function deviceCard(d, showActions) {
     return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px">
@@ -1667,28 +1691,24 @@ async function deviceAction(deviceId, action) {
   else showToast('Failed', true);
 }
 
-// CLOUD SYNC REQUESTS
+// CLOUD SYNC + CLOUD DB REQUESTS — [admin] [all tenants]
 async function loadSyncRequests(silentBadge = false) {
-  const r = await api('/admin/api/sync-requests');
-  if (!r.ok) return;
-  const requests = await r.json();
+  const [sr, dbr] = await Promise.allSettled([
+    api('/admin/api/sync-requests').then(r => r.ok ? r.json() : []),
+    api('/admin/api/cloud-db-requests').then(r => r.ok ? r.json() : []),
+  ]);
+  const syncReqs  = sr.status  === 'fulfilled' ? sr.value  : [];
+  const cloudDbReqs = dbr.status === 'fulfilled' ? dbr.value : [];
+  const totalPending = syncReqs.length + cloudDbReqs.length;
 
   const badge = document.getElementById('syncrequests-badge');
-  if (badge) { badge.textContent = requests.length; badge.style.display = requests.length > 0 ? '' : 'none'; }
+  if (badge) { badge.textContent = totalPending; badge.style.display = totalPending > 0 ? '' : 'none'; }
 
   if (silentBadge) return;
 
   const fmtDt = iso => iso ? new Date(iso).toLocaleString('en-IN') : '—';
-  const listEl = document.getElementById('syncrequests-list');
-  if (!listEl) return;
-
-  if (requests.length === 0) {
-    listEl.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:12px 0">No pending Cloud Sync requests</div>';
-    return;
-  }
-
-  listEl.innerHTML = `<h3 style="font-size:14px;font-weight:700;color:#f59e0b;margin-bottom:10px">⏳ Pending Approval (${requests.length})</h3>` +
-    requests.map(req => `<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px">
+  const requestRow = (req, approveAction, rejectAction) => `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
         <div>
           <div style="font-size:14px;font-weight:700">${ICONS[req.shop_type]||'🏪'} ${escHtml(req.shop_name||'Unknown Shop')}</div>
@@ -1698,10 +1718,32 @@ async function loadSyncRequests(silentBadge = false) {
         <span style="padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(245,158,11,.15);color:#f59e0b">PENDING</span>
       </div>
       <div style="display:flex;gap:8px;margin-top:8px">
-        <button onclick="syncRequestAction('${req.tenant_id}','approve')" style="flex:1;padding:8px;background:rgba(52,211,153,.15);border:1px solid rgba(52,211,153,.3);border-radius:10px;color:#34d399;font-size:12px;font-weight:700;cursor:pointer">✓ Approve</button>
-        <button onclick="syncRequestAction('${req.tenant_id}','reject')" style="flex:1;padding:8px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:10px;color:#f87171;font-size:12px;font-weight:700;cursor:pointer">✕ Reject</button>
+        <button onclick="${approveAction}" style="flex:1;padding:8px;background:rgba(52,211,153,.15);border:1px solid rgba(52,211,153,.3);border-radius:10px;color:#34d399;font-size:12px;font-weight:700;cursor:pointer">✓ Approve</button>
+        <button onclick="${rejectAction}" style="flex:1;padding:8px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:10px;color:#f87171;font-size:12px;font-weight:700;cursor:pointer">✕ Reject</button>
       </div>
-    </div>`).join('');
+    </div>`;
+
+  const syncListEl = document.getElementById('syncrequests-list');
+  if (syncListEl) {
+    syncListEl.innerHTML = syncReqs.length
+      ? syncReqs.map(req => requestRow(req, `syncRequestAction('${req.tenant_id}','approve')`, `syncRequestAction('${req.tenant_id}','reject')`)).join('')
+      : '<div style="color:var(--muted);font-size:13px;padding:10px 0">No pending Cloud Sync requests</div>';
+  }
+
+  const dbListEl = document.getElementById('clouddb-requests-list');
+  if (dbListEl) {
+    dbListEl.innerHTML = cloudDbReqs.length
+      ? cloudDbReqs.map(req => requestRow(req, `cloudDbRequestAction('${req.tenant_id}','approve')`, `cloudDbRequestAction('${req.tenant_id}','reject')`)).join('')
+      : '<div style="color:var(--muted);font-size:13px;padding:10px 0">No pending Cloud Storage requests</div>';
+  }
+}
+
+async function cloudDbRequestAction(tenantId, action) {
+  const r = await api(`/admin/api/customers/${tenantId}/${action}-cloud-db`, { method:'POST' });
+  if (r.ok) {
+    showToast(action === 'approve' ? '🗄️ Cloud Storage approved — tenant notified instantly' : 'Cloud Storage request rejected');
+    loadSyncRequests();
+  } else showToast('Failed', true);
 }
 
 async function syncRequestAction(tenantId, action) {
@@ -1946,6 +1988,13 @@ async function loadHealth() {
       document.getElementById('hs-'+key).textContent = ok ? 'Online' : 'Offline';
       const dm = document.getElementById('hm-'+key);
       if (dm) dm.textContent = detail || '';
+      // [admin] [all tenants] — show Start when offline, Stop when online
+      const ha = document.getElementById('ha-'+key);
+      if (ha) {
+        const btns = ha.querySelectorAll('button');
+        if (btns[0]) btns[0].style.display = ok ? 'none' : '';  // Start
+        if (btns[1]) btns[1].style.display = ok ? '' : 'none';  // Stop
+      }
     }
 
     setHealth('ollama', d.ollama.ok, d.ollama.ok ? 'Models: ' + (d.ollama.models||[]).join(', ') : 'Not running on port 11434');
@@ -1958,6 +2007,38 @@ async function loadHealth() {
     const mins   = Math.floor((uptime % 3600) / 60);
     document.getElementById('hs-uptime').textContent = `${days}d ${hours}h ${mins}m`;
   } catch(e) { console.error('health error', e); }
+}
+
+// [admin] [all tenants] — start/stop services from Health page
+async function serviceAction(service, action) {
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = action === 'start' ? '…Starting' : '…Stopping';
+  try {
+    const r = await api('/admin/api/service-control', { method: 'POST', body: JSON.stringify({ service, action }) });
+    const d = await r.json();
+    if (d.ok) {
+      showToast(action === 'start' ? `▶ ${service} starting…` : `■ ${service} stopping…`);
+      setTimeout(loadHealth, 2500);
+    } else {
+      showToast(`⚠ ${d.error || 'Failed'}`, true);
+    }
+  } catch(e) {
+    showToast('⚠ Could not reach server', true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = action === 'start' ? '▶ Start' : '■ Stop';
+  }
+}
+
+async function startAllServices() {
+  showToast('▶ Starting all services…');
+  await Promise.allSettled([
+    api('/admin/api/service-control', { method: 'POST', body: JSON.stringify({ service: 'cloudflare', action: 'start' }) }),
+    api('/admin/api/service-control', { method: 'POST', body: JSON.stringify({ service: 'ollama',     action: 'start' }) }),
+    api('/admin/api/service-control', { method: 'POST', body: JSON.stringify({ service: 'tts',        action: 'start' }) }),
+  ]);
+  setTimeout(loadHealth, 3000);
 }
 
 // ACTIVITY

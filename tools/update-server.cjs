@@ -82,12 +82,19 @@ const ACTIVITY_FILE  = path.join(DATA_DIR, 'activity.json');
 const ANNOUNCEMENTS_FILE = path.join(DATA_DIR, 'announcements.json'); // [core] [all apps] [all tenants]
 const NOTES_FILE     = path.join(DATA_DIR, 'notes.json');
 const SYNC_DIR      = path.join(DATA_DIR, 'sync');
+const CLOUD_DB_DIR  = path.join(DATA_DIR, 'cloud-db'); // [all apps] [all tenants] — full DB snapshots for Cloud Database mode
 const DEVICES_FILE  = path.join(DATA_DIR, 'devices.json');
 const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
 
 // Ensure data dirs exist
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-if (!fs.existsSync(SYNC_DIR)) fs.mkdirSync(SYNC_DIR, { recursive: true });
+if (!fs.existsSync(DATA_DIR))     fs.mkdirSync(DATA_DIR,     { recursive: true });
+if (!fs.existsSync(SYNC_DIR))     fs.mkdirSync(SYNC_DIR,     { recursive: true });
+if (!fs.existsSync(CLOUD_DB_DIR)) fs.mkdirSync(CLOUD_DB_DIR, { recursive: true });
+
+// Cloud DB helpers
+function cloudDbFile(tenantId) { return path.join(CLOUD_DB_DIR, tenantId + '.json'); }
+function loadCloudDb(tenantId) { try { return JSON.parse(fs.readFileSync(cloudDbFile(tenantId), 'utf8')); } catch { return null; } }
+function saveCloudDb(tenantId, data) { fs.writeFileSync(cloudDbFile(tenantId), JSON.stringify(data)); }
 
 // ── Device helpers ────────────────────────────────────────────────────────────
 function loadDevices() { try { return JSON.parse(fs.readFileSync(DEVICES_FILE, 'utf8')); } catch { return {}; } }
@@ -1229,6 +1236,83 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
     return;
   }
 
+  // ── Cloud Database — full persistent storage in cloud ─────────────────────────
+  // [all apps] [all tenants] — separate from Cloud Sync; cloud becomes the primary DB
+  // Approval required. Once approved, the server stores a full snapshot of all tenant data.
+
+  // POST /cloud-db/request — { tenant_id } — request Cloud Database access
+  if (req.method === 'POST' && pathname === '/cloud-db/request') {
+    if (rateLimit(req, res, 'cloud-db-request', 5, 60 * 60 * 1000)) return;
+    const body = await readBody(req);
+    try {
+      const { tenant_id } = JSON.parse(body);
+      if (!tenant_id) { json(res, { ok: false, error: 'Missing tenant_id' }, 400); return; }
+      const subs = loadSubs();
+      const sub = subs[tenant_id];
+      if (!sub) { json(res, { ok: false, error: 'Shop not found' }, 404); return; }
+      if (sub.cloud_db_request_status !== 'pending') {
+        sub.cloud_db_request_status = 'pending';
+        sub.cloud_db_requested_at = new Date().toISOString();
+        saveSubs(subs);
+        logActivity(tenant_id, sub.shop_name, 'cloud_db_requested', 'Requested Cloud Database access');
+        console.log(`🗄️  ${sub.shop_name} requested Cloud Database`);
+      }
+      json(res, { ok: true, status: 'pending' }); return;
+    } catch { json(res, { ok: false, error: 'Bad request' }, 400); return; }
+  }
+
+  // GET /cloud-db/status/:tenant_id — poll approval status
+  const cloudDbStatusMatch = pathname.match(/^\/cloud-db\/status\/([a-f0-9-]{36})$/);
+  if (req.method === 'GET' && cloudDbStatusMatch) {
+    if (rateLimit(req, res, 'cloud-db-status', 120, 60 * 60 * 1000)) return;
+    const tenantId = cloudDbStatusMatch[1];
+    const sub = loadSubs()[tenantId];
+    if (!sub) { json(res, { ok: false, error: 'Shop not found' }, 404); return; }
+    json(res, {
+      ok: true,
+      enabled: !!sub.cloud_db_enabled,
+      request_status: sub.cloud_db_request_status || null,
+      cloud_db_code: sub.cloud_db_enabled ? sub.cloud_db_code : null,
+      last_snapshot_at: sub.cloud_db_last_snapshot_at || null,
+    }); return;
+  }
+
+  // POST /cloud-db/push — { tenant_id, cloud_db_code, tables... } — store full DB snapshot
+  if (req.method === 'POST' && pathname === '/cloud-db/push') {
+    const body = await readBody(req);
+    try {
+      const data = JSON.parse(body);
+      const { tenant_id, cloud_db_code } = data;
+      if (!tenant_id || !cloud_db_code) { json(res, { ok: false, error: 'Missing fields' }, 400); return; }
+      const subs = loadSubs();
+      const sub = subs[tenant_id];
+      if (!sub || !sub.cloud_db_enabled || sub.cloud_db_code !== cloud_db_code) {
+        json(res, { ok: false, error: 'Not authorized' }, 403); return;
+      }
+      const snapshot_at = new Date().toISOString();
+      saveCloudDb(tenant_id, { ...data, snapshot_at });
+      sub.cloud_db_last_snapshot_at = snapshot_at;
+      saveSubs(subs);
+      json(res, { ok: true, snapshot_at }); return;
+    } catch { json(res, { ok: false, error: 'Bad request' }, 400); return; }
+  }
+
+  // GET /cloud-db/pull/:tenant_id?code=xxx — retrieve latest full DB snapshot
+  const cloudDbPullMatch = pathname.match(/^\/cloud-db\/pull\/([a-f0-9-]{36})$/);
+  if (req.method === 'GET' && cloudDbPullMatch) {
+    const tenantId = cloudDbPullMatch[1];
+    const url2 = new URL(req.url, `http://localhost:${PUBLIC_PORT}`);
+    const code = url2.searchParams.get('code');
+    const subs = loadSubs();
+    const sub = subs[tenantId];
+    if (!sub || !sub.cloud_db_enabled || sub.cloud_db_code !== code) {
+      json(res, { ok: false, error: 'Not authorized' }, 403); return;
+    }
+    const snapshot = loadCloudDb(tenantId);
+    if (!snapshot) { json(res, { ok: true, has_data: false }); return; }
+    json(res, { ok: true, has_data: true, ...snapshot }); return;
+  }
+
   // ── Staff logins (admin-approved sub-users under a tenant) ──────────────────
   // Owner creates username+password locally (password never leaves the device);
   // only {request_id, username} is sent here to land in the admin approval queue.
@@ -1669,6 +1753,46 @@ async function handleAdminRequest(req, res) {
     json(res, { ok: true }); return;
   }
 
+  // GET /admin/api/cloud-db-requests — [admin] [all tenants] — pending Cloud Database requests
+  if (req.method === 'GET' && pathname === '/admin/api/cloud-db-requests') {
+    const list = Object.entries(loadSubs())
+      .filter(([, s]) => s.cloud_db_request_status === 'pending')
+      .map(([tenant_id, s]) => ({ tenant_id, shop_name: s.shop_name, shop_type: s.shop_type, requested_at: s.cloud_db_requested_at }));
+    json(res, list); return;
+  }
+
+  // POST /admin/api/customers/:id/approve-cloud-db — approve Cloud Database request
+  const approveCloudDbMatch = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/approve-cloud-db$/);
+  if (req.method === 'POST' && approveCloudDbMatch) {
+    const tenantId = approveCloudDbMatch[1];
+    const subs = loadSubs();
+    const sub = subs[tenantId];
+    if (!sub) { json(res, { ok: false, error: 'Not found' }, 404); return; }
+    sub.cloud_db_code = crypto.randomBytes(6).toString('hex').toUpperCase();
+    sub.cloud_db_enabled = true;
+    sub.cloud_db_request_status = 'approved';
+    sub.cloud_db_activated_at = new Date().toISOString();
+    saveSubs(subs);
+    // Notify tenant via SSE if connected
+    sseBroadcast(tenantId, 'cloud-db-approved', { code: sub.cloud_db_code });
+    logActivity(tenantId, sub.shop_name, 'cloud_db_approved', 'Cloud Database approved by admin');
+    console.log(`🗄️  Cloud Database approved for ${sub.shop_name}`);
+    json(res, { ok: true }); return;
+  }
+
+  // POST /admin/api/customers/:id/reject-cloud-db — reject Cloud Database request
+  const rejectCloudDbMatch = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/reject-cloud-db$/);
+  if (req.method === 'POST' && rejectCloudDbMatch) {
+    const tenantId = rejectCloudDbMatch[1];
+    const subs = loadSubs();
+    const sub = subs[tenantId];
+    if (!sub) { json(res, { ok: false, error: 'Not found' }, 404); return; }
+    sub.cloud_db_request_status = 'rejected';
+    saveSubs(subs);
+    logActivity(tenantId, sub.shop_name, 'cloud_db_rejected', 'Cloud Database request rejected by admin');
+    json(res, { ok: true }); return;
+  }
+
   // POST /admin/api/customers/:id/approve-staff-user — { request_id }
   const approveStaffUserMatch = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/approve-staff-user$/);
   if (req.method === 'POST' && approveStaffUserMatch) {
@@ -2009,6 +2133,46 @@ async function handleAdminRequest(req, res) {
     json(res, results); return;
   }
 
+  // POST /admin/api/service-control — [admin] [all tenants] — start or stop Cloudflare/Ollama/TTS from Health page
+  if (req.method === 'POST' && pathname === '/admin/api/service-control') {
+    const { execSync, spawn } = require('child_process');
+    const { service, action } = JSON.parse(await readBody(req));
+    const SCRIPT_DIR = __dirname;
+    const OLLAMA_MODELS = path.join(SCRIPT_DIR, 'ollama', 'models');
+    const PYTHON = '/opt/homebrew/bin/python3.11';
+    try {
+      if (action === 'start') {
+        if (service === 'cloudflare') {
+          try { execSync('launchctl start com.frontstores.tunnel', { stdio: 'pipe' }); } catch {}
+          // also try direct spawn in case launchd service isn't installed
+          try { execSync('pgrep -x cloudflared', { stdio: 'pipe' }); } catch {
+            spawn('cloudflared', ['tunnel', 'run', 'frontstores'], { detached: true, stdio: 'ignore' }).unref();
+          }
+        } else if (service === 'ollama') {
+          try { execSync('pgrep -x ollama', { stdio: 'pipe' }); } catch {
+            spawn('ollama', ['serve'], { detached: true, stdio: 'ignore', env: { ...process.env, OLLAMA_MODELS } }).unref();
+          }
+        } else if (service === 'tts') {
+          try { execSync('pgrep -f kokoro-server', { stdio: 'pipe' }); } catch {
+            spawn(PYTHON, [path.join(SCRIPT_DIR, 'kokoro-server.py')], { detached: true, stdio: 'ignore' }).unref();
+          }
+        } else { json(res, { ok: false, error: 'Unknown service' }, 400); return; }
+      } else if (action === 'stop') {
+        if (service === 'cloudflare') {
+          try { execSync('launchctl stop com.frontstores.tunnel', { stdio: 'pipe' }); } catch {}
+          try { execSync('pkill -x cloudflared', { stdio: 'pipe' }); } catch {}
+        } else if (service === 'ollama') {
+          try { execSync('pkill -x ollama', { stdio: 'pipe' }); } catch {}
+        } else if (service === 'tts') {
+          try { execSync('pkill -f kokoro-server', { stdio: 'pipe' }); } catch {}
+        } else { json(res, { ok: false, error: 'Unknown service' }, 400); return; }
+      } else { json(res, { ok: false, error: 'Unknown action' }, 400); return; }
+      json(res, { ok: true }); return;
+    } catch(e) {
+      json(res, { ok: false, error: e.message }, 500); return;
+    }
+  }
+
   // GET /admin/api/customers/:id/activity
   const tenantActivityRoute = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/activity$/);
   if (req.method === 'GET' && tenantActivityRoute) {
@@ -2025,9 +2189,10 @@ async function handleAdminRequest(req, res) {
     json(res, log.slice(0, 200)); return;
   }
 
-  // GET /announcements — polled silently by every desktop app (no admin auth; read-only, active only)
+  // GET /announcements — polled silently by every desktop app (no admin auth; read-only, all history)
+  // [all apps] [all tenants] — returns ALL announcements (active + inactive) so apps maintain full history
   if (req.method === 'GET' && pathname === '/announcements') {
-    const list = loadAnnouncements().filter(a => a.active).map(a => ({ id: a.id, title: a.title, message: a.message, created_at: a.created_at }));
+    const list = loadAnnouncements().map(a => ({ id: a.id, title: a.title, message: a.message, created_at: a.created_at, active: a.active }));
     json(res, list); return;
   }
 
@@ -2048,6 +2213,10 @@ async function handleAdminRequest(req, res) {
       const entry = { id: crypto.randomUUID(), title: sanitize(title, 200), message: sanitize(message, 2000), created_at: new Date().toISOString(), active: true };
       list.unshift(entry);
       saveAnnouncements(list);
+      // [admin] [all tenants] — push to all connected SSE clients so apps get it instantly
+      for (const [tenantId] of sseClients) {
+        sseBroadcast(tenantId, 'announcement-new', { id: entry.id, title: entry.title, created_at: entry.created_at });
+      }
       json(res, { ok: true, announcement: entry });
     } catch { res.writeHead(400); res.end('Bad request'); }
     return;

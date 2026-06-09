@@ -124,6 +124,18 @@ export async function setMobilePin(tenantId: string, pin: string): Promise<{ ok:
   return { ok: true };
 }
 
+// [all apps] [all tenants] — detect the current OS so the admin panel shows the correct device type
+function detectPlatform(): string {
+  const ua = navigator.userAgent.toLowerCase();
+  const p  = navigator.platform.toLowerCase();
+  if (ua.includes('android'))                               return 'android';
+  if (ua.includes('iphone') || ua.includes('ipad'))        return 'ios';
+  if (p.includes('win') || ua.includes('windows'))         return 'windows';
+  if (p.includes('mac') || ua.includes('macintosh'))       return 'mac';
+  if (p.includes('linux') || ua.includes('linux'))         return 'linux';
+  return 'desktop';
+}
+
 // Used by mobile: register device + pull data after owner approval
 export async function registerDevice(phone: string, pin: string, deviceName: string): Promise<{
   ok: boolean; status?: string; tenant_id?: string; shop_name?: string; shop_type?: string;
@@ -133,7 +145,7 @@ export async function registerDevice(phone: string, pin: string, deviceName: str
   const res = await fetch(`${SERVER}/device/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phone, pin, device_id, device_name: deviceName, platform: 'android', app_version: '1.0' }),
+    body: JSON.stringify({ phone, pin, device_id, device_name: deviceName, platform: detectPlatform(), app_version: '1.0' }),
   });
   const data = await res.json();
   if (!data.ok) return { ok: false, error: data.error ?? 'Registration failed' };
@@ -234,6 +246,139 @@ export async function pushSyncData(tenantId: string): Promise<{ ok: boolean; err
 }
 
 // Pull delta from server — apply records changed on other devices since last pull
+// ── Cloud Database — full persistent cloud storage ────────────────────────────
+// [all apps] [all tenants] — separate feature from Cloud Sync; cloud is the primary DB
+
+export interface CloudDbStatus {
+  enabled: boolean;
+  requestStatus: 'pending' | 'approved' | 'rejected' | null;
+  cloudDbCode: string | null;
+  lastSnapshotAt: string | null;
+}
+
+export async function getCloudDbStatus(): Promise<CloudDbStatus> {
+  const config = await getAppConfig();
+  const s = config?.settings as any ?? {};
+  return {
+    enabled: !!s.cloud_db_enabled,
+    requestStatus: s.cloud_db_request_status ?? null,
+    cloudDbCode: s.cloud_db_code ?? null,
+    lastSnapshotAt: s.cloud_db_last_snapshot_at ?? null,
+  };
+}
+
+export async function refreshCloudDbStatus(tenantId: string): Promise<CloudDbStatus> {
+  const config = await getAppConfig();
+  const s = config?.settings as any ?? {};
+  try {
+    const res = await fetch(`${SERVER}/cloud-db/status/${tenantId}`, { signal: AbortSignal.timeout(8000) });
+    const data = await res.json();
+    if (data.ok) {
+      await updateAppConfig({
+        settings: {
+          ...s,
+          cloud_db_enabled: !!data.enabled,
+          cloud_db_request_status: data.request_status ?? null,
+          cloud_db_code: data.cloud_db_code ?? s.cloud_db_code ?? null,
+          cloud_db_last_snapshot_at: data.last_snapshot_at ?? s.cloud_db_last_snapshot_at ?? null,
+        },
+      });
+    }
+  } catch { /* offline */ }
+  return getCloudDbStatus();
+}
+
+export async function requestCloudDb(tenantId: string): Promise<{ ok: boolean; error?: string }> {
+  const config = await getAppConfig();
+  const s = config?.settings as any ?? {};
+  try {
+    const res = await fetch(`${SERVER}/cloud-db/request`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tenant_id: tenantId }),
+      signal: AbortSignal.timeout(8000),
+    });
+    const data = await res.json();
+    if (!data.ok) return { ok: false, error: data.error ?? 'Request failed' };
+    await updateAppConfig({ settings: { ...s, cloud_db_request_status: 'pending' } });
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'Could not reach server. Check your internet connection.' };
+  }
+}
+
+// Push full local DB snapshot to cloud (all tables, all rows for this tenant)
+export async function pushToCloudDb(tenantId: string): Promise<{ ok: boolean; error?: string; snapshot_at?: string }> {
+  const config = await getAppConfig();
+  const s = config?.settings as any ?? {};
+  if (!s.cloud_db_enabled || !s.cloud_db_code) return { ok: false, error: 'Cloud Database not active' };
+
+  const db = await getDb();
+  const tables = await getSyncableTables(db);
+
+  const payload: Record<string, unknown> = {
+    tenant_id: tenantId,
+    cloud_db_code: s.cloud_db_code,
+    shop_name: config?.shop_name,
+    shop_type: config?.shop_type,
+  };
+  for (const table of tables) {
+    const rows = await db.select<any[]>(
+      `SELECT * FROM ${table} WHERE tenant_id = ? ORDER BY updated_at DESC LIMIT 5000`,
+      [tenantId]
+    ).catch(() => []);
+    payload[table] = rows;
+  }
+
+  const res = await fetch(`${SERVER}/cloud-db/push`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) return { ok: false, error: `Server error ${res.status}` };
+  const result = await res.json();
+  await updateAppConfig({ settings: { ...s, cloud_db_last_snapshot_at: result.snapshot_at ?? now() } });
+  return { ok: true, snapshot_at: result.snapshot_at };
+}
+
+// Pull full DB snapshot from cloud and apply to local DB (used on fresh install / restore)
+export async function pullFromCloudDb(tenantId: string): Promise<{ ok: boolean; tables: number; rows: number; error?: string }> {
+  const config = await getAppConfig();
+  const s = config?.settings as any ?? {};
+  if (!s.cloud_db_enabled || !s.cloud_db_code) return { ok: false, tables: 0, rows: 0, error: 'Cloud Database not active' };
+
+  const res = await fetch(`${SERVER}/cloud-db/pull/${tenantId}?code=${encodeURIComponent(s.cloud_db_code)}`, {
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!res.ok) return { ok: false, tables: 0, rows: 0, error: `Server error ${res.status}` };
+  const result = await res.json();
+  if (!result.ok || !result.has_data) return { ok: true, tables: 0, rows: 0 };
+
+  const db = await getDb();
+  const SKIP = new Set(['tenant_id', 'cloud_db_code', 'shop_name', 'shop_type', 'snapshot_at', 'has_data', 'ok']);
+  let totalTables = 0;
+  let totalRows = 0;
+
+  for (const [table, rows] of Object.entries(result)) {
+    if (SKIP.has(table) || !Array.isArray(rows) || !rows.length) continue;
+    totalTables++;
+    for (const row of rows as any[]) {
+      const cols = Object.keys(row);
+      if (!cols.length) continue;
+      const placeholders = cols.map(() => '?').join(', ');
+      try {
+        await db.execute(
+          `INSERT OR REPLACE INTO ${table} (${cols.join(', ')}) VALUES (${placeholders})`,
+          cols.map(c => row[c] ?? null)
+        );
+        totalRows++;
+      } catch { /* table doesn't exist on this device yet — skip */ }
+    }
+  }
+  await updateAppConfig({ settings: { ...s, cloud_db_last_snapshot_at: result.snapshot_at ?? now() } });
+  return { ok: true, tables: totalTables, rows: totalRows };
+}
+
 export async function pullDelta(tenantId: string): Promise<{ ok: boolean; changes: number; error?: string }> {
   const config = await getAppConfig();
   const s = config?.settings as any ?? {};
