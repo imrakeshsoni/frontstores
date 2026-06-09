@@ -126,17 +126,23 @@ export function SettingsPage() {
   const [exportLoading, setExportLoading] = useState(false);
   const exportPassRef = useRef<HTMLInputElement>(null);
 
-  const [activeCount, setActiveCount] = useState(0);
-  const [staffFee, setStaffFee] = useState(200);
-  const [planFee, setPlanFee] = useState(999);
-  const [syncFee, setSyncFee] = useState(299);
+  const { data: activeCount = 0 } = useQuery({
+    queryKey: ['staff-active-count', tenantId],
+    queryFn: () => countActiveStaffUsers(tenantId),
+    enabled: !!tenantId,
+    staleTime: 0,
+  });
+  const { data: outerPricing } = useQuery({
+    queryKey: ['pricing', tenantId],
+    queryFn: () => getPricing(tenantId),
+    enabled: !!tenantId,
+    staleTime: 0,
+  });
+  const staffFee = outerPricing?.staff_user_fee ?? 200;
+  const planFee  = outerPricing?.plan_fee       ?? 999;
+  const syncFee  = outerPricing?.cloud_sync_fee ?? 299;
   useEffect(() => {
-    if (tenantId) {
-      getAuthUsername(tenantId).then(u => { if (u) setCurrentUsername(u); });
-      countActiveStaffUsers(tenantId).then(setActiveCount).catch(() => {});
-      // Always fetch latest pricing from server on every mount — no caching
-      getPricing(tenantId).then(p => { setPlanFee(p.plan_fee); setStaffFee(p.staff_user_fee); setSyncFee(p.cloud_sync_fee); }).catch(() => {});
-    }
+    if (tenantId) getAuthUsername(tenantId).then(u => { if (u) setCurrentUsername(u); });
   }, [tenantId]);
 
   async function handleChangePassword() {
