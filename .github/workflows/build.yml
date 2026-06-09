@@ -427,7 +427,7 @@ jobs:
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > /tmp/frontstores-release.keystore
 
       - name: Build Android APK (release + signed)
-        run: npx tauri android build --apk --release
+        run: npx tauri android build --apk
         env:
           ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
           NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/27.0.11902837
