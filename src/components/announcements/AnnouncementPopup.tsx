@@ -6,10 +6,11 @@ import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, Megaphone } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
-import { getUnnotifiedAnnouncements, markAllNotified, type Announcement } from '@/lib/db/announcements';
+import { getUnnotifiedAnnouncements, markAllNotified, acknowledgeAnnouncement, type Announcement } from '@/lib/db/announcements';
 
 export function AnnouncementPopup() {
   const tenantId = useAppStore(s => s.config?.tenant_id ?? '');
+  const shopName = useAppStore(s => s.config?.shop_name ?? '');
   const queryClient = useQueryClient();
   const [dismissed, setDismissed] = useState(false);
 
@@ -31,6 +32,10 @@ export function AnnouncementPopup() {
   const handleDismiss = async () => {
     setDismissed(true);
     await markAllNotified(tenantId);
+    // Report each shown announcement as acknowledged to the server
+    for (const ann of pending ?? []) {
+      acknowledgeAnnouncement(tenantId, ann.id, shopName).catch(() => {});
+    }
     queryClient.invalidateQueries({ queryKey: ['announcements-unnotified', tenantId] });
   };
 
