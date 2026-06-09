@@ -1528,6 +1528,38 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
     return;
   }
 
+  // GET /announcements — polled by every desktop app (no auth, public)
+  // [all apps] [all tenants] — MUST be on public server so Cloudflare Tunnel can reach it
+  if (req.method === 'GET' && pathname === '/announcements') {
+    const list = loadAnnouncements().map(a => ({ id: a.id, title: a.title, message: a.message, created_at: a.created_at, active: a.active }));
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    json(res, list); return;
+  }
+
+  // POST /announcement-seen — tenant app reports that a user has acknowledged an announcement
+  // [all apps] [all tenants]
+  if (req.method === 'POST' && pathname === '/announcement-seen') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { announcement_id, tenant_id, shop_name, seen_at } = JSON.parse(body);
+        if (!announcement_id || !tenant_id) { res.writeHead(400); res.end('bad request'); return; }
+        const list = loadAnnouncements();
+        const idx = list.findIndex(a => a.id === announcement_id);
+        if (idx !== -1) {
+          if (!Array.isArray(list[idx].seen_by)) list[idx].seen_by = [];
+          const already = list[idx].seen_by.find(s => s.tenant_id === tenant_id);
+          if (!already) list[idx].seen_by.push({ tenant_id, shop_name: shop_name || tenant_id, seen_at: seen_at || new Date().toISOString() });
+          saveAnnouncements(list);
+        }
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        json(res, { ok: true });
+      } catch { res.writeHead(400); res.end('bad request'); }
+    });
+    return;
+  }
+
   // POST /sync/push — receive shop data from tenant app
   if (req.method === 'POST' && pathname === '/sync/push') {
     if (rateLimit(req, res, 'sync-push', 60, 60 * 60 * 1000)) return;
@@ -2405,14 +2437,7 @@ async function handleAdminRequest(req, res) {
     json(res, log.slice(0, 200)); return;
   }
 
-  // GET /announcements — polled silently by every desktop app (no admin auth; read-only, all history)
-  // [all apps] [all tenants] — returns ALL announcements (active + inactive) so apps maintain full history
-  if (req.method === 'GET' && pathname === '/announcements') {
-    const list = loadAnnouncements().map(a => ({ id: a.id, title: a.title, message: a.message, created_at: a.created_at, active: a.active }));
-    json(res, list); return;
-  }
-
-  // GET /admin/api/announcements
+  // GET /admin/api/announcements — includes seen_by for admin display
   if (req.method === 'GET' && pathname === '/admin/api/announcements') {
     if (!checkAuth(req)) { res.writeHead(401); res.end(); return; }
     json(res, loadAnnouncements()); return;

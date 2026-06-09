@@ -97,3 +97,19 @@ export async function markAllRead(tenantId: string): Promise<void> {
     [now(), now(), tenantId]
   );
 }
+
+export async function acknowledgeAnnouncement(tenantId: string, announcementId: string, shopName: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `UPDATE announcements SET read_at = COALESCE(read_at,?), notified_at = COALESCE(notified_at,?), updated_at = ? WHERE id = ? AND tenant_id = ?`,
+    [now(), now(), now(), announcementId, tenantId]
+  );
+  // Report acknowledgement to the server (best-effort, non-blocking)
+  try {
+    await fetch(`${SERVER}/announcement-seen`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ announcement_id: announcementId, tenant_id: tenantId, shop_name: shopName, seen_at: new Date().toISOString() }),
+    });
+  } catch { /* offline — ignore */ }
+}

@@ -457,6 +457,8 @@
     .bc-meta { font-size: 12px; color: var(--muted); margin-top: 8px; }
     .bc-active-badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 2px; background: #dcfce7; color: #15803d; }
     .bc-inactive-badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 2px; background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+    .bc-seen-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+    .bc-seen-chip { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 2px; background: #ede9fe; color: #6d28d9; }
 
     /* TOAST */
     #toast {
@@ -2074,18 +2076,24 @@ async function loadAnnouncements() {
     if (!r.ok) return;
     const list = await r.json();
     const el = document.getElementById('announcements-list');
-    if (!list.length) { el.innerHTML = `<div class="empty">No announcements yet.</div>`; return; }
-    el.innerHTML = list.map(a => `
+    if (!list.length) { el.innerHTML = `<div class="empty">No announcements sent yet.</div>`; return; }
+    el.innerHTML = list.map(a => {
+      const seen = Array.isArray(a.seen_by) ? a.seen_by : [];
+      const seenHtml = seen.length
+        ? `<div class="bc-seen-row"><span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-right:4px">Seen by (${seen.length}):</span>${seen.map(s=>`<span class="bc-seen-chip">✅ ${escHtml(s.shop_name)}</span>`).join('')}</div>`
+        : `<div style="margin-top:10px;font-size:11px;color:var(--muted)">👁 No one has acknowledged yet</div>`;
+      return `
       <div class="bc-card ${a.active?'':'inactive'}">
         <div class="bc-card-top">
           <div class="bc-title">${escHtml(a.title)}</div>
           <span class="${a.active?'bc-active-badge':'bc-inactive-badge'}">${a.active?'Active':'Inactive'}</span>
         </div>
         <div class="bc-msg">${escHtml(a.message)}</div>
-        <div class="bc-meta">Pushed ${new Date(a.created_at).toLocaleString('en-IN')}</div>
-        ${a.active ? `<div style="margin-top:10px"><button class="btn-sm" onclick="deactivateAnnouncement('${escHtml(a.id)}')">Deactivate</button></div>` : ''}
-      </div>
-    `).join('');
+        <div class="bc-meta">📅 Sent ${new Date(a.created_at).toLocaleString('en-IN', {dateStyle:'medium',timeStyle:'short'})}</div>
+        ${seenHtml}
+        ${a.active ? `<div style="margin-top:12px"><button class="btn-sm" onclick="deactivateAnnouncement('${escHtml(a.id)}')">Deactivate</button></div>` : ''}
+      </div>`;
+    }).join('');
   } catch(e) { console.error('announcements error', e); }
 }
 function confirmPushAnnouncement() {
