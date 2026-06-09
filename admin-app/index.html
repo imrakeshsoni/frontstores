@@ -1184,25 +1184,6 @@ function renderPanel(c) {
         <div class="cd-label" style="margin-bottom:6px">Admin Notes</div>
         <textarea class="dp-textarea" id="dp-notes-ta" placeholder="Private notes about this customer…" onblur="saveNotes('${tid}', this.value)" style="min-height:80px"></textarea>
       </div>
-      <div style="margin-top:16px">
-        <div class="cd-label" style="margin-bottom:6px">Communication Log</div>
-        ${(c.comm_log||[]).length ? `<div style="max-height:140px;overflow-y:auto;margin-bottom:10px;display:flex;flex-direction:column;gap:6px">
-          ${c.comm_log.slice().reverse().map(l => `<div style="font-size:12px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:6px 10px">
-            <span style="color:var(--muted)">${new Date(l.at).toLocaleDateString('en-IN',{day:'numeric',month:'short'})} · ${escHtml(l.channel)}</span>
-            <div style="margin-top:2px">${escHtml(l.message)}</div>
-          </div>`).join('')}
-        </div>` : ''}
-        <div style="display:flex;gap:8px">
-          <select id="dp-comm-channel" style="flex:0 0 110px;background:var(--bg-2);border:1px solid var(--border);border-radius:8px;color:var(--fg);font-size:13px;padding:8px">
-            <option value="phone">📞 Phone</option>
-            <option value="whatsapp">💬 WhatsApp</option>
-            <option value="email">📧 Email</option>
-            <option value="other" selected>Other</option>
-          </select>
-          <input id="dp-comm-msg" class="dp-textarea" placeholder="What was discussed…" style="min-height:auto;flex:1" />
-          <button class="action-btn" style="flex:0 0 auto" onclick="addCommLog('${tid}')">Log</button>
-        </div>
-      </div>
     </div>
 
     <!-- CARD 2: Subscription -->
