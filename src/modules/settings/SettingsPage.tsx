@@ -7,7 +7,7 @@ import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { useAppStore } from '@/app/store/app.store';
 import { updateAppConfig, getOrCreateShopCode } from '@/lib/db/config';
 import { changePassword, changeUsername, getAuthUsername, getExportLogs, logExport } from '@/lib/db/auth';
-import { listStaffUsers, createStaffUser, deactivateStaffUser, generateJoinPin, countActiveStaffUsers, type StaffUser } from '@/lib/db/staffUsers';
+import { listStaffUsers, createStaffUser, deactivateStaffUser, generateJoinPin, countActiveStaffUsers, getStaffUserFee, type StaffUser } from '@/lib/db/staffUsers';
 import { exportBackup } from '@/lib/db/backup';
 import { PageIntro } from '@/components/ui/PageIntro';
 import { useTheme } from '@/lib/theme/useTheme';
@@ -126,10 +126,12 @@ export function SettingsPage() {
   const exportPassRef = useRef<HTMLInputElement>(null);
 
   const [activeCount, setActiveCount] = useState(0);
+  const [staffFee, setStaffFee] = useState(200);
   useEffect(() => {
     if (tenantId) {
       getAuthUsername(tenantId).then(u => { if (u) setCurrentUsername(u); });
       countActiveStaffUsers(tenantId).then(setActiveCount).catch(() => {});
+      getStaffUserFee(tenantId).then(setStaffFee).catch(() => {});
     }
   }, [tenantId]);
 
@@ -625,7 +627,7 @@ export function SettingsPage() {
       {renderGroup('Security', <>
         {renderRow('autolock', '🔒', 'Auto-Lock', idleLabel)}
         {renderRow('password', '🔑', 'Login & Password', `User: ${currentUsername || 'owner'}`)}
-        {isOwner && renderRow('staff', '👥', 'Staff Logins', `${activeCount ?? 0} active · ₹200/user/month`)}
+        {isOwner && renderRow('staff', '👥', 'Staff Logins', `${activeCount ?? 0} active · ₹${staffFee}/user/month`)}
         {config?.shop_type === 'carwash' && renderRow('pinlock', '🔐', 'Section PIN Lock', 'Restrict sections with PIN', undefined, true)}
       </>)}
 
@@ -804,6 +806,12 @@ function StaffLoginsSection({ tenantId }: { tenantId: string }) {
     queryFn: () => countActiveStaffUsers(tenantId),
     enabled: !!tenantId,
   });
+  const { data: staffFee = 200 } = useQuery({
+    queryKey: ['staff-user-fee', tenantId],
+    queryFn: () => getStaffUserFee(tenantId),
+    enabled: !!tenantId,
+    staleTime: 5 * 60 * 1000,
+  });
 
   function toggleTab(key: string) {
     setTabAccess(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
@@ -863,7 +871,7 @@ function StaffLoginsSection({ tenantId }: { tenantId: string }) {
 
   const activeStaff = staffUsers?.filter(s => !s.deactivated_at) ?? [];
   const deactivatedStaff = staffUsers?.filter(s => !!s.deactivated_at) ?? [];
-  const extraUserCharge = (activeCount ?? 0) * 200;
+  const extraUserCharge = (activeCount ?? 0) * staffFee;
 
   const canCreate = displayName.trim().length >= 2 && username.trim().length >= 3 && password.length >= 4 && !submitting;
 
@@ -879,7 +887,7 @@ function StaffLoginsSection({ tenantId }: { tenantId: string }) {
           </div>
           <div className="flex justify-between">
             <span style={{ color: 'var(--text-secondary)' }}>Extra user charges</span>
-            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{activeCount ?? 0} × ₹200 = ₹{extraUserCharge}/month</span>
+            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{activeCount ?? 0} × ₹{staffFee} = ₹{extraUserCharge}/month</span>
           </div>
           <div className="flex justify-between">
             <span style={{ color: 'var(--text-secondary)' }}>Billing date</span>
@@ -942,7 +950,7 @@ function StaffLoginsSection({ tenantId }: { tenantId: string }) {
         <p className="section-label mb-1 text-violet-300">➕ Add Staff Login</p>
         <p className="text-xs text-slate-400 mb-4">
           Create a login for a staff member. They get a one-time join PIN to activate their account on any device.
-          Each active staff login adds ₹200 to your monthly plan.
+          Each active staff login adds ₹{staffFee} to your monthly plan.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">

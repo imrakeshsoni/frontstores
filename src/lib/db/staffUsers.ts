@@ -272,6 +272,17 @@ export async function isStaffUsername(tenantId: string, username: string): Promi
   return (rows[0]?.count ?? 0) > 0;
 }
 
+// [all apps] [all tenants] — Fetch per-user fee from server (admin-configurable, default ₹200)
+export async function getStaffUserFee(tenantId: string): Promise<number> {
+  try {
+    const res = await fetch(`${SERVER}/staff-user-fee/${tenantId}`, { signal: AbortSignal.timeout(5000) });
+    const data = await res.json() as { fee?: number };
+    return data.fee ?? 200;
+  } catch {
+    return 200;
+  }
+}
+
 // ── Internal helpers ──────────────────────────────────────────────────────────
 async function _generatePin(): Promise<{ pinHash: string; pinSalt: string; plainPin: string }> {
   const digits = Array.from(crypto.getRandomValues(new Uint8Array(8))).map(b => b % 10).join('');

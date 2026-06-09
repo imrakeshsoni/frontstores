@@ -2108,6 +2108,33 @@ async function handleAdminRequest(req, res) {
     json(res, { ok: true }); return;
   }
 
+  // [all apps] [all tenants] — GET /staff-user-fee/:tenant_id — return per-user fee for this tenant
+  const staffUserFeeMatch = pathname.match(/^\/staff-user-fee\/([a-f0-9-]{36})$/);
+  if (req.method === 'GET' && staffUserFeeMatch) {
+    const tenantId = staffUserFeeMatch[1];
+    const subs = loadSubs();
+    const sub = subs[tenantId];
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    json(res, { ok: true, fee: sub?.staff_user_fee ?? 200, currency: 'INR' }); return;
+  }
+
+  // [all apps] [all tenants] — POST /admin/api/customers/:id/pricing — admin sets all fees for a tenant
+  const pricingMatch = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/pricing$/);
+  if (req.method === 'POST' && pricingMatch) {
+    if (!checkAuth(req)) { res.writeHead(401); res.end(); return; }
+    const tenantId = pricingMatch[1];
+    const body = JSON.parse(await readBody(req));
+    const subs = loadSubs();
+    const sub = subs[tenantId];
+    if (!sub) { json(res, { ok: false, error: 'Not found' }, 404); return; }
+    if (body.plan_fee       !== undefined) sub.plan_fee       = parseInt(body.plan_fee, 10)       || 0;
+    if (body.staff_user_fee !== undefined) sub.staff_user_fee = parseInt(body.staff_user_fee, 10) || 0;
+    if (body.cloud_sync_fee !== undefined) sub.cloud_sync_fee = parseInt(body.cloud_sync_fee, 10) || 0;
+    saveSubs(subs);
+    logActivity(tenantId, sub.shop_name, 'pricing_updated', `Pricing updated — plan:₹${sub.plan_fee} staff:₹${sub.staff_user_fee} sync:₹${sub.cloud_sync_fee}`);
+    json(res, { ok: true, plan_fee: sub.plan_fee, staff_user_fee: sub.staff_user_fee, cloud_sync_fee: sub.cloud_sync_fee }); return;
+  }
+
   // [all apps] [all tenants] — POST /admin/api/customers/:id/cloud-sync-fee — admin sets per-tenant fee
   const cloudSyncFeeAdminMatch = pathname.match(/^\/admin\/api\/customers\/([^/]+)\/cloud-sync-fee$/);
   if (req.method === 'POST' && cloudSyncFeeAdminMatch) {

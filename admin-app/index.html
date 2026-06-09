@@ -255,7 +255,7 @@
     .cd-page-header { padding: 24px 28px 0; }
     .cd-shop-name { font-size: 28px; font-weight: 900; letter-spacing: -.04em; margin-bottom: 6px; }
     .cd-shop-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
-    .cd-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; padding: 0 28px 20px; }
+    .cd-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; padding: 0 28px 20px; }
     .cd-card { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 22px; box-shadow: 0 1px 8px rgba(0,0,0,.06); }
     .cd-card-title { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; margin-bottom: 16px; }
     .cd-row { margin-bottom: 14px; }
@@ -1259,7 +1259,57 @@ function renderPanel(c) {
       </div>` : ''}
     </div>
 
-    <!-- CARD 3: Account Control -->
+    <!-- CARD 3: Pricing Config -->
+    <div class="cd-card">
+      <div class="cd-card-title">💰 Pricing Config</div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.5">Set what this tenant sees when toggling features. Changes take effect immediately on their next action.</p>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div>
+          <div class="cd-label" style="margin-bottom:6px">Monthly Plan Fee</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:13px;color:var(--muted)">₹</span>
+            <input id="price-plan-${tid}" type="number" min="0" value="${c.plan_fee ?? 999}" style="flex:1;padding:8px 10px;background:var(--surface-2,var(--bg-2));border:1px solid var(--border);border-radius:8px;color:var(--fg);font-size:14px;font-weight:600" />
+            <span style="font-size:12px;color:var(--muted)">/month</span>
+          </div>
+        </div>
+        <div>
+          <div class="cd-label" style="margin-bottom:6px">Per Staff User Fee</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:13px;color:var(--muted)">₹</span>
+            <input id="price-staff-${tid}" type="number" min="0" value="${c.staff_user_fee ?? 200}" style="flex:1;padding:8px 10px;background:var(--surface-2,var(--bg-2));border:1px solid var(--border);border-radius:8px;color:var(--fg);font-size:14px;font-weight:600" />
+            <span style="font-size:12px;color:var(--muted)">/user/month</span>
+          </div>
+        </div>
+        <div>
+          <div class="cd-label" style="margin-bottom:6px">Cloud Sync Fee</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:13px;color:var(--muted)">₹</span>
+            <input id="price-sync-${tid}" type="number" min="0" value="${c.cloud_sync_fee ?? 299}" style="flex:1;padding:8px 10px;background:var(--surface-2,var(--bg-2));border:1px solid var(--border);border-radius:8px;color:var(--fg);font-size:14px;font-weight:600" />
+            <span style="font-size:12px;color:var(--muted)">/month</span>
+          </div>
+        </div>
+      </div>
+      <button class="action-btn" style="background:linear-gradient(135deg,#0ea5e9,#2563eb);color:#fff;margin-top:16px;font-size:14px;font-weight:700" onclick="savePricing('${tid}')">💾 Save Pricing</button>
+
+      <div style="border-top:1px solid var(--border);margin:16px 0"></div>
+      <div class="cd-card-title" style="margin-bottom:6px">Current Billing Summary</div>
+      ${(() => {
+        const planFee = c.plan_fee ?? 999;
+        const staffFee = c.staff_user_fee ?? 200;
+        const syncFee = c.cloud_sync_fee ?? 299;
+        const activeStaff = Object.values(c.staff_users || {}).filter(r => r.status !== 'deactivated').length;
+        const total = planFee + (activeStaff * staffFee) + (c.sync_enabled ? syncFee : 0);
+        return `
+        <div style="display:flex;flex-direction:column;gap:6px;font-size:13px">
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Base plan</span><span>₹${planFee}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Staff users (${activeStaff} × ₹${staffFee})</span><span>₹${activeStaff * staffFee}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Cloud Sync</span><span>${c.sync_enabled ? `₹${syncFee}` : '<span style="color:var(--muted)">Off</span>'}</span></div>
+          <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:8px;margin-top:2px;font-weight:700"><span>Total / month</span><span style="color:#34d399">₹${total}</span></div>
+        </div>`;
+      })()}
+    </div>
+
+    <!-- CARD 4: Account Control -->
     <div class="cd-card">
       <div class="cd-card-title">Account Control</div>
       ${c.is_client
@@ -1757,6 +1807,22 @@ async function loadSyncRequests(silentBadge = false) {
     (!enabled.length && !disabled.length) ? '<div style="color:var(--muted);font-size:13px;padding:10px 0">No tenants have used Cloud Sync yet</div>' : '',
   ].join('');
   listEl.innerHTML = html;
+}
+
+async function savePricing(tenantId) {
+  const planFee  = parseInt(document.getElementById('price-plan-'  + tenantId)?.value ?? '999', 10);
+  const staffFee = parseInt(document.getElementById('price-staff-' + tenantId)?.value ?? '200', 10);
+  const syncFee  = parseInt(document.getElementById('price-sync-'  + tenantId)?.value ?? '299', 10);
+  if ([planFee, staffFee, syncFee].some(v => isNaN(v) || v < 0)) { showToast('Invalid fee value', true); return; }
+  const r = await api(`/admin/api/customers/${tenantId}/pricing`, {
+    method: 'POST',
+    body: JSON.stringify({ plan_fee: planFee, staff_user_fee: staffFee, cloud_sync_fee: syncFee }),
+  });
+  if (r.ok) {
+    showToast('✅ Pricing saved');
+    const c = allCustomers.find(x => x.tenant_id === tenantId);
+    if (c) { c.plan_fee = planFee; c.staff_user_fee = staffFee; c.cloud_sync_fee = syncFee; }
+  } else showToast('Failed to save', true);
 }
 
 async function setCloudSyncFee(tenantId) {
