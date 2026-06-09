@@ -410,14 +410,10 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
-      - name: Initialize Android project (if not already done)
+      - name: Initialize Android project
         run: |
-          if [ ! -f "src-tauri/gen/android/app/build.gradle.kts" ]; then
-            echo "Running tauri android init..."
-            npx tauri android init
-          else
-            echo "Android project already initialized"
-          fi
+          rm -rf src-tauri/gen/android
+          npx tauri android init
         env:
           ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
           NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/27.0.11902837
