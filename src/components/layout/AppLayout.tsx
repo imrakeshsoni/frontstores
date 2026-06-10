@@ -738,7 +738,7 @@ export function AppLayout() {
               <button onClick={() => setShowUserMenu(v => !v)}
                 style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0' }}>
                 <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '12px', flexShrink: 0 }}>
-                  {(config?.owner_name ?? 'O')[0].toUpperCase()}
+                  {(config?.owner_name?.[0] || 'O').toUpperCase()}
                 </div>
                 <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', fontWeight: 500 }}>{config?.owner_name ?? 'Owner'}</span>
                 <ChevronUp style={{ width: '12px', height: '12px', color: 'rgba(255,255,255,0.3)', transform: showUserMenu ? 'rotate(0deg)' : 'rotate(180deg)', transition: 'transform 0.2s' }} />
@@ -931,7 +931,7 @@ export function AppLayout() {
             style={{ background: showUserMenu ? 'var(--accent-soft)' : 'var(--surface-2)' }}>
             <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold"
               style={{ background: 'var(--accent)', color: 'var(--on-accent, #111)' }}>
-              {(config?.owner_name ?? 'O')[0].toUpperCase()}
+              {(config?.owner_name?.[0] || 'O').toUpperCase()}
             </div>
             <div className="min-w-0 flex-1 text-left">
               <p className="truncate text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
