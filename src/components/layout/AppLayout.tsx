@@ -122,7 +122,7 @@ export const NAV_ITEMS = [
 ];
 
 // [grocery] [all tenants]
-const GROCERY_NAV_ITEMS = [
+export const GROCERY_NAV_ITEMS = [
   { to: '/grocery/dashboard', icon: LayoutDashboard, label: 'Dashboard',      iconBg: '#dcfce7', iconColor: '#16a34a' },
   { to: '/pos',               icon: ShoppingBasket,  label: 'POS / Billing',  iconBg: '#ffedd5', iconColor: '#ea580c' },
   { to: '/products',          icon: Package,         label: 'Products',       iconBg: '#cffafe', iconColor: '#0891b2' },
@@ -139,7 +139,7 @@ const GROCERY_NAV_ITEMS = [
 ];
 
 // [restaurant] [all tenants]
-const RESTAURANT_NAV_ITEMS = [
+export const RESTAURANT_NAV_ITEMS = [
   { to: '/restaurant/dashboard', icon: LayoutDashboard, label: 'Dashboard',      iconBg: '#ede9fe', iconColor: '#7c3aed' },
   { to: '/restaurant/tables',    icon: UtensilsCrossed, label: 'Tables & Orders',iconBg: '#dcfce7', iconColor: '#16a34a' },
   { to: '/restaurant/menu',      icon: BookOpen,        label: 'Menu',           iconBg: '#ffedd5', iconColor: '#ea580c' },
@@ -152,7 +152,7 @@ const RESTAURANT_NAV_ITEMS = [
 ];
 
 // [clinic] [all tenants]
-const CLINIC_NAV_ITEMS = [
+export const CLINIC_NAV_ITEMS = [
   { to: '/clinic/dashboard',    icon: LayoutDashboard, label: 'OPD Dashboard',   iconBg: '#dbeafe', iconColor: '#2563eb' },
   { to: '/clinic/patients',     icon: Users,           label: 'Patients',        iconBg: '#fce7f3', iconColor: '#db2777' },
   { to: '/clinic/visits/new',   icon: Stethoscope,     label: 'New Visit',       iconBg: '#dcfce7', iconColor: '#16a34a' },
@@ -168,7 +168,7 @@ const CLINIC_NAV_ITEMS = [
 ];
 
 // [study] [all tenants]
-const STUDY_NAV_ITEMS = [
+export const STUDY_NAV_ITEMS = [
   { to: '/study/dashboard',    icon: LayoutDashboard, label: 'Dashboard',     iconBg: '#ede9fe', iconColor: '#7c3aed' },
   { to: '/study/ask',          icon: Brain,           label: 'Ask AI',        iconBg: '#dbeafe', iconColor: '#2563eb' },
   { to: '/study/mock-tests',   icon: ClipboardList,   label: 'Mock Tests',    iconBg: '#dcfce7', iconColor: '#16a34a' },
@@ -213,7 +213,7 @@ const STUDY_NAV_ITEMS = [
 ];
 
 // [coaching] [all tenants]
-const COACHING_NAV_ITEMS = [
+export const COACHING_NAV_ITEMS = [
   { to: '/coaching/dashboard',  icon: LayoutDashboard, label: 'Dashboard',   iconBg: '#dbeafe', iconColor: '#2563eb' },
   { to: '/coaching/students',   icon: Users,           label: 'Students',    iconBg: '#fce7f3', iconColor: '#db2777' },
   { to: '/coaching/batches',    icon: BookOpen,        label: 'Batches',     iconBg: '#dcfce7', iconColor: '#16a34a' },
@@ -227,7 +227,7 @@ const COACHING_NAV_ITEMS = [
 ];
 
 // [gym] [all tenants]
-const GYM_NAV_ITEMS = [
+export const GYM_NAV_ITEMS = [
   { to: '/gym/dashboard', icon: LayoutDashboard, label: 'Dashboard',    iconBg: '#dbeafe', iconColor: '#2563eb' },
   { to: '/gym/members',   icon: Users,           label: 'Members',      iconBg: '#fce7f3', iconColor: '#db2477' },
   { to: '/gym/checkin',   icon: LogIn,           label: 'Check In',     iconBg: '#dcfce7', iconColor: '#16a34a' },
@@ -240,7 +240,7 @@ const GYM_NAV_ITEMS = [
 ];
 
 // [jewellery] [all tenants]
-const JEWELLERY_NAV_ITEMS = [
+export const JEWELLERY_NAV_ITEMS = [
   { to: '/jewellery/dashboard',      icon: LayoutDashboard, label: 'Dashboard',      iconBg: '#fef3c7', iconColor: '#d97706' },
   { to: '/jewellery/gold-rate',      icon: TrendingUp,      label: 'Gold Rate',      iconBg: '#fef9c3', iconColor: '#ca8a04' },
   { to: '/jewellery/products',       icon: Gem,             label: 'Inventory',      iconBg: '#fef3c7', iconColor: '#d97706' },
@@ -255,7 +255,7 @@ const JEWELLERY_NAV_ITEMS = [
 ];
 
 // [repair] [all tenants]
-const REPAIR_NAV_ITEMS = [
+export const REPAIR_NAV_ITEMS = [
   { to: '/repair/dashboard', icon: LayoutDashboard, label: 'Dashboard',       iconBg: '#fee2e2', iconColor: '#dc2626' },
   { to: '/repair/jobs',      icon: ClipboardList,   label: 'Jobs',            iconBg: '#fef3c7', iconColor: '#d97706' },
   { to: '/repair/jobs/new',  icon: Wrench,          label: 'New Job',         iconBg: '#dcfce7', iconColor: '#16a34a' },
@@ -266,7 +266,7 @@ const REPAIR_NAV_ITEMS = [
 ];
 
 // [drivingschool] [all tenants]
-const DRIVINGSCHOOL_NAV_ITEMS = [
+export const DRIVINGSCHOOL_NAV_ITEMS = [
   { to: '/drivingschool/dashboard',   icon: LayoutDashboard, label: 'Dashboard',   iconBg: '#dbeafe', iconColor: '#2563eb' },
   { to: '/drivingschool/students',    icon: Users,           label: 'Students',    iconBg: '#fce7f3', iconColor: '#db2777' },
   { to: '/drivingschool/sessions',    icon: CalendarDays,    label: 'Sessions',    iconBg: '#dcfce7', iconColor: '#16a34a' },
@@ -278,7 +278,7 @@ const DRIVINGSCHOOL_NAV_ITEMS = [
 ];
 
 // [hotel] [all tenants]
-const HOTEL_NAV_ITEMS = [
+export const HOTEL_NAV_ITEMS = [
   { to: '/hotel/dashboard',    icon: LayoutDashboard, label: 'Dashboard',      iconBg: '#dbeafe', iconColor: '#2563eb' },
   { to: '/hotel/rooms',        icon: BedDouble,       label: 'Rooms',          iconBg: '#dcfce7', iconColor: '#16a34a' },
   { to: '/hotel/bookings',     icon: CalendarDays,    label: 'Bookings',       iconBg: '#ede9fe', iconColor: '#7c3aed' },
@@ -293,7 +293,7 @@ const HOTEL_NAV_ITEMS = [
 ];
 
 // [clothing] [all tenants]
-const CLOTHING_NAV_ITEMS = [
+export const CLOTHING_NAV_ITEMS = [
   { to: '/clothing/dashboard', icon: LayoutDashboard, label: 'Dashboard',   iconBg: '#fce7f3', iconColor: '#db2777' },
   { to: '/clothing/billing',   icon: ShoppingCart,    label: 'Billing',     iconBg: '#dcfce7', iconColor: '#16a34a' },
   { to: '/clothing/products',  icon: Package,         label: 'Products',    iconBg: '#fce7f3', iconColor: '#db2777' },
@@ -303,7 +303,7 @@ const CLOTHING_NAV_ITEMS = [
 ];
 
 // [bakery] [all tenants]
-const BAKERY_NAV_ITEMS = [
+export const BAKERY_NAV_ITEMS = [
   { to: '/bakery/dashboard',   icon: LayoutDashboard, label: 'Dashboard',   iconBg: '#fef3c7', iconColor: '#d97706' },
   { to: '/bakery/billing',     icon: ShoppingCart,    label: 'Billing',     iconBg: '#dcfce7', iconColor: '#16a34a' },
   { to: '/bakery/production',  icon: PackagePlus,     label: 'Production',  iconBg: '#fef3c7', iconColor: '#d97706' },
@@ -313,7 +313,7 @@ const BAKERY_NAV_ITEMS = [
 ];
 
 // [optician] [all tenants]
-const OPTICIAN_NAV_ITEMS = [
+export const OPTICIAN_NAV_ITEMS = [
   { to: '/optician/dashboard',     icon: LayoutDashboard, label: 'Dashboard',     iconBg: '#cffafe', iconColor: '#0891b2' },
   { to: '/optician/patients',      icon: Users,           label: 'Patients',      iconBg: '#fce7f3', iconColor: '#db2777' },
   { to: '/optician/prescriptions', icon: FileText,        label: 'Prescriptions', iconBg: '#dbeafe', iconColor: '#2563eb' },
@@ -324,7 +324,7 @@ const OPTICIAN_NAV_ITEMS = [
 ];
 
 // [tailor] [all tenants]
-const TAILOR_NAV_ITEMS = [
+export const TAILOR_NAV_ITEMS = [
   { to: '/tailor/dashboard',    icon: LayoutDashboard, label: 'Dashboard',    iconBg: '#ede9fe', iconColor: '#7c3aed' },
   { to: '/tailor/orders',       icon: ClipboardList,   label: 'Orders',       iconBg: '#dbeafe', iconColor: '#2563eb' },
   { to: '/tailor/orders/new',   icon: Receipt,         label: 'New Order',    iconBg: '#dcfce7', iconColor: '#16a34a' },
@@ -334,7 +334,7 @@ const TAILOR_NAV_ITEMS = [
 ];
 
 // [hardware] [all tenants]
-const HARDWARE_NAV_ITEMS = [
+export const HARDWARE_NAV_ITEMS = [
   { to: '/hardware/dashboard', icon: LayoutDashboard, label: 'Dashboard',    iconBg: '#dbeafe', iconColor: '#2563eb' },
   { to: '/hardware/pos',       icon: ShoppingCart,    label: 'Billing',      iconBg: '#dcfce7', iconColor: '#16a34a' },
   { to: '/hardware/products',  icon: Package,         label: 'Products',     iconBg: '#cffafe', iconColor: '#0891b2' },
@@ -349,7 +349,7 @@ const HARDWARE_NAV_ITEMS = [
 ];
 
 // [laundry] [all tenants]
-const LAUNDRY_NAV_ITEMS = [
+export const LAUNDRY_NAV_ITEMS = [
   { to: '/laundry/dashboard',  icon: LayoutDashboard, label: 'Dashboard',  iconBg: '#cffafe', iconColor: '#0891b2' },
   { to: '/laundry/orders',     icon: ClipboardList,   label: 'Orders',     iconBg: '#dbeafe', iconColor: '#2563eb' },
   { to: '/laundry/orders/new', icon: Receipt,         label: 'New Order',  iconBg: '#dcfce7', iconColor: '#16a34a' },
@@ -359,7 +359,7 @@ const LAUNDRY_NAV_ITEMS = [
 ];
 
 // [catering] [all tenants]
-const CATERING_NAV_ITEMS = [
+export const CATERING_NAV_ITEMS = [
   { to: '/catering/dashboard',  icon: LayoutDashboard, label: 'Dashboard', iconBg: '#fee2e2', iconColor: '#dc2626' },
   { to: '/catering/events',     icon: CalendarDays,    label: 'Events',    iconBg: '#ede9fe', iconColor: '#7c3aed' },
   { to: '/catering/events/new', icon: Receipt,         label: 'New Event', iconBg: '#dcfce7', iconColor: '#16a34a' },
@@ -369,7 +369,7 @@ const CATERING_NAV_ITEMS = [
 ];
 
 // [pestcontrol] [all tenants]
-const PESTCONTROL_NAV_ITEMS = [
+export const PESTCONTROL_NAV_ITEMS = [
   { to: '/pestcontrol/dashboard', icon: LayoutDashboard, label: 'Dashboard', iconBg: '#dcfce7', iconColor: '#16a34a' },
   { to: '/pestcontrol/jobs',      icon: ClipboardList,   label: 'Jobs',      iconBg: '#dbeafe', iconColor: '#2563eb' },
   { to: '/pestcontrol/jobs/new',  icon: Receipt,         label: 'New Job',   iconBg: '#dcfce7', iconColor: '#16a34a' },
@@ -380,7 +380,7 @@ const PESTCONTROL_NAV_ITEMS = [
 ];
 
 // [petrolpump] [all tenants]
-const PETROLPUMP_NAV_ITEMS = [
+export const PETROLPUMP_NAV_ITEMS = [
   { to: '/petrolpump/dashboard', icon: LayoutDashboard, label: 'Dashboard',     iconBg: '#fef3c7', iconColor: '#d97706' },
   { to: '/petrolpump/shift',     icon: ClipboardCheck,  label: 'Today\'s Shift',iconBg: '#dcfce7', iconColor: '#16a34a' },
   { to: '/petrolpump/rates',     icon: Receipt,         label: 'Fuel Rates',    iconBg: '#dbeafe', iconColor: '#2563eb' },
@@ -390,7 +390,7 @@ const PETROLPUMP_NAV_ITEMS = [
 ];
 
 // [furniture] [all tenants]
-const FURNITURE_NAV_ITEMS = [
+export const FURNITURE_NAV_ITEMS = [
   { to: '/furniture/dashboard',     icon: LayoutDashboard, label: 'Dashboard',     iconBg: '#fef3c7', iconColor: '#92400e' },
   { to: '/furniture/orders',        icon: ClipboardList,   label: 'Orders',        iconBg: '#dbeafe', iconColor: '#2563eb' },
   { to: '/furniture/orders/new',    icon: Receipt,         label: 'New Order',     iconBg: '#dcfce7', iconColor: '#16a34a' },
@@ -401,7 +401,7 @@ const FURNITURE_NAV_ITEMS = [
 ];
 
 // [printing] [all tenants]
-const PRINTING_NAV_ITEMS = [
+export const PRINTING_NAV_ITEMS = [
   { to: '/printing/dashboard', icon: LayoutDashboard, label: 'Dashboard',  iconBg: '#dbeafe', iconColor: '#2563eb' },
   { to: '/printing/jobs',      icon: ClipboardList,   label: 'Print Jobs', iconBg: '#ede9fe', iconColor: '#7c3aed' },
   { to: '/printing/jobs/new',  icon: Receipt,         label: 'New Job',    iconBg: '#dcfce7', iconColor: '#16a34a' },
@@ -411,7 +411,7 @@ const PRINTING_NAV_ITEMS = [
 ];
 
 // [ca] [all tenants]
-const CA_NAV_ITEMS = [
+export const CA_NAV_ITEMS = [
   { to: '/ca/dashboard',   icon: LayoutDashboard, label: 'Dashboard',   iconBg: '#dbeafe', iconColor: '#2563eb' },
   { to: '/ca/clients',     icon: Users,           label: 'Clients',     iconBg: '#ede9fe', iconColor: '#7c3aed' },
   { to: '/ca/tasks',       icon: ClipboardList,   label: 'Tasks',       iconBg: '#dcfce7', iconColor: '#16a34a' },
@@ -424,7 +424,7 @@ const CA_NAV_ITEMS = [
 ];
 
 // [crm] [all tenants]
-const CRM_NAV_ITEMS = [
+export const CRM_NAV_ITEMS = [
   { to: '/crm/dashboard',      icon: LayoutDashboard, label: 'Dashboard',   iconBg: '#cffafe', iconColor: '#0891b2' },
   { to: '/crm/leads',          icon: Zap,             label: 'Leads',       iconBg: '#fef9c3', iconColor: '#ca8a04' },
   { to: '/crm/wa-inbox',       icon: MessageSquare,   label: 'WA Inbox',    iconBg: '#dcfce7', iconColor: '#16a34a' },
@@ -437,7 +437,7 @@ const CRM_NAV_ITEMS = [
 ];
 
 // [events] [all tenants]
-const EVENTS_NAV_ITEMS = [
+export const EVENTS_NAV_ITEMS = [
   { to: '/events/dashboard', icon: LayoutDashboard, label: 'Dashboard', iconBg: '#fce7f3', iconColor: '#db2777' },
   { to: '/events/list',      icon: CalendarDays,    label: 'Events',    iconBg: '#ede9fe', iconColor: '#7c3aed' },
   { to: '/events/new',       icon: Receipt,         label: 'New Event', iconBg: '#dcfce7', iconColor: '#16a34a' },
@@ -447,7 +447,7 @@ const EVENTS_NAV_ITEMS = [
 ];
 
 // [travel] [all tenants]
-const TRAVEL_NAV_ITEMS = [
+export const TRAVEL_NAV_ITEMS = [
   { to: '/travel/dashboard', icon: LayoutDashboard, label: 'Dashboard',    iconBg: '#cffafe', iconColor: '#0891b2' },
   { to: '/travel/bookings',  icon: ClipboardList,   label: 'Bookings',     iconBg: '#dbeafe', iconColor: '#2563eb' },
   { to: '/travel/new',       icon: Receipt,         label: 'New Booking',  iconBg: '#dcfce7', iconColor: '#16a34a' },
@@ -457,7 +457,7 @@ const TRAVEL_NAV_ITEMS = [
 ];
 
 // [insurance] [all tenants]
-const INSURANCE_NAV_ITEMS = [
+export const INSURANCE_NAV_ITEMS = [
   { to: '/insurance/dashboard', icon: LayoutDashboard, label: 'Dashboard', iconBg: '#dcfce7', iconColor: '#16a34a' },
   { to: '/insurance/clients',   icon: Users,           label: 'Clients',   iconBg: '#dbeafe', iconColor: '#2563eb' },
   { to: '/insurance/policies',  icon: FileText,        label: 'Policies',  iconBg: '#ede9fe', iconColor: '#7c3aed' },
@@ -468,7 +468,7 @@ const INSURANCE_NAV_ITEMS = [
 ];
 
 // [homeservice] [all tenants]
-const HOMESERVICE_NAV_ITEMS = [
+export const HOMESERVICE_NAV_ITEMS = [
   { to: '/homeservice/dashboard',  icon: LayoutDashboard, label: 'Dashboard',   iconBg: '#fef3c7', iconColor: '#d97706' },
   { to: '/homeservice/jobs',       icon: ClipboardList,   label: 'Jobs',        iconBg: '#dbeafe', iconColor: '#2563eb' },
   { to: '/homeservice/new-job',    icon: Receipt,         label: 'New Job',     iconBg: '#dcfce7', iconColor: '#16a34a' },
@@ -480,7 +480,7 @@ const HOMESERVICE_NAV_ITEMS = [
 ];
 
 // [realestate] [all tenants]
-const REALESTATE_BASE_NAV = [
+export const REALESTATE_BASE_NAV = [
   { to: '/realestate/dashboard',   icon: LayoutDashboard, label: 'Dashboard',      iconBg: '#dcfce7', iconColor: '#15803d' },
   { to: '/realestate/leads',       icon: Users,           label: 'Leads / CRM',    iconBg: '#dbeafe', iconColor: '#2563eb' },
   { to: '/realestate/properties',  icon: Receipt,         label: 'Properties',     iconBg: '#cffafe', iconColor: '#0891b2' },
@@ -495,7 +495,7 @@ const REALESTATE_BASE_NAV = [
   { to: '/settings',               icon: Settings,        label: 'Settings',       iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
 
-function getRealEstateNavItems(role: string) {
+export function getRealEstateNavItems(role: string) {
   // Individual and rental agents don't need builder directory prominently
   if (role === 'individual' || role === 'rental' || role === 'commercial') {
     return REALESTATE_BASE_NAV.filter(i => i.to !== '/realestate/builders');
@@ -508,7 +508,7 @@ function getRealEstateNavItems(role: string) {
 }
 
 // [beauty] [all tenants]
-const BEAUTY_NAV_ITEMS = [
+export const BEAUTY_NAV_ITEMS = [
   { to: '/beauty/dashboard',     icon: LayoutDashboard, label: 'Dashboard',      iconBg: '#fce7f3', iconColor: '#db2777' },
   { to: '/beauty/appointments',  icon: Sparkles,        label: 'Appointments',   iconBg: '#ede9fe', iconColor: '#7c3aed' },
   { to: '/beauty/services',      icon: Scissors,        label: 'Services',       iconBg: '#fef3c7', iconColor: '#d97706' },
@@ -521,7 +521,7 @@ const BEAUTY_NAV_ITEMS = [
 ];
 
 // [carwash] [all tenants] — use CSS vars so icons are amber in dark mode, blue in light mode
-const CARWASH_NAV_ITEMS = [
+export const CARWASH_NAV_ITEMS = [
   { to: '/carwash/dashboard',     icon: LayoutDashboard, label: 'Dashboard',     iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
   { to: '/carwash/jobs',          icon: ClipboardCheck,  label: 'Job Cards',     iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
   { to: '/carwash/appointments',  icon: Calendar,        label: 'Appointments',  iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
@@ -534,13 +534,13 @@ const CARWASH_NAV_ITEMS = [
 ];
 
 // [carwash] [all tenants] — employee mode shows only Job Cards + Appointments
-const CARWASH_EMPLOYEE_NAV_ITEMS = [
+export const CARWASH_EMPLOYEE_NAV_ITEMS = [
   { to: '/carwash/jobs',         icon: ClipboardCheck, label: 'Job Cards',    iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
   { to: '/carwash/appointments', icon: Calendar,       label: 'Appointments', iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)' },
 ];
 
 // [tyrescrap] [all tenants]
-const TYRESCRAP_NAV_ITEMS = [
+export const TYRESCRAP_NAV_ITEMS = [
   { to: '/tyrescrap/dashboard', icon: LayoutDashboard, label: 'Dashboard',  iconBg: '#dcfce7', iconColor: '#16a34a' },
   { to: '/tyrescrap/purchase',  icon: ShoppingCart,    label: 'Purchase',   iconBg: '#fef9c3', iconColor: '#ca8a04' },
   { to: '/tyrescrap/sales',     icon: TrendingUp,      label: 'Sales',      iconBg: '#dbeafe', iconColor: '#2563eb' },
@@ -550,6 +550,47 @@ const TYRESCRAP_NAV_ITEMS = [
   { to: '/tyrescrap/expenses',  icon: Wallet,          label: 'Expenses',   iconBg: '#fee2e2', iconColor: '#dc2626' },
   { to: '/tyrescrap/reports',   icon: BarChart3,       label: 'Reports',    iconBg: '#e0f2fe', iconColor: '#0284c7' },
 ];
+
+// [core] [all tenants] — single source of truth for "which nav items does this
+// shop type see", shared between the sidebar (AppLayout) and the staff tab-access
+// picker (Settings), so the picker always matches what's actually in the sidebar.
+export function getNavItemsForShopType(shopType: string | undefined, settings: any, isEmployeeMode = false) {
+  const reRole = settings?.re_role ?? 'resale';
+  return (
+    shopType === 'restaurant'  ? RESTAURANT_NAV_ITEMS :
+    shopType === 'grocery'     ? GROCERY_NAV_ITEMS :
+    shopType === 'carwash'     ? (isEmployeeMode ? CARWASH_EMPLOYEE_NAV_ITEMS : CARWASH_NAV_ITEMS) :
+    shopType === 'clinic'      ? CLINIC_NAV_ITEMS :
+    shopType === 'beauty'      ? BEAUTY_NAV_ITEMS :
+    shopType === 'study'       ? STUDY_NAV_ITEMS :
+    shopType === 'coaching'    ? COACHING_NAV_ITEMS :
+    shopType === 'gym'         ? GYM_NAV_ITEMS :
+    shopType === 'jewellery'   ? JEWELLERY_NAV_ITEMS :
+    shopType === 'realestate'  ? getRealEstateNavItems(reRole) :
+    shopType === 'hotel'        ? HOTEL_NAV_ITEMS :
+    shopType === 'repair'        ? REPAIR_NAV_ITEMS :
+    shopType === 'drivingschool' ? DRIVINGSCHOOL_NAV_ITEMS :
+    shopType === 'clothing'      ? CLOTHING_NAV_ITEMS :
+    shopType === 'bakery'        ? BAKERY_NAV_ITEMS :
+    shopType === 'optician'      ? OPTICIAN_NAV_ITEMS :
+    shopType === 'tailor'        ? TAILOR_NAV_ITEMS :
+    shopType === 'hardware'      ? HARDWARE_NAV_ITEMS :
+    shopType === 'laundry'       ? LAUNDRY_NAV_ITEMS :
+    shopType === 'catering'      ? CATERING_NAV_ITEMS :
+    shopType === 'pestcontrol'   ? PESTCONTROL_NAV_ITEMS :
+    shopType === 'petrolpump'    ? PETROLPUMP_NAV_ITEMS :
+    shopType === 'furniture'     ? FURNITURE_NAV_ITEMS :
+    shopType === 'printing'      ? PRINTING_NAV_ITEMS :
+    shopType === 'ca'            ? CA_NAV_ITEMS :
+    shopType === 'crm'           ? CRM_NAV_ITEMS :
+    shopType === 'events'        ? EVENTS_NAV_ITEMS :
+    shopType === 'travel'        ? TRAVEL_NAV_ITEMS :
+    shopType === 'insurance'     ? INSURANCE_NAV_ITEMS :
+    shopType === 'homeservice'   ? HOMESERVICE_NAV_ITEMS :
+    shopType === 'tyrescrap'     ? TYRESCRAP_NAV_ITEMS :
+    NAV_ITEMS
+  );
+}
 
 export function AppLayout() {
   const { config, setAuthenticated } = useAppStore();
@@ -574,6 +615,29 @@ export function AppLayout() {
   // [core] [all tenants] — Switch App is a dev/tester-only feature; hidden for
   // tenants the admin has tagged as "client" (real customers), and all their users
   const isClient = !!(config?.settings as any)?.is_client;
+  // [core] [all tenants] — null = owner (sees everything); array = staff login,
+  // restricted to only the tabs the owner picked for them in Settings
+  const [staffTabAccess, setStaffTabAccess] = useState<string[] | null>(null);
+  useEffect(() => {
+    const tenantId = config?.tenant_id;
+    if (!tenantId) { setStaffTabAccess(null); return; }
+    const username = sessionStorage.getItem('fs_logged_in_username') || 'owner';
+    import('@/lib/db/staffUsers').then(({ getStaffTabAccess }) => {
+      getStaffTabAccess(tenantId, username).then(setStaffTabAccess).catch(() => setStaffTabAccess(null));
+    });
+  }, [config?.tenant_id]);
+
+  // [core] [all tenants] — staff logging out should land back on the staff login
+  // screen (Shop ID + today's PIN + username/password), not the owner login form
+  function handleLogout() {
+    const tenantId = config?.tenant_id;
+    if (tenantId) {
+      if (staffTabAccess !== null) localStorage.setItem(`fs_last_login_was_staff_${tenantId}`, '1');
+      else localStorage.removeItem(`fs_last_login_was_staff_${tenantId}`);
+    }
+    setShowUserMenu(false);
+    setAuthenticated(false);
+  }
   useEffect(() => {
     const tenantId = config?.tenant_id;
     if (!tenantId) { setLoggedInDisplayName(null); return; }
@@ -609,40 +673,13 @@ export function AppLayout() {
     }
   };
   // pick correct nav based on shop type
-  const reRole = (config?.settings as any)?.re_role ?? 'resale';
-  const activeNavItems =
-    config?.shop_type === 'restaurant'  ? RESTAURANT_NAV_ITEMS :
-    config?.shop_type === 'grocery'     ? GROCERY_NAV_ITEMS :
-    config?.shop_type === 'carwash'     ? (isEmployeeMode ? CARWASH_EMPLOYEE_NAV_ITEMS : CARWASH_NAV_ITEMS) :
-    config?.shop_type === 'clinic'      ? CLINIC_NAV_ITEMS :
-    config?.shop_type === 'beauty'      ? BEAUTY_NAV_ITEMS :
-    config?.shop_type === 'study'       ? STUDY_NAV_ITEMS :
-    config?.shop_type === 'coaching'    ? COACHING_NAV_ITEMS :
-    config?.shop_type === 'gym'         ? GYM_NAV_ITEMS :
-    config?.shop_type === 'jewellery'   ? JEWELLERY_NAV_ITEMS :
-    config?.shop_type === 'realestate'  ? getRealEstateNavItems(reRole) :
-    config?.shop_type === 'hotel'        ? HOTEL_NAV_ITEMS : // [hotel] [all tenants]
-    config?.shop_type === 'repair'        ? REPAIR_NAV_ITEMS :
-    config?.shop_type === 'drivingschool' ? DRIVINGSCHOOL_NAV_ITEMS :
-    config?.shop_type === 'clothing'      ? CLOTHING_NAV_ITEMS :
-    config?.shop_type === 'bakery'        ? BAKERY_NAV_ITEMS :
-    config?.shop_type === 'optician'      ? OPTICIAN_NAV_ITEMS :
-    config?.shop_type === 'tailor'        ? TAILOR_NAV_ITEMS :
-    config?.shop_type === 'hardware'      ? HARDWARE_NAV_ITEMS :
-    config?.shop_type === 'laundry'       ? LAUNDRY_NAV_ITEMS :
-    config?.shop_type === 'catering'      ? CATERING_NAV_ITEMS :
-    config?.shop_type === 'pestcontrol'   ? PESTCONTROL_NAV_ITEMS :
-    config?.shop_type === 'petrolpump'    ? PETROLPUMP_NAV_ITEMS :
-    config?.shop_type === 'furniture'     ? FURNITURE_NAV_ITEMS :
-    config?.shop_type === 'printing'      ? PRINTING_NAV_ITEMS :
-    config?.shop_type === 'ca'            ? CA_NAV_ITEMS :
-    config?.shop_type === 'crm'           ? CRM_NAV_ITEMS :
-    config?.shop_type === 'events'        ? EVENTS_NAV_ITEMS :
-    config?.shop_type === 'travel'        ? TRAVEL_NAV_ITEMS :
-    config?.shop_type === 'insurance'     ? INSURANCE_NAV_ITEMS :
-    config?.shop_type === 'homeservice'   ? HOMESERVICE_NAV_ITEMS :
-    config?.shop_type === 'tyrescrap'     ? TYRESCRAP_NAV_ITEMS : // [tyrescrap] [all tenants]
-    NAV_ITEMS;
+  const allNavItems = getNavItemsForShopType(config?.shop_type, config?.settings, isEmployeeMode);
+  // [core] [all tenants] — staff logins only see the tabs the owner picked for them
+  // (null staffTabAccess = owner / unrestricted). '/settings' is never offered in
+  // the picker — staff get "Check for Update" only, via the bottom user menu.
+  const activeNavItems = staffTabAccess
+    ? allNavItems.filter(item => staffTabAccess.includes(item.to))
+    : allNavItems;
 
   useEffect(() => {
     setAINavigator((path) => navigate(path));
@@ -784,7 +821,7 @@ export function AppLayout() {
                   <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setShowUserMenu(false)} />
                   <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, minWidth: '190px', background: C.nav2, border: `1px solid ${C.navBorder}`, borderRadius: '6px', overflow: 'hidden', zIndex: 50, boxShadow: '0 16px 40px rgba(0,0,0,0.4)' }}>
                     {[
-                      { to: '/settings', icon: Settings, label: 'Settings & Updates' },
+                      { to: '/settings', icon: Settings, label: staffTabAccess !== null ? 'Check for Update' : 'Settings & Updates' },
                     ].map(({ to, icon: Icon, label }) => (
                       <NavLink key={to} to={to} onClick={() => setShowUserMenu(false)}
                         style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', color: 'rgba(255,255,255,0.6)', textDecoration: 'none', fontSize: '13px', fontWeight: 500, borderBottom: `1px solid ${C.navBorder}`, transition: 'color 0.1s' }}>
@@ -797,7 +834,7 @@ export function AppLayout() {
                         <ArrowLeftRight style={{ width: '13px', height: '13px' }} /> Switch App
                       </button>
                     )}
-                    <button onClick={() => { setShowUserMenu(false); setAuthenticated(false); }}
+                    <button onClick={handleLogout}
                       style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', color: '#f87171', background: 'none', border: 'none', width: '100%', fontSize: '13px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
                       <LogOut style={{ width: '13px', height: '13px' }} /> Logout
                     </button>
@@ -933,7 +970,7 @@ export function AppLayout() {
                       className="flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors hover:opacity-80"
                       style={{ color: 'var(--text-primary)', borderBottom: '1px solid var(--surface-border)' }}>
                       <Settings className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--text-tertiary)' }} />
-                      Settings &amp; Updates
+                      {staffTabAccess !== null ? 'Check for Update' : 'Settings & Updates'}
                     </NavLink>
                     {!isClient && (
                       <button onClick={() => { setShowUserMenu(false); setShowSwitchModal(true); }}
@@ -952,7 +989,7 @@ export function AppLayout() {
                         Login as Employee
                       </button>
                     )}
-                    <button onClick={() => { setShowUserMenu(false); setAuthenticated(false); }}
+                    <button onClick={handleLogout}
                       className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors hover:opacity-80"
                       style={{ color: '#f87171' }}>
                       <LogOut className="h-4 w-4 flex-shrink-0" />

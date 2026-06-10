@@ -621,6 +621,22 @@ const publicServer = http.createServer(async (req, res) => {
     return;
   }
 
+  // GET /session/list/:tenant_id — usernames currently online (heartbeat within TTL)
+  // [core] [all tenants] — used by Settings > Staff Logins to show online/offline status
+  const sessionListMatch = pathname.match(/^\/session\/list\/([a-f0-9-]{36})$/);
+  if (req.method === 'GET' && sessionListMatch) {
+    const tenant_id = sessionListMatch[1];
+    const sessions = loadSessions();
+    const online = [];
+    for (const [key, s] of Object.entries(sessions)) {
+      if (!key.startsWith(`${tenant_id}::`)) continue;
+      if (Date.now() - new Date(s.last_heartbeat).getTime() > SESSION_TTL_MS) continue;
+      online.push(key.slice(tenant_id.length + 2));
+    }
+    json(res, { ok: true, online });
+    return;
+  }
+
   // POST /register — max 10 per IP per hour
   if (req.method === 'POST' && pathname === '/register') {
     if (rateLimit(req, res, 'register', 10, 60 * 60 * 1000)) return;

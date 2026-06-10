@@ -8,13 +8,14 @@ import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { useAppStore } from '@/app/store/app.store';
 import { updateAppConfig, getOrCreateShopCode } from '@/lib/db/config';
 import { changePassword, changeUsername, getAuthUsername, getExportLogs, logExport } from '@/lib/db/auth';
-import { listStaffUsers, createStaffUser, deactivateStaffUser, generateJoinPin, countActiveStaffUsers, getStaffUserFee, type StaffUser } from '@/lib/db/staffUsers';
+import { listStaffUsers, createStaffUser, deactivateStaffUser, generateJoinPin, countActiveStaffUsers, getStaffUserFee, getDailyShopPin, getOnlineStaffUsernames, type StaffUser } from '@/lib/db/staffUsers';
 import { exportBackup } from '@/lib/db/backup';
 import { PageIntro } from '@/components/ui/PageIntro';
 import { useTheme } from '@/lib/theme/useTheme';
 import { reportError } from '@/lib/errorReporter';
 import { triggerAutoSync } from '@/lib/autoSync';
 import { getCloudSyncStatus, refreshCloudSyncStatus, activateCloudSync, deactivateCloudSync, getCloudSyncFee, getPricing, setBillingDevice, getBillingUser } from '@/lib/db/cloudSync';
+import { getNavItemsForShopType } from '@/components/layout/AppLayout';
 
 type SettingsForm = {
   shop_name: string;
@@ -278,45 +279,49 @@ export function SettingsPage() {
     <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px', background: color === 'green' ? '#dcfce7' : color === 'amber' ? '#fef3c7' : color === 'blue' ? '#dbeafe' : '#f1f5f9', color: color === 'green' ? '#15803d' : color === 'amber' ? '#92400e' : color === 'blue' ? '#1d4ed8' : '#64748b', flexShrink: 0 }}>{text}</span>
   );
 
+  // [core] [all tenants] — shared by the owner's "App Updates" panel and the
+  // staff-only "Check for Update" page
+  const renderUpdatesPanel = () => (
+    <div className="space-y-3 p-4">
+      {currentVersion && <p className="text-xs font-mono" style={{ color: 'var(--text-tertiary)' }}>Current version: v{currentVersion}</p>}
+      {updateStatus === 'found' && (
+        <div className="rounded-xl p-3" style={{ background: '#1e1b4b', border: '1px solid #4338ca' }}>
+          <p className="text-indigo-200 font-semibold text-sm">🎉 New version v{updateVersion} is available!</p>
+          <p className="text-indigo-400 text-xs mt-0.5">⚠️ App will close and relaunch. Do this when not billing a customer.</p>
+        </div>
+      )}
+      {updateStatus === 'up-to-date' && (
+        <div className="rounded-xl p-3 flex items-center gap-2" style={{ background: '#052e16', border: '1px solid #166534' }}>
+          <span className="text-emerald-400">✅</span>
+          <p className="text-emerald-300 text-sm font-medium">You're on the latest version.</p>
+        </div>
+      )}
+      {updateStatus === 'installing' && (
+        <div className="rounded-xl p-3 space-y-2" style={{ background: '#1e1b4b', border: '1px solid #4338ca' }}>
+          <div className="flex items-center justify-between">
+            <p className="text-indigo-200 text-sm font-semibold">⬇️ Downloading v{updateVersion}…</p>
+            {dlTotal > 0 && <span className="text-indigo-400 text-xs font-mono">{(dlDone/1024/1024).toFixed(1)} / {(dlTotal/1024/1024).toFixed(1)} MB</span>}
+          </div>
+          <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'rgba(99,102,241,0.2)' }}>
+            <div className="h-2 rounded-full" style={{ background: 'linear-gradient(90deg,#6366f1,#818cf8)', width: dlTotal > 0 ? `${Math.min(100,(dlDone/dlTotal)*100).toFixed(1)}%` : '100%' }} />
+          </div>
+          <p className="text-indigo-400 text-xs">App will relaunch automatically when done.</p>
+        </div>
+      )}
+      {updateStatus === 'found'
+        ? <button onClick={handleInstallUpdate} className="btn-primary w-full">⬇️ Update & Relaunch</button>
+        : <button onClick={handleCheckUpdate} disabled={updateStatus === 'checking' || updateStatus === 'installing'} className="btn-secondary w-full disabled:opacity-50">
+            {updateStatus === 'checking' ? '⏳ Checking…' : '🔄 Check for Updates'}
+          </button>
+      }
+    </div>
+  );
+
   // ── Panel content ─────────────────────────────────────────────────────────────
   const renderPanelContent = () => {
     switch (activePanel) {
 
-      case 'updates': return (
-        <div className="space-y-3 p-4">
-          {currentVersion && <p className="text-xs font-mono" style={{ color: 'var(--text-tertiary)' }}>Current version: v{currentVersion}</p>}
-          {updateStatus === 'found' && (
-            <div className="rounded-xl p-3" style={{ background: '#1e1b4b', border: '1px solid #4338ca' }}>
-              <p className="text-indigo-200 font-semibold text-sm">🎉 New version v{updateVersion} is available!</p>
-              <p className="text-indigo-400 text-xs mt-0.5">⚠️ App will close and relaunch. Do this when not billing a customer.</p>
-            </div>
-          )}
-          {updateStatus === 'up-to-date' && (
-            <div className="rounded-xl p-3 flex items-center gap-2" style={{ background: '#052e16', border: '1px solid #166534' }}>
-              <span className="text-emerald-400">✅</span>
-              <p className="text-emerald-300 text-sm font-medium">You're on the latest version.</p>
-            </div>
-          )}
-          {updateStatus === 'installing' && (
-            <div className="rounded-xl p-3 space-y-2" style={{ background: '#1e1b4b', border: '1px solid #4338ca' }}>
-              <div className="flex items-center justify-between">
-                <p className="text-indigo-200 text-sm font-semibold">⬇️ Downloading v{updateVersion}…</p>
-                {dlTotal > 0 && <span className="text-indigo-400 text-xs font-mono">{(dlDone/1024/1024).toFixed(1)} / {(dlTotal/1024/1024).toFixed(1)} MB</span>}
-              </div>
-              <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'rgba(99,102,241,0.2)' }}>
-                <div className="h-2 rounded-full" style={{ background: 'linear-gradient(90deg,#6366f1,#818cf8)', width: dlTotal > 0 ? `${Math.min(100,(dlDone/dlTotal)*100).toFixed(1)}%` : '100%' }} />
-              </div>
-              <p className="text-indigo-400 text-xs">App will relaunch automatically when done.</p>
-            </div>
-          )}
-          {updateStatus === 'found'
-            ? <button onClick={handleInstallUpdate} className="btn-primary w-full">⬇️ Update & Relaunch</button>
-            : <button onClick={handleCheckUpdate} disabled={updateStatus === 'checking' || updateStatus === 'installing'} className="btn-secondary w-full disabled:opacity-50">
-                {updateStatus === 'checking' ? '⏳ Checking…' : '🔄 Check for Updates'}
-              </button>
-          }
-        </div>
-      );
+      case 'updates': return renderUpdatesPanel();
 
       case 'billing-summary': {
         const syncStatus = (config?.settings as any)?.cloud_sync_enabled;
@@ -649,6 +654,19 @@ export function SettingsPage() {
   const isOwner = (sessionStorage.getItem('fs_logged_in_username') || 'owner') === 'owner';
   const idleLabel = form.idleTimeoutMinutes === 0 ? 'Auto-lock off' : `Lock after ${form.idleTimeoutMinutes} min`;
 
+  // [core] [all tenants] — staff logins only get "Check for Update", not the
+  // full settings list (shop details, security, data export, etc. are owner-only)
+  if (!isOwner) {
+    return (
+      <div className="page-shell page-stack">
+        <PageIntro eyebrow="Settings" title="Check for Update" description="Update FrontStores to the latest version." />
+        <div className="rounded-2xl" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
+          {renderUpdatesPanel()}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="page-shell page-stack">
       <PageIntro eyebrow="Settings" title="Settings" description="Tap any row to open and edit." />
@@ -698,7 +716,7 @@ export function SettingsPage() {
           {/* Backdrop */}
           <div onClick={closePanel} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }} />
           {/* Centered landscape popup */}
-          <div style={{ position: 'relative', width: 'min(620px, 92vw)', maxHeight: '82vh', background: 'var(--surface)', borderRadius: '18px', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 80px rgba(0,0,0,0.5)', overflow: 'hidden' }}>
+          <div style={{ position: 'relative', width: activePanel === 'staff' ? 'min(744px, 94vw)' : 'min(620px, 92vw)', maxHeight: '82vh', background: 'var(--surface)', borderRadius: '18px', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 80px rgba(0,0,0,0.5)', overflow: 'hidden' }}>
             {/* Sticky header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--surface-border)', flexShrink: 0 }}>
               <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>{panelTitles[activePanel] ?? 'Settings'}</h2>
@@ -815,18 +833,15 @@ function WhatsAppBusinessSection() {
 
 // [core] [all apps] [all tenants] — Owner creates staff logins; auto-approved, no admin needed.
 // Server is notified of every create/deactivate for billing & audit. No hard delete ever.
-const ALL_TABS = [
-  { key: 'dashboard',       label: 'Dashboard' },
-  { key: 'pos',             label: 'POS / Billing' },
-  { key: 'products',        label: 'Products' },
-  { key: 'inventory',       label: 'Inventory' },
-  { key: 'orders',          label: 'Orders / Bills' },
-  { key: 'customers',       label: 'Customers' },
-  { key: 'khata',           label: 'Khata' },
-  { key: 'expenses',        label: 'Expenses' },
-  { key: 'suppliers',       label: 'Suppliers' },
-  { key: 'reports',         label: 'Reports' },
-];
+// [core] [all tenants] — tabs offered to pick from when creating a staff login.
+// Mirrors the actual sidebar for this shop type (via getNavItemsForShopType), so
+// whatever the owner ticks here is exactly what that staff login's sidebar shows.
+// '/settings' is excluded — staff get "Check for Update" only, not full Settings.
+function getAllTabsForShopType(shopType: string | undefined, settings: any) {
+  return getNavItemsForShopType(shopType, settings)
+    .filter(item => item.to !== '/settings')
+    .map(item => ({ key: item.to, label: item.label }));
+}
 
 // [core] [all tenants] — Owner picks ONE login (owner or a staff username) whose
 // device is allowed to do billing/stock-out and to keep working offline. Every
@@ -885,6 +900,7 @@ function BillingDeviceSection({ tenantId, activeStaff }: { tenantId: string; act
 function StaffLoginsSection({ tenantId }: { tenantId: string }) {
   const config = useAppStore((s) => s.config);
   const queryClient = useQueryClient();
+  const allTabs = getAllTabsForShopType(config?.shop_type, config?.settings);
 
   // Form state
   const [displayName, setDisplayName] = useState('');
@@ -905,6 +921,21 @@ function StaffLoginsSection({ tenantId }: { tenantId: string }) {
       getOrCreateShopCode(tenantId, config.shop_type).then(setShopCode).catch(() => {});
     }
   }, [tenantId, config?.shop_type]);
+
+  // [core] [all tenants] — today's auto-rotating staff login PIN (changes daily, computed locally)
+  const [dailyPin, setDailyPin] = useState('');
+  useEffect(() => {
+    if (!tenantId) return;
+    getDailyShopPin(tenantId).then(setDailyPin).catch(() => {});
+  }, [tenantId]);
+
+  // [core] [all tenants] — online/offline status per staff login
+  const { data: onlineUsernames } = useQuery({
+    queryKey: ['staff-online', tenantId],
+    queryFn: () => getOnlineStaffUsernames(tenantId),
+    enabled: !!tenantId,
+    refetchInterval: 30_000,
+  });
 
   const { data: staffUsers } = useQuery({
     queryKey: ['staff-users', tenantId],
@@ -992,6 +1023,20 @@ function StaffLoginsSection({ tenantId }: { tenantId: string }) {
 
   return (
     <div className="space-y-5">
+      {/* [core] [all tenants] — today's auto-rotating staff login PIN, share with staff each day */}
+      {activeStaff.length > 0 && (
+        <div className="rounded-2xl p-4 flex items-center justify-between gap-4" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
+          <div>
+            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Today's Staff Login PIN</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>Share this with staff — it changes automatically every day at midnight (UTC)</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="font-mono font-bold tracking-[0.3em]" style={{ fontSize: '24px', color: 'var(--text-primary)' }}>{dailyPin || '······'}</span>
+            <button onClick={() => copyText(dailyPin, "Today's PIN")} className="text-xs px-2 py-1 rounded-lg border" style={{ borderColor: 'var(--surface-border)', color: 'var(--text-secondary)' }}>Copy</button>
+          </div>
+        </div>
+      )}
+
       {/* [core] [all tenants] — Billing & Stock Device picker, only matters with staff logins */}
       {activeStaff.length > 0 && <BillingDeviceSection tenantId={tenantId} activeStaff={activeStaff} />}
 
@@ -1084,7 +1129,7 @@ function StaffLoginsSection({ tenantId }: { tenantId: string }) {
         <div className="mb-4">
           <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>Tab Access <span className="font-normal text-slate-500">(tick all they can see)</span></p>
           <div className="flex flex-wrap gap-2">
-            {ALL_TABS.map(tab => (
+            {allTabs.map(tab => (
               <button
                 key={tab.key}
                 onClick={() => toggleTab(tab.key)}
@@ -1100,7 +1145,7 @@ function StaffLoginsSection({ tenantId }: { tenantId: string }) {
               </button>
             ))}
             <button
-              onClick={() => setTabAccess(ALL_TABS.map(t => t.key))}
+              onClick={() => setTabAccess(allTabs.map(t => t.key))}
               style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '999px', border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}
             >All</button>
             <button
@@ -1122,15 +1167,22 @@ function StaffLoginsSection({ tenantId }: { tenantId: string }) {
           <div className="space-y-2">
             {activeStaff.map(staff => {
               const tabs: string[] = (() => { try { return JSON.parse(staff.tab_access || '[]'); } catch { return []; } })();
+              const isOnline = (onlineUsernames ?? []).includes(staff.username);
               return (
                 <div key={staff.id} className="card-strong p-3 text-sm">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-slate-100">{staff.display_name || staff.username}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-slate-100">{staff.display_name || staff.username}</p>
+                        <span className="flex items-center gap-1 text-xs" style={{ color: isOnline ? '#34d399' : 'var(--text-tertiary)' }}>
+                          <span style={{ width: '7px', height: '7px', borderRadius: '50%', display: 'inline-block', background: isOnline ? '#34d399' : 'var(--text-tertiary)' }} />
+                          {isOnline ? 'Online' : 'Offline'}
+                        </span>
+                      </div>
                       <p className="text-xs text-slate-400">{staff.role || 'No role'} · @{staff.username}</p>
                       {tabs.length > 0 && (
                         <p className="text-xs text-slate-500 mt-1">
-                          Tabs: {tabs.map(k => ALL_TABS.find(t => t.key === k)?.label ?? k).join(', ')}
+                          Tabs: {tabs.map(k => allTabs.find(t => t.key === k)?.label ?? k).join(', ')}
                         </p>
                       )}
                     </div>
