@@ -104,12 +104,19 @@ export async function acknowledgeAnnouncement(tenantId: string, announcementId: 
     `UPDATE announcements SET read_at = COALESCE(read_at,?), notified_at = COALESCE(notified_at,?), updated_at = ? WHERE id = ? AND tenant_id = ?`,
     [now(), now(), now(), announcementId, tenantId]
   );
-  // Report acknowledgement to the server (best-effort, non-blocking)
+  // [core] [all tenants] — the server keys announcements by its own id (remote_id
+  // here), not our local row id, so look that up before reporting acknowledgement.
   try {
+    const rows = await db.select<{ remote_id: string }[]>(
+      `SELECT remote_id FROM announcements WHERE id = ? AND tenant_id = ?`,
+      [announcementId, tenantId]
+    );
+    const remoteId = rows[0]?.remote_id;
+    if (!remoteId) return;
     await fetch(`${SERVER}/announcement-seen`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ announcement_id: announcementId, tenant_id: tenantId, shop_name: shopName, seen_at: new Date().toISOString() }),
+      body: JSON.stringify({ announcement_id: remoteId, tenant_id: tenantId, shop_name: shopName, seen_at: new Date().toISOString() }),
     });
   } catch { /* offline — ignore */ }
 }
