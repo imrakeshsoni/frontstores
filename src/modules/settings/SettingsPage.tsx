@@ -13,6 +13,7 @@ import { exportBackup } from '@/lib/db/backup';
 import { PageIntro } from '@/components/ui/PageIntro';
 import { useTheme } from '@/lib/theme/useTheme';
 import { reportError } from '@/lib/errorReporter';
+import { triggerAutoSync } from '@/lib/autoSync';
 import { getCloudSyncStatus, refreshCloudSyncStatus, activateCloudSync, deactivateCloudSync, getCloudSyncFee, getPricing } from '@/lib/db/cloudSync';
 
 type SettingsForm = {
@@ -883,6 +884,8 @@ function StaffLoginsSection({ tenantId }: { tenantId: string }) {
         queryClient.invalidateQueries({ queryKey: ['staff-active-count', tenantId] });
         setShareCard({ shopCode, joinPin: result.joinPin, displayName: displayName.trim() });
         setDisplayName(''); setUsername(''); setPassword(''); setConfirmPwd(''); setRole(''); setTabAccess([]);
+        // [core] [all tenants] — push immediately so the new staff user + PIN reach the server before they try to join
+        triggerAutoSync(true);
         toast.success(`${displayName.trim()} added — share the code and PIN below`);
       } else {
         toast.error(result.error ?? 'Could not create staff login');
@@ -908,6 +911,8 @@ function StaffLoginsSection({ tenantId }: { tenantId: string }) {
     const result = await generateJoinPin(tenantId, staff.id);
     if (result.ok && result.joinPin) {
       setShareCard({ shopCode, joinPin: result.joinPin, displayName: staff.display_name || staff.username });
+      // [core] [all tenants] — push immediately so the new PIN is on the server before staff tries to join
+      triggerAutoSync(true);
       toast.success('New join PIN generated');
     } else {
       toast.error(result.error ?? 'Could not generate PIN');

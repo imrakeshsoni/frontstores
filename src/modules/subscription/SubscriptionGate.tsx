@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from '@/app/store/app.store';
 import { getDb, now } from '@/lib/db/index';
+import { getPricing } from '@/lib/db/cloudSync';
 
 const CONTACT_URL = 'https://frontstores.com/#contact';
 const SERVER = 'https://update.frontstores.com';
@@ -18,10 +19,13 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
   const [graceDaysLeft, setGraceDaysLeft] = useState(0);
   const [checking, setChecking] = useState(false);
   const [lockReason, setLockReason] = useState<'expired' | 'frozen' | 'revoked'>('expired');
+  const [planFee, setPlanFee] = useState(999);
 
   useEffect(() => {
     if (!config) return;
     checkSubscription();
+    // [core] [all tenants] — always fetch latest plan price set in admin panel, never trust a hardcoded value
+    getPricing(config.tenant_id).then((p) => setPlanFee(p.plan_fee));
   }, [config]);
 
   useEffect(() => {
@@ -277,7 +281,7 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
           {isOfflineExpired && (
             <div className="bg-indigo-950 border border-indigo-800 rounded-2xl p-4 mb-6">
-              <p className="text-indigo-300 text-sm font-semibold mb-1">₹999/month</p>
+              <p className="text-indigo-300 text-sm font-semibold mb-1">₹{planFee}/month</p>
               <p className="text-indigo-400 text-xs">All features · All shop types · Unlimited bills · Auto-updates</p>
             </div>
           )}
