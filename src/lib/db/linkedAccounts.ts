@@ -125,6 +125,28 @@ export async function hydrateFromJoinSnapshot(snapshot: any): Promise<void> {
     owner_name: (snapshot.app_config || [])[0]?.owner_name ?? '',
     status: 'active',
   });
+
+  // [core] [all tenants] — carry over real-time Cloud Sync credentials so this device
+  // pushes/pulls live changes (SSE + delta sync), not just the one-time join snapshot.
+  if (snapshot.sync_enabled && snapshot.sync_code) {
+    const { updateAppConfig } = await import('./config');
+    const { getAppConfig } = await import('./config');
+    const config = await getAppConfig();
+    const s = config?.settings as any ?? {};
+    await updateAppConfig({
+      settings: {
+        ...s,
+        cloud_sync_enabled: true,
+        cloud_sync_code: snapshot.sync_code,
+        cloud_sync_last_at: now(),
+        cloud_sync_last_pull_at: now(),
+        cloud_db_enabled: !!snapshot.cloud_db_code,
+        cloud_db_code: snapshot.cloud_db_code ?? s.cloud_db_code ?? null,
+      },
+    });
+    const { initAutoSync } = await import('../autoSync');
+    initAutoSync(tenant_id);
+  }
 }
 
 // [core] [all tenants] — single shared entry point for "join existing shop via shop code + PIN",

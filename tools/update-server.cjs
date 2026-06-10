@@ -1527,7 +1527,13 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
       saveCloudDb(tenantId, snapshot);
       logActivity(tenantId, sub.shop_name, 'staff_joined_new_device', `Staff "${matched.username}" joined on a new device`);
       console.log(`📱 ${sub.shop_name}: staff "${matched.username}" joined on new device via PIN`);
-      json(res, { ok: true, tenant_id: tenantId, staff_id: matched.id, username: matched.username, ...snapshot });
+      // [core] [all tenants] — include cloud sync credentials so the joining device can
+      // enable real-time sync (SSE + delta push/pull), not just the one-time snapshot.
+      json(res, {
+        ok: true, tenant_id: tenantId, staff_id: matched.id, username: matched.username,
+        sync_enabled: !!sub.sync_enabled, sync_code: sub.sync_code ?? null, cloud_db_code: sub.cloud_db_code ?? null,
+        ...snapshot,
+      });
     } catch (e) { json(res, { ok: false, error: 'Server error' }, 500); return; }
     return;
   }
