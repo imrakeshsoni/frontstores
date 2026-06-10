@@ -45,6 +45,7 @@ async function _initDb(): Promise<Database> {
     await _db.execute('PRAGMA foreign_keys = ON');
     await _db.execute('PRAGMA synchronous = NORMAL');
     await runMigrations(_db);
+    _wrapExecuteForSync(_db);
   } catch (e: any) {
     _dbPromise = null; // allow retry on failure
     reportError(String(e?.message || e), e?.stack, 'db.getDb');
@@ -114,4 +115,26 @@ export function now(): string {
 export function localDateISO(): string {
   const d = new Date();
   return `${d.getFullYear()}-${_pad(d.getMonth()+1)}-${_pad(d.getDate())}`;
+}
+
+// [all apps] [all tenants] — central hook: any write (INSERT/UPDATE/DELETE) made
+// anywhere via getDb() schedules a debounced Cloud Sync push. Without this, only
+// the handful of call sites that remembered to call triggerAutoSync() directly
+// would ever sync — every other table (products, orders, customers, etc.) would
+// silently never reach the cloud.
+function _wrapExecuteForSync(db: Database) {
+  const originalExecute = db.execute.bind(db);
+  db.execute = (async (sql: string, bindValues?: unknown[]) => {
+    const result = await originalExecute(sql, bindValues);
+    const op = sql.trim().slice(0, 6).toUpperCase();
+    const upper = sql.toUpperCase();
+    if (
+      (op === 'INSERT' || op === 'UPDATE' || op === 'DELETE') &&
+      !upper.includes('_MIGRATIONS') &&
+      !upper.includes('SYNC_QUEUE')
+    ) {
+      import('../autoSync').then(({ triggerAutoSync }) => triggerAutoSync()).catch(() => {});
+    }
+    return result;
+  }) as typeof db.execute;
 }
