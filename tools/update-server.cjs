@@ -439,6 +439,25 @@ function logActivity(tenantId, shopName, action, detail='') {
   saveActivity(log);
 }
 
+// [all apps] [all tenants] — local-time "YYYY-MM-DD HH:MM:SS" matching client's now(), so
+// sync cursor strings compare correctly (as plain strings) against row updated_at values.
+function nowFmt() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+// Highest updated_at across all synced tables in a sync data object, in the same
+// space-separated format as nowFmt()/client now() — used as the sync cursor so
+// `updated_at > since` comparisons remain valid string comparisons.
+function maxUpdatedAt(obj) {
+  let max = '';
+  for (const table of syncTableNames(obj)) {
+    for (const r of (obj[table] || [])) {
+      if (r && r.updated_at && r.updated_at > max) max = r.updated_at;
+    }
+  }
+  return max || nowFmt();
+}
 function addDays(from, days) {
   const d = new Date(from); d.setDate(d.getDate() + days);
   return d.toISOString().replace('T',' ').substring(0,19);
@@ -1309,10 +1328,10 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
       json(res, { ok: false, error: 'Unauthorized' }, 401); return;
     }
     const stored = loadSync(tenantId);
-    if (!stored) { json(res, { ok: true, delta: {}, server_time: new Date().toISOString() }); return; }
-    if (!since) {
-      // No since → return everything (first sync)
-      json(res, { ok: true, delta: stored, server_time: new Date().toISOString(), full: true }); return;
+    if (!stored) { json(res, { ok: true, delta: {}, server_time: nowFmt() }); return; }
+    if (!since || since.includes('T')) {
+      // No since, or a stale ISO-format cursor from before the sync timestamp fix → return everything
+      json(res, { ok: true, delta: stored, server_time: maxUpdatedAt(stored), full: true }); return;
     }
     // Return only records updated after `since` — table list is whatever this tenant's app actually synced
     const tables = syncTableNames(stored);
@@ -1322,7 +1341,8 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
       const changed = (stored[table] || []).filter(r => r.updated_at && r.updated_at > since);
       if (changed.length > 0) { delta[table] = changed; hasChanges = true; }
     }
-    json(res, { ok: true, delta, server_time: new Date().toISOString(), has_changes: hasChanges }); return;
+    const server_time = hasChanges ? maxUpdatedAt(delta) : since;
+    json(res, { ok: true, delta, server_time, has_changes: hasChanges }); return;
   }
 
   // POST /sync/request — tenant requests Cloud Sync access; lands in admin approval queue
@@ -1748,14 +1768,17 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
     }
     const existing = loadSync(tenant_id) || {};
     const isDelta = !!body.is_delta; // delta push = only changed records
+    const mergedTables = mergeSyncData(existing, body);
     const merged = {
       ...existing,
       tenant_id,
       shop_name: sub.shop_name,
       shop_type: sub.shop_type,
-      synced_at: new Date().toISOString(),
-      ...mergeSyncData(existing, body),
+      ...mergedTables,
     };
+    // [all apps] [all tenants] — cursor must be in the same "YYYY-MM-DD HH:MM:SS" string
+    // format as row updated_at values (not ISO), otherwise delta sync silently breaks
+    merged.synced_at = maxUpdatedAt(merged);
     saveSync(tenant_id, merged);
     sub.last_synced_at = new Date().toISOString();
     saveSubs(subs);

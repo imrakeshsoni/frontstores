@@ -275,7 +275,11 @@ export async function pushDelta(tenantId: string): Promise<{ ok: boolean; error?
   if (!s.cloud_sync_enabled || !s.cloud_sync_code) return { ok: false, error: 'Not activated' };
 
   const db = await getDb();
-  const since = s.cloud_sync_last_at ?? '2000-01-01T00:00:00Z';
+  // [all apps] [all tenants] — stale cursors stored in ISO "...T...Z" format (pre-fix)
+  // never compare correctly against "YYYY-MM-DD HH:MM:SS" updated_at values; reset them
+  // so this push goes out as a one-time full delta and self-heals the cursor.
+  const rawSince = s.cloud_sync_last_at ?? '2000-01-01 00:00:00';
+  const since = rawSince.includes('T') ? '2000-01-01 00:00:00' : rawSince;
   const tables = await getSyncableTables(db);
 
   const payload: Record<string, unknown> = { tenant_id: tenantId, sync_code: s.cloud_sync_code, is_delta: true };
@@ -478,7 +482,9 @@ export async function pullDelta(tenantId: string): Promise<{ ok: boolean; change
   const s = config?.settings as any ?? {};
   if (!s.cloud_sync_enabled || !s.cloud_sync_code) return { ok: false, changes: 0, error: 'Not activated' };
 
-  const since = s.cloud_sync_last_pull_at ?? s.cloud_sync_last_at ?? '2000-01-01T00:00:00Z';
+  // [all apps] [all tenants] — same self-heal as pushDelta: reset stale ISO-format cursors
+  const rawSince = s.cloud_sync_last_pull_at ?? s.cloud_sync_last_at ?? '2000-01-01 00:00:00';
+  const since = rawSince.includes('T') ? '' : rawSince;
   const res = await fetch(`${SERVER}/sync/pull/${tenantId}?since=${encodeURIComponent(since)}&sync_code=${s.cloud_sync_code}`);
   if (!res.ok) return { ok: false, changes: 0, error: `Server error ${res.status}` };
   const result = await res.json();
