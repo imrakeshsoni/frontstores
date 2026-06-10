@@ -37,7 +37,6 @@ const SERVER = 'https://update.frontstores.com';
 let _tenantId = '';
 let _pushTimer: ReturnType<typeof setTimeout> | null = null;
 let _pullInterval: ReturnType<typeof setInterval> | null = null;
-let _lastPushAt = 0;
 let _sse: EventSource | null = null;
 let _sseReconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let _sseReconnectDelay = 5000;
@@ -45,8 +44,8 @@ let _sseReconnectDelay = 5000;
 let _announceSSE: EventSource | null = null;
 let _announceReconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-const PUSH_DEBOUNCE_MS = 5_000;   // 5s after last change — faster for real-time feel
-const PULL_INTERVAL_MS = 3 * 60 * 1000; // 3-min fallback poll when SSE is healthy
+const PUSH_DEBOUNCE_MS = 300;     // ~instant push — just enough to batch a single multi-row write (e.g. order + line items) into one request
+const PULL_INTERVAL_MS = 30 * 1000; // 30s fallback poll if SSE drops, so the other device never waits long
 
 // Callback registered by SyncPage to refresh Cloud DB status after SSE approval
 let _onCloudDbApproved: (() => void) | null = null;
@@ -93,9 +92,6 @@ export function triggerAutoSync(immediate = false) {
   _pushTimer = setTimeout(async () => {
     const config = await getAppConfig();
     const s = config?.settings as any ?? {};
-    const now = Date.now();
-    if (now - _lastPushAt < 2000) return;
-    _lastPushAt = now;
     if (s.cloud_sync_enabled) {
       setSyncState({ status: 'syncing' });
       try {
