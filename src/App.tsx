@@ -396,15 +396,20 @@ export default function App() {
         return;
       }
       if (exists) {
-        // [all apps] [all tenants] — claim/renew this device's single-session slot;
-        // if another device holds it, fall through to AppLoginScreen, which will
-        // re-claim on submit and surface the "already logged in elsewhere" message.
-        // Each login (owner or staff) holds its own slot, keyed by username.
-        const loggedInUsername = sessionStorage.getItem('fs_logged_in_username') || 'owner';
-        const claim = await claimSession(tenantId, loggedInUsername);
-        if (!claim.blocked) {
-          if (claim.sessionId) sessionStorage.setItem('fs_session_id', claim.sessionId);
-          setAuthenticated(true);
+        // [all apps] [all tenants] — only auto-resume a session on THIS device if it
+        // previously logged in here (remembered per-tenant in localStorage, which
+        // survives app restarts unlike sessionStorage). A device that has never
+        // logged in for this tenant must always go through AppLoginScreen so it
+        // claims its OWN username's slot — never the default 'owner' slot, which
+        // would otherwise lock the real owner out on their next launch.
+        const rememberedUsername = localStorage.getItem(`fs_remember_user_${tenantId}`);
+        if (rememberedUsername) {
+          const claim = await claimSession(tenantId, rememberedUsername);
+          if (!claim.blocked) {
+            if (claim.sessionId) sessionStorage.setItem('fs_session_id', claim.sessionId);
+            sessionStorage.setItem('fs_logged_in_username', rememberedUsername);
+            setAuthenticated(true);
+          }
         }
       }
       setAuthChecked(true);
@@ -425,6 +430,7 @@ export default function App() {
       sessionRef.current = null;
       sessionStorage.removeItem('fs_session_id');
       sessionStorage.removeItem('fs_logged_in_username');
+      localStorage.removeItem(`fs_remember_user_${tenantId}`);
       releaseSession(tenantId, sessionId, username);
     }
   }, [isAuthenticated, config?.tenant_id]);

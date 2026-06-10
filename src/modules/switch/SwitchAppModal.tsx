@@ -424,11 +424,11 @@ export function SwitchAppModal({ onClose }: SwitchAppModalProps) {
                       <input
                         value={joinPin}
                         onChange={e => {
-                          const v = e.target.value.replace(/[^0-9]/g, '');
+                          const v = e.target.value.replace(/[^0-9]/g, '').slice(0, 8);
                           setJoinPin(v.length > 4 ? v.slice(0, 4) + '-' + v.slice(4, 8) : v);
                         }}
                         placeholder="1234-5678"
-                        maxLength={9}
+                        maxLength={20}
                         className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none font-mono tracking-widest"
                         style={{ background: 'var(--surface)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }}
                         autoComplete="off"

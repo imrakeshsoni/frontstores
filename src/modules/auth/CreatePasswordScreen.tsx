@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAppStore } from '@/app/store/app.store';
 import { createAuth } from '@/lib/db/auth';
+import { claimSession } from '@/lib/db/session';
 import { toast } from 'sonner';
 
 interface Props { onCreated: () => void; }
@@ -23,6 +24,10 @@ export function CreatePasswordScreen({ onCreated }: Props) {
     setLoading(true);
     try {
       await createAuth(config.tenant_id, username.trim(), password);
+      const claim = await claimSession(config.tenant_id, 'owner');
+      if (claim.sessionId) sessionStorage.setItem('fs_session_id', claim.sessionId);
+      sessionStorage.setItem('fs_logged_in_username', 'owner');
+      localStorage.setItem(`fs_remember_user_${config.tenant_id}`, 'owner');
       toast.success('Login created! You are now signed in.');
       onCreated();
       setAuthenticated(true);

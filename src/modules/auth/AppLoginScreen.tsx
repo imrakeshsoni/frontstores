@@ -159,6 +159,7 @@ export function AppLoginScreen() {
     }
     if (claim.sessionId) sessionStorage.setItem('fs_session_id', claim.sessionId);
     sessionStorage.setItem('fs_logged_in_username', loggedInUsername);
+    localStorage.setItem(`fs_remember_user_${tenantId}`, loggedInUsername);
     setAuthenticated(true);
   }
 

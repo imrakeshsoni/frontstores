@@ -6,6 +6,7 @@ import { importBackup } from '@/lib/db/backup';
 import { enqueue, flushQueue } from '@/lib/syncQueue';
 import { toast } from 'sonner';
 import { registerDevice, checkDeviceStatus, pullDeviceSyncData, getDeviceId } from '@/lib/db/cloudSync';
+import { claimSession } from '@/lib/db/session';
 
 const SERVER = 'https://update.frontstores.com';
 
@@ -377,6 +378,10 @@ export function SetupWizard() {
       setConfig(config);
       // Only let user in if server already approved (unlikely on first reg, but handles future cases)
       if (serverStatus === 'active' || serverStatus === 'extended') {
+        const claim = await claimSession(config.tenant_id, 'owner');
+        if (claim.sessionId) sessionStorage.setItem('fs_session_id', claim.sessionId);
+        sessionStorage.setItem('fs_logged_in_username', 'owner');
+        localStorage.setItem(`fs_remember_user_${config.tenant_id}`, 'owner');
         setAuthenticated(true);
         toast.success('Setup complete! Welcome to FrontStores.');
       } else {
@@ -434,8 +439,12 @@ export function SetupWizard() {
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">Join PIN <span className="text-slate-400 font-normal">(one-time, expires in 48h)</span></label>
                     <input
                       value={joinPin}
-                      onChange={e => setJoinPin(e.target.value)}
+                      onChange={e => {
+                        const v = e.target.value.replace(/[^0-9]/g, '').slice(0, 8);
+                        setJoinPin(v.length > 4 ? v.slice(0, 4) + '-' + v.slice(4, 8) : v);
+                      }}
                       placeholder="e.g. 7483-2916"
+                      maxLength={20}
                       className="w-full rounded-xl border-2 px-4 py-3 text-base outline-none focus:border-violet-500 font-mono tracking-widest"
                       style={{ borderColor: '#e2e8f0' }}
                     />
