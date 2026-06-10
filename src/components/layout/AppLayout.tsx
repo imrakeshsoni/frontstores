@@ -578,14 +578,23 @@ export function AppLayout() {
     const tenantId = config?.tenant_id;
     if (!tenantId) { setLoggedInDisplayName(null); return; }
     const username = sessionStorage.getItem('fs_logged_in_username');
-    if (!username || username === 'owner') { setLoggedInDisplayName(null); return; }
+    if (!username || username === 'owner') {
+      // [core] [all tenants] — owner_name can be blank (e.g. devices joined via shop
+      // code/PIN before owner_name was carried over). Fall back to the login username
+      // so the bottom-left always shows who's logged in, never blank.
+      if (config?.owner_name) { setLoggedInDisplayName(null); return; }
+      import('@/lib/db/auth').then(({ getAuthUsername }) => {
+        getAuthUsername(tenantId).then(u => setLoggedInDisplayName(u || null)).catch(() => setLoggedInDisplayName(null));
+      });
+      return;
+    }
     import('@/lib/db/staffUsers').then(({ listStaffUsers }) => {
       listStaffUsers(tenantId).then(staff => {
-        const match = staff.find(s => s.username === username);
+        const match = staff.find(s => s.username === username && s.status === 'approved');
         setLoggedInDisplayName(match?.display_name || username);
       }).catch(() => setLoggedInDisplayName(username));
     });
-  }, [config?.tenant_id]);
+  }, [config?.tenant_id, config?.owner_name]);
   // [carwash] [all tenants] — verify against the real app_auth table (same as main login), not placeholder settings fields
   const attemptOwnerLogin = async () => {
     const tenantId = config?.tenant_id ?? '';
