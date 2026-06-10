@@ -259,8 +259,12 @@ export async function setStaffPassword(tenantId: string, staffId: string, newPas
 // Returns allowed tabs for the logged-in staff user (empty array = all tabs for owner)
 export async function getStaffTabAccess(tenantId: string, username: string): Promise<string[] | null> {
   const cleanUsername = username.trim().toLowerCase();
+  // [core] [all tenants] — owner login flows store the literal placeholder
+  // 'owner' in sessionStorage (not the real auth username); always treat that
+  // as unrestricted so the owner never gets staff tab filtering applied.
+  if (cleanUsername === 'owner') return null;
   if (await hasAuth(tenantId)) {
-    const ownerUsername = await getAuthUsername(tenantId);
+    const ownerUsername = (await getAuthUsername(tenantId) || '').trim().toLowerCase();
     if (ownerUsername === cleanUsername) return null; // null = owner, no restrictions
   }
   const db = await getDb();
