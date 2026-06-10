@@ -1864,6 +1864,32 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
     return;
   }
 
+  // [all apps] [all tenants] — GET /pricing/:tenant_id — return all fees for this tenant at once
+  const pricingGetMatch2 = pathname.match(/^\/pricing\/([a-f0-9-]{36})$/);
+  if (req.method === 'GET' && pricingGetMatch2) {
+    const tenantId = pricingGetMatch2[1];
+    const subs = loadSubs();
+    const sub = subs[tenantId];
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    json(res, {
+      ok: true,
+      plan_fee:       sub?.plan_fee       ?? 999,
+      staff_user_fee: sub?.staff_user_fee ?? 200,
+      cloud_sync_fee: sub?.cloud_sync_fee ?? 299,
+      currency: 'INR',
+    }); return;
+  }
+
+  // [all apps] [all tenants] — GET /staff-user-fee/:tenant_id — return per-user fee for this tenant
+  const staffUserFeeMatch2 = pathname.match(/^\/staff-user-fee\/([a-f0-9-]{36})$/);
+  if (req.method === 'GET' && staffUserFeeMatch2) {
+    const tenantId = staffUserFeeMatch2[1];
+    const subs = loadSubs();
+    const sub = subs[tenantId];
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    json(res, { ok: true, fee: sub?.staff_user_fee ?? 200, currency: 'INR' }); return;
+  }
+
   res.writeHead(404); res.end('Not found');
 });
 
@@ -2111,32 +2137,6 @@ async function handleAdminRequest(req, res) {
     logActivity(tenantId, sub.shop_name, 'sync_approved', 'Cloud Sync request approved by admin');
     console.log(`☁️  Cloud Sync approved for ${sub.shop_name}`);
     json(res, { ok: true }); return;
-  }
-
-  // [all apps] [all tenants] — GET /pricing/:tenant_id — return all fees for this tenant at once
-  const pricingGetMatch = pathname.match(/^\/pricing\/([a-f0-9-]{36})$/);
-  if (req.method === 'GET' && pricingGetMatch) {
-    const tenantId = pricingGetMatch[1];
-    const subs = loadSubs();
-    const sub = subs[tenantId];
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    json(res, {
-      ok: true,
-      plan_fee:       sub?.plan_fee       ?? 999,
-      staff_user_fee: sub?.staff_user_fee ?? 200,
-      cloud_sync_fee: sub?.cloud_sync_fee ?? 299,
-      currency: 'INR',
-    }); return;
-  }
-
-  // [all apps] [all tenants] — GET /staff-user-fee/:tenant_id — return per-user fee for this tenant
-  const staffUserFeeMatch = pathname.match(/^\/staff-user-fee\/([a-f0-9-]{36})$/);
-  if (req.method === 'GET' && staffUserFeeMatch) {
-    const tenantId = staffUserFeeMatch[1];
-    const subs = loadSubs();
-    const sub = subs[tenantId];
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    json(res, { ok: true, fee: sub?.staff_user_fee ?? 200, currency: 'INR' }); return;
   }
 
   // [all apps] [all tenants] — POST /admin/api/customers/:id/pricing — admin sets all fees for a tenant
