@@ -1,6 +1,8 @@
 // [core] [all tenants] — multi-app support
 import { getDb, uuid, now } from './index';
 
+const SERVER = 'https://update.frontstores.com';
+
 export interface LinkedAccount {
   id: string;
   tenant_id: string;
@@ -123,6 +125,30 @@ export async function hydrateFromJoinSnapshot(snapshot: any): Promise<void> {
     owner_name: (snapshot.app_config || [])[0]?.owner_name ?? '',
     status: 'active',
   });
+}
+
+// [core] [all tenants] — single shared entry point for "join existing shop via shop code + PIN",
+// used from both the Setup Wizard and Switch App modal so the two flows can't drift apart.
+export type JoinShopResult =
+  | { ok: true; tenantId: string; staffId: string; username: string; shopName: string }
+  | { ok: false; error: string };
+
+export async function joinShopWithPin(shopCode: string, pin: string): Promise<JoinShopResult> {
+  try {
+    const res = await fetch(`${SERVER}/join/verify-pin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ shop_code: shopCode, pin }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const data = await res.json();
+    if (!data.ok) return { ok: false, error: data.error || 'Invalid shop code or PIN' };
+    await hydrateFromJoinSnapshot(data);
+    return { ok: true, tenantId: data.tenant_id, staffId: data.staff_id, username: data.username ?? '', shopName: data.shop_name ?? 'Shop' };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg.toLowerCase().includes('time') ? 'Could not reach the server — check your internet and try again' : 'Something went wrong. Please try again.' };
+  }
 }
 
 // Switch the active app — updates app_config is_active flags

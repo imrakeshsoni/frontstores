@@ -6,10 +6,12 @@ import { useAppStore } from '@/app/store/app.store';
 import { APP_REGISTRY } from '@/lib/shop/shopType';
 import {
   getLinkedAccounts, upsertLinkedAccount, switchActiveApp, createLinkedAppConfig,
-  hydrateFromJoinSnapshot,
+  joinShopWithPin,
   type LinkedAccount,
 } from '@/lib/db/linkedAccounts';
 import { copyAuth } from '@/lib/db/auth';
+import { setStaffPassword } from '@/lib/db/staffUsers';
+import { triggerAutoSync } from '@/lib/autoSync';
 
 const SERVER = 'https://update.frontstores.com';
 
@@ -37,7 +39,12 @@ export function SwitchAppModal({ onClose }: SwitchAppModalProps) {
   const [joinPin, setJoinPin]     = useState('');
   const [joining, setJoining]     = useState(false);
   const [joinError, setJoinError] = useState('');
-  const [joinSuccess, setJoinSuccess] = useState<{ shopName: string; username: string } | null>(null);
+  const [joinSuccess, setJoinSuccess] = useState<{ shopName: string; username: string; tenantId: string; staffId: string } | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [settingPassword, setSettingPassword] = useState(false);
+  const [passwordSet, setPasswordSet] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
 
   useEffect(() => {
     getLinkedAccounts().then(setLinked);
@@ -161,32 +168,32 @@ export function SwitchAppModal({ onClose }: SwitchAppModalProps) {
     const pin  = joinPin.replace(/-/g, '').trim();
     if (!code || pin.length < 6) { setJoinError('Enter a valid shop code and PIN'); return; }
     setJoining(true); setJoinError('');
-    try {
-      const res = await fetch(`${SERVER}/join/verify-pin`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shop_code: code, pin }),
-        signal: AbortSignal.timeout(15000),
-      });
-      const data = await res.json();
-      if (!data.ok) { setJoinError(data.error ?? 'Invalid shop code or PIN'); setJoining(false); return; }
-
-      // Hydrate local DB with snapshot
-      await hydrateFromJoinSnapshot(data);
-      await loadConfig();
-      setJoinSuccess({ shopName: data.shop_name ?? 'Shop', username: data.username ?? '' });
-    } catch (e: unknown) {
-      setJoinError(e instanceof Error && e.message.includes('timed out')
-        ? 'Could not reach server. Check internet connection.'
-        : 'Something went wrong. Please try again.');
-      setJoining(false);
-    }
+    const result = await joinShopWithPin(code, pin);
+    if (!result.ok) { setJoinError(result.error); setJoining(false); return; }
+    await loadConfig();
+    setJoinSuccess({ shopName: result.shopName, username: result.username, tenantId: result.tenantId, staffId: result.staffId });
+    setJoining(false);
   };
 
   const handleSwitchAfterJoin = () => {
     setAuthenticated(false);
     onClose();
     navigate('/');
+  };
+
+  const handleSetJoinPassword = async () => {
+    if (!joinSuccess) return;
+    if (newPassword.length < 4) { setPasswordError('Password must be at least 4 characters'); return; }
+    if (newPassword !== confirmNewPassword) { setPasswordError('Passwords do not match'); return; }
+    setSettingPassword(true); setPasswordError('');
+    try {
+      const result = await setStaffPassword(joinSuccess.tenantId, joinSuccess.staffId, newPassword);
+      if (!result.ok) { setPasswordError(result.error ?? 'Could not set password'); return; }
+      triggerAutoSync(true);
+      setPasswordSet(true);
+    } finally {
+      setSettingPassword(false);
+    }
   };
 
   const linkedMap = new Map(linked.map(a => [a.shop_type, a]));
@@ -351,15 +358,53 @@ export function SwitchAppModal({ onClose }: SwitchAppModalProps) {
                     <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>
                       Joined <span style={{ color: '#6d28d9' }}>{joinSuccess.shopName}</span>!
                     </p>
-                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                      Log in with username <strong>{joinSuccess.username}</strong> and your password.
-                    </p>
-                    <button
-                      onClick={handleSwitchAfterJoin}
-                      className="w-full py-2.5 rounded-xl text-sm font-bold text-white"
-                      style={{ background: '#6d28d9' }}>
-                      Go to Login →
-                    </button>
+                    {passwordSet ? (
+                      <>
+                        <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                          Log in with username <strong>{joinSuccess.username}</strong> and the password you just set.
+                        </p>
+                        <button
+                          onClick={handleSwitchAfterJoin}
+                          className="w-full py-2.5 rounded-xl text-sm font-bold text-white"
+                          style={{ background: '#6d28d9' }}>
+                          Go to Login →
+                        </button>
+                      </>
+                    ) : (
+                      <div className="text-left space-y-3">
+                        <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                          Set a password for username <strong>{joinSuccess.username}</strong> to finish:
+                        </p>
+                        <div>
+                          <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--text-secondary)' }}>New Password</label>
+                          <input
+                            type="password"
+                            value={newPassword}
+                            onChange={e => setNewPassword(e.target.value)}
+                            className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none"
+                            style={{ background: 'var(--surface)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--text-secondary)' }}>Confirm Password</label>
+                          <input
+                            type="password"
+                            value={confirmNewPassword}
+                            onChange={e => setConfirmNewPassword(e.target.value)}
+                            className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none"
+                            style={{ background: 'var(--surface)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }}
+                          />
+                        </div>
+                        {passwordError && <p className="text-xs font-semibold" style={{ color: '#dc2626' }}>⚠ {passwordError}</p>}
+                        <button
+                          onClick={handleSetJoinPassword}
+                          disabled={settingPassword || !newPassword || !confirmNewPassword}
+                          className="w-full py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50"
+                          style={{ background: '#6d28d9' }}>
+                          {settingPassword ? 'Saving…' : 'Set Password'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-3 pt-3">

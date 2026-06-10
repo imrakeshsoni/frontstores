@@ -89,6 +89,12 @@ export function SetupWizard() {
   const [joinLoading, setJoinLoading] = useState(false);
   const [joinStatus, setJoinStatus] = useState<'idle' | 'loading' | 'done'>('idle');
   const [joinError, setJoinError] = useState('');
+  const [joinResult, setJoinResult] = useState<{ tenantId: string; staffId: string; username: string; shopName: string } | null>(null);
+  const [joinNewPassword, setJoinNewPassword] = useState('');
+  const [joinConfirmPassword, setJoinConfirmPassword] = useState('');
+  const [joinPasswordSet, setJoinPasswordSet] = useState(false);
+  const [joinPasswordSaving, setJoinPasswordSaving] = useState(false);
+  const [joinPasswordError, setJoinPasswordError] = useState('');
   const [tcAgreed, setTcAgreed] = useState(false);
   const [form, setForm] = useState<FormData>({
     shop_type: '', shop_name: '', owner_name: '', phone: '',
@@ -186,7 +192,6 @@ export function SetupWizard() {
         setMlError(result.error ?? 'Could not pull data. Ask owner to sync from desktop first.');
         setMlStatus('idle'); return;
       }
-      const db = (await import('@/lib/db/index')).getDb;
       const { getDb } = await import('@/lib/db/index');
       const sqliteDb = await getDb();
       const data = result.data;
@@ -242,49 +247,39 @@ export function SetupWizard() {
   // [core] [all apps] [all tenants] — Staff joins on a new device using shop code + one-time PIN
   async function handleJoinShop() {
     const code = joinShopCode.trim().toUpperCase();
-    const pin  = joinPin.trim();
+    const pin  = joinPin.replace(/-/g, '').trim();
     if (!code || !pin) { setJoinError('Enter the shop code and your join PIN'); return; }
     setJoinLoading(true);
     setJoinError('');
     setJoinStatus('loading');
+    const { joinShopWithPin } = await import('@/lib/db/linkedAccounts');
+    const result = await joinShopWithPin(code, pin);
+    if (!result.ok) { setJoinError(result.error); setJoinStatus('idle'); setJoinLoading(false); return; }
+
+    setJoinResult(result);
+    setJoinStatus('done');
+    setJoinLoading(false);
+    // Refresh app config so App.tsx recognises setup is complete
+    const { loadConfig } = (await import('@/app/store/app.store')).useAppStore.getState();
+    loadConfig();
+  }
+
+  // [core] [all tenants] — staff sets their own password right after joining via PIN
+  async function handleSetJoinPassword() {
+    if (!joinResult) return;
+    if (joinNewPassword.length < 4) { setJoinPasswordError('Password must be at least 4 characters'); return; }
+    if (joinNewPassword !== joinConfirmPassword) { setJoinPasswordError('Passwords do not match'); return; }
+    setJoinPasswordSaving(true);
+    setJoinPasswordError('');
     try {
-      const res = await fetch(`${SERVER}/join/verify-pin`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shop_code: code, pin }),
-        signal: AbortSignal.timeout(15000),
-      });
-      const data = await res.json() as { ok: boolean; error?: string; tenant_id?: string } & Record<string, unknown>;
-      if (!data.ok) { setJoinError(data.error || 'Invalid shop code or PIN'); setJoinStatus('idle'); return; }
-
-      // Server returned the full snapshot — load it into local SQLite
-      const { getDb } = await import('@/lib/db/index');
-      const sqliteDb = await getDb();
-      for (const [table, rows] of Object.entries(data)) {
-        if (!Array.isArray(rows) || rows.length === 0) continue;
-        if (['ok','tenant_id','staff_id','username','snapshot_at'].includes(table)) continue;
-        try {
-          const cols = Object.keys(rows[0]);
-          const placeholders = cols.map(() => '?').join(',');
-          for (const row of rows) {
-            await sqliteDb.execute(
-              `INSERT OR REPLACE INTO ${table} (${cols.join(',')}) VALUES (${placeholders})`,
-              cols.map(c => row[c] ?? null)
-            );
-          }
-        } catch { /* skip unknown tables */ }
-      }
-
-      setJoinStatus('done');
-      // Refresh app config so App.tsx recognises setup is complete
-      const { loadConfig } = (await import('@/app/store/app.store')).useAppStore.getState();
-      loadConfig();
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setJoinError(msg.includes('timeout') ? 'Could not reach the server — check your internet and try again' : 'Something went wrong. Try again.');
-      setJoinStatus('idle');
+      const { setStaffPassword } = await import('@/lib/db/staffUsers');
+      const result = await setStaffPassword(joinResult.tenantId, joinResult.staffId, joinNewPassword);
+      if (!result.ok) { setJoinPasswordError(result.error ?? 'Could not set password'); return; }
+      const { triggerAutoSync } = await import('@/lib/autoSync');
+      triggerAutoSync(true);
+      setJoinPasswordSet(true);
     } finally {
-      setJoinLoading(false);
+      setJoinPasswordSaving(false);
     }
   }
 
@@ -464,18 +459,57 @@ export function SetupWizard() {
                 </div>
               )}
 
-              {joinStatus === 'done' && (
-                <div className="text-center py-8">
-                  <div className="text-4xl mb-4">🎉</div>
-                  <h3 className="font-bold text-slate-800 mb-2">You're in!</h3>
-                  <p className="text-sm text-slate-500 mb-5">Shop data is on this device. Log in with the username and password your owner set for you.</p>
-                  <button
-                    onClick={() => { setJoinFlow(false); setJoinStatus('idle'); setJoinError(''); }}
-                    className="px-5 py-2.5 rounded-xl font-medium text-white text-sm"
-                    style={{ background: '#7c3aed' }}
-                  >
-                    Continue →
-                  </button>
+              {joinStatus === 'done' && joinResult && (
+                <div className="py-4">
+                  <div className="text-center mb-4">
+                    <div className="text-4xl mb-4">🎉</div>
+                    <h3 className="font-bold text-slate-800 mb-2">Joined {joinResult.shopName}!</h3>
+                  </div>
+                  {joinPasswordSet ? (
+                    <div className="text-center">
+                      <p className="text-sm text-slate-500 mb-5">Log in with username <strong>{joinResult.username}</strong> and the password you just set.</p>
+                      <button
+                        onClick={() => { setJoinFlow(false); setJoinStatus('idle'); setJoinError(''); }}
+                        className="px-5 py-2.5 rounded-xl font-medium text-white text-sm"
+                        style={{ background: '#7c3aed' }}
+                      >
+                        Continue →
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <p className="text-sm text-slate-500">Set a password for username <strong>{joinResult.username}</strong> to finish:</p>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">New Password</label>
+                        <input
+                          type="password"
+                          value={joinNewPassword}
+                          onChange={e => setJoinNewPassword(e.target.value)}
+                          className="w-full rounded-xl border-2 px-4 py-3 text-base outline-none focus:border-violet-500"
+                          style={{ borderColor: '#e2e8f0' }}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Confirm Password</label>
+                        <input
+                          type="password"
+                          value={joinConfirmPassword}
+                          onChange={e => setJoinConfirmPassword(e.target.value)}
+                          className="w-full rounded-xl border-2 px-4 py-3 text-base outline-none focus:border-violet-500"
+                          style={{ borderColor: '#e2e8f0' }}
+                        />
+                      </div>
+                      {joinPasswordError && <div className="rounded-xl p-3 text-sm font-medium" style={{ background: '#fee2e2', color: '#dc2626' }}>{joinPasswordError}</div>}
+                      <button
+                        onClick={handleSetJoinPassword}
+                        disabled={joinPasswordSaving || !joinNewPassword || !joinConfirmPassword}
+                        className="w-full py-3 rounded-xl font-bold text-white text-sm disabled:opacity-60"
+                        style={{ background: '#7c3aed' }}
+                      >
+                        {joinPasswordSaving ? 'Saving…' : 'Set Password'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -242,6 +242,20 @@ export async function verifyStaffAuth(
   return { ok: true };
 }
 
+// Set a new password for a staff login — used right after joining via PIN, since
+// the joining device doesn't know the password the owner originally set.
+export async function setStaffPassword(tenantId: string, staffId: string, newPassword: string): Promise<{ ok: boolean; error?: string }> {
+  if (newPassword.length < 4) return { ok: false, error: 'Password must be at least 4 characters' };
+  const db = await getDb();
+  const salt = randomSalt();
+  const hash = await hashPassword(newPassword, salt);
+  await db.execute(
+    `UPDATE staff_users SET password_hash = ?, salt = ?, updated_at = ? WHERE id = ? AND tenant_id = ?`,
+    [hash, salt, now(), staffId, tenantId]
+  );
+  return { ok: true };
+}
+
 // Returns allowed tabs for the logged-in staff user (empty array = all tabs for owner)
 export async function getStaffTabAccess(tenantId: string, username: string): Promise<string[] | null> {
   const cleanUsername = username.trim().toLowerCase();
