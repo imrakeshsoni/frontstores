@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAppStore } from '@/app/store/app.store';
 import { getDb, now } from '@/lib/db/index';
 import { getPricing } from '@/lib/db/cloudSync';
+import { updateAppConfig } from '@/lib/db/config';
 
 const CONTACT_URL = 'https://frontstores.com/#contact';
 const SERVER = 'https://update.frontstores.com';
@@ -148,6 +149,16 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
         `UPDATE app_config SET last_server_time = ?, last_verified_at = ?, updated_at = ? WHERE tenant_id = ?`,
         [data.server_time || new Date().toISOString(), now(), now(), config.tenant_id]
       );
+
+      // [core] [all tenants] — admin's client/tester tag controls visibility of
+      // dev-only features (e.g. Switch App) for this tenant and all its users
+      if (typeof data.is_client === 'boolean') {
+        const s = config.settings as any ?? {};
+        if (s.is_client !== data.is_client) {
+          await updateAppConfig({ settings: { ...s, is_client: data.is_client } });
+          await refreshConfig();
+        }
+      }
 
       if (data.reason === 'pending') return 'pending';
       if (data.reason === 'frozen') return 'frozen';

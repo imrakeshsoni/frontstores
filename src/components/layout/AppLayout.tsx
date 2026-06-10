@@ -571,6 +571,9 @@ export function AppLayout() {
     setSyncStateHandler(setSyncStateLocal);
     return () => removeSyncStateHandler(setSyncStateLocal);
   }, []);
+  // [core] [all tenants] — Switch App is a dev/tester-only feature; hidden for
+  // tenants the admin has tagged as "client" (real customers), and all their users
+  const isClient = !!(config?.settings as any)?.is_client;
   useEffect(() => {
     const tenantId = config?.tenant_id;
     if (!tenantId) { setLoggedInDisplayName(null); return; }
@@ -779,10 +782,12 @@ export function AppLayout() {
                         <Icon style={{ width: '13px', height: '13px' }} /> {label}
                       </NavLink>
                     ))}
-                    <button onClick={() => { setShowUserMenu(false); setShowSwitchModal(true); }}
-                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', color: 'rgba(255,255,255,0.6)', background: 'none', border: 'none', borderBottom: `1px solid ${C.navBorder}`, width: '100%', fontSize: '13px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
-                      <ArrowLeftRight style={{ width: '13px', height: '13px' }} /> Switch App
-                    </button>
+                    {!isClient && (
+                      <button onClick={() => { setShowUserMenu(false); setShowSwitchModal(true); }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', color: 'rgba(255,255,255,0.6)', background: 'none', border: 'none', borderBottom: `1px solid ${C.navBorder}`, width: '100%', fontSize: '13px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+                        <ArrowLeftRight style={{ width: '13px', height: '13px' }} /> Switch App
+                      </button>
+                    )}
                     <button onClick={() => { setShowUserMenu(false); setAuthenticated(false); }}
                       style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', color: '#f87171', background: 'none', border: 'none', width: '100%', fontSize: '13px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
                       <LogOut style={{ width: '13px', height: '13px' }} /> Logout
@@ -921,12 +926,14 @@ export function AppLayout() {
                       <Settings className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--text-tertiary)' }} />
                       Settings &amp; Updates
                     </NavLink>
-                    <button onClick={() => { setShowUserMenu(false); setShowSwitchModal(true); }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors hover:opacity-80"
-                      style={{ color: 'var(--text-primary)', borderBottom: '1px solid var(--surface-border)' }}>
-                      <ArrowLeftRight className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--text-tertiary)' }} />
-                      Switch App
-                    </button>
+                    {!isClient && (
+                      <button onClick={() => { setShowUserMenu(false); setShowSwitchModal(true); }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors hover:opacity-80"
+                        style={{ color: 'var(--text-primary)', borderBottom: '1px solid var(--surface-border)' }}>
+                        <ArrowLeftRight className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--text-tertiary)' }} />
+                        Switch App
+                      </button>
+                    )}
                     {/* [carwash] [all tenants] — Login as Employee option */}
                     {config?.shop_type === 'carwash' && (
                       <button onClick={() => { setShowUserMenu(false); setIsEmployeeMode(true); navigate('/carwash/jobs'); }}
@@ -1005,16 +1012,18 @@ export function AppLayout() {
             </div>
             <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{config?.shop_name || 'FrontStores'}</span>
           </div>
-          {/* [core] [all tenants] — App Switch button on mobile */}
-          <button
-            onClick={() => setShowSwitchModal(true)}
-            title="Switch App"
-            className="flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-semibold transition-colors"
-            style={{ color: 'white', background: 'var(--accent)' }}
-          >
-            <ArrowLeftRight className="h-3.5 w-3.5" />
-            Switch
-          </button>
+          {/* [core] [all tenants] — App Switch button on mobile (hidden for client tenants) */}
+          {!isClient && (
+            <button
+              onClick={() => setShowSwitchModal(true)}
+              title="Switch App"
+              className="flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-semibold transition-colors"
+              style={{ color: 'white', background: 'var(--accent)' }}
+            >
+              <ArrowLeftRight className="h-3.5 w-3.5" />
+              Switch
+            </button>
+          )}
         </header>
 
         {/* Mobile horizontal nav */}

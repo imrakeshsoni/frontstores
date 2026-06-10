@@ -665,8 +665,8 @@ const publicServer = http.createServer(async (req, res) => {
     if (sub.account_status === 'frozen')   { json(res, { active: false, reason: 'frozen',  server_time }); return; }
     if (sub.account_status === 'revoked')  { json(res, { active: false, reason: 'revoked', server_time }); return; }
     json(res, sub.expires_at && new Date(sub.expires_at) > new Date()
-      ? { active: true,  expires_at: sub.expires_at, server_time }
-      : { active: false, server_time });
+      ? { active: true,  expires_at: sub.expires_at, server_time, is_client: !!sub.is_client }
+      : { active: false, server_time, is_client: !!sub.is_client });
     return;
   }
 
