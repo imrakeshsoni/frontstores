@@ -7,6 +7,29 @@ import { getAppConfig } from './db/config';
 let _onAnnouncementNew: (() => void) | null = null;
 export function setAnnouncementNewHandler(cb: () => void) { _onAnnouncementNew = cb; }
 
+// [core] [all tenants] — sync status indicator (sidebar): tracks whether we're
+// online, syncing, up to date, or hit an error, so the user knows their data
+// is reaching the cloud (and can trust local-only data while offline).
+export type SyncStatus = 'disabled' | 'offline' | 'syncing' | 'synced' | 'error';
+export interface SyncState { status: SyncStatus; lastSyncedAt: string | null }
+let _syncState: SyncState = { status: 'disabled', lastSyncedAt: null };
+let _onSyncStateChange: ((s: SyncState) => void) | null = null;
+export function setSyncStateHandler(cb: ((s: SyncState) => void) | null) {
+  _onSyncStateChange = cb;
+  cb?.(_syncState);
+}
+export function getSyncState(): SyncState { return _syncState; }
+function setSyncState(partial: Partial<SyncState>) {
+  _syncState = { ..._syncState, ...partial };
+  _onSyncStateChange?.(_syncState);
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    if (_syncState.status === 'offline') setSyncState({ status: _tenantId ? 'syncing' : 'disabled' });
+  });
+  window.addEventListener('offline', () => setSyncState({ status: 'offline' }));
+}
+
 const SERVER = 'https://update.frontstores.com';
 
 let _tenantId = '';
@@ -29,16 +52,20 @@ export function setCloudDbApprovedHandler(cb: () => void) { _onCloudDbApproved =
 
 export function initAutoSync(tenantId: string) {
   _tenantId = tenantId;
+  setSyncState({ status: navigator.onLine ? 'syncing' : 'offline' });
   // Refresh both sync and cloud-db status on startup
   Promise.allSettled([
     refreshCloudSyncStatus(tenantId),
     refreshCloudDbStatus(tenantId),
-  ]).then(() => {
+  ]).then(async () => {
+    const config = await getAppConfig().catch(() => null);
+    if (!(config?.settings as any)?.cloud_sync_enabled) setSyncState({ status: 'disabled' });
     connectSSE();
     connectAnnounceSSE(); // [all apps] [all tenants] — works without Cloud Sync
     silentPull();
     silentCloudDbPush(); // push to cloud DB if enabled
   }).catch(() => {
+    setSyncState({ status: navigator.onLine ? 'error' : 'offline' });
     connectSSE();
     connectAnnounceSSE();
     silentPull();
@@ -68,7 +95,13 @@ export function triggerAutoSync(immediate = false) {
     if (now - _lastPushAt < 2000) return;
     _lastPushAt = now;
     if (s.cloud_sync_enabled) {
-      try { await pushDelta(_tenantId); } catch { /* non-critical */ }
+      setSyncState({ status: 'syncing' });
+      try {
+        await pushDelta(_tenantId);
+        setSyncState({ status: 'synced', lastSyncedAt: new Date().toISOString() });
+      } catch {
+        setSyncState({ status: navigator.onLine ? 'error' : 'offline' });
+      }
     }
     // [all apps] [all tenants] — also push to Cloud Database if enabled
     if (s.cloud_db_enabled) {
@@ -82,7 +115,13 @@ async function silentPull() {
   const config = await getAppConfig();
   const s = config?.settings as any ?? {};
   if (!s.cloud_sync_enabled) return;
-  try { await pullDelta(_tenantId); } catch { /* non-critical */ }
+  setSyncState({ status: 'syncing' });
+  try {
+    await pullDelta(_tenantId);
+    setSyncState({ status: 'synced', lastSyncedAt: new Date().toISOString() });
+  } catch {
+    setSyncState({ status: navigator.onLine ? 'error' : 'offline' });
+  }
 }
 
 async function silentCloudDbPush() {
@@ -154,6 +193,7 @@ async function connectSSE() {
     es.onerror = () => {
       es.close();
       _sse = null;
+      setSyncState({ status: navigator.onLine ? 'error' : 'offline' });
       // Reconnect with exponential backoff, cap at 2 minutes
       _sseReconnectTimer = setTimeout(() => {
         _sseReconnectDelay = Math.min(_sseReconnectDelay * 2, 120_000);

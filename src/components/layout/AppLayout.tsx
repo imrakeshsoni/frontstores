@@ -83,6 +83,10 @@ import {
   MessageSquare,
   DollarSign,
   UserCog,
+  Cloud,
+  CloudOff,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '@/app/store/app.store';
@@ -92,7 +96,7 @@ import { VoiceAssistant } from '@/components/voice/VoiceAssistant';
 import { StudyVoiceAssistant } from '@/modules/study/StudyVoiceAssistant';
 import { AnnouncementPopup } from '@/components/announcements/AnnouncementPopup';
 import { pollAnnouncements, getUnreadCount } from '@/lib/db/announcements';
-import { setAnnouncementNewHandler } from '@/lib/autoSync';
+import { setAnnouncementNewHandler, setSyncStateHandler, getSyncState, type SyncState } from '@/lib/autoSync';
 import { MobileNav } from './MobileNav';
 
 export const NAV_ITEMS = [
@@ -561,6 +565,12 @@ export function AppLayout() {
   const [showOwnerPass, setShowOwnerPass] = useState(false);
   // [core] [all tenants] — display name of the logged-in user (owner or staff) in the bottom sidebar row
   const [loggedInDisplayName, setLoggedInDisplayName] = useState<string | null>(null);
+  // [core] [all tenants] — Cloud Sync status indicator (synced / syncing / offline / error / disabled)
+  const [syncState, setSyncStateLocal] = useState<SyncState>(() => getSyncState());
+  useEffect(() => {
+    setSyncStateHandler(setSyncStateLocal);
+    return () => setSyncStateHandler(null);
+  }, []);
   useEffect(() => {
     const tenantId = config?.tenant_id;
     if (!tenantId) { setLoggedInDisplayName(null); return; }
@@ -936,6 +946,22 @@ export function AppLayout() {
                 )}
               </div>
             </>
+          )}
+
+          {/* [core] [all tenants] — Cloud Sync status indicator */}
+          {syncState.status !== 'disabled' && (
+            <div className="flex items-center gap-1.5 px-3 pb-1.5 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+              {syncState.status === 'synced' && <Cloud className="h-3.5 w-3.5" style={{ color: '#22c55e' }} />}
+              {syncState.status === 'syncing' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {syncState.status === 'offline' && <CloudOff className="h-3.5 w-3.5" style={{ color: '#f59e0b' }} />}
+              {syncState.status === 'error' && <AlertCircle className="h-3.5 w-3.5" style={{ color: '#ef4444' }} />}
+              <span>
+                {syncState.status === 'synced' && 'Synced to cloud'}
+                {syncState.status === 'syncing' && 'Syncing…'}
+                {syncState.status === 'offline' && 'Offline — saved locally'}
+                {syncState.status === 'error' && 'Sync error — retrying'}
+              </span>
+            </div>
           )}
 
           {/* Clickable owner row */}
