@@ -80,6 +80,7 @@ export async function refreshCloudSyncStatus(tenantId: string): Promise<CloudSyn
           cloud_sync_request_status: data.request_status ?? null,
           cloud_sync_code: data.sync_code ?? s.cloud_sync_code ?? null,
           cloud_sync_dashboard_url: data.dashboard_url ?? s.cloud_sync_dashboard_url ?? null,
+          billing_user: data.billing_user ?? s.billing_user ?? 'owner',
         },
       });
     }
@@ -167,6 +168,32 @@ export async function deactivateCloudSync(tenantId: string): Promise<{ ok: boole
     },
   });
   return { ok: true };
+}
+
+// [core] [all tenants] — Owner designates which staff username's device may do
+// billing/stock-out and may work fully offline. All other devices require a
+// fresh sync before they can make any changes.
+export async function setBillingDevice(tenantId: string, username: string): Promise<{ ok: boolean; error?: string }> {
+  const config = await getAppConfig();
+  const s = config?.settings as any ?? {};
+  try {
+    const res = await fetch(`${SERVER}/billing-device/set`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tenant_id: tenantId, username }),
+      signal: AbortSignal.timeout(8000),
+    });
+    const data = await res.json() as { ok: boolean; billing_user?: string; error?: string };
+    if (!data.ok) return { ok: false, error: data.error ?? 'Failed to save' };
+    await updateAppConfig({ settings: { ...s, billing_user: data.billing_user } });
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'Could not reach server. Check your internet connection.' };
+  }
+}
+
+export function getBillingUser(settings: any): string {
+  return (settings?.billing_user as string) || 'owner';
 }
 
 // Legacy — kept for backward compat; replaced by activateCloudSync

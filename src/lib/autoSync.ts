@@ -13,15 +13,17 @@ export function setAnnouncementNewHandler(cb: () => void) { _onAnnouncementNew =
 export type SyncStatus = 'disabled' | 'offline' | 'syncing' | 'synced' | 'error';
 export interface SyncState { status: SyncStatus; lastSyncedAt: string | null }
 let _syncState: SyncState = { status: 'disabled', lastSyncedAt: null };
-let _onSyncStateChange: ((s: SyncState) => void) | null = null;
+const _syncStateListeners = new Set<(s: SyncState) => void>();
 export function setSyncStateHandler(cb: ((s: SyncState) => void) | null) {
-  _onSyncStateChange = cb;
-  cb?.(_syncState);
+  if (cb) { _syncStateListeners.add(cb); cb(_syncState); }
+}
+export function removeSyncStateHandler(cb: (s: SyncState) => void) {
+  _syncStateListeners.delete(cb);
 }
 export function getSyncState(): SyncState { return _syncState; }
 function setSyncState(partial: Partial<SyncState>) {
   _syncState = { ..._syncState, ...partial };
-  _onSyncStateChange?.(_syncState);
+  _syncStateListeners.forEach(cb => cb(_syncState));
 }
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => {

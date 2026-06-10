@@ -24,13 +24,13 @@ function deviceLabel(): string {
 // `username` separates session slots so the owner and each staff login can each
 // hold their own slot under the same tenant — only the SAME login is blocked
 // from running on two devices at once. Defaults to 'owner' for the main login.
-export async function claimSession(tenantId: string, username: string = 'owner'): Promise<SessionClaimResult> {
+export async function claimSession(tenantId: string, username: string = 'owner', force = false): Promise<SessionClaimResult> {
   const device_id = getDeviceId();
   try {
     const res = await fetch(`${SERVER}/session/claim`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tenant_id: tenantId, username, device_id, device_name: deviceLabel() }),
+      body: JSON.stringify({ tenant_id: tenantId, username, device_id, device_name: deviceLabel(), force }),
       signal: AbortSignal.timeout(6000),
     });
     const data = await res.json();

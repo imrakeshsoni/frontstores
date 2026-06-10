@@ -152,10 +152,22 @@ export function AppLoginScreen() {
   // holds its own single-session slot, keyed by username, so they don't block
   // each other across devices.
   async function completeLogin(loggedInUsername: string) {
-    const claim = await claimSession(tenantId, loggedInUsername);
+    let claim = await claimSession(tenantId, loggedInUsername);
     if (claim.blocked) {
-      toast.error(claim.error || `Already logged in on ${claim.activeDevice || 'another device'}. Log out there first.`);
-      return;
+      // [core] [all tenants] — the same login can get "stuck" claimed by a device
+      // that crashed/was reinstalled without releasing its slot. Offer to take over;
+      // server only allows this if the other device hasn't sent a heartbeat recently
+      // is bypassed here intentionally — it's the user's own account.
+      const proceed = window.confirm(
+        `${claim.error || `Already logged in on ${claim.activeDevice || 'another device'}`}.\n\n` +
+        `If that device is no longer in use, click OK to log in here instead.`
+      );
+      if (!proceed) return;
+      claim = await claimSession(tenantId, loggedInUsername, true);
+      if (claim.blocked) {
+        toast.error(claim.error || 'Could not log in — please try again.');
+        return;
+      }
     }
     if (claim.sessionId) sessionStorage.setItem('fs_session_id', claim.sessionId);
     sessionStorage.setItem('fs_logged_in_username', loggedInUsername);

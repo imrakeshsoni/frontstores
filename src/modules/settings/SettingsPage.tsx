@@ -14,7 +14,7 @@ import { PageIntro } from '@/components/ui/PageIntro';
 import { useTheme } from '@/lib/theme/useTheme';
 import { reportError } from '@/lib/errorReporter';
 import { triggerAutoSync } from '@/lib/autoSync';
-import { getCloudSyncStatus, refreshCloudSyncStatus, activateCloudSync, deactivateCloudSync, getCloudSyncFee, getPricing } from '@/lib/db/cloudSync';
+import { getCloudSyncStatus, refreshCloudSyncStatus, activateCloudSync, deactivateCloudSync, getCloudSyncFee, getPricing, setBillingDevice, getBillingUser } from '@/lib/db/cloudSync';
 
 type SettingsForm = {
   shop_name: string;
@@ -663,7 +663,7 @@ export function SettingsPage() {
           const total = planFee + (activeCount * staffFee) + (syncFee > 0 ? 0 : 0);
           return `₹${planFee}/mo plan · ${activeCount > 0 ? `${activeCount} staff +₹${activeCount * staffFee} · ` : ''}₹${planFee + activeCount * staffFee}/month`;
         })())}
-        {renderRow('appearance', '🎨', 'Appearance', theme === 'dark' ? 'Dark Mode' : 'Light Mode', undefined, true)}
+        {isOwner && renderRow('staff', '👥', 'Staff Logins', `${activeCount ?? 0} active · ₹${staffFee}/user/month`, undefined, true)}
       </>)}
 
       {renderGroup('Shop', <>
@@ -682,7 +682,7 @@ export function SettingsPage() {
       {renderGroup('Security', <>
         {renderRow('autolock', '🔒', 'Auto-Lock', idleLabel)}
         {renderRow('password', '🔑', 'Login & Password', `User: ${currentUsername || 'owner'}`)}
-        {isOwner && renderRow('staff', '👥', 'Staff Logins', `${activeCount ?? 0} active · ₹${staffFee}/user/month`)}
+        {renderRow('appearance', '🎨', 'Appearance', theme === 'dark' ? 'Dark Mode' : 'Light Mode', undefined, config?.shop_type !== 'carwash')}
         {config?.shop_type === 'carwash' && renderRow('pinlock', '🔐', 'Section PIN Lock', 'Restrict sections with PIN', undefined, true)}
       </>)}
 
@@ -828,6 +828,60 @@ const ALL_TABS = [
   { key: 'reports',         label: 'Reports' },
 ];
 
+// [core] [all tenants] — Owner picks ONE login (owner or a staff username) whose
+// device is allowed to do billing/stock-out and to keep working offline. Every
+// other device must be online + synced before it can make any changes.
+function BillingDeviceSection({ tenantId, activeStaff }: { tenantId: string; activeStaff: StaffUser[] }) {
+  const { config, refreshConfig } = useAppStore();
+  const cloudSyncEnabled = !!(config?.settings as any)?.cloud_sync_enabled;
+  const [billingUser, setBillingUser] = useState(getBillingUser(config?.settings));
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { setBillingUser(getBillingUser(config?.settings)); }, [config?.settings]);
+
+  async function handleChange(value: string) {
+    setBillingUser(value);
+    setSaving(true);
+    const result = await setBillingDevice(tenantId, value);
+    setSaving(false);
+    if (result.ok) {
+      await refreshConfig();
+      toast.success('Billing & stock device updated');
+    } else {
+      toast.error(result.error ?? 'Could not save — check your internet connection');
+      setBillingUser(getBillingUser(config?.settings));
+    }
+  }
+
+  return (
+    <div className="card p-4 border-l-4 border-l-amber-500">
+      <p className="section-label mb-2 text-amber-300">🧾 Billing &amp; Stock Device</p>
+      <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>
+        Pick ONE login that's allowed to create bills and reduce stock — that device
+        can keep working even without internet. Every other login must be online and
+        fully synced before they can add products, stock, customers, etc.
+      </p>
+      {!cloudSyncEnabled && (
+        <p className="text-xs mb-3" style={{ color: '#f59e0b' }}>
+          ⚠️ Cloud Sync is off — turn it on first so other devices can sync to the cloud.
+        </p>
+      )}
+      <select
+        value={billingUser}
+        onChange={e => handleChange(e.target.value)}
+        disabled={saving}
+        className="w-full rounded-xl border px-3 py-2.5 text-sm outline-none"
+        style={{ background: 'var(--surface)', borderColor: 'var(--surface-border)', color: 'var(--text-primary)' }}
+      >
+        <option value="owner">Owner (default)</option>
+        {activeStaff.map(s => (
+          <option key={s.id} value={s.username}>{s.display_name || s.username} ({s.username})</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function StaffLoginsSection({ tenantId }: { tenantId: string }) {
   const config = useAppStore((s) => s.config);
   const queryClient = useQueryClient();
@@ -938,6 +992,9 @@ function StaffLoginsSection({ tenantId }: { tenantId: string }) {
 
   return (
     <div className="space-y-5">
+      {/* [core] [all tenants] — Billing & Stock Device picker, only matters with staff logins */}
+      {activeStaff.length > 0 && <BillingDeviceSection tenantId={tenantId} activeStaff={activeStaff} />}
+
       {/* Billing summary */}
       <div className="card p-4 border-l-4 border-l-emerald-500">
         <p className="section-label mb-2 text-emerald-300">💰 Staff Billing</p>

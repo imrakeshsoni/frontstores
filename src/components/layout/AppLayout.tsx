@@ -96,7 +96,7 @@ import { VoiceAssistant } from '@/components/voice/VoiceAssistant';
 import { StudyVoiceAssistant } from '@/modules/study/StudyVoiceAssistant';
 import { AnnouncementPopup } from '@/components/announcements/AnnouncementPopup';
 import { pollAnnouncements, getUnreadCount } from '@/lib/db/announcements';
-import { setAnnouncementNewHandler, setSyncStateHandler, getSyncState, type SyncState } from '@/lib/autoSync';
+import { setAnnouncementNewHandler, setSyncStateHandler, removeSyncStateHandler, getSyncState, type SyncState } from '@/lib/autoSync';
 import { MobileNav } from './MobileNav';
 
 export const NAV_ITEMS = [
@@ -569,7 +569,7 @@ export function AppLayout() {
   const [syncState, setSyncStateLocal] = useState<SyncState>(() => getSyncState());
   useEffect(() => {
     setSyncStateHandler(setSyncStateLocal);
-    return () => setSyncStateHandler(null);
+    return () => removeSyncStateHandler(setSyncStateLocal);
   }, []);
   useEffect(() => {
     const tenantId = config?.tenant_id;

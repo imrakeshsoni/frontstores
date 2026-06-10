@@ -550,13 +550,13 @@ const publicServer = http.createServer(async (req, res) => {
   if (req.method === 'POST' && pathname === '/session/claim') {
     if (rateLimit(req, res, 'session-claim', 60, 60 * 60 * 1000)) return;
     try {
-      const { tenant_id, username, device_id, device_name } = JSON.parse(await readBody(req));
+      const { tenant_id, username, device_id, device_name, force } = JSON.parse(await readBody(req));
       if (!tenant_id || !device_id) { json(res, { ok: false, error: 'Missing fields' }, 400); return; }
       const key = sessionKey(tenant_id, username);
       const sessions = loadSessions();
       const existing = sessions[key];
       const isStale = existing && (Date.now() - new Date(existing.last_heartbeat).getTime()) > SESSION_TTL_MS;
-      if (existing && existing.device_id !== device_id && !isStale) {
+      if (existing && existing.device_id !== device_id && !isStale && !force) {
         json(res, {
           ok: false,
           error: `Already logged in on ${existing.device_name || 'another device'}`,
@@ -1343,6 +1343,7 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
       request_status: sub.sync_request_status || null,
       sync_code: sub.sync_enabled ? sub.sync_code : null,
       dashboard_url: sub.sync_enabled ? `https://update.frontstores.com/shop/${tenantId}` : null,
+      billing_user: sub.billing_user || 'owner',
     });
     return;
   }
@@ -1604,6 +1605,23 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
     logActivity(tenant_id, sub.shop_name, 'cloud_sync_deactivated', 'Cloud Sync deactivated by owner');
     console.log(`☁️  Cloud Sync deactivated for ${sub.shop_name}`);
     json(res, { ok: true }); return;
+  }
+
+  // [core] [all tenants] — POST /billing-device/set — owner designates which staff
+  // username's device is allowed to do billing/stock-out (and to work fully offline).
+  if (req.method === 'POST' && pathname === '/billing-device/set') {
+    if (rateLimit(req, res, 'billing-device-set', 30, 60 * 60 * 1000)) return;
+    const body = JSON.parse(await readBody(req));
+    const { tenant_id, username } = body;
+    if (!tenant_id || !username) { json(res, { ok: false, error: 'Missing fields' }, 400); return; }
+    const subs = loadSubs();
+    const sub = subs[tenant_id];
+    if (!sub) { json(res, { ok: false, error: 'Shop not found' }, 404); return; }
+    sub.billing_user = username.trim().toLowerCase();
+    saveSubs(subs);
+    logActivity(tenant_id, sub.shop_name, 'billing_device_set', `Billing/stock device set to "${sub.billing_user}"`);
+    sseBroadcast(tenant_id, 'data-changed', { synced_at: new Date().toISOString() });
+    json(res, { ok: true, billing_user: sub.billing_user }); return;
   }
 
   // POST /sync/activate — validate sync code, enable cloud sync for tenant

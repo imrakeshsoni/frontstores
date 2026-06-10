@@ -8,6 +8,7 @@ import { CreatePasswordScreen } from '@/modules/auth/CreatePasswordScreen';
 import { hasAuth } from '@/lib/db/auth';
 import { claimSession, heartbeatSession, releaseSession } from '@/lib/db/session';
 import { SubscriptionGate } from '@/modules/subscription/SubscriptionGate';
+import { SyncAccessGate } from '@/components/sync/SyncAccessGate';
 import { useIdleTimer } from '@/lib/hooks/useIdleTimer';
 import { PinLockGate } from '@/components/ui/PinLockGate';
 
@@ -454,6 +455,7 @@ export default function App() {
 
   return (
     <SubscriptionGate>
+    <SyncAccessGate>
     <IdleTimerProvider />
     <HashRouter>
       <Suspense fallback={<Loading />}>
@@ -801,6 +803,7 @@ export default function App() {
         </Routes>
       </Suspense>
     </HashRouter>
+    </SyncAccessGate>
     </SubscriptionGate>
   );
 }
