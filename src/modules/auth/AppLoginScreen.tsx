@@ -2,14 +2,13 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from '@/app/store/app.store';
 import { verifyAuth, resetPasswordWithCode, resetPasswordWithPhonePin, unlockWithCode, getAuthUsername } from '@/lib/db/auth';
-import { verifyStaffAuth, verifyDailyShopPin } from '@/lib/db/staffUsers';
-import { getOrCreateShopCode } from '@/lib/db/config';
+import { verifyStaffAuth } from '@/lib/db/staffUsers';
 import { claimSession } from '@/lib/db/session';
 import { enqueue } from '@/lib/syncQueue';
 import { uuid, now } from '@/lib/db/index';
 import { toast } from 'sonner';
 
-type Screen = 'login' | 'staff-login' | 'forgot' | 'reset-code' | 'pin-reset' | 'locked' | 'unlock-code';
+type Screen = 'login' | 'forgot' | 'reset-code' | 'pin-reset' | 'locked' | 'unlock-code';
 
 function minutesLeft(lockedUntil: string): number {
   return Math.max(1, Math.ceil((new Date(lockedUntil).getTime() - Date.now()) / 60_000));
@@ -124,10 +123,7 @@ export function AppLoginScreen() {
     inputBg: `${studyColors.bg}cc`,
   } : baseTheme;
 
-  // [core] [all tenants] — staff who logged out land back on the staff login screen
-  const [screen, setScreen]       = useState<Screen>(
-    () => (tenantId && localStorage.getItem(`fs_last_login_was_staff_${tenantId}`) === '1') ? 'staff-login' : 'login'
-  );
+  const [screen, setScreen]       = useState<Screen>('login');
   const [username, setUsername]   = useState('');
   const [password, setPassword]   = useState('');
   const [showPass, setShowPass]   = useState(false);
@@ -140,15 +136,6 @@ export function AppLoginScreen() {
   const [unlockCode, setUnlockCode] = useState('');
   const [pinPhone, setPinPhone] = useState('');
   const [pinCode, setPinCode] = useState('');
-
-  // [core] [all tenants] — staff login: shop code (display only) + today's auto-rotating
-  // shop PIN, in addition to their own username/password
-  const [shopCode, setShopCode] = useState('');
-  const [staffPin, setStaffPin] = useState('');
-  useEffect(() => {
-    if (!tenantId || !shopType) return;
-    getOrCreateShopCode(tenantId, shopType).then(setShopCode).catch(() => {});
-  }, [tenantId, shopType]);
 
   useEffect(() => {
     if (screen !== 'locked' || !lockedUntil) return;
@@ -224,39 +211,6 @@ export function AppLoginScreen() {
       }
 
       const attemptsLeft = staffResult.attemptsLeft ?? ownerResult.attemptsLeft;
-      if (attemptsLeft !== undefined && attemptsLeft <= 0) {
-        toast.error('Too many failed attempts. Account locked for 30 minutes.');
-      } else if (attemptsLeft !== undefined) {
-        toast.error(`Incorrect credentials. ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} left.`);
-      } else {
-        toast.error('Incorrect username or password');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // [core] [all tenants] — staff login: requires today's auto-rotating shop PIN
-  // (told to them by the owner) plus their own username/password
-  async function handleStaffLogin(e: React.FormEvent) {
-    e.preventDefault();
-    if (!username || !password || !staffPin) return;
-    setLoading(true);
-    try {
-      const pinOk = await verifyDailyShopPin(tenantId, staffPin);
-      if (!pinOk) { toast.error("Incorrect PIN. Ask the shop owner for today's PIN."); return; }
-
-      const staffResult = await verifyStaffAuth(tenantId, username, password, maxAttempts);
-      if (staffResult.ok) {
-        await completeLogin(username.trim().toLowerCase());
-        return;
-      }
-      if (staffResult.locked) {
-        setLockedUntil(staffResult.lockedUntil!);
-        setScreen('locked');
-        return;
-      }
-      const attemptsLeft = staffResult.attemptsLeft;
       if (attemptsLeft !== undefined && attemptsLeft <= 0) {
         toast.error('Too many failed attempts. Account locked for 30 minutes.');
       } else if (attemptsLeft !== undefined) {
@@ -427,51 +381,6 @@ export function AppLoginScreen() {
               className="w-full text-center text-xs pt-1 transition-colors"
               style={{ color: theme.labelColor, opacity: 0.7 }}>
               Forgot password?
-            </button>
-            <button type="button" onClick={() => { setUsername(''); setPassword(''); setStaffPin(''); setScreen('staff-login'); }}
-              className="w-full text-center text-xs transition-colors"
-              style={{ color: theme.accentLight, opacity: 0.85 }}>
-              Staff member? Login here →
-            </button>
-          </form>
-        )}
-
-        {/* ── STAFF LOGIN ── */}
-        {screen === 'staff-login' && (
-          <form onSubmit={handleStaffLogin} style={cardStyle} className="space-y-4">
-            <p className="text-center text-sm font-semibold text-white/70 mb-2">Staff Sign In</p>
-            <div className="rounded-xl p-3 text-center" style={{ background: `${theme.accent}15`, border: `1px solid ${theme.accent}30` }}>
-              <p className="text-xs" style={{ color: theme.labelColor }}>Shop ID</p>
-              <p className="font-mono font-bold tracking-wider text-white" style={{ fontSize: '18px' }}>{shopCode || '—'}</p>
-            </div>
-            <div>
-              <label style={labelStyle}>Today's PIN</label>
-              <input style={{ ...inputStyle, textAlign: 'center', letterSpacing: '0.3em', fontSize: '20px' }} placeholder="000000" maxLength={6} value={staffPin} onChange={e => setStaffPin(e.target.value.replace(/\D/g, ''))} autoFocus />
-              <p className="text-xs mt-1" style={{ color: theme.labelColor, opacity: 0.7 }}>Ask the shop owner for today's PIN</p>
-            </div>
-            <div>
-              <label style={labelStyle}>Username</label>
-              <input style={inputStyle} placeholder="Enter your username" value={username} onChange={e => setUsername(e.target.value)} />
-            </div>
-            <div>
-              <label style={labelStyle}>Password</label>
-              <div className="relative">
-                <input style={{ ...inputStyle, paddingRight: '52px' }} type={showPass ? 'text' : 'password'} placeholder="Enter your password" value={password} onChange={e => setPassword(e.target.value)} />
-                <button type="button" onClick={() => setShowPass(s => !s)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold"
-                  style={{ color: theme.accentLight }}>
-                  {showPass ? 'Hide' : 'Show'}
-                </button>
-              </div>
-            </div>
-            <div className="pt-1">
-              <button type="submit" disabled={loading || !username || !password || staffPin.length !== 6} style={{ ...btnPrimary, opacity: (loading || !username || !password || staffPin.length !== 6) ? 0.5 : 1 }}>
-                {loading ? 'Signing in…' : 'Sign In'}
-              </button>
-            </div>
-            <button type="button" onClick={() => { setUsername(''); setPassword(''); setScreen('login'); }}
-              className="w-full text-center text-xs" style={{ color: theme.labelColor, opacity: 0.7 }}>
-              ← Back to owner login
             </button>
           </form>
         )}

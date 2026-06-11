@@ -8,7 +8,7 @@ import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { useAppStore } from '@/app/store/app.store';
 import { updateAppConfig, getOrCreateShopCode } from '@/lib/db/config';
 import { changePassword, changeUsername, getAuthUsername, getExportLogs, logExport } from '@/lib/db/auth';
-import { listStaffUsers, createStaffUser, deactivateStaffUser, generateJoinPin, countActiveStaffUsers, getStaffUserFee, getDailyShopPin, getOnlineStaffUsernames, type StaffUser } from '@/lib/db/staffUsers';
+import { listStaffUsers, createStaffUser, deactivateStaffUser, generateJoinPin, countActiveStaffUsers, getStaffUserFee, getOnlineStaffUsernames, type StaffUser } from '@/lib/db/staffUsers';
 import { exportBackup } from '@/lib/db/backup';
 import { PageIntro } from '@/components/ui/PageIntro';
 import { useTheme } from '@/lib/theme/useTheme';
@@ -922,13 +922,6 @@ function StaffLoginsSection({ tenantId }: { tenantId: string }) {
     }
   }, [tenantId, config?.shop_type]);
 
-  // [core] [all tenants] — today's auto-rotating staff login PIN (changes daily, computed locally)
-  const [dailyPin, setDailyPin] = useState('');
-  useEffect(() => {
-    if (!tenantId) return;
-    getDailyShopPin(tenantId).then(setDailyPin).catch(() => {});
-  }, [tenantId]);
-
   // [core] [all tenants] — online/offline status per staff login
   const { data: onlineUsernames } = useQuery({
     queryKey: ['staff-online', tenantId],
@@ -1023,20 +1016,6 @@ function StaffLoginsSection({ tenantId }: { tenantId: string }) {
 
   return (
     <div className="space-y-5">
-      {/* [core] [all tenants] — today's auto-rotating staff login PIN, share with staff each day */}
-      {activeStaff.length > 0 && (
-        <div className="rounded-2xl p-4 flex items-center justify-between gap-4" style={{ background: 'var(--surface)', border: '1px solid var(--surface-border)' }}>
-          <div>
-            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Today's Staff Login PIN</p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>Share this with staff — it changes automatically every day at midnight (UTC)</p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="font-mono font-bold tracking-[0.3em]" style={{ fontSize: '24px', color: 'var(--text-primary)' }}>{dailyPin || '······'}</span>
-            <button onClick={() => copyText(dailyPin, "Today's PIN")} className="text-xs px-2 py-1 rounded-lg border" style={{ borderColor: 'var(--surface-border)', color: 'var(--text-secondary)' }}>Copy</button>
-          </div>
-        </div>
-      )}
-
       {/* [core] [all tenants] — Billing & Stock Device picker, only matters with staff logins */}
       {activeStaff.length > 0 && <BillingDeviceSection tenantId={tenantId} activeStaff={activeStaff} />}
 

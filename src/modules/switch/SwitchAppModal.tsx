@@ -196,6 +196,44 @@ export function SwitchAppModal({ onClose }: SwitchAppModalProps) {
     }
   };
 
+  // [core] [all tenants] — testers (is_client !== true) can spin up any shop type
+  // locally and switch instantly, with no server registration/approval round-trip.
+  // Real clients never see this — they go through "Register for X" + admin approval.
+  const isClient = !!(config?.settings as any)?.is_client;
+  const [quickCreating, setQuickCreating] = useState<string | null>(null);
+
+  const handleQuickTest = async (shopType: string, label: string) => {
+    if (!config) return;
+    setQuickCreating(shopType);
+    try {
+      const { uuid } = await import('@/lib/db/index');
+      const newTenantId = uuid();
+      await createLinkedAppConfig({
+        tenant_id: newTenantId,
+        shop_type: shopType,
+        shop_name: `${label} (Test)`,
+        owner_name: config.owner_name ?? '',
+        phone: config.phone ?? null,
+        email: config.email ?? null,
+        city: config.city ?? null,
+      });
+      await copyAuth(config.tenant_id, newTenantId);
+      await upsertLinkedAccount({
+        tenant_id: newTenantId,
+        shop_type: shopType,
+        shop_name: `${label} (Test)`,
+        owner_name: config.owner_name ?? '',
+        status: 'active',
+      });
+      await loadConfig();
+      setAuthenticated(false);
+      onClose();
+      navigate('/');
+    } finally {
+      setQuickCreating(null);
+    }
+  };
+
   const linkedMap = new Map(linked.map(a => [a.shop_type, a]));
   const currentType = config?.shop_type;
 
@@ -314,12 +352,24 @@ export function SwitchAppModal({ onClose }: SwitchAppModalProps) {
                           </div>
                         </div>
                       ) : (
-                        <button
-                          onClick={() => { setRegistering(app.type); setShopName(''); setError(''); }}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all"
-                          style={{ borderColor: app.color + '60', color: app.color, background: app.bgColor + '40' }}>
-                          + Register for {app.label}
-                        </button>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <button
+                            onClick={() => { setRegistering(app.type); setShopName(''); setError(''); }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all"
+                            style={{ borderColor: app.color + '60', color: app.color, background: app.bgColor + '40' }}>
+                            + Register for {app.label}
+                          </button>
+                          {!isClient && (
+                            <button
+                              onClick={() => handleQuickTest(app.type, app.label)}
+                              disabled={quickCreating === app.type}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border disabled:opacity-50 transition-all"
+                              style={{ borderColor: 'var(--surface-border)', color: 'var(--text-tertiary)' }}
+                              title="Tester only — creates a local test shop instantly, no approval needed">
+                              {quickCreating === app.type ? 'Creating…' : '⚡ Quick Test'}
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>

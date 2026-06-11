@@ -287,6 +287,8 @@ const CRMCommunicationLogPage = lazy(() => import('@/modules/crm/CommunicationLo
 const CRMWhatsAppInboxPage    = lazy(() => import('@/modules/crm/WhatsAppInboxPage').then(m => ({ default: m.WhatsAppInboxPage })));
 const CRMCommissionsPage      = lazy(() => import('@/modules/crm/CommissionsPage').then(m => ({ default: m.CommissionsPage })));
 const CRMTeamPage             = lazy(() => import('@/modules/crm/TeamPage').then(m => ({ default: m.TeamPage })));
+const CRMSalesPage            = lazy(() => import('@/modules/crm/SalesPage').then(m => ({ default: m.CRMSalesPage })));
+const CRMServicePage          = lazy(() => import('@/modules/crm/ServicePage').then(m => ({ default: m.CRMServicePage })));
 
 // [events] [all tenants]
 const EventsDashboard  = lazy(() => import('@/modules/events/EventsDashboard').then(m => ({ default: m.EventsDashboard })));
@@ -720,6 +722,8 @@ export default function App() {
             <Route path="crm/wa-inbox"       element={<CRMWhatsAppInboxPage />} />
             <Route path="crm/contacts"       element={<CRMContactsPage />} />
             <Route path="crm/pipeline"       element={<CRMPipelinePage />} />
+            <Route path="crm/sales"          element={<CRMSalesPage />} />
+            <Route path="crm/service"        element={<CRMServicePage />} />
             <Route path="crm/followups"      element={<CRMFollowUpsPage />} />
             <Route path="crm/communications" element={<CRMCommunicationLogPage />} />
             <Route path="crm/commissions"    element={<CRMCommissionsPage />} />

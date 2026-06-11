@@ -1,4 +1,4 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { SwitchAppModal } from '@/modules/switch/SwitchAppModal';
 import { setAINavigator } from '@/lib/voice/aiNavigator';
@@ -430,6 +430,8 @@ export const CRM_NAV_ITEMS = [
   { to: '/crm/wa-inbox',       icon: MessageSquare,   label: 'WA Inbox',    iconBg: '#dcfce7', iconColor: '#16a34a' },
   { to: '/crm/contacts',       icon: Users,           label: 'Contacts',    iconBg: '#dbeafe', iconColor: '#2563eb' },
   { to: '/crm/pipeline',       icon: Target,          label: 'Pipeline',    iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/crm/sales',          icon: ShoppingCart,    label: 'Sales',       iconBg: '#fee2e2', iconColor: '#dc2626' },
+  { to: '/crm/service',        icon: Wrench,          label: 'Service',     iconBg: '#e0e7ff', iconColor: '#4f46e5' },
   { to: '/crm/followups',      icon: Timer,           label: 'Follow-ups',  iconBg: '#fef3c7', iconColor: '#d97706' },
   { to: '/crm/communications', icon: Radio,           label: 'Comm. Log',   iconBg: '#e0f2fe', iconColor: '#0369a1' },
   { to: '/crm/commissions',    icon: DollarSign,      label: 'Commissions', iconBg: '#fef9c3', iconColor: '#ca8a04' },
@@ -627,14 +629,7 @@ export function AppLayout() {
     });
   }, [config?.tenant_id]);
 
-  // [core] [all tenants] — staff logging out should land back on the staff login
-  // screen (Shop ID + today's PIN + username/password), not the owner login form
   function handleLogout() {
-    const tenantId = config?.tenant_id;
-    if (tenantId) {
-      if (staffTabAccess !== null) localStorage.setItem(`fs_last_login_was_staff_${tenantId}`, '1');
-      else localStorage.removeItem(`fs_last_login_was_staff_${tenantId}`);
-    }
     setShowUserMenu(false);
     setAuthenticated(false);
   }
@@ -680,6 +675,22 @@ export function AppLayout() {
   const activeNavItems = staffTabAccess
     ? allNavItems.filter(item => staffTabAccess.includes(item.to))
     : allNavItems;
+
+  // [core] [all tenants] — sidebar links are filtered above, but the route Outlet
+  // below isn't — without this, a restricted staff login could still reach any
+  // page directly (typed URL, browser back/forward, saved link). Bounce them to
+  // their first allowed tab (or Announcements, always pinned) if the current
+  // page isn't one they're allowed to see.
+  const location = useLocation();
+  useEffect(() => {
+    if (staffTabAccess === null) return; // owner — unrestricted
+    const currentTop = '/' + location.pathname.split('/')[1];
+    const allowedTops = new Set(activeNavItems.map(item => '/' + item.to.split('/')[1]));
+    allowedTops.add('/announcements');
+    if (!allowedTops.has(currentTop)) {
+      navigate(activeNavItems[0]?.to ?? '/announcements', { replace: true });
+    }
+  }, [location.pathname, staffTabAccess, activeNavItems, navigate]);
 
   useEffect(() => {
     setAINavigator((path) => navigate(path));

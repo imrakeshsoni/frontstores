@@ -303,24 +303,6 @@ export async function isStaffUsername(tenantId: string, username: string): Promi
   return (rows[0]?.count ?? 0) > 0;
 }
 
-// [core] [all tenants] — Daily shop-wide login PIN. Deterministic from tenant_id +
-// today's date (UTC), so every device computes the same 6-digit PIN offline with no
-// server round-trip, and it auto-rotates at midnight UTC without any cron/expiry job.
-export async function getDailyShopPin(tenantId: string): Promise<string> {
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
-  const encoder = new TextEncoder();
-  const data = encoder.encode(`fs-daily-pin:${tenantId}:${today}`);
-  const hashBuf = await crypto.subtle.digest('SHA-256', data);
-  const hashHex = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
-  const num = parseInt(hashHex.slice(0, 8), 16) % 1000000;
-  return num.toString().padStart(6, '0');
-}
-
-export async function verifyDailyShopPin(tenantId: string, pin: string): Promise<boolean> {
-  const expected = await getDailyShopPin(tenantId);
-  return pin.trim() === expected;
-}
-
 // [core] [all tenants] — Online/offline status for Settings > Staff Logins (recent heartbeat = online)
 export async function getOnlineStaffUsernames(tenantId: string): Promise<string[]> {
   try {
