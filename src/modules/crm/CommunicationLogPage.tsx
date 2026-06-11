@@ -1,142 +1,129 @@
-// [crm] [all tenants]
+// [crm] [all tenants] — Communication log: timeline of every call, message & meeting
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, Phone, MessageCircle, Mail, Users as UsersIcon, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { Plus, Trash2, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
-import { listCRMCommunications, createCRMCommunication, deleteCRMCommunication, listCRMContacts } from '@/lib/db/crm';
 import { toast } from 'sonner';
+import { listCRMCommunications, createCRMCommunication, deleteCRMCommunication, listCRMContacts } from '@/lib/db/crm';
+import { CRMPage, PageHead, Panel, EmptyState, Btn, Modal, Field, FormGrid, inp, Avatar, C, fmtDate, timeAgo } from './components/kit';
 
-const TYPES = [
-  { key: 'call', label: 'Call', icon: Phone },
-  { key: 'whatsapp', label: 'WhatsApp', icon: MessageCircle },
-  { key: 'sms', label: 'SMS', icon: MessageCircle },
-  { key: 'email', label: 'Email', icon: Mail },
-  { key: 'meeting', label: 'Meeting', icon: UsersIcon },
-];
+const TYPE_META: Record<string, { icon: string; label: string }> = {
+  call:     { icon: '📞', label: 'Call' },
+  whatsapp: { icon: '💬', label: 'WhatsApp' },
+  email:    { icon: '✉️', label: 'Email' },
+  meeting:  { icon: '🤝', label: 'Meeting' },
+  sms:      { icon: '📱', label: 'SMS' },
+  other:    { icon: '📌', label: 'Other' },
+};
 
-function nowLocal() {
-  const d = new Date();
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-  return d.toISOString().slice(0, 16);
-}
+const emptyForm = { contact_id: '', type: 'call', direction: 'outgoing', summary: '' };
 
 export function CRMCommunicationLogPage() {
   const tenantId = useAppStore(s => s.config?.tenant_id ?? '');
   const qc = useQueryClient();
-  const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ contact_id: '', type: 'call', direction: 'outgoing', summary: '', occurred_at: nowLocal() });
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState(emptyForm);
 
-  const { data: logs = [], isLoading } = useQuery({
-    queryKey: ['crm-communications', tenantId],
-    queryFn: () => listCRMCommunications(tenantId),
-    enabled: !!tenantId,
-  });
+  const { data: comms = [] } = useQuery({ queryKey: ['crm-comms', tenantId], queryFn: () => listCRMCommunications(tenantId), enabled: !!tenantId });
+  const { data: contacts = [] } = useQuery({ queryKey: ['crm-contacts', tenantId, ''], queryFn: () => listCRMContacts(tenantId), enabled: !!tenantId });
 
-  const { data: contacts = [] } = useQuery({
-    queryKey: ['crm-contacts', tenantId, ''],
-    queryFn: () => listCRMContacts(tenantId),
-    enabled: !!tenantId,
-  });
-
-  const contactName = (id: string) => contacts.find(c => c.id === id)?.name ?? 'Unknown';
-  const typeIcon = (type: string) => TYPES.find(t => t.key === type)?.icon ?? Phone;
+  const contactName = (id: string) => contacts.find(c => c.id === id)?.name ?? '—';
 
   const add = useMutation({
-    mutationFn: () => createCRMCommunication(tenantId, { contact_id: form.contact_id, type: form.type, direction: form.direction, summary: form.summary, occurred_at: new Date(form.occurred_at).toISOString() }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['crm-communications'] }); setShowAdd(false); setForm({ contact_id: '', type: 'call', direction: 'outgoing', summary: '', occurred_at: nowLocal() }); toast.success('Logged'); },
-    onError: (e) => toast.error(String(e)),
+    mutationFn: () => createCRMCommunication(tenantId, { ...form, occurred_at: new Date().toISOString() }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['crm-comms'] }); setShowForm(false); setForm(emptyForm); toast.success('Logged 📝'); },
+    onError: (e: Error) => toast.error(e.message),
   });
 
-  const del = useMutation({
+  const remove = useMutation({
     mutationFn: (id: string) => deleteCRMCommunication(tenantId, id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['crm-communications'] }); toast.success('Entry removed'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['crm-comms'] }); toast.success('Deleted'); },
   });
+
+  // Group by day for timeline dividers
+  const byDay = comms.reduce<Record<string, typeof comms>>((acc, cm) => {
+    const day = (cm.occurred_at || '').slice(0, 10) || 'unknown';
+    (acc[day] = acc[day] ?? []).push(cm);
+    return acc;
+  }, {});
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-900">Communication Log</h1>
-        <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-500 transition-colors">
-          <Plus className="h-4 w-4" /> Log Communication
-        </button>
-      </div>
+    <CRMPage>
+      <PageHead title="Communication Log" subtitle="A clean timeline of every interaction with your customers."
+        actions={<Btn onClick={() => { setForm(emptyForm); setShowForm(true); }}><Plus size={14} /> Log Interaction</Btn>} />
 
-      {isLoading ? <p className="text-slate-400 text-sm text-center py-8">Loading…</p> : (
-        <div className="space-y-2">
-          {logs.map(l => {
-            const Icon = typeIcon(l.type);
-            const Dir = l.direction === 'incoming' ? ArrowDownLeft : ArrowUpRight;
-            return (
-              <div key={l.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50">
-                    <Icon className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <p className="font-semibold text-slate-800">{contactName(l.contact_id)}</p>
-                      <Dir className={`h-3.5 w-3.5 ${l.direction === 'incoming' ? 'text-green-500' : 'text-blue-500'}`} />
+      {comms.length === 0 ? (
+        <Panel>
+          <EmptyState emoji="📜" title="No interactions logged" hint="Log calls, WhatsApp chats and meetings so the whole story stays in one place."
+            action={<Btn small onClick={() => { setForm(emptyForm); setShowForm(true); }}><Plus size={13} /> Log First Interaction</Btn>} />
+        </Panel>
+      ) : (
+        Object.entries(byDay).map(([day, items]) => (
+          <div key={day} style={{ marginBottom: '18px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 800, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 8px 4px' }}>
+              {fmtDate(day)}
+            </div>
+            <Panel>
+              {items.map(cm => {
+                const tm = TYPE_META[cm.type] ?? TYPE_META.other;
+                const incoming = cm.direction === 'incoming';
+                return (
+                  <div key={cm.id} className="crm-row" style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px 18px', borderBottom: `1px solid ${C.border}` }}>
+                    <span style={{ fontSize: '18px', marginTop: '2px' }}>{tm.icon}</span>
+                    <Avatar name={contactName(cm.contact_id)} size={28} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: C.text }}>{contactName(cm.contact_id)}</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '10px', fontWeight: 700, color: incoming ? C.green : C.blue, background: incoming ? C.greenBg : C.blueBg, borderRadius: '999px', padding: '2px 8px' }}>
+                          {incoming ? <ArrowDownLeft size={9} /> : <ArrowUpRight size={9} />}
+                          {incoming ? 'Incoming' : 'Outgoing'} {tm.label}
+                        </span>
+                        <span style={{ fontSize: '11px', color: C.faint }}>{timeAgo(cm.occurred_at)}</span>
+                      </div>
+                      {cm.summary && <div style={{ fontSize: '12px', color: C.muted, whiteSpace: 'pre-wrap' }}>{cm.summary}</div>}
                     </div>
-                    <p className="text-xs text-slate-400">{l.type} · {l.direction} {l.summary ? `· ${l.summary}` : ''}</p>
+                    <button onClick={() => { if (confirm('Delete this entry?')) remove.mutate(cm.id); }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.faint, padding: '4px', display: 'flex' }}>
+                      <Trash2 size={13} />
+                    </button>
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-semibold text-slate-500">{new Date(l.occurred_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
-                  <button onClick={() => { if (confirm('Remove this entry?')) del.mutate(l.id); }} className="p-1.5 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="h-4 w-4" /></button>
-                </div>
-              </div>
-            );
-          })}
-          {logs.length === 0 && <p className="text-slate-400 text-sm text-center py-8">No communication logged yet</p>}
-        </div>
+                );
+              })}
+            </Panel>
+          </div>
+        ))
       )}
 
-      {showAdd && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 space-y-4 shadow-xl">
-            <h2 className="text-lg font-bold text-slate-800">Log Communication</h2>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Contact *</label>
-              <select className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none" value={form.contact_id} onChange={e => setForm(p => ({ ...p, contact_id: e.target.value }))}>
-                <option value="">Select contact…</option>
-                {contacts.map(c => <option key={c.id} value={c.id}>{c.name}{c.company ? ` (${c.company})` : ''}</option>)}
+      {showForm && (
+        <Modal title="Log Interaction" onClose={() => setShowForm(false)}
+          footer={<>
+            <Btn variant="ghost" onClick={() => setShowForm(false)}>Cancel</Btn>
+            <Btn onClick={() => {
+              if (!form.contact_id) return toast.error('Pick a contact');
+              add.mutate();
+            }} disabled={add.isPending}>Save Log</Btn>
+          </>}>
+          <FormGrid>
+            <Field label="Contact *">
+              <select style={inp()} value={form.contact_id} onChange={e => setForm(p => ({ ...p, contact_id: e.target.value }))} autoFocus>
+                <option value="">— select —</option>
+                {contacts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Type</label>
-                <select className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none" value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value }))}>
-                  {TYPES.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Direction</label>
-                <select className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none" value={form.direction} onChange={e => setForm(p => ({ ...p, direction: e.target.value }))}>
-                  <option value="outgoing">Outgoing</option>
-                  <option value="incoming">Incoming</option>
-                </select>
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">When</label>
-              <input type="datetime-local" className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={form.occurred_at} onChange={e => setForm(p => ({ ...p, occurred_at: e.target.value }))} />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Summary</label>
-              <input className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="What was discussed…" value={form.summary} onChange={e => setForm(p => ({ ...p, summary: e.target.value }))} />
-            </div>
-            <div className="flex gap-3 pt-2">
-              <button onClick={() => setShowAdd(false)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
-              <button onClick={() => add.mutate()} disabled={!form.contact_id || add.isPending}
-                className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500 disabled:opacity-40">
-                {add.isPending ? 'Saving…' : 'Log'}
-              </button>
-            </div>
-          </div>
-        </div>
+            </Field>
+            <Field label="Type">
+              <select style={inp()} value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value }))}>
+                {Object.entries(TYPE_META).map(([k, m]) => <option key={k} value={k}>{m.icon} {m.label}</option>)}
+              </select>
+            </Field>
+            <Field label="Direction">
+              <select style={inp()} value={form.direction} onChange={e => setForm(p => ({ ...p, direction: e.target.value }))}>
+                <option value="outgoing">Outgoing</option><option value="incoming">Incoming</option>
+              </select>
+            </Field>
+            <Field label="Summary" span2><textarea style={inp({ minHeight: '80px', resize: 'vertical' })} value={form.summary} onChange={e => setForm(p => ({ ...p, summary: e.target.value }))} placeholder="What was discussed?" /></Field>
+          </FormGrid>
+        </Modal>
       )}
-    </div>
+    </CRMPage>
   );
 }

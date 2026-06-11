@@ -1,320 +1,269 @@
-// [crm] [all tenants]
+// [crm] [all tenants] — Leads: capture → work → convert (Account + Contact + Deal)
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Zap, CheckCircle2, ArrowRightCircle, Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Phone, MessageSquare, Sparkles, Trash2, Pencil } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
-import { listCRMLeads, createCRMLead, updateCRMLead, deleteCRMLead, convertCRMLead, listCRMTeamMembers, type CRMLead } from '@/lib/db/crm';
-import { getCurrentStaffDisplayName } from '@/lib/db/staffUsers';
 import { toast } from 'sonner';
+import {
+  listCRMLeads, createCRMLead, updateCRMLead, deleteCRMLead, convertCRMLead,
+  listCRMTeamMembers, type CRMLead,
+} from '@/lib/db/crm';
+import { sendWhatsApp } from '@/lib/whatsapp';
+import {
+  CRMPage, PageHead, Segments, SearchInput, Panel, EmptyState, Badge, Avatar, Btn, Modal, Drawer,
+  Field, FormGrid, inp, Confetti, C, fmtINR, fmtDate, timeAgo, th, td,
+} from './components/kit';
 
-const C = {
-  bg: '#f0ece4', nav: '#0f1523', surface: '#ffffff', surface2: '#f8f5f0',
-  border: '#e5dfd3', border2: '#ccc5b5', text: '#111520', muted: '#7c7869',
-  accent: '#b8922a', accent2: '#d4aa44',
-};
-
-const STATUSES = ['new', 'working', 'converted', 'dead'] as const;
 const STATUS_META: Record<string, { label: string; bg: string; color: string }> = {
-  new:       { label: 'New',       bg: '#ede9fe', color: '#6d28d9' },
-  working:   { label: 'Working',   bg: '#fef3c7', color: '#92400e' },
-  converted: { label: 'Converted', bg: '#dcfce7', color: '#15803d' },
-  dead:      { label: 'Dead',      bg: '#f1f5f9', color: '#64748b' },
+  new:       { label: 'New',       bg: C.amberBg,  color: C.amber },
+  working:   { label: 'Working',   bg: C.blueBg,   color: C.blue },
+  converted: { label: 'Converted', bg: C.greenBg,  color: C.green },
+  dead:      { label: 'Dead',      bg: C.slateBg,  color: C.slate },
 };
-const SOURCES = ['Website', 'Referral', 'Cold Call', 'Email', 'Social Media', 'Event', 'Other'];
 
-const inp = (extra?: React.CSSProperties): React.CSSProperties => ({
-  background: C.surface2, border: `1px solid ${C.border}`, color: C.text,
-  borderRadius: '4px', padding: '10px 14px', width: '100%', fontSize: '14px',
-  fontFamily: "'Inter', -apple-system, sans-serif", outline: 'none',
-  ...extra,
-});
+const SOURCES = ['whatsapp', 'referral', 'website', 'walk-in', 'cold-call', 'social', 'other'];
+
+const emptyForm = { name: '', company: '', email: '', phone: '', source: '', status: 'new', lead_value: '', notes: '', owner: '', referred_by: '' };
 
 export function CRMLeadsPage() {
   const tenantId = useAppStore(s => s.config?.tenant_id ?? '');
-  const ownerName = useAppStore(s => s.config?.owner_name ?? '');
+  const navigate = useNavigate();
   const qc = useQueryClient();
+  const [statusFilter, setStatusFilter] = useState('all');
   const [search, setSearch] = useState('');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [showAdd, setShowAdd] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [viewLead, setViewLead] = useState<CRMLead | null>(null);
   const [convertLead, setConvertLead] = useState<CRMLead | null>(null);
-  const [convertOpts, setConvertOpts] = useState({ createAccount: true, createContact: true, createDeal: true, dealValue: 0 });
-  const [form, setForm] = useState({ name: '', company: '', email: '', phone: '', source: '', status: 'new', lead_value: '', notes: '', owner: '', referred_by: '' });
+  const [convertOpts, setConvertOpts] = useState({ createAccount: true, createContact: true, createDeal: true, dealValue: '' });
+  const [celebrate, setCelebrate] = useState(false);
+  const [form, setForm] = useState(emptyForm);
 
-  // Current logged-in user: null = tenant owner (sees all), string = staff (sees own leads only)
-  const { data: currentStaff } = useQuery({
-    queryKey: ['current-staff', tenantId],
-    queryFn: () => getCurrentStaffDisplayName(tenantId),
-    enabled: !!tenantId,
-    staleTime: Infinity,
-  });
-  const isStaff = currentStaff !== null && currentStaff !== undefined;
-
-  const { data: leads = [], isLoading } = useQuery({
-    queryKey: ['crm-leads', tenantId, search, filterStatus, currentStaff],
-    queryFn: () => listCRMLeads(tenantId, { search, status: filterStatus, ownerFilter: currentStaff ?? null }),
+  const { data: leads = [] } = useQuery({
+    queryKey: ['crm-leads', tenantId, statusFilter, search],
+    queryFn: () => listCRMLeads(tenantId, { status: statusFilter === 'all' ? undefined : statusFilter, search }),
     enabled: !!tenantId,
   });
+  const { data: allLeads = [] } = useQuery({ queryKey: ['crm-leads', tenantId, 'all', ''], queryFn: () => listCRMLeads(tenantId, {}), enabled: !!tenantId });
+  const { data: team = [] } = useQuery({ queryKey: ['crm-team', tenantId], queryFn: () => listCRMTeamMembers(tenantId), enabled: !!tenantId });
 
-  const { data: teamMembers = [] } = useQuery({
-    queryKey: ['crm-team', tenantId],
-    queryFn: () => listCRMTeamMembers(tenantId),
-    enabled: !!tenantId,
-  });
-  const allOwners = [ownerName, ...teamMembers.map(m => m.name)].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
+  const invalidate = () => { qc.invalidateQueries({ queryKey: ['crm-leads'] }); qc.invalidateQueries({ queryKey: ['crm-stats'] }); };
 
-  const add = useMutation({
-    mutationFn: () => createCRMLead(tenantId, {
-      ...form,
-      lead_value: parseFloat(form.lead_value) || 0,
-      owner: form.owner || (isStaff ? currentStaff! : ownerName),
-    }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['crm-leads'] });
-      qc.invalidateQueries({ queryKey: ['crm-stats'] });
-      setShowAdd(false);
-      setForm({ name: '', company: '', email: '', phone: '', source: '', status: 'new', lead_value: '', notes: '', owner: '', referred_by: '' });
-      toast.success('Lead added');
+  const save = useMutation({
+    mutationFn: async () => {
+      const data = { ...form, lead_value: Number(form.lead_value) || 0 };
+      if (editId) await updateCRMLead(tenantId, editId, data);
+      else await createCRMLead(tenantId, data);
     },
-    onError: (e) => toast.error(String(e)),
+    onSuccess: () => { invalidate(); setShowForm(false); setEditId(null); setForm(emptyForm); toast.success(editId ? 'Lead updated' : 'Lead added 🎉'); },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const setStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => updateCRMLead(tenantId, id, { status }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['crm-leads'] }); qc.invalidateQueries({ queryKey: ['crm-stats'] }); },
+    onSuccess: () => { invalidate(); },
   });
 
-  const del = useMutation({
+  const remove = useMutation({
     mutationFn: (id: string) => deleteCRMLead(tenantId, id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['crm-leads'] }); qc.invalidateQueries({ queryKey: ['crm-stats'] }); toast.success('Lead deleted'); },
+    onSuccess: () => { invalidate(); setViewLead(null); toast.success('Lead deleted'); },
   });
 
-  const doConvert = useMutation({
-    mutationFn: () => convertCRMLead(tenantId, convertLead!.id, convertOpts),
+  const convert = useMutation({
+    mutationFn: () => convertCRMLead(tenantId, convertLead!.id, {
+      createAccount: convertOpts.createAccount && !!convertLead!.company,
+      createContact: convertOpts.createContact,
+      createDeal: convertOpts.createDeal,
+      dealValue: Number(convertOpts.dealValue) || undefined,
+    }),
     onSuccess: (res) => {
-      qc.invalidateQueries({ queryKey: ['crm-leads'] });
+      invalidate();
       qc.invalidateQueries({ queryKey: ['crm-contacts'] });
-      qc.invalidateQueries({ queryKey: ['crm-stats'] });
-      const parts = [res.accountId && 'Account', res.contactId && 'Contact', res.dealId && 'Opportunity'].filter(Boolean);
-      toast.success(`Lead converted → ${parts.join(', ')} created`);
-      setConvertLead(null);
+      qc.invalidateQueries({ queryKey: ['crm-deals'] });
+      setConvertLead(null); setViewLead(null);
+      setCelebrate(true); setTimeout(() => setCelebrate(false), 2200);
+      toast.success(`Lead converted! ${res.dealId ? 'Deal created in pipeline.' : ''}`);
     },
-    onError: (e) => toast.error(String(e)),
+    onError: (e: Error) => toast.error(e.message),
   });
+
+  const openEdit = (l: CRMLead) => {
+    setEditId(l.id);
+    setForm({ name: l.name, company: l.company, email: l.email, phone: l.phone, source: l.source, status: l.status, lead_value: String(l.lead_value || ''), notes: l.notes, owner: l.owner, referred_by: l.referred_by });
+    setViewLead(null);
+    setShowForm(true);
+  };
+
+  const counts = (s: string) => s === 'all' ? allLeads.length : allLeads.filter(l => l.status === s).length;
 
   return (
-    <div style={{ background: C.bg, minHeight: '100%', fontFamily: "'Inter', -apple-system, sans-serif" }}>
-      {/* Page header */}
-      <div style={{ padding: '28px 30px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 800, letterSpacing: '-0.04em', color: C.text, margin: 0 }}>Leads</h1>
-          <p style={{ fontSize: '11px', color: C.muted, marginTop: '4px', letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 500 }}>
-            {leads.length} lead{leads.length !== 1 ? 's' : ''} · Manage and convert
-          </p>
-        </div>
-        <button onClick={() => setShowAdd(true)}
-          style={{ background: C.nav, color: '#fff', border: 'none', borderRadius: '4px', padding: '10px 18px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', letterSpacing: '0.04em', fontFamily: 'inherit' }}>
-          + Add Lead
-        </button>
+    <CRMPage>
+      {celebrate && <Confetti />}
+      <PageHead title="Leads" subtitle="Capture, qualify and convert prospects into customers."
+        actions={<Btn onClick={() => { setEditId(null); setForm(emptyForm); setShowForm(true); }}><Plus size={14} /> New Lead</Btn>} />
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+        <Segments value={statusFilter} onChange={setStatusFilter}
+          options={[{ key: 'all', label: 'All', count: counts('all') }, ...Object.entries(STATUS_META).map(([key, m]) => ({ key, label: m.label, count: counts(key) }))]} />
+        <SearchInput value={search} onChange={setSearch} placeholder="Search name, company, email…" />
       </div>
 
-      <div style={{ padding: '24px 30px 30px' }}>
-        {/* Toolbar */}
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
-            <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', width: '14px', height: '14px', color: C.muted }} />
-            <input style={{ ...inp(), paddingLeft: '34px' }} placeholder="Search leads…" value={search} onChange={e => setSearch(e.target.value)} />
-          </div>
-          <div style={{ display: 'flex', gap: '6px' }}>
-            {(['all', ...STATUSES] as string[]).map(s => {
-              const isActive = filterStatus === s;
-              return (
-                <button key={s} onClick={() => setFilterStatus(s)}
-                  style={{ background: isActive ? C.nav : C.surface, border: `1px solid ${isActive ? C.nav : C.border}`, color: isActive ? '#fff' : C.muted, padding: '8px 14px', borderRadius: '4px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.12s' }}>
-                  {s === 'all' ? 'All' : STATUS_META[s]?.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Leads table */}
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '4px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-          {isLoading ? (
-            <div style={{ padding: '60px', textAlign: 'center', color: C.muted }}>Loading…</div>
-          ) : leads.length === 0 ? (
-            <div style={{ padding: '60px', textAlign: 'center', color: C.muted, fontSize: '14px' }}>
-              No leads found. <button onClick={() => setShowAdd(true)} style={{ background: 'none', border: 'none', color: C.accent, fontWeight: 600, cursor: 'pointer', fontSize: '14px', fontFamily: 'inherit' }}>Add your first lead →</button>
-            </div>
-          ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  {['Name', 'Company', 'Contact', 'Source', 'Owner / Ref', 'Value', 'Status', 'Actions'].map(h => (
-                    <th key={h} style={{ padding: '12px 20px', fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.12em', textAlign: 'left', borderBottom: `1px solid ${C.border}`, fontWeight: 700, background: C.surface2 }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {leads.map((lead, i) => {
-                  const sm = STATUS_META[lead.status] ?? STATUS_META.new;
-                  return (
-                    <tr key={lead.id} style={{ borderBottom: i < leads.length - 1 ? `1px solid ${C.border}` : 'none' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = C.surface2)}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                      <td style={{ padding: '13px 20px' }}>
-                        <div style={{ fontWeight: 700, color: C.text, fontSize: '13.5px' }}>{lead.name}</div>
-                        {lead.notes && <div style={{ fontSize: '11px', color: C.muted, marginTop: '2px', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.notes}</div>}
-                      </td>
-                      <td style={{ padding: '13px 20px', fontSize: '13px', color: C.muted }}>{lead.company || '—'}</td>
-                      <td style={{ padding: '13px 20px', fontSize: '12px', color: C.muted }}>
-                        {lead.email && <div>{lead.email}</div>}
-                        {lead.phone && <div>{lead.phone}</div>}
-                        {!lead.email && !lead.phone && '—'}
-                      </td>
-                      <td style={{ padding: '13px 20px', fontSize: '12px', color: C.muted }}>{lead.source || '—'}</td>
-                      <td style={{ padding: '13px 20px', fontSize: '12px' }}>
-                        {lead.owner && <div style={{ color: C.text, fontWeight: 600 }}>👤 {lead.owner}</div>}
-                        {lead.referred_by && <div style={{ color: C.muted, marginTop: '2px' }}>🤝 {lead.referred_by}</div>}
-                        {!lead.owner && !lead.referred_by && <span style={{ color: C.muted }}>—</span>}
-                      </td>
-                      <td style={{ padding: '13px 20px', fontSize: '13px', fontWeight: 600, color: lead.lead_value > 0 ? '#16a34a' : C.muted }}>
-                        {lead.lead_value > 0 ? `₹${lead.lead_value.toLocaleString('en-IN')}` : '—'}
-                      </td>
-                      <td style={{ padding: '13px 20px' }}>
-                        {lead.status === 'converted' ? (
-                          <span style={{ background: sm.bg, color: sm.color, borderRadius: '2px', padding: '3px 10px', fontSize: '11px', fontWeight: 600, letterSpacing: '0.04em' }}>{sm.label}</span>
-                        ) : (
-                          <select value={lead.status} onChange={e => setStatus.mutate({ id: lead.id, status: e.target.value })}
-                            style={{ background: sm.bg, color: sm.color, border: 'none', borderRadius: '2px', padding: '4px 8px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.04em' }}>
-                            {STATUSES.filter(s => s !== 'converted').map(s => <option key={s} value={s}>{STATUS_META[s].label}</option>)}
-                          </select>
-                        )}
-                      </td>
-                      <td style={{ padding: '13px 20px' }}>
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          {lead.status !== 'converted' && (
-                            <button onClick={() => { setConvertLead(lead); setConvertOpts({ createAccount: true, createContact: true, createDeal: true, dealValue: lead.lead_value ?? 0 }); }}
-                              style={{ background: C.nav, color: '#fff', border: 'none', borderRadius: '4px', padding: '6px 12px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', letterSpacing: '0.03em', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                              <ArrowRightCircle style={{ width: '12px', height: '12px' }} /> Convert
-                            </button>
-                          )}
-                          <button onClick={() => { if (confirm('Delete this lead?')) del.mutate(lead.id); }}
-                            style={{ background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '4px', padding: '6px 8px', cursor: 'pointer', fontFamily: 'inherit' }}>
-                            <Trash2 style={{ width: '12px', height: '12px' }} />
-                          </button>
+      <Panel>
+        {leads.length === 0 ? (
+          <EmptyState emoji="🧲" title="No leads here yet" hint="Add your first lead, or import enquiries from the WhatsApp Inbox."
+            action={<Btn small onClick={() => { setEditId(null); setForm(emptyForm); setShowForm(true); }}><Plus size={13} /> Add Lead</Btn>} />
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead><tr>
+              <th style={th}>Lead</th><th style={th}>Source</th><th style={th}>Value</th><th style={th}>Owner</th><th style={th}>Status</th><th style={th}>Updated</th><th style={th}></th>
+            </tr></thead>
+            <tbody>
+              {leads.map(l => {
+                const sm = STATUS_META[l.status] ?? STATUS_META.new;
+                return (
+                  <tr key={l.id} className="crm-row" style={{ cursor: 'pointer' }} onClick={() => setViewLead(l)}>
+                    <td style={td}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Avatar name={l.name} size={32} />
+                        <div>
+                          <div style={{ fontWeight: 700 }}>{l.name}</div>
+                          <div style={{ fontSize: '11px', color: C.muted }}>{l.company || l.phone || '—'}</div>
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </div>
+                    </td>
+                    <td style={td}>{l.source ? <Badge bg={C.surface2} color={C.muted}>{l.source}</Badge> : <span style={{ color: C.faint }}>—</span>}</td>
+                    <td style={{ ...td, fontWeight: 700 }}>{l.lead_value ? fmtINR(l.lead_value) : <span style={{ color: C.faint }}>—</span>}</td>
+                    <td style={td}>{l.owner || <span style={{ color: C.faint }}>—</span>}</td>
+                    <td style={td}><Badge bg={sm.bg} color={sm.color}>{sm.label}</Badge></td>
+                    <td style={{ ...td, color: C.muted, fontSize: '12px' }}>{timeAgo(l.updated_at)}</td>
+                    <td style={{ ...td, textAlign: 'right' }} onClick={e => e.stopPropagation()}>
+                      {l.status !== 'converted' && (
+                        <Btn variant="subtle" small onClick={() => { setConvertLead(l); setConvertOpts({ createAccount: !!l.company, createContact: true, createDeal: true, dealValue: String(l.lead_value || '') }); }}>
+                          <Sparkles size={12} /> Convert
+                        </Btn>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </Panel>
+
+      {/* Add / Edit modal */}
+      {showForm && (
+        <Modal title={editId ? 'Edit Lead' : 'New Lead'} onClose={() => { setShowForm(false); setEditId(null); }}
+          footer={<>
+            <Btn variant="ghost" onClick={() => { setShowForm(false); setEditId(null); }}>Cancel</Btn>
+            <Btn onClick={() => form.name.trim() ? save.mutate() : toast.error('Name is required')} disabled={save.isPending}>{editId ? 'Save Changes' : 'Add Lead'}</Btn>
+          </>}>
+          <FormGrid>
+            <Field label="Name *"><input style={inp()} value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} autoFocus /></Field>
+            <Field label="Company"><input style={inp()} value={form.company} onChange={e => setForm(p => ({ ...p, company: e.target.value }))} /></Field>
+            <Field label="Phone"><input style={inp()} value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} /></Field>
+            <Field label="Email"><input style={inp()} value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} /></Field>
+            <Field label="Source">
+              <select style={inp()} value={form.source} onChange={e => setForm(p => ({ ...p, source: e.target.value }))}>
+                <option value="">— select —</option>
+                {SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </Field>
+            <Field label="Estimated Value (₹)"><input type="number" style={inp()} value={form.lead_value} onChange={e => setForm(p => ({ ...p, lead_value: e.target.value }))} /></Field>
+            <Field label="Owner">
+              <select style={inp()} value={form.owner} onChange={e => setForm(p => ({ ...p, owner: e.target.value }))}>
+                <option value="">— select —</option>
+                {team.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Referred By"><input style={inp()} value={form.referred_by} onChange={e => setForm(p => ({ ...p, referred_by: e.target.value }))} /></Field>
+            <Field label="Notes" span2><textarea style={inp({ minHeight: '70px', resize: 'vertical' })} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} /></Field>
+          </FormGrid>
+        </Modal>
+      )}
+
+      {/* Lead detail drawer */}
+      {viewLead && (
+        <Drawer eyebrow="Lead" title={viewLead.name} onClose={() => setViewLead(null)}
+          footer={<>
+            <Btn variant="ghost" small onClick={() => openEdit(viewLead)}><Pencil size={12} /> Edit</Btn>
+            <Btn variant="danger" small onClick={() => { if (confirm('Delete this lead?')) remove.mutate(viewLead.id); }}><Trash2 size={12} /> Delete</Btn>
+            <div style={{ flex: 1 }} />
+            {viewLead.status !== 'converted' && (
+              <Btn variant="success" small onClick={() => { setConvertLead(viewLead); setConvertOpts({ createAccount: !!viewLead.company, createContact: true, createDeal: true, dealValue: String(viewLead.lead_value || '') }); }}>
+                <Sparkles size={12} /> Convert
+              </Btn>
+            )}
+          </>}>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '18px' }}>
+            {viewLead.phone && <>
+              <Btn variant="subtle" small onClick={() => window.open(`tel:${viewLead.phone}`)}><Phone size={12} /> Call</Btn>
+              <Btn variant="subtle" small onClick={() => sendWhatsApp(viewLead.phone, `Hi ${viewLead.name},`).catch(e => toast.error(e.message))}><MessageSquare size={12} /> WhatsApp</Btn>
+            </>}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+            {[
+              ['Company', viewLead.company], ['Phone', viewLead.phone], ['Email', viewLead.email], ['Source', viewLead.source],
+              ['Value', viewLead.lead_value ? fmtINR(viewLead.lead_value) : ''], ['Owner', viewLead.owner],
+              ['Referred By', viewLead.referred_by], ['Business Type', viewLead.business_type],
+              ['Interest', viewLead.software_interest], ['Converted', viewLead.converted_at ? fmtDate(viewLead.converted_at) : ''],
+            ].filter(([, v]) => v).map(([k, v]) => (
+              <div key={k as string}>
+                <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 800, marginBottom: '3px' }}>{k}</div>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: C.text }}>{v}</div>
+              </div>
+            ))}
+          </div>
+          {viewLead.notes && (
+            <div style={{ marginTop: '16px', background: C.surface2, borderRadius: '10px', padding: '12px 14px', fontSize: '13px', color: C.text, whiteSpace: 'pre-wrap' }}>{viewLead.notes}</div>
           )}
-        </div>
-      </div>
-
-      {/* Add Lead Modal */}
-      {showAdd && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '4px', padding: '32px', width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.18)', fontFamily: 'inherit' }}>
-            <h2 style={{ fontSize: '18px', fontWeight: 800, letterSpacing: '-0.03em', color: C.text, margin: '0 0 24px' }}>New Lead</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-              {([['Full Name *', 'name', 'text'], ['Company', 'company', 'text'], ['Email', 'email', 'email'], ['Phone', 'phone', 'tel'], ['Lead Value (₹)', 'lead_value', 'number']] as [string, keyof typeof form, string][]).map(([label, key, type]) => (
-                <div key={key} style={key === 'name' ? { gridColumn: '1 / -1' } : {}}>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: C.muted, marginBottom: '5px' }}>{label}</label>
-                  <input type={type} style={inp()} placeholder={label.replace(' *', '')} value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} />
-                </div>
-              ))}
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: C.muted, marginBottom: '5px' }}>Source</label>
-                <select style={inp()} value={form.source} onChange={e => setForm(f => ({ ...f, source: e.target.value }))}>
-                  <option value="">— Select —</option>
-                  {SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
-                  <option value="whatsapp">WhatsApp</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: C.muted, marginBottom: '5px' }}>Owner</label>
-                <select style={inp()} value={form.owner} onChange={e => setForm(f => ({ ...f, owner: e.target.value }))}>
-                  <option value="">— Assign Owner —</option>
-                  {allOwners.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: C.muted, marginBottom: '5px' }}>Referred By</label>
-                <select style={inp()} value={form.referred_by} onChange={e => setForm(f => ({ ...f, referred_by: e.target.value }))}>
-                  <option value="">— None —</option>
-                  {allOwners.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
+          {viewLead.status !== 'converted' && (
+            <div style={{ marginTop: '18px' }}>
+              <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 800, marginBottom: '6px' }}>Status</div>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {(['new', 'working', 'dead'] as const).map(s => (
+                  <Btn key={s} small variant={viewLead.status === s ? 'primary' : 'ghost'}
+                    onClick={() => { setStatus.mutate({ id: viewLead.id, status: s }); setViewLead({ ...viewLead, status: s }); }}>
+                    {STATUS_META[s].label}
+                  </Btn>
+                ))}
               </div>
             </div>
-            <div style={{ marginTop: '14px' }}>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: C.muted, marginBottom: '5px' }}>Notes</label>
-              <textarea style={{ ...inp(), resize: 'vertical', minHeight: '70px' }} placeholder="Notes…" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
-            </div>
-            <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
-              <button onClick={() => setShowAdd(false)} style={{ flex: 1, background: C.surface2, color: C.muted, border: `1px solid ${C.border}`, borderRadius: '4px', padding: '11px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
-              <button onClick={() => add.mutate()} disabled={!form.name || add.isPending}
-                style={{ flex: 2, background: C.nav, color: '#fff', border: 'none', borderRadius: '4px', padding: '11px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.04em', opacity: !form.name || add.isPending ? 0.6 : 1 }}>
-                {add.isPending ? 'Saving…' : 'Save Lead'}
-              </button>
-            </div>
-          </div>
-        </div>
+          )}
+        </Drawer>
       )}
 
-      {/* Convert Lead Modal */}
+      {/* Convert modal */}
       {convertLead && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '4px', padding: '32px', width: '100%', maxWidth: '440px', boxShadow: '0 24px 64px rgba(0,0,0,0.18)', fontFamily: 'inherit' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-              <div style={{ background: C.nav, borderRadius: '8px', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Zap style={{ width: '18px', height: '18px', color: C.accent2 }} />
-              </div>
+        <Modal title={`Convert "${convertLead.name}"`} onClose={() => setConvertLead(null)} width={460}
+          footer={<>
+            <Btn variant="ghost" onClick={() => setConvertLead(null)}>Cancel</Btn>
+            <Btn variant="success" onClick={() => convert.mutate()} disabled={convert.isPending}><Sparkles size={13} /> Convert Lead</Btn>
+          </>}>
+          <p style={{ fontSize: '13px', color: C.muted, margin: '0 0 14px' }}>Pick what gets created. The lead is then marked converted.</p>
+          {[
+            { key: 'createAccount' as const, emoji: '🏢', label: 'Account', desc: convertLead.company || 'No company on lead — skipped', disabled: !convertLead.company },
+            { key: 'createContact' as const, emoji: '👤', label: 'Contact', desc: convertLead.name, disabled: false },
+            { key: 'createDeal' as const, emoji: '💰', label: 'Deal in Pipeline', desc: `${convertLead.company || convertLead.name} — Opportunity`, disabled: false },
+          ].map(o => (
+            <label key={o.key} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', border: `1px solid ${C.border}`, borderRadius: '10px', marginBottom: '8px', cursor: o.disabled ? 'not-allowed' : 'pointer', opacity: o.disabled ? 0.5 : 1, background: convertOpts[o.key] && !o.disabled ? C.surface2 : C.surface }}>
+              <input type="checkbox" checked={convertOpts[o.key] && !o.disabled} disabled={o.disabled}
+                onChange={e => setConvertOpts(p => ({ ...p, [o.key]: e.target.checked }))} />
+              <span style={{ fontSize: '20px' }}>{o.emoji}</span>
               <div>
-                <h2 style={{ fontSize: '17px', fontWeight: 800, letterSpacing: '-0.03em', color: C.text, margin: 0 }}>Convert Lead</h2>
-                <p style={{ color: C.muted, fontSize: '12px', margin: 0 }}>{convertLead.name}{convertLead.company ? ` · ${convertLead.company}` : ''}</p>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: C.text }}>{o.label}</div>
+                <div style={{ fontSize: '11px', color: C.muted }}>{o.desc}</div>
               </div>
-            </div>
-            <p style={{ color: C.muted, fontSize: '13px', marginBottom: '16px', lineHeight: 1.5 }}>Auto-create records from this lead:</p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {[
-                { key: 'createAccount' as const, label: 'Account', desc: convertLead.company || '(no company — skip)', emoji: '🏢', disabled: !convertLead.company },
-                { key: 'createContact' as const, label: 'Contact', desc: convertLead.name, emoji: '👤', disabled: false },
-                { key: 'createDeal' as const, label: 'Opportunity', desc: `${convertLead.company || convertLead.name} — Opportunity`, emoji: '💰', disabled: false },
-              ].map(item => (
-                <label key={item.key}
-                  style={{ display: 'flex', alignItems: 'center', gap: '12px', background: item.disabled ? C.surface2 : C.surface2, border: `1px solid ${C.border}`, borderRadius: '4px', padding: '12px 14px', cursor: item.disabled ? 'not-allowed' : 'pointer', opacity: item.disabled ? 0.45 : 1 }}>
-                  <input type="checkbox" checked={convertOpts[item.key] && !item.disabled} disabled={item.disabled}
-                    onChange={e => setConvertOpts(o => ({ ...o, [item.key]: e.target.checked }))}
-                    style={{ width: '15px', height: '15px', accentColor: C.nav, flexShrink: 0 }} />
-                  <span style={{ fontSize: '18px' }}>{item.emoji}</span>
-                  <div>
-                    <p style={{ color: C.text, fontWeight: 700, fontSize: '13px', margin: 0 }}>{item.label}</p>
-                    <p style={{ color: C.muted, fontSize: '12px', margin: 0 }}>{item.desc}</p>
-                  </div>
-                </label>
-              ))}
-              {convertOpts.createDeal && (
-                <div style={{ marginTop: '4px' }}>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: C.muted, marginBottom: '5px' }}>Deal Value (₹)</label>
-                  <input type="number" style={inp()} placeholder="0" value={convertOpts.dealValue || ''}
-                    onChange={e => setConvertOpts(o => ({ ...o, dealValue: parseFloat(e.target.value) || 0 }))} />
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
-              <button onClick={() => setConvertLead(null)} style={{ flex: 1, background: C.surface2, color: C.muted, border: `1px solid ${C.border}`, borderRadius: '4px', padding: '11px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
-              <button onClick={() => doConvert.mutate()} disabled={doConvert.isPending}
-                style={{ flex: 2, background: C.nav, color: '#fff', border: 'none', borderRadius: '4px', padding: '11px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.04em', opacity: doConvert.isPending ? 0.6 : 1 }}>
-                {doConvert.isPending ? 'Converting…' : 'Convert Lead →'}
-              </button>
-            </div>
-          </div>
-        </div>
+            </label>
+          ))}
+          {convertOpts.createDeal && (
+            <Field label="Deal Value (₹)">
+              <input type="number" style={inp()} value={convertOpts.dealValue} onChange={e => setConvertOpts(p => ({ ...p, dealValue: e.target.value }))} />
+            </Field>
+          )}
+        </Modal>
       )}
-    </div>
+    </CRMPage>
   );
 }

@@ -1,123 +1,219 @@
-// [crm] [all tenants]
+// [crm] [all tenants] — Contacts: customer 360° view with deals, sales docs & activity
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, User, Trash2 } from 'lucide-react';
+import { Plus, Phone, MessageSquare, Trash2, Pencil, Mail } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
-import { listCRMContacts, createCRMContact, updateCRMContact, deleteCRMContact } from '@/lib/db/crm';
 import { toast } from 'sonner';
+import {
+  listCRMContacts, createCRMContact, updateCRMContact, deleteCRMContact,
+  listCRMDeals, listCRMFollowUps, listCRMCommunications, type CRMContact,
+} from '@/lib/db/crm';
+import { listCRMSales } from '@/lib/db/crmSales';
+import { sendWhatsApp } from '@/lib/whatsapp';
+import {
+  CRMPage, PageHead, SearchInput, Panel, EmptyState, Badge, Avatar, Btn, Modal, Drawer,
+  Field, FormGrid, inp, C, fmtINR, fmtDate, timeAgo, th, td,
+} from './components/kit';
 
-const STAGES = ['lead', 'contacted', 'qualified', 'customer', 'lost'];
-const STAGE_COLORS: Record<string, string> = {
-  lead: '#64748b', contacted: '#2563eb', qualified: '#7c3aed', customer: '#16a34a', lost: '#dc2626',
+const STAGE_BADGE: Record<string, { bg: string; color: string }> = {
+  lead:      { bg: C.amberBg, color: C.amber },
+  qualified: { bg: C.blueBg,  color: C.blue },
+  customer:  { bg: C.greenBg, color: C.green },
 };
+
+const emptyForm = { name: '', phone: '', email: '', company: '', source: '', stage: 'lead', tags: '', notes: '' };
 
 export function CRMContactsPage() {
   const tenantId = useAppStore(s => s.config?.tenant_id ?? '');
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
-  const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ name: '', phone: '', email: '', company: '', source: '', stage: 'lead', tags: '', notes: '' });
+  const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [view, setView] = useState<CRMContact | null>(null);
+  const [form, setForm] = useState(emptyForm);
 
-  const { data: contacts = [], isLoading } = useQuery({
+  const { data: contacts = [] } = useQuery({
     queryKey: ['crm-contacts', tenantId, search],
     queryFn: () => listCRMContacts(tenantId, search),
     enabled: !!tenantId,
   });
 
-  const add = useMutation({
-    mutationFn: () => createCRMContact(tenantId, form),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['crm-contacts'] }); setShowAdd(false); setForm({ name: '', phone: '', email: '', company: '', source: '', stage: 'lead', tags: '', notes: '' }); toast.success('Contact added'); },
-    onError: (e) => toast.error(String(e)),
+  // 360° data for the open contact
+  const { data: deals = [] } = useQuery({ queryKey: ['crm-deals', tenantId, view?.id], queryFn: () => listCRMDeals(tenantId, { contactId: view!.id }), enabled: !!tenantId && !!view });
+  const { data: sales = [] } = useQuery({ queryKey: ['crm-sales', tenantId, view?.id], queryFn: () => listCRMSales(tenantId, { contactId: view!.id }), enabled: !!tenantId && !!view });
+  const { data: followups = [] } = useQuery({ queryKey: ['crm-followups', tenantId, view?.id], queryFn: () => listCRMFollowUps(tenantId, { contactId: view!.id }), enabled: !!tenantId && !!view });
+  const { data: comms = [] } = useQuery({ queryKey: ['crm-comms', tenantId, view?.id], queryFn: () => listCRMCommunications(tenantId, view!.id), enabled: !!tenantId && !!view });
+
+  const save = useMutation({
+    mutationFn: async () => {
+      if (editId) await updateCRMContact(tenantId, editId, form);
+      else await createCRMContact(tenantId, form);
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['crm-contacts'] }); setShowForm(false); setEditId(null); setForm(emptyForm); toast.success(editId ? 'Contact updated' : 'Contact added'); },
+    onError: (e: Error) => toast.error(e.message),
   });
 
-  const setStage = useMutation({
-    mutationFn: ({ id, stage }: { id: string; stage: string }) => updateCRMContact(tenantId, id, { stage }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['crm-contacts'] }),
-  });
-
-  const del = useMutation({
+  const remove = useMutation({
     mutationFn: (id: string) => deleteCRMContact(tenantId, id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['crm-contacts'] }); toast.success('Contact removed'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['crm-contacts'] }); setView(null); toast.success('Contact deleted'); },
   });
+
+  const openEdit = (c: CRMContact) => {
+    setEditId(c.id);
+    setForm({ name: c.name, phone: c.phone, email: c.email, company: c.company, source: c.source, stage: c.stage, tags: c.tags, notes: c.notes });
+    setView(null);
+    setShowForm(true);
+  };
+
+  const openDealsValue = deals.filter(d => d.stage !== 'won' && d.stage !== 'lost').reduce((s, d) => s + (d.value || 0), 0);
+  const invoiced = sales.filter(s => s.doc_type === 'invoice').reduce((s2, s) => s2 + (s.total || 0), 0);
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-900">Contacts &amp; Leads</h1>
-        <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-500 transition-colors">
-          <Plus className="h-4 w-4" /> Add Contact
-        </button>
+    <CRMPage>
+      <PageHead title="Contacts" subtitle="Your people — every deal, document and conversation in one place."
+        actions={<Btn onClick={() => { setEditId(null); setForm(emptyForm); setShowForm(true); }}><Plus size={14} /> New Contact</Btn>} />
+
+      <div style={{ marginBottom: '16px' }}>
+        <SearchInput value={search} onChange={setSearch} placeholder="Search name, phone, company…" />
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-        <input className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="Search by name, phone, company…" value={search} onChange={e => setSearch(e.target.value)} />
-      </div>
+      <Panel>
+        {contacts.length === 0 ? (
+          <EmptyState emoji="👥" title="No contacts yet" hint="Contacts are created automatically when you convert a lead, or add one manually."
+            action={<Btn small onClick={() => { setEditId(null); setForm(emptyForm); setShowForm(true); }}><Plus size={13} /> Add Contact</Btn>} />
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead><tr><th style={th}>Contact</th><th style={th}>Phone</th><th style={th}>Email</th><th style={th}>Stage</th><th style={th}>Tags</th></tr></thead>
+            <tbody>
+              {contacts.map(c => {
+                const sb = STAGE_BADGE[c.stage] ?? STAGE_BADGE.lead;
+                return (
+                  <tr key={c.id} className="crm-row" style={{ cursor: 'pointer' }} onClick={() => setView(c)}>
+                    <td style={td}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Avatar name={c.name} size={32} />
+                        <div>
+                          <div style={{ fontWeight: 700 }}>{c.name}</div>
+                          <div style={{ fontSize: '11px', color: C.muted }}>{c.company || '—'}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={td}>{c.phone || <span style={{ color: C.faint }}>—</span>}</td>
+                    <td style={td}>{c.email || <span style={{ color: C.faint }}>—</span>}</td>
+                    <td style={td}><Badge bg={sb.bg} color={sb.color}>{c.stage}</Badge></td>
+                    <td style={{ ...td, fontSize: '12px', color: C.muted }}>{c.tags || '—'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </Panel>
 
-      {isLoading ? <p className="text-slate-400 text-sm text-center py-8">Loading…</p> : (
-        <div className="space-y-2">
-          {contacts.map(c => (
-            <div key={c.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50">
-                  <User className="h-5 w-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="font-semibold text-slate-800">{c.name}</p>
-                  <p className="text-xs text-slate-400">{c.company || '—'} · {c.phone || '—'} · {c.email || '—'}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <select value={c.stage} onChange={e => setStage.mutate({ id: c.id, stage: e.target.value })}
-                  className="text-xs font-semibold rounded-lg px-2.5 py-1.5 border-0 outline-none cursor-pointer"
-                  style={{ background: `${STAGE_COLORS[c.stage] ?? '#64748b'}1a`, color: STAGE_COLORS[c.stage] ?? '#64748b' }}>
-                  {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-                <button onClick={() => { if (confirm('Remove this contact?')) del.mutate(c.id); }} className="p-1.5 text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="h-4 w-4" /></button>
-              </div>
-            </div>
-          ))}
-          {contacts.length === 0 && <p className="text-slate-400 text-sm text-center py-8">No contacts found</p>}
-        </div>
+      {/* Add / Edit modal */}
+      {showForm && (
+        <Modal title={editId ? 'Edit Contact' : 'New Contact'} onClose={() => { setShowForm(false); setEditId(null); }}
+          footer={<>
+            <Btn variant="ghost" onClick={() => { setShowForm(false); setEditId(null); }}>Cancel</Btn>
+            <Btn onClick={() => form.name.trim() ? save.mutate() : toast.error('Name is required')} disabled={save.isPending}>{editId ? 'Save Changes' : 'Add Contact'}</Btn>
+          </>}>
+          <FormGrid>
+            <Field label="Name *"><input style={inp()} value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} autoFocus /></Field>
+            <Field label="Company"><input style={inp()} value={form.company} onChange={e => setForm(p => ({ ...p, company: e.target.value }))} /></Field>
+            <Field label="Phone"><input style={inp()} value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} /></Field>
+            <Field label="Email"><input style={inp()} value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} /></Field>
+            <Field label="Stage">
+              <select style={inp()} value={form.stage} onChange={e => setForm(p => ({ ...p, stage: e.target.value }))}>
+                <option value="lead">Lead</option><option value="qualified">Qualified</option><option value="customer">Customer</option>
+              </select>
+            </Field>
+            <Field label="Tags (comma separated)"><input style={inp()} value={form.tags} onChange={e => setForm(p => ({ ...p, tags: e.target.value }))} /></Field>
+            <Field label="Notes" span2><textarea style={inp({ minHeight: '70px', resize: 'vertical' })} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} /></Field>
+          </FormGrid>
+        </Modal>
       )}
 
-      {showAdd && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 space-y-4 shadow-xl max-h-[90vh] overflow-y-auto">
-            <h2 className="text-lg font-bold text-slate-800">Add Contact</h2>
-            {[
-              { key: 'name', label: 'Name *', placeholder: 'Contact name' },
-              { key: 'phone', label: 'Phone', placeholder: '9xxxxxxxxx' },
-              { key: 'email', label: 'Email', placeholder: 'email@example.com' },
-              { key: 'company', label: 'Company', placeholder: 'Company name' },
-              { key: 'source', label: 'Source', placeholder: 'Referral, website, ad…' },
-              { key: 'tags', label: 'Tags', placeholder: 'comma, separated, tags' },
-              { key: 'notes', label: 'Notes', placeholder: 'Optional' },
-            ].map(f => (
-              <div key={f.key}>
-                <label className="block text-xs font-medium text-slate-600 mb-1">{f.label}</label>
-                <input className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder={f.placeholder} value={(form as Record<string, string>)[f.key]}
-                  onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))} />
-              </div>
-            ))}
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Stage</label>
-              <select className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none" value={form.stage} onChange={e => setForm(p => ({ ...p, stage: e.target.value }))}>
-                {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
+      {/* Contact 360° drawer */}
+      {view && (
+        <Drawer eyebrow="Contact" title={view.name} onClose={() => setView(null)} width={520}
+          footer={<>
+            <Btn variant="ghost" small onClick={() => openEdit(view)}><Pencil size={12} /> Edit</Btn>
+            <Btn variant="danger" small onClick={() => { if (confirm('Delete this contact?')) remove.mutate(view.id); }}><Trash2 size={12} /> Delete</Btn>
+          </>}>
+          {/* Quick actions */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+            {view.phone && <>
+              <Btn variant="subtle" small onClick={() => window.open(`tel:${view.phone}`)}><Phone size={12} /> Call</Btn>
+              <Btn variant="subtle" small onClick={() => sendWhatsApp(view.phone, `Hi ${view.name},`).catch(e => toast.error(e.message))}><MessageSquare size={12} /> WhatsApp</Btn>
+            </>}
+            {view.email && <Btn variant="subtle" small onClick={() => window.open(`mailto:${view.email}`)}><Mail size={12} /> Email</Btn>}
+          </div>
+
+          {/* Mini KPIs */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '18px' }}>
+            <div style={{ background: C.violetBg, borderRadius: '10px', padding: '12px 14px' }}>
+              <div style={{ fontSize: '10px', fontWeight: 800, color: C.violet, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Open Pipeline</div>
+              <div style={{ fontSize: '18px', fontWeight: 800, color: C.text }}>{fmtINR(openDealsValue)}</div>
             </div>
-            <div className="flex gap-3 pt-2">
-              <button onClick={() => setShowAdd(false)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
-              <button onClick={() => add.mutate()} disabled={!form.name.trim() || add.isPending}
-                className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500 disabled:opacity-40">
-                {add.isPending ? 'Saving…' : 'Add Contact'}
-              </button>
+            <div style={{ background: C.greenBg, borderRadius: '10px', padding: '12px 14px' }}>
+              <div style={{ fontSize: '10px', fontWeight: 800, color: C.green, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Invoiced</div>
+              <div style={{ fontSize: '18px', fontWeight: 800, color: C.text }}>{fmtINR(invoiced)}</div>
             </div>
           </div>
-        </div>
+
+          {/* Details */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '18px' }}>
+            {[['Company', view.company], ['Phone', view.phone], ['Email', view.email], ['Source', view.source], ['Tags', view.tags]].filter(([, v]) => v).map(([k, v]) => (
+              <div key={k as string}>
+                <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 800, marginBottom: '3px' }}>{k}</div>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: C.text }}>{v}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Deals */}
+          <SectionTitle>💰 Deals ({deals.length})</SectionTitle>
+          {deals.length === 0 ? <Hint>No deals yet.</Hint> : deals.map(d => (
+            <MiniRow key={d.id} title={d.title} right={fmtINR(d.value)} sub={`Stage: ${d.stage}${d.expected_close_date ? ` · closes ${fmtDate(d.expected_close_date)}` : ''}`} />
+          ))}
+
+          {/* Sales docs */}
+          <SectionTitle>🧾 Sales Documents ({sales.length})</SectionTitle>
+          {sales.length === 0 ? <Hint>No quotes, orders or invoices yet.</Hint> : sales.map(s => (
+            <MiniRow key={s.id} title={`${s.doc_no} · ${s.doc_type}`} right={fmtINR(s.total)} sub={`Status: ${s.status}${s.due_date ? ` · due ${fmtDate(s.due_date)}` : ''}`} />
+          ))}
+
+          {/* Follow-ups */}
+          <SectionTitle>⏰ Follow-ups ({followups.length})</SectionTitle>
+          {followups.length === 0 ? <Hint>No follow-ups.</Hint> : followups.slice(0, 5).map(f => (
+            <MiniRow key={f.id} title={f.title} right={f.status} sub={f.due_at ? `Due ${fmtDate(f.due_at)}` : ''} />
+          ))}
+
+          {/* Recent communications */}
+          <SectionTitle>📞 Recent Activity ({comms.length})</SectionTitle>
+          {comms.length === 0 ? <Hint>No logged communication.</Hint> : comms.slice(0, 6).map(cm => (
+            <MiniRow key={cm.id} title={`${cm.type} · ${cm.direction}`} right={timeAgo(cm.occurred_at)} sub={cm.summary} />
+          ))}
+        </Drawer>
       )}
+    </CRMPage>
+  );
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <div style={{ fontSize: '11px', fontWeight: 800, color: C.text, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '18px 0 8px' }}>{children}</div>;
+}
+function Hint({ children }: { children: React.ReactNode }) {
+  return <div style={{ fontSize: '12px', color: C.faint, marginBottom: '6px' }}>{children}</div>;
+}
+function MiniRow({ title, sub, right }: { title: string; sub?: string; right?: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', padding: '9px 12px', background: C.surface2, borderRadius: '8px', marginBottom: '6px' }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: '12px', fontWeight: 700, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</div>
+        {sub && <div style={{ fontSize: '11px', color: C.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</div>}
+      </div>
+      {right && <div style={{ fontSize: '12px', fontWeight: 700, color: C.muted, flexShrink: 0 }}>{right}</div>}
     </div>
   );
 }

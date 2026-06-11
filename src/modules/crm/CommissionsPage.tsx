@@ -1,139 +1,112 @@
-// [crm] [all tenants]
+// [crm] [all tenants] — Commissions: auto-created on deal win, tracked per person until paid
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { IndianRupee, CheckCircle2, Hourglass } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
-import { listCRMCommissions, updateCRMCommissionStatus, type CRMCommission } from '@/lib/db/crm';
-
-const C = {
-  bg: '#f0ece4', nav: '#0f1523', surface: '#ffffff', border: '#e5dfd3',
-  text: '#111520', muted: '#7c7869', accent: '#b8922a',
-};
-
-const STATUS_META: Record<string, { bg: string; color: string; label: string }> = {
-  pending: { bg: '#fef3c7', color: '#92400e', label: 'Pending' },
-  paid:    { bg: '#dcfce7', color: '#15803d', label: 'Paid' },
-  waived:  { bg: '#f1f5f9', color: '#64748b', label: 'Waived' },
-};
-
-function fmt(n: number) { return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`; }
+import { toast } from 'sonner';
+import { listCRMCommissions, updateCRMCommissionStatus } from '@/lib/db/crm';
+import { CRMPage, PageHead, Segments, StatCard, Panel, EmptyState, Badge, Btn, Avatar, C, fmtINR, timeAgo, th, td } from './components/kit';
 
 export function CommissionsPage() {
   const tenantId = useAppStore(s => s.config?.tenant_id ?? '');
   const qc = useQueryClient();
+  const [tab, setTab] = useState<'pending' | 'paid' | 'all'>('pending');
 
-  const { data: commissions = [] } = useQuery({
-    queryKey: ['crm-commissions', tenantId],
-    queryFn: () => listCRMCommissions(tenantId),
-    enabled: !!tenantId,
-  });
+  const { data: commissions = [] } = useQuery({ queryKey: ['crm-commissions', tenantId], queryFn: () => listCRMCommissions(tenantId), enabled: !!tenantId });
 
-  const statusMutation = useMutation({
+  const setStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => updateCRMCommissionStatus(tenantId, id, status),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['crm-commissions', tenantId] }),
+    onSuccess: (_, { status }) => {
+      qc.invalidateQueries({ queryKey: ['crm-commissions'] });
+      toast.success(status === 'paid' ? 'Commission marked paid 💸' : 'Moved back to pending');
+    },
   });
 
-  const totalPending = commissions.filter(c => c.status === 'pending').reduce((s, c) => s + c.commission_amount, 0);
-  const totalPaid    = commissions.filter(c => c.status === 'paid').reduce((s, c) => s + c.commission_amount, 0);
+  const pending = commissions.filter(c => c.status === 'pending');
+  const paid = commissions.filter(c => c.status === 'paid');
+  const visible = tab === 'all' ? commissions : tab === 'paid' ? paid : pending;
 
-  // Group by deal
-  const byDeal: Record<string, CRMCommission[]> = {};
-  for (const c of commissions) {
-    if (!byDeal[c.deal_id]) byDeal[c.deal_id] = [];
-    byDeal[c.deal_id].push(c);
-  }
+  const pendingTotal = pending.reduce((s, c) => s + (c.commission_amount || 0), 0);
+  const paidTotal = paid.reduce((s, c) => s + (c.commission_amount || 0), 0);
+
+  // Totals per person (pending)
+  const perPerson = pending.reduce<Record<string, number>>((acc, c) => {
+    acc[c.person_name] = (acc[c.person_name] ?? 0) + (c.commission_amount || 0);
+    return acc;
+  }, {});
 
   return (
-    <div style={{ background: C.bg, minHeight: '100%', fontFamily: "'Inter', -apple-system, sans-serif" }}>
-      <div style={{ padding: '28px 30px 0' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: 800, letterSpacing: '-0.04em', color: C.text, margin: 0 }}>Commissions</h1>
-        <p style={{ fontSize: '11px', color: C.muted, marginTop: '4px', letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 500 }}>
-          50/50 deal commission splits
-        </p>
+    <CRMPage>
+      <PageHead title="Commissions" subtitle="Created automatically when a deal is won — owner and referrer each get their share." />
+
+      <div className="crm-fade-up" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '18px' }}>
+        <StatCard label="Pending Payout" value={fmtINR(pendingTotal)} sub={`${pending.length} commissions`} icon={<Hourglass size={15} />} tint={C.amber} tintBg={C.amberBg} />
+        <StatCard label="Paid Out" value={fmtINR(paidTotal)} sub={`${paid.length} commissions`} icon={<CheckCircle2 size={15} />} tint={C.green} tintBg={C.greenBg} />
+        <StatCard label="Total" value={fmtINR(pendingTotal + paidTotal)} icon={<IndianRupee size={15} />} tint={C.violet} tintBg={C.violetBg} />
       </div>
 
-      <div style={{ padding: '24px 30px' }}>
-        {/* Summary cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '24px' }}>
-          {[
-            { label: 'Pending Commissions', value: fmt(totalPending), color: '#d97706', icon: '⏳' },
-            { label: 'Total Paid Out',       value: fmt(totalPaid),    color: '#16a34a', icon: '✅' },
-            { label: 'Total Records',         value: commissions.length, color: C.nav,   icon: '📋' },
-          ].map(card => (
-            <div key={card.label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '4px', borderTop: `3px solid ${card.color}`, padding: '20px' }}>
-              <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: C.muted, marginBottom: '10px' }}>{card.label}</div>
-              <div style={{ fontSize: '28px', fontWeight: 900, color: card.color }}>{card.value}</div>
+      {/* Owed per person */}
+      {Object.keys(perPerson).length > 0 && (
+        <div className="crm-fade-up" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '18px' }}>
+          {Object.entries(perPerson).map(([name, amt]) => (
+            <div key={name} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: '999px', padding: '6px 14px 6px 6px', boxShadow: C.shadow }}>
+              <Avatar name={name} size={26} />
+              <span style={{ fontSize: '12px', fontWeight: 700, color: C.text }}>{name}</span>
+              <span style={{ fontSize: '12px', fontWeight: 800, color: C.amber }}>{fmtINR(amt)} due</span>
             </div>
           ))}
         </div>
+      )}
 
-        {commissions.length === 0 ? (
-          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '4px', padding: '60px 20px', textAlign: 'center', color: C.muted }}>
-            <div style={{ fontSize: '40px', marginBottom: '12px' }}>💰</div>
-            <p style={{ fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>No commissions yet</p>
-            <p style={{ fontSize: '13px' }}>Commissions are created automatically when a deal is marked as Won.</p>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {Object.entries(byDeal).map(([dealId, items]) => {
-              const dealTitle = items[0]?.deal_title || dealId;
-              const dealValue = items[0]?.deal_value || 0;
-              return (
-                <div key={dealId} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '4px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-                  <div style={{ padding: '14px 20px', borderBottom: `1px solid ${C.border}`, background: '#f8f5f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <span style={{ fontWeight: 800, fontSize: '14px', color: C.text }}>{dealTitle}</span>
-                      <span style={{ marginLeft: '10px', fontSize: '12px', color: C.muted }}>Deal value: {fmt(dealValue)}</span>
-                    </div>
-                    <span style={{ fontSize: '11px', color: C.muted }}>50/50 split</span>
-                  </div>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr>
-                        {['Person', 'Type', 'Split', 'Amount', 'Status', 'Actions'].map(h => (
-                          <th key={h} style={{ padding: '10px 16px', fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'left', borderBottom: `1px solid ${C.border}`, fontWeight: 700 }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {items.map((c, i) => {
-                        const sm = STATUS_META[c.status] ?? STATUS_META.pending;
-                        return (
-                          <tr key={c.id} style={{ borderBottom: i < items.length - 1 ? `1px solid ${C.border}` : 'none' }}>
-                            <td style={{ padding: '12px 16px', fontWeight: 700, fontSize: '13px', color: C.text }}>{c.person_name}</td>
-                            <td style={{ padding: '12px 16px', fontSize: '12px', color: C.muted, textTransform: 'capitalize' }}>
-                              {c.person_type === 'owner' ? '🏢 Deal Owner' : '🤝 Referrer'}
-                            </td>
-                            <td style={{ padding: '12px 16px', fontWeight: 600, fontSize: '13px', color: C.accent }}>{c.commission_pct}%</td>
-                            <td style={{ padding: '12px 16px', fontWeight: 800, fontSize: '14px', color: '#16a34a' }}>{fmt(c.commission_amount)}</td>
-                            <td style={{ padding: '12px 16px' }}>
-                              <span style={{ background: sm.bg, color: sm.color, borderRadius: '2px', padding: '3px 8px', fontSize: '11px', fontWeight: 600 }}>{sm.label}</span>
-                            </td>
-                            <td style={{ padding: '12px 16px' }}>
-                              <div style={{ display: 'flex', gap: '6px' }}>
-                                {c.status === 'pending' && (
-                                  <button onClick={() => statusMutation.mutate({ id: c.id, status: 'paid' })}
-                                    style={{ background: '#dcfce7', border: '1px solid #86efac', borderRadius: '3px', padding: '5px 10px', fontSize: '11px', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', color: '#15803d' }}>
-                                    Mark Paid
-                                  </button>
-                                )}
-                                {c.status === 'pending' && (
-                                  <button onClick={() => statusMutation.mutate({ id: c.id, status: 'waived' })}
-                                    style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '3px', padding: '5px 10px', fontSize: '11px', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', color: '#64748b' }}>
-                                    Waive
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              );
-            })}
-          </div>
-        )}
+      <div style={{ marginBottom: '16px' }}>
+        <Segments value={tab} onChange={k => setTab(k as typeof tab)}
+          options={[
+            { key: 'pending', label: 'Pending', count: pending.length },
+            { key: 'paid', label: 'Paid', count: paid.length },
+            { key: 'all', label: 'All', count: commissions.length },
+          ]} />
       </div>
-    </div>
+
+      <Panel>
+        {visible.length === 0 ? (
+          <EmptyState emoji="💸" title={tab === 'pending' ? 'No pending commissions' : 'Nothing here yet'}
+            hint="Win a deal in the Pipeline and commissions appear here automatically." />
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead><tr><th style={th}>Person</th><th style={th}>Deal</th><th style={th}>Deal Value</th><th style={th}>Share</th><th style={th}>Commission</th><th style={th}>Status</th><th style={th}></th></tr></thead>
+            <tbody>
+              {visible.map(c => (
+                <tr key={c.id} className="crm-row">
+                  <td style={td}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Avatar name={c.person_name} size={28} />
+                      <div>
+                        <div style={{ fontWeight: 700 }}>{c.person_name}</div>
+                        <div style={{ fontSize: '11px', color: C.muted }}>{c.person_type}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td style={td}>{c.deal_title}</td>
+                  <td style={td}>{fmtINR(c.deal_value)}</td>
+                  <td style={td}>{c.commission_pct}%</td>
+                  <td style={{ ...td, fontWeight: 800, color: C.green }}>{fmtINR(c.commission_amount)}</td>
+                  <td style={td}>
+                    <Badge bg={c.status === 'paid' ? C.greenBg : C.amberBg} color={c.status === 'paid' ? C.green : C.amber}>
+                      {c.status === 'paid' ? 'Paid' : 'Pending'}
+                    </Badge>
+                    <div style={{ fontSize: '10px', color: C.faint, marginTop: '2px' }}>{timeAgo(c.updated_at)}</div>
+                  </td>
+                  <td style={{ ...td, textAlign: 'right' }}>
+                    {c.status === 'pending'
+                      ? <Btn variant="success" small onClick={() => setStatus.mutate({ id: c.id, status: 'paid' })}><CheckCircle2 size={12} /> Mark Paid</Btn>
+                      : <Btn variant="ghost" small onClick={() => setStatus.mutate({ id: c.id, status: 'pending' })}>Undo</Btn>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Panel>
+    </CRMPage>
   );
 }

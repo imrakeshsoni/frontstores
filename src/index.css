@@ -39,10 +39,10 @@
 
   html.dark {
     color-scheme: dark;
-    /* Deep dark — rich, not pure black. Warm-neutral undertone. */
-    --bg:              #0F1117;
-    --surface:         #181B23;
-    --surface-2:       #21252F;
+    /* [all apps] [all tenants] — Aurora-deep dark: matches the CRM Aurora design language */
+    --bg:              #0a0c14;
+    --surface:         #141722;
+    --surface-2:       #1c2130;
     --surface-border:  rgba(255, 255, 255, 0.09);
     /* All three text levels clearly readable — WCAG AA+ contrast */
     --text-primary:    #F0F2F7;   /* near-white, slight cool tint */

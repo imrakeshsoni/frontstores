@@ -2,6 +2,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { SwitchAppModal } from '@/modules/switch/SwitchAppModal';
 import { setAINavigator } from '@/lib/voice/aiNavigator';
+import { useTheme } from '@/lib/theme/useTheme';
 import {
   Car,
   LayoutDashboard,
@@ -597,6 +598,7 @@ export function getNavItemsForShopType(shopType: string | undefined, settings: a
 export function AppLayout() {
   const { config, setAuthenticated } = useAppStore();
   const navigate = useNavigate();
+  const { theme: crmTheme } = useTheme(); // [crm] [all tenants] — Aurora shell light/dark
   const [showSwitchModal, setShowSwitchModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   // [carwash] [all tenants] — employee mode
@@ -746,117 +748,152 @@ export function AppLayout() {
     }
   }, [config?.shop_type]);
 
-  // [crm] [all tenants] — admin-panel design: dark navy sidebar/nav + warm cream bg
+  // [crm] [all tenants] — "Aurora" CRM shell: glass sidebar over aurora background, light & dark
   if (config?.shop_type === 'crm') {
-    const C = {
-      bg: '#f0ece4',
-      nav: '#0f1523',
-      nav2: '#171f30',
-      navBorder: 'rgba(255,255,255,0.07)',
-      surface: '#ffffff',
-      surface2: '#f8f5f0',
-      border: '#e5dfd3',
-      text: '#111520',
-      muted: '#7c7869',
-      accent: '#b8922a',
-      accent2: '#d4aa44',
+    const dark = crmTheme === 'dark';
+    const C = dark ? {
+      bg: '#0a0c14',
+      side: 'rgba(255,255,255,0.035)',
+      sideBorder: 'rgba(255,255,255,0.08)',
+      sideText: 'rgba(255,255,255,0.55)',
+      sideLabel: 'rgba(255,255,255,0.28)',
+      sideTitle: '#ffffff',
+      menuBg: 'rgba(23,26,38,0.96)',
+      menuText: 'rgba(255,255,255,0.65)',
+      auroraOpacity: 1,
+    } : {
+      bg: '#f2f3fa',
+      side: 'rgba(255,255,255,0.68)',
+      sideBorder: 'rgba(18,21,38,0.09)',
+      sideText: 'rgba(24,27,39,0.60)',
+      sideLabel: 'rgba(24,27,39,0.36)',
+      sideTitle: '#181b27',
+      menuBg: 'rgba(255,255,255,0.97)',
+      menuText: 'rgba(24,27,39,0.7)',
+      auroraOpacity: 0.55,
     };
+    const SIDE_GRADIENT = 'linear-gradient(135deg, #6366f1, #a855f7)';
+    // Grouped IA — items still respect staff tab access (activeNavItems)
+    const NAV_GROUPS: { label: string | null; paths: string[] }[] = [
+      { label: null, paths: ['/crm/dashboard'] },
+      { label: 'Sell', paths: ['/crm/leads', '/crm/wa-inbox', '/crm/pipeline', '/crm/sales'] },
+      { label: 'Serve', paths: ['/crm/service', '/crm/followups'] },
+      { label: 'People', paths: ['/crm/contacts', '/crm/communications'] },
+      { label: 'Team', paths: ['/crm/commissions', '/crm/team'] },
+    ];
+    const groups = NAV_GROUPS
+      .map(g => ({ ...g, items: g.paths.map(p => activeNavItems.find(i => i.to === p)).filter(Boolean) as typeof activeNavItems }))
+      .filter(g => g.items.length > 0);
+    const navItemStyle = (isActive: boolean): React.CSSProperties => ({
+      display: 'flex', alignItems: 'center', gap: '10px',
+      padding: '8px 12px', borderRadius: '9px', fontSize: '13px', fontWeight: isActive ? 700 : 500,
+      textDecoration: 'none', whiteSpace: 'nowrap', transition: 'all 0.14s',
+      background: isActive ? SIDE_GRADIENT : 'transparent',
+      color: isActive ? '#ffffff' : C.sideText,
+      boxShadow: isActive ? '0 6px 20px rgba(99,102,241,0.45), inset 0 1px 0 rgba(255,255,255,0.2)' : 'none',
+    });
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: C.bg, fontFamily: "'Inter', -apple-system, sans-serif" }}>
-        {/* Top nav — same dark navy as admin sidebar */}
-        <header style={{ background: C.nav, flexShrink: 0, zIndex: 20, boxShadow: '0 2px 16px rgba(0,0,0,0.25)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', padding: '0 24px', height: '54px', gap: '4px' }}>
-            {/* Brand */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginRight: '24px', flexShrink: 0, borderRight: `1px solid ${C.navBorder}`, paddingRight: '24px' }}>
-              <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '8px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Store style={{ width: '16px', height: '16px', color: C.accent2 }} />
-              </div>
-              <div>
-                <div style={{ color: '#ffffff', fontWeight: 800, fontSize: '14px', letterSpacing: '-0.03em' }}>
-                  {config?.shop_name || 'FrontStores'}
-                </div>
-                <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '10px', fontWeight: 500, letterSpacing: '0.08em', textTransform: 'uppercase' }}>CRM</div>
-              </div>
+      <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: C.bg, fontFamily: "'Inter', -apple-system, sans-serif", position: 'relative' }}>
+        {/* Aurora background */}
+        <div style={{ position: 'fixed', inset: 0, zIndex: 0, overflow: 'hidden', pointerEvents: 'none', opacity: C.auroraOpacity }}>
+          <div style={{ position: 'absolute', top: '-220px', left: '-160px', width: '620px', height: '620px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.30), transparent 65%)', filter: 'blur(60px)' }} />
+          <div style={{ position: 'absolute', bottom: '-260px', right: '-180px', width: '700px', height: '700px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(168,85,247,0.24), transparent 65%)', filter: 'blur(70px)' }} />
+          <div style={{ position: 'absolute', top: '35%', left: '45%', width: '520px', height: '520px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(34,211,238,0.14), transparent 65%)', filter: 'blur(70px)' }} />
+        </div>
+        {/* Sidebar — glass */}
+        <aside style={{ width: '220px', flexShrink: 0, background: C.side, backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)', borderRight: `1px solid ${C.sideBorder}`, display: 'flex', flexDirection: 'column', zIndex: 20 }}>
+          {/* Brand */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '18px 16px 14px', borderBottom: `1px solid ${C.sideBorder}` }}>
+            <div style={{ background: SIDE_GRADIENT, borderRadius: '10px', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 6px 20px rgba(99,102,241,0.5)' }}>
+              <Store style={{ width: '16px', height: '16px', color: '#fff' }} />
             </div>
-            {/* Nav items */}
-            <nav style={{ display: 'flex', alignItems: 'center', gap: '2px', flex: 1, overflowX: 'auto' }}>
-              {activeNavItems.map(({ to, icon: Icon, label }) => (
-                <NavLink key={to} to={to}
-                  style={({ isActive }) => ({
-                    display: 'flex', alignItems: 'center', gap: '7px',
-                    padding: '7px 13px', borderRadius: '5px', fontSize: '13px', fontWeight: 500,
-                    textDecoration: 'none', whiteSpace: 'nowrap', transition: 'all 0.12s',
-                    borderLeft: isActive ? `2px solid ${C.accent2}` : '2px solid transparent',
-                    background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
-                    color: isActive ? '#ffffff' : 'rgba(255,255,255,0.45)',
-                  })}>
-                  <Icon style={{ width: '13px', height: '13px', flexShrink: 0 }} />
-                  {label}
-                </NavLink>
-              ))}
-              <NavLink to="/announcements"
-                style={({ isActive }) => ({
-                  display: 'flex', alignItems: 'center', gap: '7px',
-                  padding: '7px 13px', borderRadius: '5px', fontSize: '13px', fontWeight: 500,
-                  textDecoration: 'none', whiteSpace: 'nowrap', transition: 'all 0.12s',
-                  borderLeft: isActive ? `2px solid ${C.accent2}` : '2px solid transparent',
-                  background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
-                  color: isActive ? '#ffffff' : 'rgba(255,255,255,0.45)',
-                  position: 'relative',
-                })}>
-                {({ isActive }) => (
-                  <>
-                    <Megaphone style={{ width: '13px', height: '13px', flexShrink: 0 }} />
-                    Announcements
-                    {!!unreadAnnouncements && (
-                      <span style={{ background: '#dc2626', color: 'white', borderRadius: '999px', padding: '0 5px', fontSize: '10px', fontWeight: 700, minWidth: '16px', height: '16px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {unreadAnnouncements > 9 ? '9+' : unreadAnnouncements}
-                      </span>
-                    )}
-                  </>
-                )}
-              </NavLink>
-            </nav>
-            {/* User menu */}
-            <div style={{ position: 'relative', flexShrink: 0, marginLeft: '12px', borderLeft: `1px solid ${C.navBorder}`, paddingLeft: '16px' }}>
-              <button onClick={() => setShowUserMenu(v => !v)}
-                style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0' }}>
-                <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '12px', flexShrink: 0 }}>
-                  {((loggedInDisplayName ?? config?.owner_name)?.[0] || 'O').toUpperCase()}
-                </div>
-                <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', fontWeight: 500 }}>{loggedInDisplayName ?? config?.owner_name ?? 'Owner'}</span>
-                <ChevronUp style={{ width: '12px', height: '12px', color: 'rgba(255,255,255,0.3)', transform: showUserMenu ? 'rotate(0deg)' : 'rotate(180deg)', transition: 'transform 0.2s' }} />
-              </button>
-              {showUserMenu && (
-                <>
-                  <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setShowUserMenu(false)} />
-                  <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, minWidth: '190px', background: C.nav2, border: `1px solid ${C.navBorder}`, borderRadius: '6px', overflow: 'hidden', zIndex: 50, boxShadow: '0 16px 40px rgba(0,0,0,0.4)' }}>
-                    {[
-                      { to: '/settings', icon: Settings, label: staffTabAccess !== null ? 'Check for Update' : 'Settings & Updates' },
-                    ].map(({ to, icon: Icon, label }) => (
-                      <NavLink key={to} to={to} onClick={() => setShowUserMenu(false)}
-                        style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', color: 'rgba(255,255,255,0.6)', textDecoration: 'none', fontSize: '13px', fontWeight: 500, borderBottom: `1px solid ${C.navBorder}`, transition: 'color 0.1s' }}>
-                        <Icon style={{ width: '13px', height: '13px' }} /> {label}
-                      </NavLink>
-                    ))}
-                    {!isClient && (
-                      <button onClick={() => { setShowUserMenu(false); setShowSwitchModal(true); }}
-                        style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', color: 'rgba(255,255,255,0.6)', background: 'none', border: 'none', borderBottom: `1px solid ${C.navBorder}`, width: '100%', fontSize: '13px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
-                        <ArrowLeftRight style={{ width: '13px', height: '13px' }} /> Switch App
-                      </button>
-                    )}
-                    <button onClick={handleLogout}
-                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', color: '#f87171', background: 'none', border: 'none', width: '100%', fontSize: '13px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
-                      <LogOut style={{ width: '13px', height: '13px' }} /> Logout
-                    </button>
-                  </div>
-                </>
-              )}
+            <div style={{ minWidth: 0 }}>
+              <div style={{ color: C.sideTitle, fontWeight: 800, fontSize: '13.5px', letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {config?.shop_name || 'FrontStores'}
+              </div>
+              <div style={{ color: C.sideLabel, fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase' }}>CRM Workspace</div>
             </div>
           </div>
-        </header>
+
+          {/* Nav groups */}
+          <nav style={{ flex: 1, overflowY: 'auto', padding: '12px 10px' }}>
+            {groups.map((g, gi) => (
+              <div key={g.label ?? gi} style={{ marginBottom: '14px' }}>
+                {g.label && (
+                  <div style={{ fontSize: '9.5px', fontWeight: 800, color: C.sideLabel, textTransform: 'uppercase', letterSpacing: '0.12em', padding: '0 12px', marginBottom: '5px' }}>
+                    {g.label}
+                  </div>
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  {g.items.map(({ to, icon: Icon, label }) => (
+                    <NavLink key={to} to={to} style={({ isActive }) => navItemStyle(isActive)}>
+                      <Icon style={{ width: '14px', height: '14px', flexShrink: 0 }} />
+                      {label}
+                    </NavLink>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </nav>
+
+          {/* Announcements pinned */}
+          <div style={{ padding: '8px 10px', borderTop: `1px solid ${C.sideBorder}` }}>
+            <NavLink to="/announcements" style={({ isActive }) => navItemStyle(isActive)}>
+              <Megaphone style={{ width: '14px', height: '14px', flexShrink: 0 }} />
+              Announcements
+              {!!unreadAnnouncements && (
+                <span style={{ marginLeft: 'auto', background: '#ef4444', color: 'white', borderRadius: '999px', padding: '0 6px', fontSize: '10px', fontWeight: 700, minWidth: '17px', height: '17px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {unreadAnnouncements > 9 ? '9+' : unreadAnnouncements}
+                </span>
+              )}
+            </NavLink>
+          </div>
+
+          {/* User card */}
+          <div style={{ position: 'relative', padding: '10px', borderTop: `1px solid ${C.sideBorder}` }}>
+            <button onClick={() => setShowUserMenu(v => !v)}
+              style={{ display: 'flex', alignItems: 'center', gap: '10px', background: showUserMenu ? C.sideBorder : 'none', border: 'none', cursor: 'pointer', padding: '8px 10px', borderRadius: '9px', width: '100%', transition: 'background 0.12s' }}>
+              <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: SIDE_GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 800, fontSize: '12px', flexShrink: 0, boxShadow: '0 4px 14px rgba(99,102,241,0.4)' }}>
+                {((loggedInDisplayName ?? config?.owner_name)?.[0] || 'O').toUpperCase()}
+              </div>
+              <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                <div style={{ color: C.sideTitle, fontSize: '12.5px', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {loggedInDisplayName ?? config?.owner_name ?? 'Owner'}
+                </div>
+                <div style={{ color: C.sideLabel, fontSize: '10px', fontWeight: 600 }}>{staffTabAccess !== null ? 'Staff' : 'Owner'}</div>
+              </div>
+              <ChevronUp style={{ width: '12px', height: '12px', color: C.sideLabel, transform: showUserMenu ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+            </button>
+            {showUserMenu && (
+              <>
+                <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setShowUserMenu(false)} />
+                <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', left: '10px', right: '10px', background: C.menuBg, backdropFilter: 'blur(24px)', border: `1px solid ${C.sideBorder}`, borderRadius: '12px', overflow: 'hidden', zIndex: 50, boxShadow: '0 16px 48px rgba(0,0,0,0.35)' }}>
+                  {[
+                    { to: '/settings', icon: Settings, label: staffTabAccess !== null ? 'Check for Update' : 'Settings & Updates' },
+                  ].map(({ to, icon: Icon, label }) => (
+                    <NavLink key={to} to={to} onClick={() => setShowUserMenu(false)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', color: C.menuText, textDecoration: 'none', fontSize: '12.5px', fontWeight: 600, borderBottom: `1px solid ${C.sideBorder}` }}>
+                      <Icon style={{ width: '13px', height: '13px' }} /> {label}
+                    </NavLink>
+                  ))}
+                  {!isClient && (
+                    <button onClick={() => { setShowUserMenu(false); setShowSwitchModal(true); }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', color: C.menuText, background: 'none', border: 'none', borderBottom: `1px solid ${C.sideBorder}`, width: '100%', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      <ArrowLeftRight style={{ width: '13px', height: '13px' }} /> Switch App
+                    </button>
+                  )}
+                  <button onClick={handleLogout}
+                    style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', color: '#f87171', background: 'none', border: 'none', width: '100%', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    <LogOut style={{ width: '13px', height: '13px' }} /> Logout
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </aside>
+
         {/* Main content */}
-        <main style={{ flex: 1, overflowY: 'auto', background: C.bg }}>
+        <main style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', position: 'relative', zIndex: 1 }}>
           <Outlet />
         </main>
         {showSwitchModal && <SwitchAppModal onClose={() => setShowSwitchModal(false)} />}
