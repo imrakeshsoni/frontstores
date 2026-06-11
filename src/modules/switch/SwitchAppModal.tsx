@@ -149,8 +149,9 @@ export function SwitchAppModal({ onClose }: SwitchAppModalProps) {
           email: config?.email ?? null,
           city: config?.city ?? null,
         });
-        // Copy current app's credentials to the new app so owner uses the same password
-        if (config?.tenant_id) await copyAuth(config.tenant_id, account.tenant_id);
+        // [core] [all apps] [all tenants] — every app keeps its OWN credentials:
+        // first switch into a newly approved app shows the create-password screen,
+        // and from then on the user logs in with that app's username + password.
       } else {
         await switchActiveApp(account.tenant_id);
       }
@@ -245,7 +246,7 @@ export function SwitchAppModal({ onClose }: SwitchAppModalProps) {
           <div>
             <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Switch App</h2>
             <p className="text-sm mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
-              All apps share your owner profile · Each app has its own data
+              Each app has its own login and its own data · New apps need admin approval
             </p>
           </div>
           <div className="flex items-center gap-2">

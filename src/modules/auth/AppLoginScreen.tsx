@@ -104,20 +104,18 @@ export function AppLoginScreen() {
   const shopType  = config?.shop_type ?? '';
   const maxAttempts: number = ((config?.settings as Record<string, unknown>)?.maxLoginAttempts as number) ?? 5;
 
-  // [core] [all tenants] — testers run multiple linked apps (e.g. owner of a CRM
-  // tenant + various test shops). Switching apps normally requires logging in
-  // first, but a tester logged out of one app has no way back to the others.
-  // Let testers (is_client !== true) jump straight to another app's login screen.
-  const isClient = !!(config?.settings as any)?.is_client;
+  // [core] [all apps] [all tenants] — after logout, every registered (purchased)
+  // app on this device is listed below the login form. Pick an app → its login
+  // screen appears → sign in with THAT app's username + password → the whole app
+  // switches to that tenant's data.
   const [otherApps, setOtherApps] = useState<{ tenant_id: string; shop_type: string; shop_name: string }[]>([]);
   useEffect(() => {
-    if (isClient) { setOtherApps([]); return; }
     import('@/lib/db/linkedAccounts').then(({ getLinkedAccounts }) => {
       getLinkedAccounts().then(accounts => {
         setOtherApps(accounts.filter(a => a.status === 'active' && a.tenant_id !== tenantId));
       }).catch(() => {});
     });
-  }, [isClient, tenantId]);
+  }, [tenantId]);
 
   async function handleSwitchToApp(otherTenantId: string) {
     const { switchActiveApp } = await import('@/lib/db/linkedAccounts');
@@ -517,10 +515,10 @@ export function AppLoginScreen() {
           </form>
         )}
 
-        {/* [core] [all tenants] — tester-only: jump to another linked app's login screen */}
+        {/* [core] [all apps] [all tenants] — your other registered apps: pick one to go to its login */}
         {otherApps.length > 0 && (screen === 'login') && (
           <div className="mt-5 rounded-xl p-3" style={{ background: `${theme.accent}10`, border: `1px solid ${theme.cardBorder}` }}>
-            <p className="text-xs text-center mb-2" style={{ color: theme.labelColor, opacity: 0.8 }}>Switch to another app (tester)</p>
+            <p className="text-xs text-center mb-2" style={{ color: theme.labelColor, opacity: 0.8 }}>Your other apps — select one to sign in</p>
             <div className="flex flex-wrap gap-2 justify-center">
               {otherApps.map(app => (
                 <button key={app.tenant_id} type="button" onClick={() => handleSwitchToApp(app.tenant_id)}

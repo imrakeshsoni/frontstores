@@ -749,6 +749,18 @@ function WhatsAppBusinessSection() {
     if (!phoneId.trim() || !token.trim()) { toast.error('Both fields are required'); return; }
     await updateAppConfig({ settings: { ...(config?.settings ?? {}), wa_phone_id: phoneId.trim(), wa_token: token.trim() } });
     await refreshConfig();
+    // [all apps] [all tenants] — also register with the update server so the
+    // incoming-message webhook bot can reply on this tenant's behalf
+    if (config?.tenant_id) {
+      try {
+        await fetch(`https://update.frontstores.com/api/wa-credentials/${config.tenant_id}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone_id: phoneId.trim(), token: token.trim() }),
+          signal: AbortSignal.timeout(8000),
+        });
+      } catch { toast.warning('Saved locally, but could not reach the server — incoming WhatsApp replies stay off until you save again online.'); }
+    }
     toast.success('WhatsApp Business API credentials saved');
     setStatus('idle');
   };
@@ -768,6 +780,14 @@ function WhatsAppBusinessSection() {
     delete s.wa_phone_id; delete s.wa_token;
     await updateAppConfig({ settings: s });
     await refreshConfig();
+    // [all apps] [all tenants] — also unregister from the update server webhook bot
+    if (config?.tenant_id) {
+      try {
+        await fetch(`https://update.frontstores.com/api/wa-credentials/${config.tenant_id}`, {
+          method: 'DELETE', signal: AbortSignal.timeout(8000),
+        });
+      } catch { /* offline — server entry goes stale but token is invalid once rotated */ }
+    }
     setPhoneId(''); setToken(''); setStatus('idle');
     toast.success('Credentials removed');
   };

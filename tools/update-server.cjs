@@ -141,8 +141,38 @@ async function sendWaMessage(phoneId, token, to, text) {
   });
 }
 
+// [crm] [all tenants] — every tenant runs their own WhatsApp bot on their own
+// number. A lead record is created the moment the first message arrives (not
+// after the bot finishes), updated progressively as the customer answers each
+// question, and auto-assigned to that tenant's owner.
+function upsertWaLeadRecord(c, from, tenantId) {
+  const leads = loadWaLeads();
+  const idx = c.lead_record_id ? leads.findIndex(l => l.id === c.lead_record_id) : -1;
+  const rec = idx >= 0 ? leads[idx] : {
+    id: crypto.randomUUID(),
+    tenant_id: tenantId,
+    from_phone: from,
+    received_at: c.started_at,
+    imported: false,
+  };
+  rec.from_name = c.name || c.profile_name || '';
+  rec.company = c.company || '';
+  rec.business_type = c.business_type || '';
+  rec.software_interest = c.software_interest || '';
+  rec.assigned_to = loadSubs()[tenantId]?.owner_name || '';
+  const parts = [];
+  if (c.first_message) parts.push(`First message: ${c.first_message}`);
+  if (c.business_type) parts.push(`Business: ${c.business_type}`);
+  if (c.software_interest) parts.push(`Needs: ${c.software_interest}`);
+  rec.message_preview = parts.join('. ');
+  rec.updated_at = new Date().toISOString();
+  if (idx >= 0) leads[idx] = rec; else leads.push(rec);
+  saveWaLeads(leads);
+  c.lead_record_id = rec.id;
+}
+
 // Bot conversation step logic
-async function handleWaBotStep(from, text, tenantId) {
+async function handleWaBotStep(from, text, tenantId, profileName = '') {
   const convos = loadWaConvos();
   const key = `${tenantId}:${from}`;
   const creds = loadWaCreds()[tenantId];
@@ -154,14 +184,19 @@ async function handleWaBotStep(from, text, tenantId) {
     await sendWaMessage(creds.phone_id, creds.token, from, msg);
   };
 
+  // [crm] [all tenants] — the bot speaks on behalf of the tenant's own business
+  const shopName = loadSubs()[tenantId]?.shop_name || 'our business';
+
   if (c.step === 0) {
     // First contact — greet and ask name
+    c.first_message = text.trim();
+    c.profile_name = profileName || '';
     c.step = 1;
-    await reply(`👋 Hello! Welcome to FrontStores.\n\nI'm here to help you find the right software for your business.\n\nCould you please tell me *your name*?`);
+    await reply(`👋 Hello! Welcome to *${shopName}*.\n\nThanks for reaching out — I'd like to take a few quick details so our team can help you better.\n\nCould you please tell me *your name*?`);
   } else if (c.step === 1) {
     c.name = text.trim();
     c.step = 2;
-    await reply(`Nice to meet you, ${c.name}! 😊\n\nWhat is the *name of your business or company*?`);
+    await reply(`Nice to meet you, ${c.name}! 😊\n\nWhat is the *name of your business or company*?\n\n(If this is a personal enquiry, just reply "personal")`);
   } else if (c.step === 2) {
     c.company = text.trim();
     c.step = 3;
@@ -169,35 +204,20 @@ async function handleWaBotStep(from, text, tenantId) {
   } else if (c.step === 3) {
     c.business_type = text.trim();
     c.step = 4;
-    await reply(`Interesting! And what kind of *software solution* are you looking for from FrontStores?\n\n(e.g. billing, inventory, customer management, CRM, etc.)`);
+    await reply(`Interesting! And finally — *what are you looking for*? How can we help you?`);
   } else if (c.step === 4) {
     c.software_interest = text.trim();
     c.step = 5;
     c.completed_at = new Date().toISOString();
-
-    // Save as pending lead
-    const leads = loadWaLeads();
-    const existing = leads.findIndex(l => l.from_phone === from && l.tenant_id === tenantId && !l.imported);
-    const lead = {
-      id: crypto.randomUUID(),
-      tenant_id: tenantId,
-      from_phone: from,
-      from_name: c.name || '',
-      company: c.company || '',
-      business_type: c.business_type || '',
-      software_interest: c.software_interest || '',
-      message_preview: `Business: ${c.business_type}. Needs: ${c.software_interest}`,
-      received_at: c.started_at,
-      imported: false,
-    };
-    if (existing >= 0) leads[existing] = lead; else leads.push(lead);
-    saveWaLeads(leads);
-
-    await reply(`Thank you, ${c.name}! 🙏\n\nOur team is reviewing your information and will get back to you shortly.\n\nWe look forward to helping *${c.company}* with their ${c.business_type} software needs!`);
+    await reply(`Thank you, ${c.name}! 🙏\n\nOur team has your details and will get back to you shortly.\n\n— *${shopName}*`);
   } else {
     // Already captured
     await reply(`Hi ${c.name || 'there'}! We already have your information. Our team will be in touch with you soon. 😊`);
   }
+
+  // [crm] [all tenants] — lead exists from the FIRST message and is updated
+  // after every answer; always auto-assigned to the tenant's owner
+  upsertWaLeadRecord(c, from, tenantId);
 
   convos[key] = c;
   saveWaConvos(convos);
@@ -485,6 +505,7 @@ const publicServer = http.createServer(async (req, res) => {
 
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
   // GET /lookup-tenant?phone=xxx (primary) or ?email=xxx (fallback) — used by reinstall flow to find existing tenant
@@ -1875,7 +1896,9 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
         const tenantEntry = Object.entries(creds).find(([, c]) => c.phone_id === businessPhoneId);
         const tenantId = tenantEntry ? tenantEntry[0] : 'default';
 
-        await handleWaBotStep(from, text, tenantId);
+        // [crm] [tenant: FrontStores.com] — capture the sender's WhatsApp profile name
+        const profileName = change?.value?.contacts?.[0]?.profile?.name || '';
+        await handleWaBotStep(from, text, tenantId, profileName);
       } catch (e) {
         console.error('WA webhook error:', e.message);
       }
@@ -1901,6 +1924,16 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
       } catch (e) { json(res, { error: 'invalid json' }, 400); }
     });
     return;
+  }
+
+  // [all apps] [all tenants] — Unregister WA credentials (app removed them)
+  if (req.method === 'DELETE' && pathname.startsWith('/api/wa-credentials/')) {
+    const tenantId = pathname.split('/')[3];
+    if (!tenantId) { res.writeHead(400); res.end('bad request'); return; }
+    const creds = loadWaCreds();
+    delete creds[tenantId];
+    saveWaCreds(creds);
+    json(res, { ok: true }); return;
   }
 
   // [crm] [all tenants] — Get pending WA leads for the app to sync

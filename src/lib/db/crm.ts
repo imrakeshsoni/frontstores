@@ -469,3 +469,83 @@ export async function importWaLeadToLead(tenantId: string, waInboxId: string, ow
   await db.execute(`UPDATE crm_wa_inbox SET imported_at = ?, lead_id = ?, updated_at = ? WHERE id = ?`, [now(), leadId, now(), waInboxId]);
   return leadId;
 }
+
+// ── WhatsApp auto-lead sync ───────────────────────────────────────────────────
+// [crm] [all tenants] — pulls WhatsApp bot leads from the update server (each
+// tenant runs the bot on their own WhatsApp Business number). A lead is
+// auto-created the moment a customer sends their first message, kept updated
+// as they answer each bot question, and assigned to the tenant's owner.
+const WA_LEADS_SERVER = 'https://update.frontstores.com';
+
+interface ServerWaLead {
+  id: string; from_phone: string; from_name?: string; company?: string;
+  business_type?: string; software_interest?: string; message_preview?: string;
+  received_at?: string; imported?: boolean; assigned_to?: string;
+}
+
+export async function syncWaLeadsFromServer(tenantId: string, ownerName = ''): Promise<boolean> {
+  if (!tenantId) return false;
+  let serverLeads: ServerWaLead[] = [];
+  try {
+    const res = await fetch(`${WA_LEADS_SERVER}/api/wa-leads/${tenantId}`);
+    serverLeads = (await res.json()).leads ?? [];
+  } catch { return false; } // offline — try again on the next poll
+  if (serverLeads.length === 0) return false;
+
+  const db = await getDb();
+  let changedAny = false;
+  for (const sl of serverLeads) {
+    if (!sl.from_phone) continue;
+    const [inbox] = await db.select<CRMWaInbox[]>(
+      `SELECT * FROM crm_wa_inbox WHERE tenant_id = ? AND from_phone = ? AND deleted_at IS NULL ORDER BY received_at DESC LIMIT 1`,
+      [tenantId, sl.from_phone]
+    );
+    if (!inbox) {
+      const inboxId = await upsertCRMWaLead(tenantId, {
+        from_phone: sl.from_phone,
+        from_name: sl.from_name || '',
+        company: sl.company || '',
+        business_type: sl.business_type || '',
+        software_interest: sl.software_interest || '',
+        message_preview: sl.message_preview || '',
+        received_at: sl.received_at || now(),
+      });
+      await importWaLeadToLead(tenantId, inboxId, sl.assigned_to || ownerName);
+      changedAny = true;
+    } else {
+      // Merge: server values win when present, but never blank out local data
+      const merged = {
+        from_name: sl.from_name || inbox.from_name || '',
+        company: sl.company || inbox.company || '',
+        business_type: sl.business_type || inbox.business_type || '',
+        software_interest: sl.software_interest || inbox.software_interest || '',
+        message_preview: sl.message_preview || inbox.message_preview || '',
+      };
+      const changed = (Object.keys(merged) as (keyof typeof merged)[]).some(k => merged[k] !== (inbox[k] || ''));
+      if (changed) {
+        await db.execute(
+          `UPDATE crm_wa_inbox SET from_name=?,company=?,business_type=?,software_interest=?,message_preview=?,updated_at=? WHERE id=?`,
+          [merged.from_name, merged.company, merged.business_type, merged.software_interest, merged.message_preview, now(), inbox.id]
+        );
+        if (inbox.lead_id) {
+          await updateCRMLead(tenantId, inbox.lead_id, {
+            name: merged.from_name || sl.from_phone,
+            company: merged.company,
+            business_type: merged.business_type,
+            software_interest: merged.software_interest,
+            notes: merged.message_preview,
+          });
+        }
+        changedAny = true;
+      }
+      if (!inbox.lead_id) {
+        await importWaLeadToLead(tenantId, inbox.id, sl.assigned_to || ownerName);
+        changedAny = true;
+      }
+    }
+    if (!sl.imported) {
+      try { await fetch(`${WA_LEADS_SERVER}/api/wa-leads/${tenantId}/${sl.id}/mark-imported`, { method: 'POST' }); } catch { /* retried next poll */ }
+    }
+  }
+  return changedAny;
+}
