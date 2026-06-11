@@ -3,9 +3,8 @@
 // Mode 2 (when API credentials set): WhatsApp Business API — sends automatically, silently
 
 import { open as shellOpen } from '@tauri-apps/plugin-shell';
+import { invoke } from '@tauri-apps/api/core';
 import { useAppStore } from '@/app/store/app.store';
-
-const WA_API_VERSION = 'v18.0';
 
 function getWaCredentials(): { phoneId: string; token: string } | null {
   const settings = useAppStore.getState().config?.settings ?? {};
@@ -35,26 +34,13 @@ export async function sendWhatsApp(phone: string, text: string): Promise<void> {
 
   if (creds) {
     // ── WhatsApp Business API mode ──
-    const res = await fetch(
-      `https://graph.facebook.com/${WA_API_VERSION}/${creds.phoneId}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${creds.token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to: e164,
-          type: 'text',
-          text: { body: text, preview_url: false },
-        }),
-      }
-    );
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err?.error?.message ?? `WhatsApp API error ${res.status}`);
-    }
+    const result = await invoke<{ ok: boolean; error?: string }>('send_whatsapp_message', {
+      phoneId: creds.phoneId,
+      token: creds.token,
+      to: e164,
+      text,
+    });
+    if (!result.ok) throw new Error(result.error ?? 'WhatsApp API error');
     return;
   }
 
@@ -88,15 +74,13 @@ export async function sendWhatsAppBulk(
     try {
       const text = buildMessage(name);
       if (creds) {
-        const res = await fetch(
-          `https://graph.facebook.com/${WA_API_VERSION}/${creds.phoneId}/messages`,
-          {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${creds.token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ messaging_product: 'whatsapp', to: e164, type: 'text', text: { body: text } }),
-          }
-        );
-        if (res.ok) sent++; else failed++;
+        const result = await invoke<{ ok: boolean; error?: string }>('send_whatsapp_message', {
+          phoneId: creds.phoneId,
+          token: creds.token,
+          to: e164,
+          text,
+        });
+        if (result.ok) sent++; else failed++;
       } else {
         // Without API: open one at a time with small delay
         const encoded = encodeURIComponent(text);
@@ -119,13 +103,7 @@ export async function sendWhatsAppBulk(
  */
 export async function testWaCredentials(phoneId: string, token: string): Promise<{ ok: boolean; error?: string }> {
   try {
-    const res = await fetch(
-      `https://graph.facebook.com/${WA_API_VERSION}/${phoneId}`,
-      { headers: { 'Authorization': `Bearer ${token}` } }
-    );
-    if (res.ok) return { ok: true };
-    const err = await res.json().catch(() => ({}));
-    return { ok: false, error: err?.error?.message ?? `Error ${res.status}` };
+    return await invoke<{ ok: boolean; error?: string }>('test_whatsapp_credentials', { phoneId, token });
   } catch (e: any) {
     return { ok: false, error: e?.message ?? 'Network error' };
   }

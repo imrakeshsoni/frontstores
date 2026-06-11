@@ -18,6 +18,9 @@ pub fn run() {
             commands::config::get_or_create_tenant,
             commands::config::get_next_bill_number,
             commands::system::get_system_info,
+            commands::whatsapp::test_whatsapp_credentials,
+            commands::whatsapp::send_whatsapp_message,
+            commands::whatsapp::send_whatsapp_bulk,
         ])
         .run(tauri::generate_context!())
         .expect("error while running FrontStores");
