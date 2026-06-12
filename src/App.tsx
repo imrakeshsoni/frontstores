@@ -289,6 +289,8 @@ const CRMCommissionsPage      = lazy(() => import('@/modules/crm/CommissionsPage
 const CRMTeamPage             = lazy(() => import('@/modules/crm/TeamPage').then(m => ({ default: m.TeamPage })));
 const CRMSalesPage            = lazy(() => import('@/modules/crm/SalesPage').then(m => ({ default: m.CRMSalesPage })));
 const CRMServicePage          = lazy(() => import('@/modules/crm/ServicePage').then(m => ({ default: m.CRMServicePage })));
+// [crm] [tenant: FrontStores.com] — Salesforce-style Accounts object
+const CRMAccountsPage         = lazy(() => import('@/modules/crm/SalesforceAccountsPage').then(m => ({ default: m.SalesforceAccountsPage })));
 
 // [events] [all tenants]
 const EventsDashboard  = lazy(() => import('@/modules/events/EventsDashboard').then(m => ({ default: m.EventsDashboard })));
@@ -721,6 +723,8 @@ export default function App() {
             <Route path="crm/leads"          element={<CRMLeadsPage />} />
             <Route path="crm/wa-inbox"       element={<CRMWhatsAppInboxPage />} />
             <Route path="crm/contacts"       element={<CRMContactsPage />} />
+            {/* [crm] [tenant: FrontStores.com] — Salesforce-style Accounts object */}
+            <Route path="crm/accounts"       element={<CRMAccountsPage />} />
             <Route path="crm/pipeline"       element={<CRMPipelinePage />} />
             <Route path="crm/sales"          element={<CRMSalesPage />} />
             <Route path="crm/service"        element={<CRMServicePage />} />

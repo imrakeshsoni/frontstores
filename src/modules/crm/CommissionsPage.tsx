@@ -6,9 +6,18 @@ import { useAppStore } from '@/app/store/app.store';
 import { toast } from 'sonner';
 import { listCRMCommissions, updateCRMCommissionStatus } from '@/lib/db/crm';
 import { CRMPage, PageHead, Segments, StatCard, Panel, EmptyState, Badge, Btn, Avatar, C, fmtINR, timeAgo, th, td } from './components/kit';
+import { SF_TENANT_ID } from './components/lightning';
+import { SalesforceCommissionsPage } from './SalesforceOpsPages';
 
 export function CommissionsPage() {
   const tenantId = useAppStore(s => s.config?.tenant_id ?? '');
+  // [crm] [tenant: FrontStores.com] — Salesforce-style commissions (table + wide record popup)
+  if (tenantId === SF_TENANT_ID) return <SalesforceCommissionsPage />;
+  return <AuroraCommissionsPage tenantId={tenantId} />;
+}
+
+// [crm] [all tenants] — original Aurora commissions UI
+function AuroraCommissionsPage({ tenantId }: { tenantId: string }) {
   const qc = useQueryClient();
   const [tab, setTab] = useState<'pending' | 'paid' | 'all'>('pending');
 

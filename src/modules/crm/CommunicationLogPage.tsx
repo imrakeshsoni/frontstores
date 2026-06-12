@@ -6,6 +6,8 @@ import { useAppStore } from '@/app/store/app.store';
 import { toast } from 'sonner';
 import { listCRMCommunications, createCRMCommunication, deleteCRMCommunication, listCRMContacts } from '@/lib/db/crm';
 import { CRMPage, PageHead, Panel, EmptyState, Btn, Modal, Field, FormGrid, inp, Avatar, C, fmtDate, timeAgo } from './components/kit';
+import { SF_TENANT_ID } from './components/lightning';
+import { SalesforceCommLogPage } from './SalesforceOpsPages';
 
 const TYPE_META: Record<string, { icon: string; label: string }> = {
   call:     { icon: '📞', label: 'Call' },
@@ -20,6 +22,13 @@ const emptyForm = { contact_id: '', type: 'call', direction: 'outgoing', summary
 
 export function CRMCommunicationLogPage() {
   const tenantId = useAppStore(s => s.config?.tenant_id ?? '');
+  // [crm] [tenant: FrontStores.com] — Salesforce-style log (table + wide record popup)
+  if (tenantId === SF_TENANT_ID) return <SalesforceCommLogPage />;
+  return <AuroraCommunicationLogPage tenantId={tenantId} />;
+}
+
+// [crm] [all tenants] — original Aurora timeline UI
+function AuroraCommunicationLogPage({ tenantId }: { tenantId: string }) {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);

@@ -69,6 +69,9 @@ import migration0068 from '../../../src-tauri/migrations/0068_crm_leads_accounts
 import migration0069 from '../../../src-tauri/migrations/0069_crm_ownership.sql?raw';
 import migration0070 from '../../../src-tauri/migrations/0070_staff_users_v2.sql?raw';
 import migration0071 from '../../../src-tauri/migrations/0071_crm_sales_service.sql?raw';
+import migration0072 from '../../../src-tauri/migrations/0072_crm_salesforce.sql?raw';
+import migration0073 from '../../../src-tauri/migrations/0073_crm_person_accounts.sql?raw';
+import migration0074 from '../../../src-tauri/migrations/0074_crm_account_links.sql?raw';
 
 export interface Migration {
   name: string;
@@ -148,5 +151,8 @@ export async function readMigrations(): Promise<Migration[]> {
     { name: '0069_crm_ownership', sql: migration0069 }, // [crm] [all tenants]
     { name: '0070_staff_users_v2', sql: migration0070 }, // [core] [all apps] [all tenants]
     { name: '0071_crm_sales_service', sql: migration0071 }, // [crm] [all tenants]
+    { name: '0072_crm_salesforce', sql: migration0072 }, // [crm] [tenant: FrontStores.com]
+    { name: '0073_crm_person_accounts', sql: migration0073 }, // [crm] [tenant: FrontStores.com]
+    { name: '0074_crm_account_links', sql: migration0074 }, // [crm] [tenant: FrontStores.com]
   ];
 }

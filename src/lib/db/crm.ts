@@ -6,6 +6,7 @@ export interface CRMContact {
   name: string; phone: string; email: string;
   company: string; source: string;
   stage: string; tags: string; notes: string;
+  account_id: string; // [crm] [tenant: FrontStores.com] — Salesforce-style Account lookup
   updated_at: string; deleted_at: string | null;
 }
 
@@ -14,6 +15,8 @@ export interface CRMDeal {
   title: string; value: number; stage: string;
   expected_close_date: string | null; notes: string;
   owner: string; referred_by: string;
+  next_step: string; // [crm] [tenant: FrontStores.com] — Salesforce-style "Next Step" field
+  account_id: string; // [crm] [tenant: FrontStores.com] — Salesforce-style Account lookup
   updated_at: string; deleted_at: string | null;
 }
 
@@ -52,19 +55,19 @@ export async function listCRMContacts(tenantId: string, search = ''): Promise<CR
   );
 }
 
-export async function createCRMContact(tenantId: string, data: Omit<CRMContact, 'id' | 'tenant_id' | 'updated_at' | 'deleted_at'>): Promise<string> {
+export async function createCRMContact(tenantId: string, data: Omit<CRMContact, 'id' | 'tenant_id' | 'account_id' | 'updated_at' | 'deleted_at'> & { account_id?: string }): Promise<string> {
   const db = await getDb();
   const id = uuid();
   await db.execute(
-    `INSERT INTO crm_contacts (id,tenant_id,name,phone,email,company,source,stage,tags,notes,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-    [id, tenantId, data.name, data.phone, data.email, data.company ?? '', data.source ?? '', data.stage || 'lead', data.tags ?? '', data.notes ?? '', now()]
+    `INSERT INTO crm_contacts (id,tenant_id,name,phone,email,company,source,stage,tags,notes,account_id,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [id, tenantId, data.name, data.phone, data.email, data.company ?? '', data.source ?? '', data.stage || 'lead', data.tags ?? '', data.notes ?? '', data.account_id ?? '', now()]
   );
   return id;
 }
 
 export async function updateCRMContact(tenantId: string, id: string, data: Partial<CRMContact>): Promise<void> {
   const db = await getDb();
-  const fields = ['name','phone','email','company','source','stage','tags','notes'];
+  const fields = ['name','phone','email','company','source','stage','tags','notes','account_id'];
   const updates: string[] = ['updated_at = ?'];
   const vals: unknown[] = [now()];
   for (const f of fields) { if (f in data) { updates.push(`${f} = ?`); vals.push((data as Record<string, unknown>)[f]); } }
@@ -88,19 +91,19 @@ export async function listCRMDeals(tenantId: string, opts: { contactId?: string;
   return db.select<CRMDeal[]>(`SELECT * FROM crm_deals WHERE ${conds.join(' AND ')} ORDER BY updated_at DESC`, params);
 }
 
-export async function createCRMDeal(tenantId: string, data: Omit<CRMDeal, 'id' | 'tenant_id' | 'updated_at' | 'deleted_at'>): Promise<string> {
+export async function createCRMDeal(tenantId: string, data: Omit<CRMDeal, 'id' | 'tenant_id' | 'updated_at' | 'deleted_at'> | (Partial<CRMDeal> & { contact_id: string; title: string })): Promise<string> {
   const db = await getDb();
   const id = uuid();
   await db.execute(
-    `INSERT INTO crm_deals (id,tenant_id,contact_id,title,value,stage,expected_close_date,notes,owner,referred_by,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-    [id, tenantId, data.contact_id, data.title, data.value ?? 0, data.stage || 'new', data.expected_close_date ?? null, data.notes ?? '', data.owner ?? '', data.referred_by ?? '', now()]
+    `INSERT INTO crm_deals (id,tenant_id,contact_id,title,value,stage,expected_close_date,notes,owner,referred_by,next_step,account_id,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [id, tenantId, data.contact_id, data.title, data.value ?? 0, data.stage || 'new', data.expected_close_date ?? null, data.notes ?? '', data.owner ?? '', data.referred_by ?? '', data.next_step ?? '', data.account_id ?? '', now()]
   );
   return id;
 }
 
 export async function updateCRMDeal(tenantId: string, id: string, data: Partial<CRMDeal>): Promise<void> {
   const db = await getDb();
-  const fields = ['contact_id','title','value','stage','expected_close_date','notes'];
+  const fields = ['contact_id','title','value','stage','expected_close_date','notes','owner','next_step','account_id'];
   const updates: string[] = ['updated_at = ?'];
   const vals: unknown[] = [now()];
   for (const f of fields) { if (f in data) { updates.push(`${f} = ?`); vals.push((data as Record<string, unknown>)[f]); } }
@@ -184,6 +187,7 @@ export interface CRMAccount {
   id: string; tenant_id: string;
   name: string; industry: string; phone: string; email: string;
   website: string; address: string; notes: string; owner_name: string;
+  is_person: number; // [crm] [tenant: FrontStores.com] — 1 = Salesforce-style Person Account
   updated_at: string; deleted_at: string | null;
 }
 
@@ -200,8 +204,8 @@ export async function createCRMAccount(tenantId: string, data: Partial<CRMAccoun
   const db = await getDb();
   const id = uuid();
   await db.execute(
-    `INSERT INTO crm_accounts (id,tenant_id,name,industry,phone,email,website,address,notes,owner_name,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-    [id, tenantId, data.name ?? '', data.industry ?? '', data.phone ?? '', data.email ?? '', data.website ?? '', data.address ?? '', data.notes ?? '', data.owner_name ?? '', now()]
+    `INSERT INTO crm_accounts (id,tenant_id,name,industry,phone,email,website,address,notes,owner_name,is_person,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [id, tenantId, data.name ?? '', data.industry ?? '', data.phone ?? '', data.email ?? '', data.website ?? '', data.address ?? '', data.notes ?? '', data.owner_name ?? '', data.is_person ?? 0, now()]
   );
   return id;
 }
@@ -295,10 +299,13 @@ export async function deleteCRMLead(tenantId: string, id: string): Promise<void>
 }
 
 // Salesforce-style lead conversion: auto-creates Account + Contact + Opportunity
+// accountMode ('business' | 'person') is the Salesforce flow used by tenant FrontStores.com:
+// business → account named after the company; person → Person Account named after the lead.
+// Without accountMode the original behavior applies (account only when the lead has a company).
 export async function convertCRMLead(
   tenantId: string,
   leadId: string,
-  opts: { createAccount: boolean; createContact: boolean; createDeal: boolean; dealValue?: number }
+  opts: { createAccount: boolean; createContact: boolean; createDeal: boolean; dealValue?: number; accountMode?: 'business' | 'person'; dealStage?: string }
 ): Promise<{ accountId: string | null; contactId: string | null; dealId: string | null }> {
   const db = await getDb();
   const [lead] = await db.select<CRMLead[]>(`SELECT * FROM crm_leads WHERE id = ? AND tenant_id = ?`, [leadId, tenantId]);
@@ -308,7 +315,13 @@ export async function convertCRMLead(
   let contactId: string | null = null;
   let dealId: string | null = null;
 
-  if (opts.createAccount && lead.company) {
+  if (opts.createAccount && opts.accountMode) {
+    const isPerson = opts.accountMode === 'person' || !lead.company;
+    accountId = await createCRMAccount(tenantId, {
+      name: isPerson ? lead.name : lead.company,
+      phone: lead.phone, email: lead.email, is_person: isPerson ? 1 : 0,
+    });
+  } else if (opts.createAccount && lead.company) {
     accountId = await createCRMAccount(tenantId, {
       name: lead.company, phone: lead.phone, email: lead.email,
     });
@@ -319,14 +332,15 @@ export async function convertCRMLead(
       name: lead.name, phone: lead.phone, email: lead.email,
       company: lead.company, source: lead.source,
       stage: 'qualified', tags: '', notes: lead.notes,
+      account_id: accountId ?? '', // [crm] [tenant: FrontStores.com] — hard link to the new Account
     });
   }
 
   if (opts.createDeal && contactId) {
     dealId = uuid();
     await db.execute(
-      `INSERT INTO crm_deals (id,tenant_id,contact_id,title,value,stage,expected_close_date,notes,owner,referred_by,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-      [dealId, tenantId, contactId, `${lead.company || lead.name} — Opportunity`, opts.dealValue ?? lead.lead_value ?? 0, 'new', null, '', lead.owner ?? '', lead.referred_by ?? '', now()]
+      `INSERT INTO crm_deals (id,tenant_id,contact_id,title,value,stage,expected_close_date,notes,owner,referred_by,account_id,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [dealId, tenantId, contactId, `${lead.company || lead.name} — Opportunity`, opts.dealValue ?? lead.lead_value ?? 0, opts.dealStage ?? 'new', null, '', lead.owner ?? '', lead.referred_by ?? '', accountId ?? '', now()]
     );
   }
 

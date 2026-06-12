@@ -1869,8 +1869,10 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
     const creds = loadWaCreds();
     const validTenant = Object.entries(creds).find(([, c]) => c.verify_token === token);
     if (mode === 'subscribe' && (token === expectedToken || validTenant)) {
+      console.log('✅ WA webhook verified by Meta');
       res.writeHead(200); res.end(challenge); return;
     }
+    console.log(`❌ WA webhook verification REJECTED — got token "${token}"`);
     res.writeHead(403); res.end('Forbidden'); return;
   }
 
@@ -1895,6 +1897,7 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
         const creds = loadWaCreds();
         const tenantEntry = Object.entries(creds).find(([, c]) => c.phone_id === businessPhoneId);
         const tenantId = tenantEntry ? tenantEntry[0] : 'default';
+        console.log(`💬 WA message from ${from} → phone_id ${businessPhoneId} → tenant ${tenantEntry ? tenantId.substring(0, 8) : 'UNMATCHED (no creds registered for this phone_id!)'}`);
 
         // [crm] [tenant: FrontStores.com] — capture the sender's WhatsApp profile name
         const profileName = change?.value?.contacts?.[0]?.profile?.name || '';

@@ -6,6 +6,8 @@ import { useAppStore } from '@/app/store/app.store';
 import { toast } from 'sonner';
 import { listCRMTeamMembers, createCRMTeamMember, updateCRMTeamMember, deleteCRMTeamMember, listCRMCommissions, type CRMTeamMember } from '@/lib/db/crm';
 import { CRMPage, PageHead, Panel, EmptyState, Badge, Btn, Modal, Field, FormGrid, inp, Avatar, C, fmtINR } from './components/kit';
+import { SF_TENANT_ID } from './components/lightning';
+import { SalesforceTeamPage } from './SalesforceOpsPages';
 
 const ROLES = [
   { key: 'owner', label: 'Owner', bg: C.amberBg, color: C.amber },
@@ -19,6 +21,13 @@ const emptyForm = { name: '', phone: '', email: '', role: 'agent', commission_pc
 
 export function TeamPage() {
   const tenantId = useAppStore(s => s.config?.tenant_id ?? '');
+  // [crm] [tenant: FrontStores.com] — Salesforce-style team (table + wide record popup)
+  if (tenantId === SF_TENANT_ID) return <SalesforceTeamPage />;
+  return <AuroraTeamPage tenantId={tenantId} />;
+}
+
+// [crm] [all tenants] — original Aurora team UI
+function AuroraTeamPage({ tenantId }: { tenantId: string }) {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);

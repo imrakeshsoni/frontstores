@@ -1,7 +1,11 @@
 // [crm] [all tenants] — CRM design kit v2 "Aurora": futuristic glassmorphism + neon gradients, light & dark
+// [crm] [tenant: FrontStores.com] — adds the "Designpro" brand: Salesforce Lightning skin
+// (gray canvas, white cards, SLDS blue, rectangular buttons) — applied only for that tenant.
 import { useEffect, useMemo, type ReactNode, type CSSProperties } from 'react';
 import { Search, X, Check } from 'lucide-react';
 import { useTheme } from '@/lib/theme/useTheme';
+import { useAppStore } from '@/app/store/app.store';
+import { SF_TENANT_ID } from './lightning';
 
 // ── Design tokens — Aurora Dark (glass over dark aurora) ─────────────────────
 const DARK = {
@@ -36,6 +40,7 @@ const DARK = {
   glow: '0 0 24px rgba(99,102,241,0.35)',
   chevronDoneText: '#06281c',
   panel: 'rgba(20,23,34,0.93)',
+  btnRadius: '10px',
 };
 
 // ── Aurora Light — same design language on a bright glass canvas ─────────────
@@ -71,16 +76,96 @@ const LIGHT: typeof DARK = {
   glow: '0 0 24px rgba(99,102,241,0.22)',
   chevronDoneText: '#ffffff',
   panel: 'rgba(255,255,255,0.94)',
+  btnRadius: '10px',
 };
 
-// Mutable token object — pages read C at render time; CRMPage swaps it per theme
+// ── "Designpro" brand — "Aria" skin: pastel blue→mint canvas, ink mono type,
+// royal-blue #4a7df0 + violet #8b5cf6 accents (per the user's reference template)
+// [crm] [tenant: FrontStores.com]
+const DP_LIGHT: typeof DARK = {
+  bg: '#edf1f8',
+  nav: '#ffffff',
+  surface: '#ffffff',
+  surface2: 'rgba(29,31,36,0.04)',
+  border: 'rgba(29,31,36,0.10)',
+  text: '#23252b',
+  muted: 'rgba(29,31,36,0.58)',
+  faint: 'rgba(29,31,36,0.34)',
+  accent: '#4a7df0',
+  accent2: '#8b5cf6',
+  accent3: '#4a7df0',
+  accentSoft: 'rgba(74,125,240,0.12)',
+  green: '#2e844a',
+  greenBg: 'rgba(46,132,74,0.10)',
+  red: '#c0392b',
+  redBg: 'rgba(192,57,43,0.09)',
+  blue: '#4a7df0',
+  blueBg: 'rgba(74,125,240,0.10)',
+  amber: '#8c5e02',
+  amberBg: 'rgba(193,135,15,0.13)',
+  violet: '#8b5cf6',
+  violetBg: 'rgba(139,92,246,0.10)',
+  pink: '#c2417e',
+  pinkBg: 'rgba(194,65,126,0.10)',
+  slate: '#646a78',
+  slateBg: 'rgba(100,106,120,0.12)',
+  shadow: '0 2px 8px rgba(29,31,36,0.06)',
+  shadowLg: '0 16px 48px rgba(29,31,36,0.26)',
+  glow: '0 4px 14px rgba(74,125,240,0.30)',
+  chevronDoneText: '#ffffff',
+  panel: '#ffffff',
+  btnRadius: '8px',
+};
+
+const DP_DARK: typeof DARK = {
+  bg: '#15171e',
+  nav: '#1e212b',
+  surface: 'rgba(255,255,255,0.05)',
+  surface2: 'rgba(255,255,255,0.07)',
+  border: 'rgba(255,255,255,0.10)',
+  text: '#e7e9f0',
+  muted: 'rgba(231,233,240,0.60)',
+  faint: 'rgba(231,233,240,0.35)',
+  accent: '#7c9bff',
+  accent2: '#a78bfa',
+  accent3: '#7c9bff',
+  accentSoft: 'rgba(124,155,255,0.16)',
+  green: '#4bbf73',
+  greenBg: 'rgba(75,191,115,0.14)',
+  red: '#f0705f',
+  redBg: 'rgba(240,112,95,0.14)',
+  blue: '#7c9bff',
+  blueBg: 'rgba(124,155,255,0.14)',
+  amber: '#e0b34c',
+  amberBg: 'rgba(224,179,76,0.14)',
+  violet: '#a78bfa',
+  violetBg: 'rgba(167,139,250,0.14)',
+  pink: '#e07aab',
+  pinkBg: 'rgba(224,122,171,0.14)',
+  slate: '#94a0b8',
+  slateBg: 'rgba(148,160,184,0.14)',
+  shadow: '0 4px 20px rgba(0,0,0,0.35)',
+  shadowLg: '0 32px 80px rgba(0,0,0,0.6)',
+  glow: '0 4px 14px rgba(124,155,255,0.30)',
+  chevronDoneText: '#ffffff',
+  panel: 'rgba(30,33,43,0.97)',
+  btnRadius: '8px',
+};
+
+// Mutable token object — pages read C at render time; CRMPage swaps it per theme + tenant brand
 export const C = { ...DARK };
 
-export function applyCRMTokens(mode: 'light' | 'dark') {
-  Object.assign(C, mode === 'dark' ? DARK : LIGHT);
-}
+export type CRMBrand = 'aurora' | 'designpro';
 
-export const GRADIENT = `linear-gradient(135deg, #6366f1 0%, #a855f7 55%, #22d3ee 120%)`;
+export let GRADIENT = `linear-gradient(135deg, #6366f1 0%, #a855f7 55%, #22d3ee 120%)`;
+const AURORA_GRADIENT = `linear-gradient(135deg, #6366f1 0%, #a855f7 55%, #22d3ee 120%)`;
+const DP_GRADIENT = `linear-gradient(135deg, #4a7df0 0%, #8b5cf6 100%)`;
+
+export function applyCRMTokens(mode: 'light' | 'dark', brand: CRMBrand = 'aurora') {
+  const sets = brand === 'designpro' ? { dark: DP_DARK, light: DP_LIGHT } : { dark: DARK, light: LIGHT };
+  Object.assign(C, mode === 'dark' ? sets.dark : sets.light);
+  GRADIENT = brand === 'designpro' ? DP_GRADIENT : AURORA_GRADIENT;
+}
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 export const fmtINR = (n: number) => `₹${(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
@@ -151,6 +236,21 @@ function injectStyles() {
     html.dark .crm-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 8px; }
     html.dark select.crm-inp option { background: #141722; color: #eef0f6; }
     html.dark input.crm-inp::placeholder, html.dark textarea.crm-inp::placeholder { color: rgba(238,240,246,0.3); }
+
+    /* [crm] [tenant: FrontStores.com] — "Designpro" brand overrides ("Aria" template:
+       mono type, ink headings, royal-blue→violet gradient accents) */
+    .crm-dp { font-family: 'JetBrains Mono', 'SF Mono', ui-monospace, 'Cascadia Mono', 'Roboto Mono', Menlo, Consolas, monospace; }
+    /* note: the background shorthand resets background-clip, so re-declare clip + fill
+       here or the heading characters render transparent (invisible) */
+    .crm-dp .crm-grad-text { background: linear-gradient(95deg, #1d1f24 15%, #4a7df0 60%, #8b5cf6 90%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+    html.dark .crm-dp .crm-grad-text { background: linear-gradient(95deg, #f1f2f7 15%, #9db4ff 60%, #c4b5fd 90%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+    .crm-dp .crm-glass { background: #ffffff; border: 1px solid rgba(29,31,36,0.10); backdrop-filter: none; -webkit-backdrop-filter: none; }
+    html.dark .crm-dp .crm-glass { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.10); }
+    .crm-dp .crm-row:hover { background: rgba(74,125,240,0.06); }
+    html.dark .crm-dp .crm-row:hover { background: rgba(124,155,255,0.09); }
+    .crm-dp .crm-hover-lift:hover { box-shadow: 0 6px 16px rgba(29,31,36,0.12), 0 0 0 1px rgba(74,125,240,0.35); }
+    html.dark .crm-dp .crm-hover-lift:hover { box-shadow: 0 14px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(124,155,255,0.4); }
+    .crm-dp input.crm-inp:focus, .crm-dp textarea.crm-inp:focus, .crm-dp select.crm-inp:focus { border-color: #4a7df0 !important; box-shadow: 0 0 0 2px rgba(74,125,240,0.18); }
   `;
   document.head.appendChild(s);
 }
@@ -179,13 +279,13 @@ export function Btn({ children, onClick, variant = 'primary', small, disabled, s
 }) {
   const base: CSSProperties = {
     display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'center',
-    padding: small ? '6px 13px' : '9px 19px', borderRadius: '10px',
+    padding: small ? '6px 13px' : '9px 19px', borderRadius: C.btnRadius,
     fontSize: small ? '12px' : '13px', fontWeight: 700, fontFamily: 'inherit',
     cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1,
     border: '1px solid transparent', transition: 'all 0.14s ease', whiteSpace: 'nowrap',
   };
   const variants: Record<BtnVariant, CSSProperties> = {
-    primary: { background: GRADIENT, color: '#fff', boxShadow: '0 6px 20px rgba(99,102,241,0.45), inset 0 1px 0 rgba(255,255,255,0.25)' },
+    primary: { background: GRADIENT, color: '#fff', boxShadow: `${C.glow}, inset 0 1px 0 rgba(255,255,255,0.25)` },
     success: { background: 'linear-gradient(135deg, #10b981, #34d399)', color: '#06281c', boxShadow: '0 6px 20px rgba(52,211,153,0.35), inset 0 1px 0 rgba(255,255,255,0.3)' },
     danger:  { background: C.redBg, color: C.red, border: '1px solid rgba(248,113,113,0.35)' },
     ghost:   { background: 'transparent', color: C.text, border: `1px solid ${C.border}` },
@@ -274,10 +374,10 @@ export function Segments({ options, value, onChange }: {
         return (
           <button key={o.key} onClick={() => onChange(o.key)}
             style={{
-              padding: '7px 15px', borderRadius: '9px', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              padding: '7px 15px', borderRadius: C.btnRadius === '999px' ? '999px' : '9px', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
               fontSize: '12px', fontWeight: 700, transition: 'all 0.14s ease',
               background: active ? GRADIENT : 'transparent', color: active ? '#fff' : C.muted,
-              boxShadow: active ? '0 4px 16px rgba(99,102,241,0.4)' : 'none',
+              boxShadow: active ? C.glow : 'none',
               display: 'flex', alignItems: 'center', gap: '6px',
             }}>
             {o.label}
@@ -480,6 +580,13 @@ export function CRMPage({ children }: { children: ReactNode }) {
   useCRMStyles();
   // Swap tokens before children render — pages read C at render time
   const { theme } = useTheme();
-  applyCRMTokens(theme);
-  return <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '4px 4px 48px', position: 'relative', zIndex: 1 }}>{children}</div>;
+  const tenantId = useAppStore(s => s.config?.tenant_id ?? '');
+  const brand: CRMBrand = tenantId === SF_TENANT_ID ? 'designpro' : 'aurora'; // [crm] [tenant: FrontStores.com]
+  applyCRMTokens(theme, brand);
+  return (
+    <div className={brand === 'designpro' ? 'crm-dp' : undefined}
+      style={{ maxWidth: '1280px', margin: '0 auto', padding: '4px 4px 48px', position: 'relative', zIndex: 1 }}>
+      {children}
+    </div>
+  );
 }

@@ -68,6 +68,9 @@
       "Bash(curl -s -X POST http://localhost:3001/api/shop-ai -H 'Content-Type: application/json' -d '{\"sessionId\":\"r4\",\"shopContext\":{\"shopName\":\"Roshan Medical\"},\"message\":\"I want to add a new product\"}')",
       "Bash(curl -s -X POST http://localhost:3001/api/shop-ai -H 'Content-Type: application/json' -d '{\"sessionId\":\"r5\",\"shopContext\":{\"shopName\":\"Roshan Medical\"},\"message\":\"search for crocin\"}')",
       "Bash(launchctl list *)"
+    ],
+    "additionalDirectories": [
+      "/Users/rakeshsoni/Documents/Cloud Software/ngo-webapp"
     ]
   },
   "hooks": {

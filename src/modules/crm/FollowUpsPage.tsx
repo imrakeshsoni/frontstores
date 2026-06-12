@@ -6,6 +6,8 @@ import { useAppStore } from '@/app/store/app.store';
 import { toast } from 'sonner';
 import { listCRMFollowUps, createCRMFollowUp, updateCRMFollowUp, deleteCRMFollowUp, listCRMContacts, type CRMFollowUp } from '@/lib/db/crm';
 import { CRMPage, PageHead, Segments, Panel, PanelTitle, EmptyState, Btn, Modal, Field, FormGrid, inp, Avatar, C, fmtDate } from './components/kit';
+import { SF_TENANT_ID } from './components/lightning';
+import { SalesforceTasksPage } from './SalesforceTasksPage';
 
 const TYPES = [
   { key: 'call', label: '📞 Call' },
@@ -20,6 +22,13 @@ const emptyForm = { contact_id: '', title: '', type: 'call', due_at: '', notes: 
 
 export function CRMFollowUpsPage() {
   const tenantId = useAppStore(s => s.config?.tenant_id ?? '');
+  // [crm] [tenant: FrontStores.com] — Salesforce-style Tasks (table + wide record popup)
+  if (tenantId === SF_TENANT_ID) return <SalesforceTasksPage />;
+  return <AuroraFollowUpsPage tenantId={tenantId} />;
+}
+
+// [crm] [all tenants] — original Aurora follow-ups UI
+function AuroraFollowUpsPage({ tenantId }: { tenantId: string }) {
   const qc = useQueryClient();
   const [tab, setTab] = useState<'pending' | 'done'>('pending');
   const [showForm, setShowForm] = useState(false);

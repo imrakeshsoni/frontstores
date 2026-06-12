@@ -15,6 +15,8 @@ import {
   CRMPage, PageHead, Segments, StatCard, Panel, EmptyState, Badge, Btn, Modal, Drawer,
   Field, FormGrid, inp, StageChevrons, Confetti, C, fmtINR, fmtDate, th, td,
 } from './components/kit';
+import { SF_TENANT_ID } from './components/lightning';
+import { SalesforceSalesPage } from './SalesforceSalesPage';
 
 const DOC_LABEL: Record<string, string> = { quote: 'Quote', order: 'Order', invoice: 'Invoice' };
 const NEXT_DOC: Record<string, 'order' | 'invoice' | null> = { quote: 'order', order: 'invoice', invoice: null };
@@ -42,7 +44,14 @@ function parseItems(json: string): CRMSaleItem[] {
   try { const a = JSON.parse(json); return Array.isArray(a) ? a : []; } catch { return []; }
 }
 
+// [crm] [tenant: FrontStores.com] — Salesforce-style Sales Cloud for this tenant; Aurora UI for everyone else
 export function CRMSalesPage() {
+  const tenantId = useAppStore(s => s.config?.tenant_id ?? '');
+  if (tenantId === SF_TENANT_ID) return <SalesforceSalesPage />;
+  return <AuroraSalesPage />;
+}
+
+function AuroraSalesPage() {
   const tenantId = useAppStore(s => s.config?.tenant_id ?? '');
   const shopName = useAppStore(s => s.config?.shop_name ?? '');
   const qc = useQueryClient();

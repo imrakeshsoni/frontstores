@@ -14,6 +14,8 @@ import {
   CRMPage, PageHead, SearchInput, Panel, EmptyState, Badge, Avatar, Btn, Modal, Drawer,
   Field, FormGrid, inp, C, fmtINR, fmtDate, timeAgo, th, td,
 } from './components/kit';
+import { SF_TENANT_ID } from './components/lightning';
+import { SalesforceContactsPage } from './SalesforceContactsPage';
 
 const STAGE_BADGE: Record<string, { bg: string; color: string }> = {
   lead:      { bg: C.amberBg, color: C.amber },
@@ -25,6 +27,13 @@ const emptyForm = { name: '', phone: '', email: '', company: '', source: '', sta
 
 export function CRMContactsPage() {
   const tenantId = useAppStore(s => s.config?.tenant_id ?? '');
+  // [crm] [tenant: FrontStores.com] — Salesforce-style Contacts (table + wide record popup)
+  if (tenantId === SF_TENANT_ID) return <SalesforceContactsPage />;
+  return <AuroraContactsPage tenantId={tenantId} />;
+}
+
+// [crm] [all tenants] — original Aurora contacts UI
+function AuroraContactsPage({ tenantId }: { tenantId: string }) {
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);

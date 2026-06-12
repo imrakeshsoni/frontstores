@@ -10,6 +10,7 @@ export interface CRMSaleItem {
 export interface CRMSale {
   id: string; tenant_id: string;
   contact_id: string; account_id: string;
+  deal_id: string; // [crm] [tenant: FrontStores.com] — links quote/order/invoice to an opportunity
   doc_type: string; doc_no: string; title: string;
   items: string; subtotal: number; discount: number; tax: number; total: number;
   status: string; due_date: string | null; notes: string; owner: string;
@@ -22,12 +23,13 @@ export interface CRMPayment {
   updated_at: string; deleted_at: string | null;
 }
 
-export async function listCRMSales(tenantId: string, opts: { docType?: string; contactId?: string; status?: string } = {}): Promise<CRMSale[]> {
+export async function listCRMSales(tenantId: string, opts: { docType?: string; contactId?: string; status?: string; dealId?: string } = {}): Promise<CRMSale[]> {
   const db = await getDb();
   const conds = ['tenant_id = ?', 'deleted_at IS NULL'];
   const params: unknown[] = [tenantId];
   if (opts.docType) { conds.push('doc_type = ?'); params.push(opts.docType); }
   if (opts.contactId) { conds.push('contact_id = ?'); params.push(opts.contactId); }
+  if (opts.dealId) { conds.push('deal_id = ?'); params.push(opts.dealId); }
   if (opts.status) { conds.push('status = ?'); params.push(opts.status); }
   return db.select<CRMSale[]>(`SELECT * FROM crm_sales WHERE ${conds.join(' AND ')} ORDER BY updated_at DESC`, params);
 }
@@ -37,9 +39,9 @@ export async function createCRMSale(tenantId: string, data: Partial<CRMSale>): P
   const id = uuid();
   const docNo = data.doc_no || `${(data.doc_type || 'quote').toUpperCase().slice(0, 3)}-${Date.now().toString().slice(-6)}`;
   await db.execute(
-    `INSERT INTO crm_sales (id,tenant_id,contact_id,account_id,doc_type,doc_no,title,items,subtotal,discount,tax,total,status,due_date,notes,owner,updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [id, tenantId, data.contact_id ?? '', data.account_id ?? '', data.doc_type || 'quote', docNo, data.title ?? '',
+    `INSERT INTO crm_sales (id,tenant_id,contact_id,account_id,deal_id,doc_type,doc_no,title,items,subtotal,discount,tax,total,status,due_date,notes,owner,updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [id, tenantId, data.contact_id ?? '', data.account_id ?? '', data.deal_id ?? '', data.doc_type || 'quote', docNo, data.title ?? '',
      data.items ?? '[]', data.subtotal ?? 0, data.discount ?? 0, data.tax ?? 0, data.total ?? 0,
      data.status || 'draft', data.due_date ?? null, data.notes ?? '', data.owner ?? '', now()]
   );
@@ -48,7 +50,7 @@ export async function createCRMSale(tenantId: string, data: Partial<CRMSale>): P
 
 export async function updateCRMSale(tenantId: string, id: string, data: Partial<CRMSale>): Promise<void> {
   const db = await getDb();
-  const fields = ['contact_id','account_id','doc_type','doc_no','title','items','subtotal','discount','tax','total','status','due_date','notes','owner'];
+  const fields = ['contact_id','account_id','deal_id','doc_type','doc_no','title','items','subtotal','discount','tax','total','status','due_date','notes','owner'];
   const updates: string[] = ['updated_at = ?'];
   const vals: unknown[] = [now()];
   for (const f of fields) { if (f in data) { updates.push(`${f} = ?`); vals.push((data as Record<string, unknown>)[f]); } }

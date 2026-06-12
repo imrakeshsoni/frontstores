@@ -7,6 +7,14 @@ export interface CRMTicket {
   ticket_no: string; subject: string; description: string;
   priority: string; status: string; assigned_to: string;
   due_date: string | null; resolved_at: string | null; notes: string;
+  origin: string; escalated_at: string | null; // [crm] [tenant: FrontStores.com] — Salesforce-style case fields
+  updated_at: string; deleted_at: string | null;
+}
+
+// [crm] [tenant: FrontStores.com] — Salesforce-style case feed comments
+export interface CRMCaseComment {
+  id: string; tenant_id: string; ticket_id: string;
+  body: string; author: string; created_at: string;
   updated_at: string; deleted_at: string | null;
 }
 
@@ -34,17 +42,17 @@ export async function createCRMTicket(tenantId: string, data: Partial<CRMTicket>
   const id = uuid();
   const ticketNo = data.ticket_no || `TKT-${Date.now().toString().slice(-6)}`;
   await db.execute(
-    `INSERT INTO crm_tickets (id,tenant_id,contact_id,account_id,ticket_no,subject,description,priority,status,assigned_to,due_date,resolved_at,notes,updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO crm_tickets (id,tenant_id,contact_id,account_id,ticket_no,subject,description,priority,status,assigned_to,due_date,resolved_at,notes,origin,updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [id, tenantId, data.contact_id ?? '', data.account_id ?? '', ticketNo, data.subject ?? '', data.description ?? '',
-     data.priority || 'medium', data.status || 'open', data.assigned_to ?? '', data.due_date ?? null, null, data.notes ?? '', now()]
+     data.priority || 'medium', data.status || 'open', data.assigned_to ?? '', data.due_date ?? null, null, data.notes ?? '', data.origin || 'phone', now()]
   );
   return id;
 }
 
 export async function updateCRMTicket(tenantId: string, id: string, data: Partial<CRMTicket>): Promise<void> {
   const db = await getDb();
-  const fields = ['contact_id','account_id','subject','description','priority','status','assigned_to','due_date','resolved_at','notes'];
+  const fields = ['contact_id','account_id','subject','description','priority','status','assigned_to','due_date','resolved_at','notes','origin','escalated_at'];
   const updates: string[] = ['updated_at = ?'];
   const vals: unknown[] = [now()];
   for (const f of fields) { if (f in data) { updates.push(`${f} = ?`); vals.push((data as Record<string, unknown>)[f]); } }
@@ -57,6 +65,32 @@ export async function updateCRMTicket(tenantId: string, id: string, data: Partia
 export async function deleteCRMTicket(tenantId: string, id: string): Promise<void> {
   const db = await getDb();
   await db.execute(`UPDATE crm_tickets SET deleted_at = ?, updated_at = ? WHERE id = ? AND tenant_id = ?`, [now(), now(), id, tenantId]);
+}
+
+// ── Case comments (Salesforce-style case feed) ───────────────────────────────
+// [crm] [tenant: FrontStores.com]
+
+export async function listCRMCaseComments(tenantId: string, ticketId: string): Promise<CRMCaseComment[]> {
+  const db = await getDb();
+  return db.select<CRMCaseComment[]>(
+    `SELECT * FROM crm_case_comments WHERE tenant_id = ? AND ticket_id = ? AND deleted_at IS NULL ORDER BY created_at DESC`,
+    [tenantId, ticketId]
+  );
+}
+
+export async function createCRMCaseComment(tenantId: string, data: { ticket_id: string; body: string; author?: string }): Promise<string> {
+  const db = await getDb();
+  const id = uuid();
+  await db.execute(
+    `INSERT INTO crm_case_comments (id,tenant_id,ticket_id,body,author,created_at,updated_at) VALUES (?,?,?,?,?,?,?)`,
+    [id, tenantId, data.ticket_id, data.body, data.author ?? '', now(), now()]
+  );
+  return id;
+}
+
+export async function deleteCRMCaseComment(tenantId: string, id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(`UPDATE crm_case_comments SET deleted_at = ?, updated_at = ? WHERE id = ? AND tenant_id = ?`, [now(), now(), id, tenantId]);
 }
 
 // ── Service Contracts (AMC) ───────────────────────────────────────────────────

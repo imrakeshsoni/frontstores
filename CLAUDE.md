@@ -69,6 +69,10 @@ Which app are you working on?
 ── Real Estate ──
 31) Real Estate / PropMate (realestate)
 
+── Web Apps ──
+38) 🌐➕ Create new web app
+39) NGO Web App (ngo-webapp) — multi-tenant NGO sites, live at ngo.frontstores.com
+
 ── System ──
 32) Core / Shared (affects all apps)
 33) 🌐 All Apps (change applies to every app)
@@ -80,6 +84,16 @@ Which app are you working on?
 
 If user picks **33 (All Apps)**, tag changes as `// [all apps] [all tenants]` and implement for every shopType.
 If user picks **37 (General Question)**, answer the question directly — no Q2 needed, no app tagging required.
+
+**Web Apps** are a separate category from the desktop Tauri apps above. They are browser-based, multi-tenant SaaS projects:
+- Naming convention: every web app project is named `<name>-webapp` (e.g., `inventory-webapp`, `booking-webapp`) so it's always clear it's a web app, not a desktop app.
+- Architecture: same multi-tenant model as desktop apps (tenant_id on every row, soft deletes, etc.), but server + database run on this Mac (Cloudflare Tunnel), and the frontend is a normal web app accessed via browser — no Tauri/desktop packaging.
+- When user picks **38 (Create new web app)**:
+  1. Ask: what is the web app's name/purpose?
+  2. Ask: what are the core features needed?
+  3. Scaffold a new project folder named `<name>-webapp/` (separate from `frontstores/` desktop codebase)
+  4. Add it to a "Web Apps" list in this file (under 39) so it shows up in future Q1 menus
+  5. Set up its own server route/subdomain served via this Mac's Cloudflare Tunnel
 
 ---
 

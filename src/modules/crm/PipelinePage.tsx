@@ -13,6 +13,8 @@ import {
   CRMPage, PageHead, Panel, Btn, Modal, Field, FormGrid, inp, Confetti, Avatar,
   C, fmtINR, fmtDate, daysUntil,
 } from './components/kit';
+import { SF_TENANT_ID } from './components/lightning';
+import { SalesforceSalesPage } from './SalesforceSalesPage';
 
 const STAGES = [
   { key: 'new',         label: 'New',         color: C.slate, bg: C.slateBg },
@@ -24,7 +26,15 @@ const STAGES = [
 
 const emptyForm = { contact_id: '', title: '', value: '', expected_close_date: '', notes: '', stage: 'new', owner: '', referred_by: '' };
 
+// [crm] [tenant: FrontStores.com] — this tenant's pipeline IS the Salesforce opportunity view
+// (its deals use Salesforce stage keys, which the Aurora board wouldn't display)
 export function CRMPipelinePage() {
+  const tenantId = useAppStore(s => s.config?.tenant_id ?? '');
+  if (tenantId === SF_TENANT_ID) return <SalesforceSalesPage />;
+  return <AuroraPipelinePage />;
+}
+
+function AuroraPipelinePage() {
   const tenantId = useAppStore(s => s.config?.tenant_id ?? '');
   const ownerName = useAppStore(s => s.config?.owner_name ?? '');
   const navigate = useNavigate();

@@ -14,13 +14,17 @@ import {
   CRMPage, PageHead, Segments, SearchInput, Panel, EmptyState, Badge, Avatar, Btn, Modal, Drawer,
   Field, FormGrid, inp, Confetti, C, fmtINR, fmtDate, timeAgo, th, td,
 } from './components/kit';
+import { SF_TENANT_ID } from './components/lightning';
+import { SalesforceLeadsPage } from './SalesforceLeadsPage';
 
-const STATUS_META: Record<string, { label: string; bg: string; color: string }> = {
+// Built as a function — C tokens are swapped per theme/brand at render time, so reading
+// them at module scope freezes the dark-theme colors and badges become unreadable in light
+const statusMeta = (): Record<string, { label: string; bg: string; color: string }> => ({
   new:       { label: 'New',       bg: C.amberBg,  color: C.amber },
   working:   { label: 'Working',   bg: C.blueBg,   color: C.blue },
   converted: { label: 'Converted', bg: C.greenBg,  color: C.green },
   dead:      { label: 'Dead',      bg: C.slateBg,  color: C.slate },
-};
+});
 
 const SOURCES = ['whatsapp', 'referral', 'website', 'walk-in', 'cold-call', 'social', 'other'];
 
@@ -28,6 +32,14 @@ const emptyForm = { name: '', company: '', email: '', phone: '', source: '', sta
 
 export function CRMLeadsPage() {
   const tenantId = useAppStore(s => s.config?.tenant_id ?? '');
+  // [crm] [tenant: FrontStores.com] — Salesforce-style Leads (table list + wide record popup)
+  if (tenantId === SF_TENANT_ID) return <SalesforceLeadsPage />;
+  return <AuroraLeadsPage tenantId={tenantId} />;
+}
+
+// [crm] [all tenants] — original Aurora leads UI
+function AuroraLeadsPage({ tenantId }: { tenantId: string }) {
+  const STATUS_META = statusMeta();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('all');
@@ -36,7 +48,7 @@ export function CRMLeadsPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [viewLead, setViewLead] = useState<CRMLead | null>(null);
   const [convertLead, setConvertLead] = useState<CRMLead | null>(null);
-  const [convertOpts, setConvertOpts] = useState({ createAccount: true, createContact: true, createDeal: true, dealValue: '' });
+  const [convertOpts, setConvertOpts] = useState({ createAccount: true, createContact: true, createDeal: true, dealValue: '', accountType: 'business' as 'business' | 'person' });
   const [celebrate, setCelebrate] = useState(false);
   const [form, setForm] = useState(emptyForm);
 
@@ -70,20 +82,32 @@ export function CRMLeadsPage() {
     onSuccess: () => { invalidate(); setViewLead(null); toast.success('Lead deleted'); },
   });
 
+  // [crm] [tenant: FrontStores.com] — Salesforce-style conversion: always create Account
+  // (business name or Person Account), opportunity starts at Prospecting, customer gets a WhatsApp welcome
+  const isSF = tenantId === SF_TENANT_ID;
+  const shopName = useAppStore(s => s.config?.shop_name ?? '');
+
   const convert = useMutation({
     mutationFn: () => convertCRMLead(tenantId, convertLead!.id, {
-      createAccount: convertOpts.createAccount && !!convertLead!.company,
+      createAccount: isSF ? convertOpts.createAccount : (convertOpts.createAccount && !!convertLead!.company),
       createContact: convertOpts.createContact,
       createDeal: convertOpts.createDeal,
       dealValue: Number(convertOpts.dealValue) || undefined,
+      accountMode: isSF ? (convertLead!.company ? convertOpts.accountType : 'person') : undefined,
+      dealStage: isSF ? 'prospecting' : undefined,
     }),
     onSuccess: (res) => {
       invalidate();
       qc.invalidateQueries({ queryKey: ['crm-contacts'] });
       qc.invalidateQueries({ queryKey: ['crm-deals'] });
+      if (isSF && convertLead?.phone) {
+        sendWhatsApp(convertLead.phone,
+          `Hi ${convertLead.name}! 👋 Thank you for your interest in ${shopName}. We've opened your file and will keep you updated at every step — from demo to final quote. Talk soon!`
+        ).then(() => toast.success('Welcome message sent on WhatsApp ✓')).catch(() => {});
+      }
       setConvertLead(null); setViewLead(null);
       setCelebrate(true); setTimeout(() => setCelebrate(false), 2200);
-      toast.success(`Lead converted! ${res.dealId ? 'Deal created in pipeline.' : ''}`);
+      toast.success(`Lead converted! ${res.dealId ? (isSF ? 'Opportunity created at Prospecting.' : 'Deal created in pipeline.') : ''}`);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -139,7 +163,7 @@ export function CRMLeadsPage() {
                     <td style={{ ...td, color: C.muted, fontSize: '12px' }}>{timeAgo(l.updated_at)}</td>
                     <td style={{ ...td, textAlign: 'right' }} onClick={e => e.stopPropagation()}>
                       {l.status !== 'converted' && (
-                        <Btn variant="subtle" small onClick={() => { setConvertLead(l); setConvertOpts({ createAccount: !!l.company, createContact: true, createDeal: true, dealValue: String(l.lead_value || '') }); }}>
+                        <Btn variant="subtle" small onClick={() => { setConvertLead(l); setConvertOpts({ createAccount: isSF || !!l.company, createContact: true, createDeal: true, dealValue: String(l.lead_value || ''), accountType: l.company ? 'business' : 'person' }); }}>
                           <Sparkles size={12} /> Convert
                         </Btn>
                       )}
@@ -191,7 +215,7 @@ export function CRMLeadsPage() {
             <Btn variant="danger" small onClick={() => { if (confirm('Delete this lead?')) remove.mutate(viewLead.id); }}><Trash2 size={12} /> Delete</Btn>
             <div style={{ flex: 1 }} />
             {viewLead.status !== 'converted' && (
-              <Btn variant="success" small onClick={() => { setConvertLead(viewLead); setConvertOpts({ createAccount: !!viewLead.company, createContact: true, createDeal: true, dealValue: String(viewLead.lead_value || '') }); }}>
+              <Btn variant="success" small onClick={() => { setConvertLead(viewLead); setConvertOpts({ createAccount: isSF || !!viewLead.company, createContact: true, createDeal: true, dealValue: String(viewLead.lead_value || ''), accountType: viewLead.company ? 'business' : 'person' }); }}>
                 <Sparkles size={12} /> Convert
               </Btn>
             )}
@@ -242,10 +266,25 @@ export function CRMLeadsPage() {
             <Btn variant="success" onClick={() => convert.mutate()} disabled={convert.isPending}><Sparkles size={13} /> Convert Lead</Btn>
           </>}>
           <p style={{ fontSize: '13px', color: C.muted, margin: '0 0 14px' }}>Pick what gets created. The lead is then marked converted.</p>
+          {/* [crm] [tenant: FrontStores.com] — Salesforce-style: account always created; business vs Person Account */}
+          {isSF && convertOpts.createAccount && (
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+              {([['business', `🏢 Business — ${convertLead.company || 'no company name'}`], ['person', `🙋 Person Account — ${convertLead.name}`]] as const).map(([k, label]) => {
+                const disabled = k === 'business' && !convertLead.company;
+                const active = (convertLead.company ? convertOpts.accountType : 'person') === k;
+                return (
+                  <label key={k} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', border: `1px solid ${active ? C.accent : C.border}`, borderRadius: '10px', cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.45 : 1, background: active ? C.accentSoft : C.surface, fontSize: '12px', fontWeight: 700, color: C.text }}>
+                    <input type="radio" disabled={disabled} checked={active} onChange={() => setConvertOpts(p => ({ ...p, accountType: k }))} />
+                    {label}
+                  </label>
+                );
+              })}
+            </div>
+          )}
           {[
-            { key: 'createAccount' as const, emoji: '🏢', label: 'Account', desc: convertLead.company || 'No company on lead — skipped', disabled: !convertLead.company },
+            { key: 'createAccount' as const, emoji: '🏢', label: 'Account', desc: isSF ? (convertLead.company && convertOpts.accountType === 'business' ? convertLead.company : `${convertLead.name} (Person Account)`) : (convertLead.company || 'No company on lead — skipped'), disabled: isSF ? false : !convertLead.company },
             { key: 'createContact' as const, emoji: '👤', label: 'Contact', desc: convertLead.name, disabled: false },
-            { key: 'createDeal' as const, emoji: '💰', label: 'Deal in Pipeline', desc: `${convertLead.company || convertLead.name} — Opportunity`, disabled: false },
+            { key: 'createDeal' as const, emoji: '💰', label: isSF ? 'Opportunity' : 'Deal in Pipeline', desc: `${convertLead.company || convertLead.name} — Opportunity${isSF ? ' · starts at Prospecting' : ''}`, disabled: false },
           ].map(o => (
             <label key={o.key} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', border: `1px solid ${C.border}`, borderRadius: '10px', marginBottom: '8px', cursor: o.disabled ? 'not-allowed' : 'pointer', opacity: o.disabled ? 0.5 : 1, background: convertOpts[o.key] && !o.disabled ? C.surface2 : C.surface }}>
               <input type="checkbox" checked={convertOpts[o.key] && !o.disabled} disabled={o.disabled}

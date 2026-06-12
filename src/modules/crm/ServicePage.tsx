@@ -14,6 +14,8 @@ import {
   CRMPage, PageHead, Segments, StatCard, Panel, EmptyState, Badge, Btn, Modal, Drawer, Avatar,
   Field, FormGrid, inp, Confetti, C, fmtINR, fmtDate, daysUntil, timeAgo, th, td,
 } from './components/kit';
+import { SF_TENANT_ID } from './components/lightning';
+import { SalesforceServicePage } from './SalesforceServicePage';
 
 const TICKET_COLS = [
   { key: 'open',        label: 'Open',        color: C.red, bg: C.redBg },
@@ -31,7 +33,14 @@ const PRIORITY_META: Record<string, { bg: string; color: string; label: string }
 const emptyTicket = { contact_id: '', subject: '', description: '', priority: 'medium', assigned_to: '', due_date: '' };
 const emptyContract = { contact_id: '', title: '', start_date: '', end_date: '', value: '', notes: '' };
 
+// [crm] [tenant: FrontStores.com] — Salesforce-style Service Cloud for this tenant; Aurora UI for everyone else
 export function CRMServicePage() {
+  const tenantId = useAppStore(s => s.config?.tenant_id ?? '');
+  if (tenantId === SF_TENANT_ID) return <SalesforceServicePage />;
+  return <AuroraServicePage />;
+}
+
+function AuroraServicePage() {
   const tenantId = useAppStore(s => s.config?.tenant_id ?? '');
   const qc = useQueryClient();
   const [tab, setTab] = useState<'tickets' | 'contracts'>('tickets');

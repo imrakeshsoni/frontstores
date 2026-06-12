@@ -84,6 +84,11 @@ import {
   MessageSquare,
   DollarSign,
   UserCog,
+  Grip,
+  Home,
+  ChevronDown,
+  Building2,
+  Headphones,
   Cloud,
   CloudOff,
   Loader2,
@@ -601,6 +606,12 @@ export function AppLayout() {
   const { theme: crmTheme } = useTheme(); // [crm] [all tenants] — Aurora shell light/dark
   const [showSwitchModal, setShowSwitchModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  // [crm] [tenant: FrontStores.com] — "More ▾" overflow dropdown in the Salesforce tab bar
+  const [showMoreTabs, setShowMoreTabs] = useState(false);
+  // [crm] [tenant: FrontStores.com] — App Launcher (9-dot waffle): switch between the
+  // Sales and Service apps (more apps can be added here later)
+  const [showAppLauncher, setShowAppLauncher] = useState(false);
+  const [sfApp, setSfApp] = useState<'sales' | 'service'>(() => (localStorage.getItem('fs_sf_app') === 'service' ? 'service' : 'sales'));
   // [carwash] [all tenants] — employee mode
   const [isEmployeeMode, setIsEmployeeMode] = useState(false);
   const [showOwnerLogin, setShowOwnerLogin] = useState(false);
@@ -769,8 +780,232 @@ export function AppLayout() {
   }, [config?.shop_type]);
 
   // [crm] [all tenants] — "Aurora" CRM shell: glass sidebar over aurora background, light & dark
+  // [crm] [tenant: FrontStores.com] — Salesforce org shell: global header + horizontal object tabs
   if (config?.shop_type === 'crm') {
     const dark = crmTheme === 'dark';
+    const isDP = config?.tenant_id === '78610b1e-5e6e-4093-a548-1cdeee9c580e'; // FrontStores.com
+
+    if (isDP) {
+      // Salesforce org shell, "Aria" skin — pastel blue→mint canvas, mono type, white
+      // global header (9-dot App Launcher + app name), object tab bar like a Salesforce org
+      const ARIA_FONT = "'JetBrains Mono', 'SF Mono', ui-monospace, 'Cascadia Mono', 'Roboto Mono', Menlo, Consolas, monospace";
+      const H = dark ? {
+        canvas: 'linear-gradient(135deg, #14161e 0%, #171b1d 60%, #151a18 100%)',
+        header: '#1e212b', border: 'rgba(255,255,255,0.10)',
+        text: '#e7e9f0', muted: 'rgba(231,233,240,0.62)', brand: '#7c9bff',
+        hover: 'rgba(255,255,255,0.06)', menuBg: '#1e212b',
+        barShadow: '0 2px 6px rgba(0,0,0,0.35)', menuShadow: '0 12px 40px rgba(0,0,0,0.6)',
+      } : {
+        canvas: 'linear-gradient(135deg, #e3e9f8 0%, #edf3ee 55%, #e2efe7 100%)',
+        header: '#ffffff', border: 'rgba(29,31,36,0.10)',
+        text: '#1d1f24', muted: 'rgba(29,31,36,0.58)', brand: '#4a7df0',
+        hover: 'rgba(74,125,240,0.07)', menuBg: '#ffffff',
+        barShadow: '0 2px 4px rgba(29,31,36,0.06)', menuShadow: '0 12px 40px rgba(29,31,36,0.22)',
+      };
+      const APP_GRADIENT = sfApp === 'sales' ? 'linear-gradient(135deg, #4a7df0, #8b5cf6)' : 'linear-gradient(135deg, #0b827c, #2e844a)';
+      // Object tabs per app, Salesforce order. `gate` = the nav path that controls staff
+      // tab access (Quotes/Orders/Invoices live inside /crm/sales; Accounts rides on Contacts).
+      type ObjectTab = { to: string; label: string; icon: typeof Home; color: string; gate: string };
+      const SALES_TABS: ObjectTab[] = [
+        { to: '/crm/dashboard',        label: 'Home',          icon: Home,          color: '#4a7df0', gate: '/crm/dashboard' },
+        { to: '/crm/leads',            label: 'Leads',         icon: Zap,           color: '#f88962', gate: '/crm/leads' },
+        { to: '/crm/contacts',         label: 'Contacts',      icon: Users,         color: '#a094ed', gate: '/crm/contacts' },
+        { to: '/crm/accounts',         label: 'Accounts',      icon: Building2,     color: '#7f8de1', gate: '/crm/contacts' },
+        { to: '/crm/pipeline',         label: 'Opportunities', icon: Target,        color: '#fcb95b', gate: '/crm/pipeline' },
+        { to: '/crm/sales?t=quote',    label: 'Quotes',        icon: FileText,      color: '#06a59a', gate: '/crm/sales' },
+        { to: '/crm/sales?t=order',    label: 'Orders',        icon: Package,       color: '#769ed9', gate: '/crm/sales' },
+        { to: '/crm/sales?t=invoice',  label: 'Invoices',      icon: Receipt,       color: '#2e844a', gate: '/crm/sales' },
+        { to: '/crm/followups',        label: 'Tasks',         icon: CheckSquare,   color: '#4bc076', gate: '/crm/followups' },
+        { to: '/crm/wa-inbox',         label: 'WhatsApp',      icon: MessageSquare, color: '#16a34a', gate: '/crm/wa-inbox' },
+      ];
+      const SERVICE_TABS: ObjectTab[] = [
+        { to: '/crm/dashboard',        label: 'Home',          icon: Home,          color: '#4a7df0', gate: '/crm/dashboard' },
+        { to: '/crm/service',          label: 'Cases',         icon: Wrench,        color: '#e4a201', gate: '/crm/service' },
+        { to: '/crm/accounts',         label: 'Accounts',      icon: Building2,     color: '#7f8de1', gate: '/crm/contacts' },
+        { to: '/crm/contacts',         label: 'Contacts',      icon: Users,         color: '#a094ed', gate: '/crm/contacts' },
+        { to: '/crm/followups',        label: 'Tasks',         icon: CheckSquare,   color: '#4bc076', gate: '/crm/followups' },
+        { to: '/crm/wa-inbox',         label: 'WhatsApp',      icon: MessageSquare, color: '#16a34a', gate: '/crm/wa-inbox' },
+      ];
+      const allowedPaths = new Set(activeNavItems.map(i => i.to));
+      const objectTabs = (sfApp === 'sales' ? SALES_TABS : SERVICE_TABS).filter(t => allowedPaths.has(t.gate));
+      const MORE_ITEMS = [
+        { to: '/crm/communications', label: 'Communication Log', icon: Radio },
+        ...(sfApp === 'sales' ? [{ to: '/crm/commissions', label: 'Commissions', icon: DollarSign }] : []),
+        { to: '/crm/team',           label: 'Team',              icon: UserCog },
+      ].filter(i => allowedPaths.has(i.to));
+      const APPS: { key: 'sales' | 'service'; name: string; desc: string; gradient: string; icon: typeof Home }[] = [
+        { key: 'sales',   name: 'Sales',   desc: 'Leads, accounts, opportunities, quotes & billing', gradient: 'linear-gradient(135deg, #4a7df0, #8b5cf6)', icon: Cloud },
+        { key: 'service', name: 'Service', desc: 'Cases, contracts & customer support',              gradient: 'linear-gradient(135deg, #0b827c, #2e844a)', icon: Headphones },
+      ];
+      const tabActive = (to: string) => {
+        const [path, search] = to.split('?');
+        return location.pathname === path && (!search || location.search === `?${search}`);
+      };
+      const moreActive = MORE_ITEMS.some(i => location.pathname === i.to);
+      const headerIconBtn: React.CSSProperties = {
+        display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px',
+        borderRadius: '50%', color: H.muted, background: 'transparent', border: 'none', cursor: 'pointer',
+        textDecoration: 'none', position: 'relative', flexShrink: 0,
+      };
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: H.canvas, fontFamily: ARIA_FONT }}>
+          {/* Global header */}
+          <header style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '0 14px', height: '50px', background: H.header, borderBottom: `1px solid ${H.border}`, flexShrink: 0, zIndex: 30 }}>
+            {/* 9-dot App Launcher — the only way to switch between Sales/Service apps */}
+            <div style={{ position: 'relative', display: 'flex', flexShrink: 0 }}>
+              <button onClick={() => setShowAppLauncher(v => !v)} title="App Launcher"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '6px', background: showAppLauncher ? H.hover : 'transparent', border: 'none', cursor: 'pointer', color: H.muted }}>
+                <Grip style={{ width: '18px', height: '18px' }} />
+              </button>
+              {showAppLauncher && (
+                <>
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setShowAppLauncher(false)} />
+                  <div style={{ position: 'absolute', top: 'calc(100% + 10px)', left: 0, width: '320px', background: H.menuBg, border: `1px solid ${H.border}`, borderRadius: '10px', overflow: 'hidden', zIndex: 50, boxShadow: H.menuShadow }}>
+                    <div style={{ padding: '12px 16px', borderBottom: `1px solid ${H.border}`, fontSize: '13px', fontWeight: 700, color: H.text }}>App Launcher</div>
+                    {APPS.map(app => {
+                      const AppIcon = app.icon;
+                      const current = app.key === sfApp;
+                      return (
+                        <button key={app.key}
+                          onClick={() => {
+                            setShowAppLauncher(false);
+                            if (current) return;
+                            setSfApp(app.key);
+                            localStorage.setItem('fs_sf_app', app.key);
+                            navigate('/crm/dashboard');
+                          }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', width: '100%', background: current ? H.hover : 'transparent', border: 'none', borderBottom: `1px solid ${H.border}`, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+                          <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: app.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <AppIcon style={{ width: '18px', height: '18px', color: '#fff' }} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: '13px', fontWeight: 700, color: H.text }}>{app.name}{current && <span style={{ color: H.brand, fontWeight: 600, fontSize: '10.5px', marginLeft: '8px' }}>● current</span>}</div>
+                            <div style={{ fontSize: '10.5px', color: H.muted, lineHeight: 1.4 }}>{app.desc}</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                    <div style={{ padding: '9px 16px', fontSize: '10.5px', color: H.muted }}>More apps coming soon…</div>
+                  </div>
+                </>
+              )}
+            </div>
+            {/* App icon — display only, not clickable */}
+            <div style={{ width: '30px', height: '30px', borderRadius: '6px', background: APP_GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              {sfApp === 'sales'
+                ? <Cloud style={{ width: '17px', height: '17px', color: '#fff' }} />
+                : <Headphones style={{ width: '16px', height: '16px', color: '#fff' }} />}
+            </div>
+            <div style={{ fontSize: '15px', fontWeight: 700, color: H.text, whiteSpace: 'nowrap' }}>{sfApp === 'sales' ? 'Sales' : 'Service'}</div>
+            <div style={{ fontSize: '11.5px', color: H.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
+              {config?.shop_name || 'FrontStores'}
+            </div>
+            <div style={{ flex: 1 }} />
+            <NavLink to="/announcements" title="Announcements" style={headerIconBtn}>
+              <Megaphone style={{ width: '16px', height: '16px' }} />
+              {!!unreadAnnouncements && (
+                <span style={{ position: 'absolute', top: '1px', right: '0px', background: '#c0392b', color: '#fff', borderRadius: '999px', padding: '0 4px', fontSize: '9px', fontWeight: 700, minWidth: '14px', height: '14px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {unreadAnnouncements > 9 ? '9+' : unreadAnnouncements}
+                </span>
+              )}
+            </NavLink>
+            {/* Settings + Switch App pinned in the header (always reachable) */}
+            <NavLink to="/settings" title={staffTabAccess !== null ? 'Check for Update' : 'Settings & Updates'} style={headerIconBtn}>
+              <Settings style={{ width: '16px', height: '16px' }} />
+            </NavLink>
+            <button onClick={() => setShowSwitchModal(true)} title="Switch App" style={headerIconBtn}>
+              <ArrowLeftRight style={{ width: '16px', height: '16px' }} />
+            </button>
+            <div style={{ position: 'relative' }}>
+              <button onClick={() => setShowUserMenu(v => !v)} title="View profile"
+                style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #4a7df0, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: '12px', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
+                {((loggedInDisplayName ?? config?.owner_name)?.[0] || 'O').toUpperCase()}
+              </button>
+              {showUserMenu && (
+                <>
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setShowUserMenu(false)} />
+                  <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: '220px', background: H.menuBg, border: `1px solid ${H.border}`, borderRadius: '8px', overflow: 'hidden', zIndex: 50, boxShadow: H.menuShadow }}>
+                    <div style={{ padding: '12px 14px', borderBottom: `1px solid ${H.border}` }}>
+                      <div style={{ color: H.text, fontSize: '13px', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {loggedInDisplayName ?? config?.owner_name ?? 'Owner'}
+                      </div>
+                      <div style={{ color: H.muted, fontSize: '11px', fontWeight: 600 }}>{staffTabAccess !== null ? 'Staff' : 'Owner'}</div>
+                    </div>
+                    <NavLink to="/settings" onClick={() => setShowUserMenu(false)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', color: H.muted, textDecoration: 'none', fontSize: '12.5px', fontWeight: 600, borderBottom: `1px solid ${H.border}` }}>
+                      <Settings style={{ width: '13px', height: '13px' }} /> {staffTabAccess !== null ? 'Check for Update' : 'Settings & Updates'}
+                    </NavLink>
+                    {/* [core] [all apps] [all tenants] — Switch App for everyone (testers AND clients) */}
+                    <button onClick={() => { setShowUserMenu(false); setShowSwitchModal(true); }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', color: H.muted, background: 'none', border: 'none', borderBottom: `1px solid ${H.border}`, width: '100%', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      <ArrowLeftRight style={{ width: '13px', height: '13px' }} /> Switch App
+                    </button>
+                    <button onClick={handleLogout}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', color: '#c0392b', background: 'none', border: 'none', width: '100%', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      <LogOut style={{ width: '13px', height: '13px' }} /> Logout
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </header>
+
+          {/* Object tab bar */}
+          <nav style={{ display: 'flex', alignItems: 'stretch', padding: '0 10px', background: H.header, borderBottom: `1px solid ${H.border}`, boxShadow: H.barShadow, flexShrink: 0, overflowX: 'auto', overflowY: 'visible', zIndex: 20 }}>
+            {objectTabs.map(t => {
+              const on = tabActive(t.to);
+              const Icon = t.icon;
+              return (
+                <NavLink key={t.label} to={t.to}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '6px', padding: '0 13px', height: '40px',
+                    fontSize: '13px', fontWeight: on ? 700 : 500, color: on ? H.text : H.muted,
+                    textDecoration: 'none', whiteSpace: 'nowrap', borderBottom: `3px solid ${on ? H.brand : 'transparent'}`,
+                    background: on ? H.hover : 'transparent', transition: 'all 0.12s ease',
+                  }}>
+                  <Icon style={{ width: '14px', height: '14px', color: t.color, flexShrink: 0 }} />
+                  {t.label}
+                </NavLink>
+              );
+            })}
+            {MORE_ITEMS.length > 0 && (
+              <div style={{ position: 'relative', display: 'flex' }}>
+                <button onClick={() => setShowMoreTabs(v => !v)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '5px', padding: '0 13px', height: '40px',
+                    fontSize: '13px', fontWeight: moreActive ? 700 : 500, color: moreActive ? H.text : H.muted,
+                    background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                    borderBottom: `3px solid ${moreActive ? H.brand : 'transparent'}`, whiteSpace: 'nowrap',
+                  }}>
+                  More <ChevronDown style={{ width: '13px', height: '13px' }} />
+                </button>
+                {showMoreTabs && (
+                  <>
+                    <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setShowMoreTabs(false)} />
+                    <div style={{ position: 'absolute', top: '100%', left: 0, width: '210px', background: H.menuBg, border: `1px solid ${H.border}`, borderRadius: '8px', overflow: 'hidden', zIndex: 50, boxShadow: H.menuShadow }}>
+                      {MORE_ITEMS.map(({ to, label, icon: Icon }) => (
+                        <NavLink key={to} to={to} onClick={() => setShowMoreTabs(false)}
+                          style={({ isActive }) => ({ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', color: isActive ? H.brand : H.muted, textDecoration: 'none', fontSize: '12.5px', fontWeight: 600 })}>
+                          <Icon style={{ width: '13px', height: '13px' }} /> {label}
+                        </NavLink>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </nav>
+
+          {/* Main content */}
+          <main style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', position: 'relative' }}>
+            <Outlet />
+          </main>
+          {showSwitchModal && <SwitchAppModal onClose={() => setShowSwitchModal(false)} />}
+          <AnnouncementPopup />
+        </div>
+      );
+    }
+
     const C = dark ? {
       bg: '#0a0c14',
       side: 'rgba(255,255,255,0.035)',
@@ -793,6 +1028,7 @@ export function AppLayout() {
       auroraOpacity: 0.55,
     };
     const SIDE_GRADIENT = 'linear-gradient(135deg, #6366f1, #a855f7)';
+    const SIDE_SHADOW = '0 6px 20px rgba(99,102,241,0.5)';
     // Grouped IA — items still respect staff tab access (activeNavItems)
     const NAV_GROUPS: { label: string | null; paths: string[] }[] = [
       { label: null, paths: ['/crm/dashboard'] },
@@ -810,7 +1046,7 @@ export function AppLayout() {
       textDecoration: 'none', whiteSpace: 'nowrap', transition: 'all 0.14s',
       background: isActive ? SIDE_GRADIENT : 'transparent',
       color: isActive ? '#ffffff' : C.sideText,
-      boxShadow: isActive ? '0 6px 20px rgba(99,102,241,0.45), inset 0 1px 0 rgba(255,255,255,0.2)' : 'none',
+      boxShadow: isActive ? `${SIDE_SHADOW}, inset 0 1px 0 rgba(255,255,255,0.2)` : 'none',
     });
     return (
       <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: C.bg, fontFamily: "'Inter', -apple-system, sans-serif", position: 'relative' }}>
@@ -824,7 +1060,7 @@ export function AppLayout() {
         <aside style={{ width: '220px', flexShrink: 0, background: C.side, backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)', borderRight: `1px solid ${C.sideBorder}`, display: 'flex', flexDirection: 'column', zIndex: 20 }}>
           {/* Brand */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '18px 16px 14px', borderBottom: `1px solid ${C.sideBorder}` }}>
-            <div style={{ background: SIDE_GRADIENT, borderRadius: '10px', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 6px 20px rgba(99,102,241,0.5)' }}>
+            <div style={{ background: SIDE_GRADIENT, borderRadius: '10px', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: SIDE_SHADOW }}>
               <Store style={{ width: '16px', height: '16px', color: '#fff' }} />
             </div>
             <div style={{ minWidth: 0 }}>
@@ -873,7 +1109,7 @@ export function AppLayout() {
           <div style={{ position: 'relative', padding: '10px', borderTop: `1px solid ${C.sideBorder}` }}>
             <button onClick={() => setShowUserMenu(v => !v)}
               style={{ display: 'flex', alignItems: 'center', gap: '10px', background: showUserMenu ? C.sideBorder : 'none', border: 'none', cursor: 'pointer', padding: '8px 10px', borderRadius: '9px', width: '100%', transition: 'background 0.12s' }}>
-              <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: SIDE_GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 800, fontSize: '12px', flexShrink: 0, boxShadow: '0 4px 14px rgba(99,102,241,0.4)' }}>
+              <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: SIDE_GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 800, fontSize: '12px', flexShrink: 0, boxShadow: SIDE_SHADOW }}>
                 {((loggedInDisplayName ?? config?.owner_name)?.[0] || 'O').toUpperCase()}
               </div>
               <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
