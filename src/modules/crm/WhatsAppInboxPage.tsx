@@ -56,7 +56,10 @@ export function WhatsAppInboxPage() {
                 <Avatar name={e.from_name || e.from_phone} size={38} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 800, color: C.text }}>{e.from_name || e.from_phone}</span>
+                    <span style={{ fontSize: '13px', fontWeight: 800, color: C.text }}>{e.from_name || e.whatsapp_name || e.from_phone}</span>
+                    {e.whatsapp_name && e.whatsapp_name !== e.from_name && (
+                      <Badge bg={C.greenBg} color={C.green}>WA: {e.whatsapp_name}</Badge>
+                    )}
                     <span style={{ fontSize: '11px', color: C.muted }}>{e.from_phone}</span>
                     {e.company && <Badge bg={C.surface2} color={C.muted}>{e.company}</Badge>}
                     {e.business_type && <Badge bg={C.violetBg} color={C.violet}>{e.business_type}</Badge>}

@@ -266,6 +266,9 @@ function upsertWaLeadRecord(c, from, tenantId) {
     imported: false,
   };
   rec.from_name = c.name || c.profile_name || '';
+  // The WhatsApp profile name is kept as its OWN field — the typed name never
+  // overwrites it; the CRM shows both.
+  rec.whatsapp_name = c.profile_name || '';
   rec.company = c.company || '';
   rec.business_type = c.business_type || '';
   rec.software_interest = c.software_interest || '';
@@ -312,6 +315,10 @@ async function handleWaBotStep(from, text, tenantId, profileName = '', rawTexts 
   let c = convos[key] || { step: 0, from_phone: from, tenant_id: tenantId, started_at: new Date().toISOString() };
   const save = () => { convos[key] = c; saveWaConvos(convos); };
   const nowMs = Date.now();
+
+  // capture the WhatsApp profile name from the very first message (or whenever
+  // Meta first provides it) — saved on the lead immediately, never overwritten
+  if (profileName && !c.profile_name) c.profile_name = cleanWaAnswer(profileName, 60);
 
   // ── flood protection: pause the bot if someone is spamming ──
   c.msg_times = (c.msg_times || []).filter(t => nowMs - t < 60 * 1000);

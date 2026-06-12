@@ -231,6 +231,7 @@ export interface CRMLead {
   name: string; company: string; email: string; phone: string;
   source: string; status: string; lead_value: number; notes: string;
   owner: string; referred_by: string;
+  whatsapp_name: string; // [crm] [all tenants] — WhatsApp profile name, separate from the typed name
   business_type: string; software_interest: string;
   converted_at: string | null;
   converted_contact_id: string | null;
@@ -257,7 +258,7 @@ export interface CRMCommission {
 
 export interface CRMWaInbox {
   id: string; tenant_id: string;
-  from_phone: string; from_name: string;
+  from_phone: string; from_name: string; whatsapp_name: string;
   company: string; business_type: string; software_interest: string;
   message_preview: string; received_at: string;
   imported_at: string | null; lead_id: string | null;
@@ -278,15 +279,15 @@ export async function createCRMLead(tenantId: string, data: Partial<CRMLead>): P
   const db = await getDb();
   const id = uuid();
   await db.execute(
-    `INSERT INTO crm_leads (id,tenant_id,name,company,email,phone,source,status,lead_value,notes,owner,referred_by,business_type,software_interest,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [id, tenantId, data.name ?? '', data.company ?? '', data.email ?? '', data.phone ?? '', data.source ?? '', data.status || 'new', data.lead_value ?? 0, data.notes ?? '', data.owner ?? '', data.referred_by ?? '', data.business_type ?? '', data.software_interest ?? '', now()]
+    `INSERT INTO crm_leads (id,tenant_id,name,company,email,phone,source,status,lead_value,notes,owner,referred_by,whatsapp_name,business_type,software_interest,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [id, tenantId, data.name ?? '', data.company ?? '', data.email ?? '', data.phone ?? '', data.source ?? '', data.status || 'new', data.lead_value ?? 0, data.notes ?? '', data.owner ?? '', data.referred_by ?? '', data.whatsapp_name ?? '', data.business_type ?? '', data.software_interest ?? '', now()]
   );
   return id;
 }
 
 export async function updateCRMLead(tenantId: string, id: string, data: Partial<CRMLead>): Promise<void> {
   const db = await getDb();
-  const fields = ['name','company','email','phone','source','status','lead_value','notes','owner','referred_by','business_type','software_interest'];
+  const fields = ['name','company','email','phone','source','status','lead_value','notes','owner','referred_by','whatsapp_name','business_type','software_interest'];
   const updates: string[] = ['updated_at = ?'];
   const vals: unknown[] = [now()];
   for (const f of fields) { if (f in data) { updates.push(`${f} = ?`); vals.push((data as Record<string,unknown>)[f]); } }
@@ -451,15 +452,15 @@ export async function upsertCRMWaLead(tenantId: string, data: Omit<CRMWaInbox, '
   const [existing] = await db.select<CRMWaInbox[]>(`SELECT id FROM crm_wa_inbox WHERE tenant_id = ? AND from_phone = ? AND imported_at IS NULL`, [tenantId, data.from_phone]);
   if (existing) {
     await db.execute(
-      `UPDATE crm_wa_inbox SET from_name=?,company=?,business_type=?,software_interest=?,message_preview=?,updated_at=? WHERE id=?`,
-      [data.from_name, data.company, data.business_type, data.software_interest, data.message_preview, now(), existing.id]
+      `UPDATE crm_wa_inbox SET from_name=?,whatsapp_name=?,company=?,business_type=?,software_interest=?,message_preview=?,updated_at=? WHERE id=?`,
+      [data.from_name, data.whatsapp_name ?? '', data.company, data.business_type, data.software_interest, data.message_preview, now(), existing.id]
     );
     return existing.id;
   }
   const id = uuid();
   await db.execute(
-    `INSERT INTO crm_wa_inbox (id,tenant_id,from_phone,from_name,company,business_type,software_interest,message_preview,received_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)`,
-    [id, tenantId, data.from_phone, data.from_name, data.company, data.business_type, data.software_interest, data.message_preview, data.received_at, now()]
+    `INSERT INTO crm_wa_inbox (id,tenant_id,from_phone,from_name,whatsapp_name,company,business_type,software_interest,message_preview,received_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+    [id, tenantId, data.from_phone, data.from_name, data.whatsapp_name ?? '', data.company, data.business_type, data.software_interest, data.message_preview, data.received_at, now()]
   );
   return id;
 }
@@ -469,7 +470,8 @@ export async function importWaLeadToLead(tenantId: string, waInboxId: string, ow
   const [wa] = await db.select<CRMWaInbox[]>(`SELECT * FROM crm_wa_inbox WHERE id = ? AND tenant_id = ?`, [waInboxId, tenantId]);
   if (!wa) throw new Error('WA inbox entry not found');
   const leadId = await createCRMLead(tenantId, {
-    name: wa.from_name || wa.from_phone,
+    name: wa.from_name || wa.whatsapp_name || wa.from_phone,
+    whatsapp_name: wa.whatsapp_name || '',
     company: wa.company,
     phone: wa.from_phone,
     source: 'whatsapp',
@@ -492,7 +494,7 @@ export async function importWaLeadToLead(tenantId: string, waInboxId: string, ow
 const WA_LEADS_SERVER = 'https://update.frontstores.com';
 
 interface ServerWaLead {
-  id: string; from_phone: string; from_name?: string; company?: string;
+  id: string; from_phone: string; from_name?: string; whatsapp_name?: string; company?: string;
   business_type?: string; software_interest?: string; message_preview?: string;
   received_at?: string; imported?: boolean; assigned_to?: string;
 }
@@ -521,6 +523,7 @@ export async function syncWaLeadsFromServer(tenantId: string, ownerName = ''): P
       const inboxId = await upsertCRMWaLead(tenantId, {
         from_phone: sl.from_phone,
         from_name: sl.from_name || '',
+        whatsapp_name: sl.whatsapp_name || '',
         company: sl.company || '',
         business_type: sl.business_type || '',
         software_interest: sl.software_interest || '',
@@ -533,6 +536,7 @@ export async function syncWaLeadsFromServer(tenantId: string, ownerName = ''): P
       // Merge: server values win when present, but never blank out local data
       const merged = {
         from_name: sl.from_name || inbox.from_name || '',
+        whatsapp_name: sl.whatsapp_name || inbox.whatsapp_name || '',
         company: sl.company || inbox.company || '',
         business_type: sl.business_type || inbox.business_type || '',
         software_interest: sl.software_interest || inbox.software_interest || '',
@@ -541,12 +545,13 @@ export async function syncWaLeadsFromServer(tenantId: string, ownerName = ''): P
       const changed = (Object.keys(merged) as (keyof typeof merged)[]).some(k => merged[k] !== (inbox[k] || ''));
       if (changed) {
         await db.execute(
-          `UPDATE crm_wa_inbox SET from_name=?,company=?,business_type=?,software_interest=?,message_preview=?,updated_at=? WHERE id=?`,
-          [merged.from_name, merged.company, merged.business_type, merged.software_interest, merged.message_preview, now(), inbox.id]
+          `UPDATE crm_wa_inbox SET from_name=?,whatsapp_name=?,company=?,business_type=?,software_interest=?,message_preview=?,updated_at=? WHERE id=?`,
+          [merged.from_name, merged.whatsapp_name, merged.company, merged.business_type, merged.software_interest, merged.message_preview, now(), inbox.id]
         );
         if (inbox.lead_id) {
           await updateCRMLead(tenantId, inbox.lead_id, {
             name: merged.from_name || sl.from_phone,
+            whatsapp_name: merged.whatsapp_name,
             company: merged.company,
             business_type: merged.business_type,
             software_interest: merged.software_interest,
