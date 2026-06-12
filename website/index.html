@@ -541,12 +541,12 @@
         </div>
         <div class="f-row">
           <input class="inp" type="tel" name="mobile" placeholder="WhatsApp number *" required maxlength="13" />
-          <input class="inp" type="email" name="email" placeholder="Email *" required maxlength="200" />
+          <input class="inp" type="email" name="email" placeholder="Email (optional)" maxlength="200" />
         </div>
         <textarea class="inp" name="message" placeholder="What should we build for you? *" required maxlength="1000"></textarea>
         <div class="f-error" id="f-error"></div>
         <button class="btn-spec" type="submit" id="f-btn">Verify on WhatsApp →</button>
-        <div class="f-note">All fields are required. A 6-digit code will be sent to your WhatsApp.</div>
+        <div class="f-note">Email is optional — everything else is required. A 6-digit code will be sent to your WhatsApp.</div>
       </form>
 
       <div id="otp-step">
@@ -800,7 +800,8 @@
       email:     form.email.value.trim(),
       message:   form.message.value.trim(),
     };
-    if (Object.values(payload).some(v => !v)) { showErr(fErr, 'All fields are required.'); return; }
+    const { email: _optEmail, ...requiredFields } = payload;
+    if (Object.values(requiredFields).some(v => !v)) { showErr(fErr, 'All fields except email are required.'); return; }
     if (!/^(\+?91)?[6-9]\d{9}$/.test(payload.mobile.replace(/[\s-]/g, ''))) { showErr(fErr, 'Enter a valid 10-digit Indian WhatsApp number.'); return; }
 
     const btn = document.getElementById('f-btn');

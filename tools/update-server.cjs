@@ -974,16 +974,15 @@ const publicServer = http.createServer(async (req, res) => {
     const body = await readBody(req);
     try {
       const { name, shop_type, mobile, email, message } = JSON.parse(body);
-      // every field is mandatory
+      // every field mandatory except email
       const missing = [
         !String(name || '').trim() && 'name',
         !String(shop_type || '').trim() && 'business type',
         !String(mobile || '').trim() && 'mobile',
-        !String(email || '').trim() && 'email',
         !String(message || '').trim() && 'message',
       ].filter(Boolean);
       if (missing.length) { res.writeHead(400); res.end(`Required: ${missing.join(', ')}`); return; }
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) { res.writeHead(400); res.end('Invalid email address'); return; }
+      if (String(email || '').trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) { res.writeHead(400); res.end('Invalid email address'); return; }
       const phone = normalizeIndianPhone(mobile);
       if (!phone) { res.writeHead(400); res.end('Enter a valid 10-digit Indian mobile number'); return; }
 
@@ -1015,7 +1014,7 @@ const publicServer = http.createServer(async (req, res) => {
         saveContacts(contacts.slice(0, 1000));
         if (knownLead) {
           // attach the new message to their existing lead and resync it to the app
-          knownLead.message_preview = `${knownLead.message_preview || ''} | Website (known number): ${f.message} | Email: ${f.email}`.slice(0, 900);
+          knownLead.message_preview = `${knownLead.message_preview || ''} | Website (known number): ${f.message}${f.email ? ` | Email: ${f.email}` : ''}`.slice(0, 900);
           knownLead.updated_at = new Date().toISOString();
           knownLead.imported = false;
           saveWaLeads(allLeads);
@@ -1030,7 +1029,7 @@ const publicServer = http.createServer(async (req, res) => {
             business_type: f.shop_type,
             software_interest: f.shop_type,
             assigned_to: loadSubs()[crmTenant]?.owner_name || '',
-            message_preview: `Website enquiry (known contact): ${f.message} | Email: ${f.email}`,
+            message_preview: `Website enquiry (known contact): ${f.message}${f.email ? ` | Email: ${f.email}` : ''}`,
             source: 'website',
             received_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
@@ -1116,7 +1115,7 @@ const publicServer = http.createServer(async (req, res) => {
           business_type: f.shop_type,
           software_interest: f.shop_type,
           assigned_to: loadSubs()[tenantId]?.owner_name || '',
-          message_preview: `Website enquiry (WhatsApp-verified): ${f.message} | Email: ${f.email}`,
+          message_preview: `Website enquiry (WhatsApp-verified): ${f.message}${f.email ? ` | Email: ${f.email}` : ''}`,
           source: 'website',
           received_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
