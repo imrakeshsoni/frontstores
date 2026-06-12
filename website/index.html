@@ -163,11 +163,13 @@
   @media (prefers-reduced-motion: reduce) { #intro { display: none; } }
 
   /* ════════ PLANE + BANNER MOVIE OPENING ════════ */
+  #intro { perspective: 1300px; }
   .shade { position: absolute; left: 0; right: 0; height: 50.5%; background: #000; z-index: 3;
-    transition: transform 1.5s cubic-bezier(.72,0,.2,1); }
-  .shade.top { top: 0; } .shade.bot { bottom: 0; }
-  #intro.open .shade.top { transform: translateY(-101%); }
-  #intro.open .shade.bot { transform: translateY(101%); }
+    transition: transform 2.8s cubic-bezier(.62,0,.16,1); }
+  .shade.top { top: 0; transform-origin: 50% 0; }
+  .shade.bot { bottom: 0; transform-origin: 50% 100%; }
+  #intro.open .shade.top { transform: translateY(-101%) rotateX(26deg); }
+  #intro.open .shade.bot { transform: translateY(101%) rotateX(-26deg); }
 
   #plane-rig {
     position: fixed; top: 0; left: 0; z-index: 1200; pointer-events: none;
@@ -200,22 +202,30 @@
     50% { transform: skewY(-2.4deg) scaleY(1); }
     75% { transform: skewY(.8deg) scaleY(1.015); }
   }
-  /* pass 1 — banner flyby right → left, then banks away into the distance */
-  #plane-rig.fly1 { animation: flyBanner 5.4s cubic-bezier(.35,.12,.55,.9) forwards; }
+  /* pass 1 — slow entry, then a full round trip INSIDE the screen:
+     left across the top, banks down the left side, sweeps the bottom into
+     the distance, climbs the right side and settles top-right — while the
+     website opens beneath it */
+  #plane-rig.fly1 { animation: flyBanner 10s cubic-bezier(.4,.1,.5,.9) forwards; }
   @keyframes flyBanner {
-    0%   { transform: translate(115vw, 24vh) scale(1); }
-    50%  { transform: translate(26vw, 20vh) scale(1); }
-    74%  { transform: translate(-16vw, 24vh) scale(.85); }
-    100% { transform: translate(-70vw, -4vh) scale(.45); }
+    0%   { transform: translate(112vw, 20vh) scale(1) rotate(0deg); }
+    20%  { transform: translate(52vw, 17vh) scale(1) rotate(-1deg); }
+    34%  { transform: translate(12vw, 24vh) scale(.95) rotate(4deg); }
+    47%  { transform: translate(6vw, 52vh) scale(.8) rotate(10deg); }
+    61%  { transform: translate(38vw, 70vh) scale(.62) rotate(3deg); }
+    74%  { transform: translate(68vw, 56vh) scale(.56) rotate(-6deg); }
+    87%  { transform: translate(74vw, 22vh) scale(.52) rotate(-8deg); }
+    100% { transform: translate(70vw, 7vh) scale(.5) rotate(-2deg); }
   }
-  /* pass 2 — dives into the open website and through the headline */
-  #plane-rig.dive { animation: diveHit 1.9s cubic-bezier(.5,.05,.55,.95) forwards; }
+  /* pass 2 — from its top-right perch it dives through the headline and
+     vanishes inside the site (never leaves the screen) */
+  #plane-rig.dive { animation: diveHit 2.4s cubic-bezier(.5,.05,.55,.95) forwards; }
   #plane-rig.dive .rope, #plane-rig.dive .banner { display: none; }
   @keyframes diveHit {
-    0%   { transform: translate(112vw, -6vh) scale(.5) rotate(-9deg); opacity: 1; }
-    52%  { transform: translate(44vw, 17vh) scale(.95) rotate(2deg); opacity: 1; }
-    86%  { transform: translate(8vw, 26vh) scale(.7) rotate(7deg); opacity: .5; }
-    100% { transform: translate(-6vw, 30vh) scale(.4) rotate(9deg); opacity: 0; } /* disappears inside the site */
+    0%   { transform: translate(70vw, 7vh) scale(.5) rotate(-2deg); opacity: 1; }
+    55%  { transform: translate(42vw, 17vh) scale(.9) rotate(4deg); opacity: 1; }
+    85%  { transform: translate(15vw, 27vh) scale(.5) rotate(8deg); opacity: .55; }
+    100% { transform: translate(9vw, 31vh) scale(.26) rotate(10deg); opacity: 0; }
   }
 
   /* headline letters break apart in 3D and self-heal */
@@ -231,8 +241,8 @@
   /* ════════ WARP-IN REVEAL — everything flies in from the viewer ════════ */
   .warp-item { opacity: 0; transform-style: preserve-3d; will-change: transform, opacity, filter; }
   body.warp .warp-item {
-    animation: warpIn 1.15s cubic-bezier(.16,1,.3,1) forwards;
-    animation-delay: var(--d, 0s);
+    animation: warpIn 1.7s cubic-bezier(.16,1,.3,1) forwards;
+    animation-delay: calc(var(--d, 0s) + .5s); /* let the 3D curtain breathe first */
   }
   @keyframes warpIn {
     0% { opacity: 0; transform: translateY(22px); }
@@ -279,9 +289,11 @@
     transform: translateZ(60px);
   }
   .hero h1 {
-    margin-top: 34px; font-size: clamp(1.7rem, 4.8vw, 3.9rem); font-weight: 800; line-height: 1.14;
-    transform: translateZ(90px); max-width: 1000px; margin-left: auto; margin-right: auto;
+    margin-top: 34px; font-size: clamp(1.2rem, 4.3vw, 3.5rem); font-weight: 800; line-height: 1.18;
+    transform: translateZ(90px); margin-left: auto; margin-right: auto;
   }
+  /* each phrase is one unbreakable line — always exactly two clean lines */
+  .hero h1 > span { display: inline-block; white-space: nowrap; }
   .hero-sub {
     margin-top: 26px; max-width: 660px; margin-left: auto; margin-right: auto;
     font-size: clamp(1rem, 1.6vw, 1.18rem); line-height: 1.75; color: var(--muted);
@@ -819,7 +831,9 @@
   let introDone = false;
   let skipped = false;
 
-  // split the headline into letters so the plane can break them
+  // split the headline into letters so the plane can break them.
+  // Letters are grouped into word blocks so wrapping only happens between
+  // words — punctuation can never end up alone on its own line.
   (function splitLetters() {
     if (!heroH1) return;
     heroH1.querySelectorAll(':scope > span').forEach(line => {
@@ -827,12 +841,19 @@
       const txt = line.textContent;
       if (isHolo) line.classList.remove('holo-text'); // gradient moves to each letter
       line.textContent = '';
-      for (const ch of txt) {
-        const s = document.createElement('span');
-        s.className = 'ltr' + (isHolo ? ' holo-text' : '');
-        s.innerHTML = ch === ' ' ? '&nbsp;' : ch;
-        line.appendChild(s);
-      }
+      txt.split(' ').forEach((word, wi, arr) => {
+        const w = document.createElement('span');
+        w.style.display = 'inline-block';
+        w.style.whiteSpace = 'nowrap';
+        for (const ch of word) {
+          const s = document.createElement('span');
+          s.className = 'ltr' + (isHolo ? ' holo-text' : '');
+          s.textContent = ch;
+          w.appendChild(s);
+        }
+        line.appendChild(w);
+        if (wi < arr.length - 1) line.appendChild(document.createTextNode(' '));
+      });
     });
   })();
 
@@ -874,15 +895,15 @@
     const sleep = ms => new Promise(r => setTimeout(r, ms));
     await sleep(650);
     if (skipped) return;
-    rig.classList.add('fly1');                 // banner flyby (5.4s)
-    await sleep(4500); if (skipped) return;
-    openIntro();                               // curtains part while plane banks away
-    await sleep(1450); if (skipped) return;
+    rig.classList.add('fly1');                 // slow banner pass + in-screen round trip (10s)
+    await sleep(4600); if (skipped) return;
+    openIntro();                               // 3D curtains part slowly while the plane circles
+    await sleep(5600); if (skipped) return;    // round trip finishes on its top-right perch
     rig.classList.remove('fly1');
-    rig.classList.add('dive');                 // dive at the headline (1.9s)
-    await sleep(1000); if (skipped) return;
+    rig.classList.add('dive');                 // dive at the headline (2.4s)
+    await sleep(1350); if (skipped) return;
     shatter();                                 // impact — letters explode in 3D
-    await sleep(950); if (skipped) return;
+    await sleep(1100); if (skipped) return;
     rig.classList.add('gone');                 // plane is gone, inside the site
     heal();                                    // letters fly back together
   })();
