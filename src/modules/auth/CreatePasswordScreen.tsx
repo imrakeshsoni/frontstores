@@ -3,6 +3,8 @@ import { useAppStore } from '@/app/store/app.store';
 import { createAuth } from '@/lib/db/auth';
 import { claimSession } from '@/lib/db/session';
 import { toast } from 'sonner';
+// [core] [all apps] [all tenants] — frontstores.com spectrum brand system
+import { SPEC_GRADIENT, SPEC_BG } from './AppLoginScreen';
 
 interface Props { onCreated: () => void; }
 
@@ -39,11 +41,12 @@ export function CreatePasswordScreen({ onCreated }: Props) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: SPEC_BG }}>
       <div className="w-full max-w-sm">
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
+        <div className="rounded-2xl p-8 shadow-2xl" style={{ background: 'rgba(41,33,58,.72)', border: '1px solid rgba(255,255,255,.16)', backdropFilter: 'blur(16px)' }}>
           <div className="flex flex-col items-center mb-6">
-            <div className="h-14 w-14 rounded-2xl bg-indigo-600 flex items-center justify-center text-white font-black text-xl mb-3">
+            <div className="h-14 w-14 rounded-2xl flex items-center justify-center text-white font-black text-xl mb-3"
+              style={{ background: 'linear-gradient(150deg, #d92b14, #8f1206)', boxShadow: '0 0 26px rgba(255,61,154,.3)' }}>
               FS
             </div>
             <h1 className="text-lg font-bold text-white">{shopName}</h1>
@@ -105,7 +108,8 @@ export function CreatePasswordScreen({ onCreated }: Props) {
             <button
               type="submit"
               disabled={!valid || loading}
-              className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl text-sm transition-colors mt-2"
+              className="w-full disabled:opacity-40 disabled:cursor-not-allowed font-bold py-2.5 rounded-xl text-sm transition-transform hover:scale-[1.01] mt-2"
+              style={{ background: SPEC_GRADIENT, color: '#1b0a14', boxShadow: '0 0 26px rgba(255,61,154,.3)' }}
             >
               {loading ? 'Creating…' : 'Create Login & Open App'}
             </button>

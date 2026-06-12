@@ -238,13 +238,33 @@ export function SwitchAppModal({ onClose }: SwitchAppModalProps) {
   const linkedMap = new Map(linked.map(a => [a.shop_type, a]));
   const currentType = config?.shop_type;
 
+  // [core] [all apps] [all tenants] — frontstores.com spectrum design: the
+  // modal carries its own colour system (inline CSS vars) so it looks the
+  // same premium way in every app and both light/dark themes.
+  const SPEC = 'linear-gradient(110deg, #ffb73d, #ff5e62 26%, #ff3d9a 50%, #8b5cf6 74%, #06d6f9)';
+  const specVars = {
+    '--bg': '#18131f',
+    '--surface': 'rgba(41,33,58,.72)',
+    '--surface-2': 'rgba(36,29,53,.92)',
+    '--surface-border': 'rgba(255,255,255,.14)',
+    '--text-primary': '#fdfcff',
+    '--text-secondary': '#d3cce2',
+    '--text-tertiary': '#9b91b4',
+  } as React.CSSProperties;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
-      <div className="rounded-2xl overflow-hidden shadow-2xl" style={{ width: '90%', background: 'var(--bg)', border: '1px solid var(--surface-border)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(10,6,18,0.72)', backdropFilter: 'blur(8px)' }}>
+      <div className="rounded-2xl overflow-hidden shadow-2xl" style={{ ...specVars, width: '90%',
+        background: `radial-gradient(ellipse 70% 50% at 10% -5%, rgba(255,94,98,.26), transparent 60%),
+          radial-gradient(ellipse 60% 45% at 95% 0%, rgba(255,61,154,.24), transparent 60%),
+          radial-gradient(ellipse 55% 45% at 95% 90%, rgba(139,92,246,.26), transparent 62%),
+          radial-gradient(ellipse 55% 45% at 5% 100%, rgba(6,214,249,.18), transparent 60%),
+          #18131f`,
+        border: '1px solid rgba(255,255,255,.14)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: 'var(--surface-border)' }}>
           <div>
-            <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Switch App</h2>
+            <h2 className="text-xl font-bold" style={{ color: '#fff' }}>Switch <span style={{ background: SPEC, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>App</span></h2>
             <p className="text-sm mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
               Each app has its own login and its own data · New apps need admin approval
             </p>

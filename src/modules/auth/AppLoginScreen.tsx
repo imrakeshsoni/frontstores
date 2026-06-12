@@ -10,6 +10,15 @@ import { toast } from 'sonner';
 
 type Screen = 'login' | 'forgot' | 'reset-code' | 'pin-reset' | 'locked' | 'unlock-code';
 
+// [core] [all apps] [all tenants] — the frontstores.com spectrum brand system
+export const SPEC_GRADIENT = 'linear-gradient(110deg, #ffb73d, #ff5e62 26%, #ff3d9a 50%, #8b5cf6 74%, #06d6f9)';
+export const SPEC_BG = `radial-gradient(ellipse 62% 48% at 12% -4%, rgba(255,94,98,.32), transparent 60%),
+  radial-gradient(ellipse 60% 44% at 88% -2%, rgba(255,61,154,.3), transparent 60%),
+  radial-gradient(ellipse 52% 40% at 96% 48%, rgba(139,92,246,.32), transparent 62%),
+  radial-gradient(ellipse 52% 40% at 2% 60%, rgba(6,214,249,.22), transparent 60%),
+  radial-gradient(ellipse 80% 50% at 50% 112%, rgba(255,183,61,.24), transparent 62%),
+  #18131f`;
+
 function minutesLeft(lockedUntil: string): number {
   return Math.max(1, Math.ceil((new Date(lockedUntil).getTime() - Date.now()) / 60_000));
 }
@@ -133,14 +142,17 @@ export function AppLoginScreen() {
       if (saved) setStudyColors({ accent: saved.accent, bg: saved.bg });
     });
   }, [shopType]);
-  const theme: AppTheme = shopType === 'study' && studyColors ? {
+  void studyColors; // superseded by the unified brand design below
+  // [core] [all apps] [all tenants] — unified FrontStores spectrum design:
+  // the login screen matches frontstores.com for every app. Per-app icon and
+  // tagline remain; colours are one premium brand system.
+  const theme: AppTheme = {
     ...baseTheme,
-    bgFrom: studyColors.bg, bgTo: studyColors.bg,
-    accent: studyColors.accent, accentDark: studyColors.accent,
-    cardBg: `${studyColors.bg}ee`,
-    cardBorder: `${studyColors.accent}40`,
-    inputBg: `${studyColors.bg}cc`,
-  } : baseTheme;
+    bgFrom: '#18131f', bgTo: '#18131f',
+    accent: '#ff3d9a', accentDark: '#8b5cf6', accentLight: '#ffb73d',
+    cardBg: 'rgba(41,33,58,.72)', cardBorder: 'rgba(255,255,255,.16)',
+    inputBg: 'rgba(36,29,53,.92)', labelColor: '#d3cce2',
+  };
 
   const [screen, setScreen]       = useState<Screen>('login');
   const [username, setUsername]   = useState('');
@@ -334,8 +346,8 @@ export function AppLoginScreen() {
   };
 
   const btnPrimary: React.CSSProperties = {
-    background: `linear-gradient(135deg, ${theme.accent}, ${theme.accentDark})`,
-    color: 'white',
+    background: SPEC_GRADIENT,
+    color: '#1b0a14',
     border: 'none',
     borderRadius: '12px',
     padding: '11px 0',
@@ -343,33 +355,29 @@ export function AppLoginScreen() {
     fontWeight: 700,
     fontSize: '14px',
     cursor: 'pointer',
-    boxShadow: `0 4px 20px ${theme.accent}40`,
+    boxShadow: '0 0 26px rgba(255,61,154,.3), 0 6px 24px rgba(255,183,61,.2)',
   };
 
   return (
     <div
       className="min-h-screen flex items-center justify-center p-4"
-      style={{ background: `linear-gradient(135deg, ${theme.bgFrom} 0%, ${theme.bgTo} 100%)` }}
+      style={{ background: SPEC_BG }}
     >
-      {/* Decorative glow */}
-      <div style={{
-        position: 'fixed', top: '-20%', left: '50%', transform: 'translateX(-50%)',
-        width: '600px', height: '600px', borderRadius: '50%',
-        background: `radial-gradient(circle, ${theme.accent}18 0%, transparent 70%)`,
-        pointerEvents: 'none',
-      }} />
-
       <div className="w-full max-w-sm relative">
         {/* App logo + name */}
         <div className="text-center mb-8">
           <div
             className="inline-flex items-center justify-center w-20 h-20 rounded-3xl text-4xl mb-4 shadow-2xl"
-            style={{ background: `linear-gradient(135deg, ${theme.accent}30, ${theme.accentDark}50)`, border: `2px solid ${theme.accent}50` }}
+            style={{ background: 'rgba(41,33,58,.8)', border: '2px solid rgba(255,61,154,.45)', boxShadow: '0 0 34px rgba(255,61,154,.25)' }}
           >
             {theme.icon}
           </div>
           <h1 className="text-2xl font-bold text-white tracking-tight">{shopName}</h1>
           <p className="text-sm mt-1 font-medium" style={{ color: theme.accentLight }}>{theme.tagline}</p>
+          <p className="text-xs mt-2 font-bold tracking-tight">
+            <span style={{ color: '#fff' }}>Front</span>
+            <span style={{ background: SPEC_GRADIENT, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>Stores</span>
+          </p>
         </div>
 
         {/* ── LOGIN ── */}
