@@ -515,6 +515,9 @@ export async function syncWaLeadsFromServer(tenantId: string, ownerName = ''): P
       [tenantId, sl.from_phone]
     );
     if (!inbox) {
+      // [crm] [all tenants] — already imported once on some device: the user may have
+      // deleted it locally. Re-importing would resurrect deleted leads on every poll.
+      if (sl.imported) continue;
       const inboxId = await upsertCRMWaLead(tenantId, {
         from_phone: sl.from_phone,
         from_name: sl.from_name || '',

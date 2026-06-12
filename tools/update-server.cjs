@@ -141,6 +141,32 @@ async function sendWaMessage(phoneId, token, to, text) {
   });
 }
 
+// [website] [tenant: FrontStores.com] — WhatsApp OTP store for the website contact
+// form. Keyed by normalized phone. Max 2 OTP sends per number per 15 minutes,
+// 5-minute code expiry, max 5 wrong attempts per code. In-memory: a server restart
+// just means the visitor requests a fresh code.
+const contactOtps = new Map();
+const OTP_WINDOW_MS = 15 * 60 * 1000;
+const OTP_TTL_MS = 5 * 60 * 1000;
+const OTP_MAX_SENDS = 2;
+const OTP_MAX_ATTEMPTS = 5;
+
+function normalizeIndianPhone(raw) {
+  const d = String(raw || '').replace(/\D/g, '');
+  if (d.length === 10) return '91' + d;
+  if (d.length === 12 && d.startsWith('91')) return d;
+  return null;
+}
+
+// The website's leads land in the FrontStores.com CRM tenant (it owns the WA API creds)
+function websiteCrmTenantId() {
+  const subs = loadSubs();
+  const creds = loadWaCreds();
+  return Object.keys(subs).find(id => subs[id].shop_type === 'crm' && subs[id].shop_name === 'FrontStores.com')
+      || Object.keys(subs).find(id => subs[id].shop_type === 'crm' && creds[id])
+      || null;
+}
+
 // [crm] [all tenants] — every tenant runs their own WhatsApp bot on their own
 // number. A lead record is created the moment the first message arrives (not
 // after the bot finishes), updated progressively as the customer answers each
@@ -749,26 +775,115 @@ const publicServer = http.createServer(async (req, res) => {
     return;
   }
 
-  // POST /contact — website inquiry form — max 5 per IP per 15 minutes
-  if (req.method === 'POST' && pathname === '/contact') {
-    if (rateLimit(req, res, 'contact', 5, 15 * 60 * 1000)) return;
+  // [website] [tenant: FrontStores.com] — contact form step 1: validate all fields,
+  // send OTP to the visitor's WhatsApp via the FrontStores.com CRM tenant's WA API.
+  if (req.method === 'POST' && pathname === '/contact/request-otp') {
+    if (rateLimit(req, res, 'contact-otp', 6, OTP_WINDOW_MS)) return;
     const body = await readBody(req);
     try {
       const { name, shop_type, mobile, email, message } = JSON.parse(body);
-      if (!mobile || !email) { res.writeHead(400); res.end('Mobile and email are required'); return; }
+      // every field is mandatory
+      const missing = [
+        !String(name || '').trim() && 'name',
+        !String(shop_type || '').trim() && 'business type',
+        !String(mobile || '').trim() && 'mobile',
+        !String(email || '').trim() && 'email',
+        !String(message || '').trim() && 'message',
+      ].filter(Boolean);
+      if (missing.length) { res.writeHead(400); res.end(`Required: ${missing.join(', ')}`); return; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) { res.writeHead(400); res.end('Invalid email address'); return; }
+      const phone = normalizeIndianPhone(mobile);
+      if (!phone) { res.writeHead(400); res.end('Enter a valid 10-digit Indian mobile number'); return; }
+
+      // lazy purge of stale entries
+      for (const [k, v] of contactOtps) { if (Date.now() - v.windowStart > OTP_WINDOW_MS) contactOtps.delete(k); }
+
+      let entry = contactOtps.get(phone);
+      if (entry && entry.sends >= OTP_MAX_SENDS) {
+        res.writeHead(429); res.end('Maximum OTP requests reached for this number. Try again after 15 minutes.'); return;
+      }
+      const tenantId = websiteCrmTenantId();
+      const creds = tenantId ? loadWaCreds()[tenantId] : null;
+      if (!creds) { res.writeHead(503); res.end('Verification is temporarily unavailable.'); return; }
+
+      const otp = String(crypto.randomInt(100000, 1000000));
+      const sent = await sendWaMessage(creds.phone_id, creds.token, phone,
+        `Your FrontStores verification code is ${otp}. It expires in 5 minutes.`);
+      entry = {
+        otp,
+        expires: Date.now() + OTP_TTL_MS,
+        windowStart: entry ? entry.windowStart : Date.now(),
+        sends: (entry ? entry.sends : 0) + 1, // failed sends count too — caps WA API triggering
+        attempts: 0,
+        form: {
+          name:      sanitize(name,      100),
+          shop_type: sanitize(shop_type,  50),
+          mobile:    phone,
+          email:     sanitize(email,     200),
+          message:   sanitize(message,  1000),
+        },
+      };
+      contactOtps.set(phone, entry);
+      if (!sent || sent.status < 200 || sent.status >= 300) {
+        res.writeHead(502); res.end('Could not reach that number on WhatsApp. Check the number and try again.'); return;
+      }
+      console.log(`📲 Contact OTP sent to ${phone} (send ${entry.sends}/${OTP_MAX_SENDS})`);
+      json(res, { ok: true, sends_left: OTP_MAX_SENDS - entry.sends });
+    } catch { res.writeHead(400); res.end('Bad request'); }
+    return;
+  }
+
+  // [website] [tenant: FrontStores.com] — contact form step 2: verify OTP; only then
+  // save the contact and create a lead in the FrontStores.com CRM via wa-leads sync.
+  if (req.method === 'POST' && pathname === '/contact/verify-otp') {
+    if (rateLimit(req, res, 'contact-verify', 20, OTP_WINDOW_MS)) return;
+    const body = await readBody(req);
+    try {
+      const { mobile, otp } = JSON.parse(body);
+      const phone = normalizeIndianPhone(mobile);
+      const entry = phone ? contactOtps.get(phone) : null;
+      if (!entry) { res.writeHead(400); res.end('No OTP requested for this number.'); return; }
+      if (Date.now() > entry.expires) { contactOtps.delete(phone); res.writeHead(400); res.end('Code expired. Request a new one.'); return; }
+      if (entry.attempts >= OTP_MAX_ATTEMPTS) { contactOtps.delete(phone); res.writeHead(429); res.end('Too many wrong attempts.'); return; }
+      if (String(otp || '').trim() !== entry.otp) {
+        entry.attempts++;
+        res.writeHead(400); res.end('Incorrect code. Check your WhatsApp and try again.'); return;
+      }
+      contactOtps.delete(phone);
+      const f = entry.form;
+
       const contacts = loadContacts();
       contacts.unshift({
         id: crypto.randomBytes(8).toString('hex'),
-        name:      sanitize(name,      100),
-        shop_type: sanitize(shop_type,  50),
-        mobile:    sanitize(mobile,     20),
-        email:     sanitize(email,     200),
-        message:   sanitize(message,  1000),
+        ...f,
+        verified: true,
         received_at: new Date().toISOString(),
         resolved: false,
       });
       saveContacts(contacts.slice(0, 1000));
-      console.log(`📩 Contact: ${sanitize(name,30)} (${sanitize(mobile,20)}) — ${sanitize(shop_type,30)}`);
+
+      // create the CRM lead — the FrontStores.com app picks it up via /api/wa-leads polling
+      const tenantId = websiteCrmTenantId();
+      if (tenantId) {
+        const leads = loadWaLeads();
+        leads.push({
+          id: crypto.randomUUID(),
+          tenant_id: tenantId,
+          from_phone: f.mobile,
+          from_name: f.name,
+          company: '',
+          business_type: f.shop_type,
+          software_interest: f.shop_type,
+          assigned_to: loadSubs()[tenantId]?.owner_name || '',
+          message_preview: `Website enquiry (WhatsApp-verified): ${f.message} | Email: ${f.email}`,
+          source: 'website',
+          received_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          imported: false,
+        });
+        saveWaLeads(leads);
+      }
+      console.log(`📩 Verified contact → CRM lead: ${f.name} (${f.mobile}) — ${f.shop_type}`);
       json(res, { ok: true });
     } catch { res.writeHead(400); res.end('Bad request'); }
     return;
@@ -1939,11 +2054,13 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
     json(res, { ok: true }); return;
   }
 
-  // [crm] [all tenants] — Get pending WA leads for the app to sync
+  // [crm] [all tenants] — Get pending WA leads for the app to sync.
+  // Only serve leads not yet imported: older app builds re-import everything they're
+  // given, which resurrected leads the user had deleted.
   if (req.method === 'GET' && pathname.startsWith('/api/wa-leads/')) {
     const tenantId = pathname.split('/')[3];
     if (!tenantId) { res.writeHead(400); res.end('bad request'); return; }
-    const leads = loadWaLeads().filter(l => l.tenant_id === tenantId);
+    const leads = loadWaLeads().filter(l => l.tenant_id === tenantId && !l.imported);
     json(res, { leads }); return;
   }
 
