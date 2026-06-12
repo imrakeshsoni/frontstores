@@ -1,227 +1,463 @@
 <!DOCTYPE html>
-<!-- [website] [tenant: FrontStores.com] — minimal premium redesign. No pricing, no company
-     contact details. Contact form: all fields mandatory, WhatsApp OTP verified (max 2 sends),
-     verified submissions become leads in the FrontStores.com CRM. -->
+<!-- [website] [tenant: FrontStores.com] — cinematic 3D holographic redesign.
+     Positioning: we build ALL software — offline desktop (data never leaves),
+     cloud web apps, Android/iPhone, fully customized. No company contact
+     details anywhere. Contact form: all fields mandatory + WhatsApp OTP,
+     verified submissions become CRM leads. -->
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>FrontStores</title>
-<meta name="description" content="World-class offline software for Indian businesses. Your data never leaves your machine." />
+<title>FrontStores — Software, Engineered Like Cinema</title>
+<meta name="description" content="Offline desktop apps, cloud web apps, Android & iPhone apps — fully customized software for your business. Your data, your rules." />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #fafafa;
-    --text: #0d0e12;
-    --muted: #5c6370;
-    --dim: #9aa1ad;
-    --line: rgba(13,14,18,.09);
-    --accent1: #6d5bf5;
-    --accent2: #1f9de0;
-    --grad: linear-gradient(100deg, var(--accent1), var(--accent2));
-    --green: #16a34a;
+    --bg: #03040a;
+    --text: #eef1f7;
+    --muted: #8b93a5;
+    --dim: #545c6e;
+    --line: rgba(140,160,255,.14);
+    --holo1: #00e5ff;
+    --holo2: #7b5cff;
+    --holo3: #ff4ecd;
+    --holo4: #34f5c5;
+    --holo: linear-gradient(110deg, var(--holo1), var(--holo2) 38%, var(--holo3) 72%, var(--holo4));
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html { scroll-behavior: smooth; }
   body {
     background: var(--bg); color: var(--text);
-    font-family: 'Inter', sans-serif;
-    -webkit-font-smoothing: antialiased;
+    font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
   }
-  ::selection { background: rgba(109,91,245,.22); }
+  ::selection { background: rgba(123,92,255,.45); }
   a { color: inherit; text-decoration: none; }
-  h1, h2 { font-family: 'Sora', sans-serif; letter-spacing: -.035em; }
-
-  .glow {
-    position: fixed; z-index: -1; pointer-events: none;
-    width: 900px; height: 900px; border-radius: 50%;
-    top: -480px; left: 50%; transform: translateX(-50%);
-    background: radial-gradient(circle, rgba(109,91,245,.12), transparent 65%);
+  h1,h2,h3 { font-family: 'Sora', sans-serif; letter-spacing: -.03em; }
+  .holo-text {
+    background: var(--holo); background-size: 300% auto;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: holoflow 7s linear infinite;
   }
+  @keyframes holoflow { to { background-position: 300% center; } }
 
+  /* ════════ CINEMATIC INTRO ════════ */
+  #intro {
+    position: fixed; inset: 0; z-index: 1000; background: #000;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: opacity 1.1s ease, visibility 1.1s;
+  }
+  #intro.done { opacity: 0; visibility: hidden; }
+  .bar { position: absolute; left: 0; right: 0; height: 11vh; background: #000; z-index: 3; transition: transform 1.4s cubic-bezier(.7,0,.2,1); }
+  .bar.top { top: 0; } .bar.bot { bottom: 0; }
+  #intro.open .bar.top { transform: translateY(-100%); }
+  #intro.open .bar.bot { transform: translateY(100%); }
+  .intro-stage { text-align: center; position: relative; z-index: 2; }
+  .intro-presents {
+    font-family: 'JetBrains Mono', monospace; font-size: clamp(10px, 1.4vw, 13px);
+    letter-spacing: .55em; text-transform: uppercase; color: var(--dim);
+    opacity: 0; animation: introFade 1.2s .4s ease forwards;
+  }
+  .intro-title {
+    margin-top: 22px; font-family: 'Sora', sans-serif; font-weight: 800;
+    font-size: clamp(2.6rem, 9vw, 7rem); letter-spacing: -.02em; line-height: 1;
+    opacity: 0; transform: scale(.86);
+    animation: introZoom 2.2s 1.1s cubic-bezier(.16,1,.3,1) forwards;
+    position: relative;
+  }
+  .intro-title .holo-text { filter: drop-shadow(0 0 34px rgba(123,92,255,.55)); }
+  .intro-sweep {
+    position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+  }
+  .intro-sweep::after {
+    content: ''; position: absolute; top: 0; bottom: 0; width: 36%; left: -50%;
+    background: linear-gradient(100deg, transparent, rgba(255,255,255,.5), transparent);
+    transform: skewX(-18deg);
+    animation: sweep 1.5s 2.4s ease forwards;
+  }
+  @keyframes sweep { to { left: 130%; } }
+  .intro-tag {
+    margin-top: 26px; font-size: clamp(.8rem, 1.6vw, 1rem); color: var(--muted);
+    letter-spacing: .25em; text-transform: uppercase;
+    opacity: 0; animation: introFade 1.4s 2.8s ease forwards;
+  }
+  .intro-skip {
+    position: absolute; bottom: 14vh; left: 50%; transform: translateX(-50%);
+    font-size: 11px; color: var(--dim); letter-spacing: .2em; text-transform: uppercase;
+    opacity: 0; animation: introFade 1s 2s ease forwards; z-index: 4;
+  }
+  @keyframes introFade { to { opacity: 1; } }
+  @keyframes introZoom { to { opacity: 1; transform: scale(1); } }
+  @media (prefers-reduced-motion: reduce) { #intro { display: none; } }
+
+  /* ════════ AMBIENT FX ════════ */
+  #webgl { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+  .scanlines {
+    position: fixed; inset: 0; z-index: 2; pointer-events: none; opacity: .05;
+    background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(160,200,255,.6) 2px 3px);
+    mix-blend-mode: overlay;
+  }
+  .vignette { position: fixed; inset: 0; z-index: 2; pointer-events: none;
+    background: radial-gradient(ellipse 95% 85% at 50% 45%, transparent 55%, rgba(0,0,5,.75)); }
+  main { position: relative; z-index: 5; }
+
+  /* ════════ NAV ════════ */
   nav {
-    position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+    position: fixed; top: 0; left: 0; right: 0; z-index: 60;
     display: flex; align-items: center; justify-content: space-between;
-    padding: 26px clamp(24px, 6vw, 72px);
-    background: linear-gradient(rgba(250,250,250,.9), transparent);
+    padding: 22px clamp(22px, 5vw, 64px);
+    background: linear-gradient(rgba(3,4,10,.9), transparent);
   }
-  .logo { font-family: 'Sora', sans-serif; font-weight: 800; font-size: 18px; letter-spacing: -.02em; }
-  .logo em { font-style: normal; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
-  .nav-r { display: flex; gap: 32px; font-size: 14px; color: var(--muted); }
-  .nav-r a:hover { color: var(--text); }
+  .logo { font-family: 'Sora', sans-serif; font-weight: 800; font-size: 19px; letter-spacing: -.01em;
+    text-shadow: 0 0 26px rgba(0,229,255,.35); }
+  .nav-links { display: flex; gap: 30px; font-size: 13px; color: var(--muted); letter-spacing: .04em; }
+  .nav-links a { transition: color .25s, text-shadow .25s; }
+  .nav-links a:hover { color: #fff; text-shadow: 0 0 14px rgba(0,229,255,.8); }
+  @media (max-width: 720px) { .nav-links { display: none; } }
 
+  /* ════════ HERO ════════ */
   .hero {
     min-height: 100svh; display: flex; flex-direction: column;
     align-items: center; justify-content: center; text-align: center;
-    padding: 0 24px;
+    padding: 120px 24px 80px; position: relative; perspective: 1200px;
+  }
+  .hero-chip {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .4em;
+    text-transform: uppercase; color: var(--holo1);
+    border: 1px solid rgba(0,229,255,.3); border-radius: 100px; padding: 9px 22px;
+    background: rgba(0,229,255,.05); box-shadow: 0 0 30px rgba(0,229,255,.12) inset, 0 0 24px rgba(0,229,255,.1);
   }
   .hero h1 {
-    font-size: clamp(2.8rem, 8vw, 6.2rem); font-weight: 800; line-height: 1.02;
-    animation: rise 1s ease both;
+    margin-top: 34px; font-size: clamp(2.6rem, 7.6vw, 6rem); font-weight: 800; line-height: 1.03;
+    transform-style: preserve-3d;
   }
-  .hero h1 .grad { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
-  .hero p {
-    margin-top: 28px; font-size: clamp(1rem, 1.5vw, 1.18rem); color: var(--muted);
-    max-width: 480px; line-height: 1.7; animation: rise 1s .15s ease both;
+  .hero h1 .ghost { color: var(--text); text-shadow: 0 0 60px rgba(123,92,255,.3); }
+  .hero-sub { margin-top: 26px; max-width: 640px; font-size: clamp(.98rem, 1.6vw, 1.16rem); line-height: 1.75; color: var(--muted); }
+  .hero-sub b { color: var(--text); font-weight: 600; }
+  .hero-cta { margin-top: 44px; display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+  .btn-holo {
+    position: relative; display: inline-flex; align-items: center; gap: 10px;
+    font-weight: 700; font-size: 15px; padding: 17px 38px; border-radius: 14px;
+    color: #021018; background: var(--holo); background-size: 250% auto;
+    border: none; cursor: pointer; font-family: 'Inter', sans-serif;
+    box-shadow: 0 0 38px rgba(0,229,255,.35), 0 10px 40px rgba(123,92,255,.35);
+    transition: transform .25s, box-shadow .25s; animation: holoflow 5s linear infinite;
   }
-  .hero-cta { margin-top: 48px; display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; animation: rise 1s .3s ease both; }
-  .btn {
-    display: inline-flex; align-items: center; gap: 9px;
-    font-weight: 600; font-size: 15px; padding: 17px 36px; border-radius: 100px;
-    background: var(--text); color: #fff; border: none; cursor: pointer;
-    font-family: 'Inter', sans-serif;
-    transition: transform .25s, box-shadow .25s;
+  .btn-holo:hover { transform: translateY(-3px) scale(1.02); box-shadow: 0 0 60px rgba(0,229,255,.55), 0 18px 60px rgba(123,92,255,.5); }
+  .btn-holo:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+  .btn-wire {
+    display: inline-flex; align-items: center; gap: 9px; font-weight: 500; font-size: 15px;
+    padding: 17px 32px; border-radius: 14px; color: var(--text);
+    border: 1px solid var(--line); background: rgba(10,14,30,.45); backdrop-filter: blur(8px);
+    transition: border-color .25s, box-shadow .25s;
   }
-  .btn:hover { transform: translateY(-2px); box-shadow: 0 14px 36px rgba(13,14,18,.25); }
-  .btn:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
-  .btn-line {
-    display: inline-flex; align-items: center; gap: 8px;
-    font-weight: 500; font-size: 15px; padding: 17px 32px; border-radius: 100px;
-    border: 1px solid var(--line); color: var(--muted); background: transparent;
-    transition: border-color .25s, color .25s;
-  }
-  .btn-line:hover { border-color: rgba(13,14,18,.35); color: var(--text); }
-  .hero-foot {
-    margin-top: 88px; font-size: 13px; color: var(--dim); letter-spacing: .08em;
-    text-transform: uppercase; animation: rise 1s .45s ease both;
-  }
-  .hero-foot b { color: var(--muted); font-weight: 600; }
-  .hero-foot span { margin: 0 14px; opacity: .4; }
-  @keyframes rise { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: none; } }
+  .btn-wire:hover { border-color: rgba(0,229,255,.5); box-shadow: 0 0 28px rgba(0,229,255,.18); }
+  .hero-stats { margin-top: 76px; display: flex; gap: clamp(26px, 6vw, 72px); flex-wrap: wrap; justify-content: center; }
+  .hstat { text-align: center; }
+  .hstat b { display: block; font-family: 'Sora', sans-serif; font-size: clamp(1.5rem, 3vw, 2.2rem); font-weight: 800; }
+  .hstat span { font-size: 11px; letter-spacing: .22em; text-transform: uppercase; color: var(--dim); }
+  .scroll-hint { position: absolute; bottom: 26px; left: 50%; transform: translateX(-50%);
+    font-size: 10px; letter-spacing: .3em; text-transform: uppercase; color: var(--dim); animation: bob 2.4s ease-in-out infinite; }
+  @keyframes bob { 50% { transform: translate(-50%, 8px); } }
 
-  section { padding: 130px 24px; }
-  .wrap { max-width: 680px; margin: 0 auto; text-align: center; }
-  .sec-title { font-size: clamp(1.9rem, 4vw, 2.9rem); font-weight: 800; line-height: 1.1; }
-  .sec-sub { margin-top: 16px; color: var(--muted); font-size: 1.02rem; line-height: 1.7; }
-
-  .reveal { opacity: 0; transform: translateY(30px); transition: opacity .9s ease, transform .9s ease; }
+  /* ════════ SECTIONS ════════ */
+  section { padding: 130px 24px; position: relative; }
+  .wrap { max-width: 1140px; margin: 0 auto; }
+  .eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .45em;
+    text-transform: uppercase; color: var(--holo1); }
+  .sec-title { margin-top: 18px; font-size: clamp(1.9rem, 4.6vw, 3.4rem); font-weight: 800; line-height: 1.08; }
+  .sec-sub { margin-top: 18px; color: var(--muted); font-size: 1.04rem; line-height: 1.75; max-width: 640px; }
+  .center { text-align: center; }
+  .center .sec-sub { margin-left: auto; margin-right: auto; }
+  .reveal { opacity: 0; transform: translateY(46px) rotateX(8deg); transform-origin: 50% 100%;
+    transition: opacity .9s ease, transform .9s cubic-bezier(.16,1,.3,1); }
   .reveal.in { opacity: 1; transform: none; }
 
-  /* download */
-  .dl-list { margin-top: 52px; display: flex; flex-direction: column; gap: 2px; border-top: 1px solid var(--line); }
-  .dl-row {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 24px 8px; border-bottom: 1px solid var(--line);
-    transition: padding .25s, background .25s;
+  /* ════════ 3D OFFER CARDS ════════ */
+  .offer-grid { margin-top: 70px; display: grid; grid-template-columns: repeat(auto-fit, minmax(255px, 1fr)); gap: 22px; perspective: 1400px; }
+  .o-card {
+    position: relative; border-radius: 22px; padding: 2px; transform-style: preserve-3d;
+    background: linear-gradient(140deg, rgba(0,229,255,.45), rgba(123,92,255,.25) 45%, rgba(255,78,205,.35));
+    transition: transform .18s ease-out; will-change: transform;
   }
-  .dl-row:hover { background: rgba(13,14,18,.03); padding-left: 18px; padding-right: 14px; }
-  .dl-row-l { display: flex; align-items: center; gap: 16px; text-align: left; }
-  .dl-os { font-family: 'Sora', sans-serif; font-weight: 700; font-size: 1rem; }
-  .dl-meta { font-size: .8rem; color: var(--dim); margin-top: 3px; }
-  .dl-arrow { color: var(--dim); font-size: 1.1rem; transition: color .25s, transform .25s; }
-  .dl-row:hover .dl-arrow { color: var(--text); transform: translateY(2px); }
-  .dl-version { margin-top: 26px; font-size: 12.5px; color: var(--dim); }
-  .install-note {
-    display: none; margin: 26px auto 0; text-align: left;
-    border: 1px solid var(--line); border-radius: 14px; padding: 20px 24px;
-    font-size: .88rem; line-height: 1.7; color: var(--muted); background: #fff;
+  .o-card-inner {
+    border-radius: 20px; padding: 36px 30px; height: 100%;
+    background: linear-gradient(165deg, rgba(13,18,38,.96), rgba(5,7,18,.98));
+    transform-style: preserve-3d; position: relative; overflow: hidden;
   }
-  .install-note strong { color: var(--text); }
-  .install-note code {
-    display: inline-block; background: rgba(13,14,18,.06); border-radius: 7px;
-    padding: 3px 10px; font-size: .82rem; color: #0b6aa8; margin: 4px 0;
+  .o-card-inner::before {
+    content: ''; position: absolute; inset: 0; opacity: 0; transition: opacity .4s;
+    background: radial-gradient(500px circle at var(--mx,50%) var(--my,0%), rgba(0,229,255,.14), transparent 65%);
   }
+  .o-card:hover .o-card-inner::before { opacity: 1; }
+  .o-ico {
+    width: 60px; height: 60px; border-radius: 16px; display: grid; place-items: center; font-size: 28px;
+    background: rgba(0,229,255,.08); border: 1px solid rgba(0,229,255,.25);
+    box-shadow: 0 0 26px rgba(0,229,255,.14); transform: translateZ(46px);
+  }
+  .o-card h3 { margin-top: 22px; font-size: 1.28rem; font-weight: 700; transform: translateZ(34px); }
+  .o-card p { margin-top: 12px; font-size: .93rem; line-height: 1.7; color: var(--muted); transform: translateZ(22px); }
+  .o-foot { margin-top: 18px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px;
+    letter-spacing: .2em; text-transform: uppercase; transform: translateZ(28px); }
 
-  /* contact */
-  .form { margin-top: 52px; display: flex; flex-direction: column; gap: 14px; text-align: left; }
-  .f-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  /* ════════ CHOICE PANEL ════════ */
+  .choice { margin-top: 70px; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; perspective: 1400px; }
+  @media (max-width: 800px) { .choice { grid-template-columns: 1fr; } }
+  .c-side {
+    border-radius: 22px; padding: 44px 38px; border: 1px solid var(--line);
+    background: rgba(8,11,26,.7); backdrop-filter: blur(10px); position: relative; overflow: hidden;
+    transition: transform .18s ease-out, border-color .3s; transform-style: preserve-3d; will-change: transform;
+  }
+  .c-side:hover { border-color: rgba(0,229,255,.4); }
+  .c-side h3 { font-size: 1.5rem; font-weight: 800; transform: translateZ(30px); }
+  .c-side .c-big { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .3em;
+    text-transform: uppercase; color: var(--holo4); }
+  .c-side ul { margin-top: 22px; list-style: none; display: flex; flex-direction: column; gap: 13px; transform: translateZ(18px); }
+  .c-side li { display: flex; gap: 12px; font-size: .95rem; color: #c6ccdb; line-height: 1.55; }
+  .c-side li::before { content: '◆'; color: var(--holo1); font-size: 10px; margin-top: 5px; flex-shrink: 0;
+    text-shadow: 0 0 10px var(--holo1); }
+
+  /* ════════ CAPABILITY MARQUEE ════════ */
+  .cap-band { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    padding: 26px 0; overflow: hidden; background: rgba(6,9,22,.6);
+    mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent); }
+  .cap-track { display: flex; gap: 54px; width: max-content; animation: capscroll 44s linear infinite; }
+  .cap-track span { font-family: 'JetBrains Mono', monospace; font-size: 13px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--dim); white-space: nowrap; }
+  .cap-track span i { font-style: normal; color: var(--holo2); margin-right: 10px; text-shadow: 0 0 12px var(--holo2); }
+  @keyframes capscroll { to { transform: translateX(-50%); } }
+
+  /* ════════ DOWNLOAD ════════ */
+  .dl-grid { margin-top: 60px; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; perspective: 1200px; }
+  .dl-card {
+    border-radius: 18px; padding: 34px 26px; text-align: center; cursor: pointer;
+    border: 1px solid var(--line); background: rgba(8,11,26,.7); backdrop-filter: blur(8px);
+    transition: transform .2s, border-color .3s, box-shadow .3s;
+  }
+  .dl-card:hover { transform: translateY(-6px); border-color: rgba(0,229,255,.45); box-shadow: 0 0 36px rgba(0,229,255,.16); }
+  .dl-ico { font-size: 34px; filter: drop-shadow(0 0 14px rgba(0,229,255,.4)); }
+  .dl-name { margin-top: 14px; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 1rem; }
+  .dl-meta { margin-top: 5px; font-size: .78rem; color: var(--dim); }
+  .dl-get { margin-top: 16px; display: inline-block; font-size: 12.5px; font-weight: 700; letter-spacing: .06em; }
+  .dl-version { margin-top: 26px; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 11.5px; letter-spacing: .1em; color: var(--dim); }
+  .install-note { display: none; max-width: 640px; margin: 26px auto 0; text-align: left;
+    border: 1px solid var(--line); border-radius: 14px; padding: 20px 24px;
+    font-size: .88rem; line-height: 1.7; color: var(--muted); background: rgba(8,11,26,.85); }
+  .install-note strong { color: var(--text); }
+  .install-note code { display: inline-block; background: rgba(0,229,255,.08); border: 1px solid rgba(0,229,255,.2);
+    border-radius: 7px; padding: 3px 10px; font-family: 'JetBrains Mono', monospace; font-size: .8rem; color: var(--holo1); margin: 4px 0; }
+
+  /* ════════ CONTACT ════════ */
+  .form-wrap { max-width: 660px; margin: 0 auto; }
+  .form { margin-top: 54px; display: flex; flex-direction: column; gap: 15px; text-align: left; }
+  .f-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
   @media (max-width: 560px) { .f-row { grid-template-columns: 1fr; } }
   .inp, textarea.inp {
-    width: 100%; background: #fff; border: 1px solid var(--line);
-    border-radius: 12px; padding: 15px 18px; color: var(--text);
+    width: 100%; background: rgba(8,11,26,.8); border: 1px solid var(--line);
+    border-radius: 13px; padding: 16px 18px; color: var(--text);
     font-family: 'Inter', sans-serif; font-size: 14.5px; outline: none;
     transition: border-color .25s, box-shadow .25s;
   }
   .inp::placeholder { color: var(--dim); }
-  .inp:focus { border-color: rgba(109,91,245,.55); box-shadow: 0 0 0 4px rgba(109,91,245,.08); }
+  .inp:focus { border-color: rgba(0,229,255,.55); box-shadow: 0 0 0 4px rgba(0,229,255,.08), 0 0 24px rgba(0,229,255,.12); }
   textarea.inp { resize: vertical; min-height: 110px; }
-  .form .btn { margin-top: 10px; justify-content: center; }
+  .form .btn-holo { margin-top: 8px; justify-content: center; }
   .f-note { font-size: 12px; color: var(--dim); text-align: center; }
-  .f-error { display: none; font-size: 13.5px; color: #dc2626; text-align: center; }
-  .f-success { display: none; margin-top: 52px; }
-  .f-success .tick {
-    width: 64px; height: 64px; margin: 0 auto; border-radius: 50%;
-    display: grid; place-items: center; font-size: 28px;
-    background: rgba(22,163,74,.08); border: 1px solid rgba(22,163,74,.3); color: var(--green);
-  }
-  .f-success h3 { font-family: 'Sora', sans-serif; margin-top: 22px; font-size: 1.3rem; }
-  .f-success p { margin-top: 10px; color: var(--muted); font-size: .95rem; }
-
-  /* otp step */
-  #otp-step { display: none; margin-top: 52px; }
-  .otp-sent { color: var(--muted); font-size: .95rem; line-height: 1.7; }
+  .f-error { display: none; font-size: 13.5px; color: #ff6b81; text-align: center; text-shadow: 0 0 12px rgba(255,80,120,.4); }
+  #otp-step { display: none; margin-top: 54px; text-align: center; }
+  .otp-sent { color: var(--muted); font-size: .96rem; line-height: 1.7; }
   .otp-sent b { color: var(--text); }
   .otp-input {
-    margin: 30px auto 0; display: block; width: 230px; text-align: center;
-    letter-spacing: 14px; font-size: 1.5rem; font-weight: 600;
-    background: #fff; border: 1px solid var(--line); border-radius: 14px;
-    padding: 16px 0 16px 14px; color: var(--text); outline: none; font-family: 'Sora', sans-serif;
+    margin: 30px auto 0; display: block; width: 250px; text-align: center;
+    letter-spacing: 16px; font-size: 1.6rem; font-weight: 600; font-family: 'JetBrains Mono', monospace;
+    background: rgba(8,11,26,.85); border: 1px solid var(--line); border-radius: 14px;
+    padding: 16px 0 16px 16px; color: var(--holo1); outline: none;
+    text-shadow: 0 0 16px rgba(0,229,255,.6);
   }
-  .otp-input:focus { border-color: rgba(109,91,245,.55); box-shadow: 0 0 0 4px rgba(109,91,245,.08); }
-  #otp-step .btn { margin-top: 26px; }
+  .otp-input:focus { border-color: rgba(0,229,255,.6); box-shadow: 0 0 30px rgba(0,229,255,.15); }
+  #otp-step .btn-holo { margin-top: 28px; }
   .otp-links { margin-top: 22px; font-size: 13px; color: var(--dim); }
   .otp-links a { color: var(--muted); border-bottom: 1px solid var(--line); cursor: pointer; }
-  .otp-links a:hover { color: var(--text); }
-  .otp-links a.off { opacity: .35; pointer-events: none; }
+  .otp-links a:hover { color: var(--holo1); }
+  .otp-links a.off { opacity: .3; pointer-events: none; }
+  .f-success { display: none; margin-top: 54px; text-align: center; }
+  .f-success .tick { width: 72px; height: 72px; margin: 0 auto; border-radius: 50%; display: grid; place-items: center;
+    font-size: 30px; color: var(--holo4); border: 1px solid rgba(52,245,197,.5);
+    background: rgba(52,245,197,.07); box-shadow: 0 0 44px rgba(52,245,197,.25); }
+  .f-success h3 { margin-top: 24px; font-size: 1.4rem; }
+  .f-success p { margin-top: 10px; color: var(--muted); font-size: .95rem; }
 
-  footer {
-    border-top: 1px solid var(--line); padding: 40px clamp(24px, 6vw, 72px);
-    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;
-  }
-  .f-copy { font-size: 12.5px; color: var(--dim); }
+  footer { position: relative; z-index: 5; border-top: 1px solid var(--line);
+    padding: 42px clamp(22px, 5vw, 64px); display: flex; align-items: center;
+    justify-content: space-between; flex-wrap: wrap; gap: 16px; background: rgba(3,4,10,.85); }
+  .f-copy { font-size: 12px; color: var(--dim); }
   @media (max-width: 560px) { footer { justify-content: center; } }
 </style>
 </head>
 <body>
 
-<div class="glow"></div>
+<!-- ════════ CINEMATIC INTRO ════════ -->
+<div id="intro">
+  <div class="bar top"></div>
+  <div class="bar bot"></div>
+  <div class="intro-stage">
+    <div class="intro-presents">A FrontStores Production</div>
+    <div class="intro-title">
+      <span class="holo-text">FRONTSTORES</span>
+      <div class="intro-sweep"></div>
+    </div>
+    <div class="intro-tag">Software, engineered like cinema</div>
+  </div>
+  <div class="intro-skip">Click anywhere to skip</div>
+</div>
 
+<canvas id="webgl"></canvas>
+<div class="scanlines"></div>
+<div class="vignette"></div>
+
+<main>
 <nav>
-  <a href="#" class="logo">Front<em>Stores</em></a>
-  <div class="nav-r">
+  <a href="#" class="logo">Front<span class="holo-text">Stores</span></a>
+  <div class="nav-links">
+    <a href="#build">What we build</a>
+    <a href="#choice">Your data, your rules</a>
     <a href="#download">Download</a>
-    <a href="#contact">Contact</a>
+    <a href="#contact">Start a project</a>
   </div>
 </nav>
 
 <!-- HERO -->
 <header class="hero">
-  <h1>Software your business<br><span class="grad">will never outgrow.</span></h1>
-  <p>Beautifully crafted apps for 30+ kinds of Indian businesses. Works fully offline. Your data never leaves your machine.</p>
+  <div class="hero-chip">DESKTOP · WEB · ANDROID · IPHONE · CUSTOM</div>
+  <h1>
+    <span class="ghost">Any software.</span><br>
+    <span class="holo-text">Any platform. Built for you.</span>
+  </h1>
+  <p class="hero-sub">From <b>100% offline desktop apps</b> where your data never leaves your machine, to <b>cloud web apps</b> you can open anywhere, to <b>Android &amp; iPhone apps</b> — we design, build and tailor software around <b>your</b> business. Not the other way around.</p>
   <div class="hero-cta">
-    <a href="#download" class="btn">Download</a>
-    <a href="#contact" class="btn-line">Talk to us</a>
+    <a href="#contact" class="btn-holo">Start your project ⚡</a>
+    <a href="#build" class="btn-wire">Explore ↓</a>
   </div>
-  <div class="hero-foot"><b>31 apps</b><span>·</span><b>100% offline</b><span>·</span><b>Zero cloud</b></div>
+  <div class="hero-stats">
+    <div class="hstat"><b class="holo-text">∞</b><span>Customization</span></div>
+    <div class="hstat"><b>4</b><span>Platforms</span></div>
+    <div class="hstat"><b>0</b><span>Forced cloud</span></div>
+    <div class="hstat"><b>100%</b><span>Tailor-made</span></div>
+  </div>
+  <div class="scroll-hint">Scroll</div>
 </header>
+
+<!-- WHAT WE BUILD -->
+<section id="build">
+  <div class="wrap center">
+    <div class="reveal">
+      <div class="eyebrow">// What we build</div>
+      <h2 class="sec-title">Every kind of software.<br><span class="holo-text">One obsession with quality.</span></h2>
+      <p class="sec-sub">Tell us what your business needs. We'll build it — on the platform that fits, with the features that matter, nothing you don't need.</p>
+    </div>
+    <div class="offer-grid">
+      <div class="o-card tilt reveal"><div class="o-card-inner">
+        <div class="o-ico">🖥️</div>
+        <h3>Desktop Apps</h3>
+        <p>Blazing-fast Windows &amp; Mac software that runs fully offline. Billing, inventory, reports — working even when the internet isn't.</p>
+        <div class="o-foot holo-text">// Local-first · Zero lag</div>
+      </div></div>
+      <div class="o-card tilt reveal"><div class="o-card-inner">
+        <div class="o-ico">🌐</div>
+        <h3>Cloud Web Apps</h3>
+        <p>Open from any browser, any device, anywhere. Multi-user, multi-branch, always in sync — hosted and managed for you.</p>
+        <div class="o-foot holo-text">// Anywhere access</div>
+      </div></div>
+      <div class="o-card tilt reveal"><div class="o-card-inner">
+        <div class="o-ico">📱</div>
+        <h3>Mobile Apps</h3>
+        <p>Native-feel Android and iPhone apps for you, your staff, and your customers — connected to your desktop or cloud system.</p>
+        <div class="o-foot holo-text">// Android + iOS</div>
+      </div></div>
+      <div class="o-card tilt reveal"><div class="o-card-inner">
+        <div class="o-ico">🛠️</div>
+        <h3>Fully Custom Builds</h3>
+        <p>Your workflow is unique — your software should be too. We add, remove and redesign features until it fits your business like a glove.</p>
+        <div class="o-foot holo-text">// Tailored end-to-end</div>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<!-- CAPABILITY BAND -->
+<div class="cap-band">
+  <div class="cap-track" id="cap-track">
+    <span><i>◆</i>Billing &amp; GST</span><span><i>◆</i>Inventory</span><span><i>◆</i>CRM &amp; Leads</span><span><i>◆</i>WhatsApp Automation</span><span><i>◆</i>Appointments</span><span><i>◆</i>Khata / Credit</span><span><i>◆</i>Multi-branch</span><span><i>◆</i>Staff &amp; Payroll</span><span><i>◆</i>Reports &amp; Analytics</span><span><i>◆</i>Thermal Printing</span><span><i>◆</i>Barcode &amp; POS</span><span><i>◆</i>Custom Integrations</span>
+  </div>
+</div>
+
+<!-- YOUR DATA YOUR RULES -->
+<section id="choice">
+  <div class="wrap center">
+    <div class="reveal">
+      <div class="eyebrow">// Your data, your rules</div>
+      <h2 class="sec-title">Local-only? Cloud? <span class="holo-text">You decide.</span></h2>
+      <p class="sec-sub">Most companies force you onto their cloud. We give you the choice — and build it your way.</p>
+    </div>
+    <div class="choice">
+      <div class="c-side tilt reveal">
+        <div class="c-big">Option 01 — Private</div>
+        <h3 style="margin-top:14px">🔒 Local-Only</h3>
+        <ul>
+          <li>Everything stays on <b>your computer</b> — nothing is ever uploaded</li>
+          <li>Works 100% without internet, forever</li>
+          <li>No cloud account, no servers, no breach risk</li>
+          <li>Instant — every screen opens in milliseconds</li>
+        </ul>
+      </div>
+      <div class="c-side tilt reveal">
+        <div class="c-big">Option 02 — Connected</div>
+        <h3 style="margin-top:14px">☁️ Cloud Web App</h3>
+        <ul>
+          <li>Open from shop, home, phone — anywhere</li>
+          <li>Team works together in real time</li>
+          <li>Automatic backups, managed hosting</li>
+          <li>Or go <b>hybrid</b> — local speed with cloud sync</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
 
 <!-- DOWNLOAD -->
 <section id="download">
-  <div class="wrap reveal">
-    <h2 class="sec-title">Get the app</h2>
-    <p class="sec-sub">One installer. Choose your business type on first launch.</p>
-    <div class="dl-list">
-      <a href="#" class="dl-row" id="dl-win">
-        <div class="dl-row-l"><div><div class="dl-os">Windows</div><div class="dl-meta">Windows 10 / 11 · 64-bit</div></div></div>
-        <span class="dl-arrow">↓</span>
+  <div class="wrap center">
+    <div class="reveal">
+      <div class="eyebrow">// Ready-made apps</div>
+      <h2 class="sec-title">Try our apps <span class="holo-text">today</span></h2>
+      <p class="sec-sub">30+ business types covered out of the box — pharmacy, restaurant, salon, gym, CRM and more. One installer, pick yours on first launch. Free 30-day trial.</p>
+    </div>
+    <div class="dl-grid reveal">
+      <a href="#" class="dl-card" id="dl-win">
+        <div class="dl-ico">🪟</div><div class="dl-name">Windows</div>
+        <div class="dl-meta">Windows 10 / 11 · 64-bit</div>
+        <span class="dl-get holo-text">DOWNLOAD ↓</span>
       </a>
-      <a href="#" class="dl-row" id="dl-mac-arm">
-        <div class="dl-row-l"><div><div class="dl-os">Mac — Apple Silicon</div><div class="dl-meta">M1 / M2 / M3 / M4</div></div></div>
-        <span class="dl-arrow">↓</span>
+      <a href="#" class="dl-card" id="dl-mac-arm">
+        <div class="dl-ico">🍎</div><div class="dl-name">Mac · Apple Silicon</div>
+        <div class="dl-meta">M1 / M2 / M3 / M4</div>
+        <span class="dl-get holo-text">DOWNLOAD ↓</span>
       </a>
-      <a href="#" class="dl-row" id="dl-mac-intel">
-        <div class="dl-row-l"><div><div class="dl-os">Mac — Intel</div><div class="dl-meta">Older MacBook / iMac</div></div></div>
-        <span class="dl-arrow">↓</span>
+      <a href="#" class="dl-card" id="dl-mac-intel">
+        <div class="dl-ico">🍎</div><div class="dl-name">Mac · Intel</div>
+        <div class="dl-meta">Older MacBook / iMac</div>
+        <span class="dl-get holo-text">DOWNLOAD ↓</span>
       </a>
-      <a href="#" class="dl-row" id="dl-android">
-        <div class="dl-row-l"><div><div class="dl-os">Android</div><div class="dl-meta">Phone / Tablet · Android 8+</div></div></div>
-        <span class="dl-arrow">↓</span>
+      <a href="#" class="dl-card" id="dl-android">
+        <div class="dl-ico">🤖</div><div class="dl-name">Android</div>
+        <div class="dl-meta">Phone / Tablet · Android 8+</div>
+        <span class="dl-get holo-text">DOWNLOAD ↓</span>
       </a>
     </div>
-    <div class="dl-version" id="dl-version">Fetching latest version…</div>
+    <div class="dl-version" id="dl-version">FETCHING LATEST VERSION…</div>
 
     <div id="mac-install-note" class="install-note">
       <strong>Mac — one extra step.</strong> macOS may show "App is damaged" — a standard prompt for apps outside the App Store. FrontStores is safe. Copy the app to Applications, open Terminal, paste this and press Enter:<br>
@@ -239,11 +475,14 @@
 
 <!-- CONTACT -->
 <section id="contact">
-  <div class="wrap reveal">
-    <h2 class="sec-title">Talk to us</h2>
-    <p class="sec-sub">Tell us about your business. We verify your number on WhatsApp — no spam, ever.</p>
+  <div class="form-wrap center">
+    <div class="reveal">
+      <div class="eyebrow">// Start a project</div>
+      <h2 class="sec-title">Tell us what <span class="holo-text">you dream of</span></h2>
+      <p class="sec-sub">Describe your business and what you need — local, cloud, mobile or fully custom. We verify your number on WhatsApp. No spam, ever.</p>
+    </div>
 
-    <form class="form" id="contact-form">
+    <form class="form reveal" id="contact-form">
       <div class="f-row">
         <input class="inp" type="text" name="name" placeholder="Your name *" required maxlength="100" />
         <input class="inp" type="text" name="shop_type" placeholder="Your business type *" required maxlength="50" />
@@ -252,9 +491,9 @@
         <input class="inp" type="tel" name="mobile" placeholder="WhatsApp number *" required maxlength="13" />
         <input class="inp" type="email" name="email" placeholder="Email *" required maxlength="200" />
       </div>
-      <textarea class="inp" name="message" placeholder="Your message *" required maxlength="1000"></textarea>
+      <textarea class="inp" name="message" placeholder="What should we build for you? *" required maxlength="1000"></textarea>
       <div class="f-error" id="f-error"></div>
-      <button class="btn" type="submit" id="f-btn">Verify on WhatsApp →</button>
+      <button class="btn-holo" type="submit" id="f-btn">Verify on WhatsApp →</button>
       <div class="f-note">All fields are required. A 6-digit code will be sent to your WhatsApp.</div>
     </form>
 
@@ -262,7 +501,7 @@
       <div class="otp-sent">We sent a 6-digit code to your WhatsApp<br><b id="otp-phone"></b></div>
       <input class="otp-input" id="otp-input" type="text" inputmode="numeric" maxlength="6" placeholder="······" autocomplete="one-time-code" />
       <div class="f-error" id="otp-error" style="margin-top:18px"></div>
-      <button class="btn" id="otp-verify">Verify &amp; send message</button>
+      <button class="btn-holo" id="otp-verify">Verify &amp; send →</button>
       <div class="otp-links">
         <a id="otp-resend">Resend code</a> &nbsp;·&nbsp; <a id="otp-back">Change details</a>
       </div>
@@ -270,23 +509,118 @@
 
     <div class="f-success" id="f-success">
       <div class="tick">✓</div>
-      <h3>Message sent</h3>
-      <p>Your number is verified and your message is with us.<br>We'll reach out on WhatsApp.</p>
+      <h3>Transmission received</h3>
+      <p>Your number is verified and your project brief is with us.<br>We'll reach out on WhatsApp.</p>
     </div>
   </div>
 </section>
+</main>
 
 <footer>
-  <a href="#" class="logo">Front<em>Stores</em></a>
-  <div class="f-copy">© 2026 FrontStores · Crafted for Indian businesses</div>
+  <a href="#" class="logo">Front<span class="holo-text">Stores</span></a>
+  <div class="f-copy">© 2026 FrontStores · Desktop · Web · Android · iPhone · Custom — crafted in India</div>
 </footer>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
-  // reveal on scroll
-  const io = new IntersectionObserver((es) => {
+  // ── cinematic intro ──
+  const intro = document.getElementById('intro');
+  function openIntro() { intro.classList.add('open'); setTimeout(() => intro.classList.add('done'), 900); }
+  const introTimer = setTimeout(openIntro, 4600);
+  intro.addEventListener('click', () => { clearTimeout(introTimer); openIntro(); });
+
+  // ── WebGL holographic particle field ──
+  (function () {
+    const canvas = document.getElementById('webgl');
+    if (!window.THREE || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { canvas.remove(); return; }
+    let renderer;
+    try { renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true }); }
+    catch { canvas.remove(); return; }
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 100);
+    camera.position.z = 7;
+
+    // particle globe
+    const N = 2400, pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
+    const palette = [[0,.9,1],[.48,.36,1],[1,.3,.8],[.2,.96,.77]];
+    for (let i = 0; i < N; i++) {
+      const phi = Math.acos(2 * Math.random() - 1), th = Math.random() * Math.PI * 2;
+      const r = 2.6 + (Math.random() - .5) * .18;
+      pos[i*3]   = r * Math.sin(phi) * Math.cos(th);
+      pos[i*3+1] = r * Math.cos(phi);
+      pos[i*3+2] = r * Math.sin(phi) * Math.sin(th);
+      const c = palette[(Math.random() * palette.length) | 0];
+      col[i*3] = c[0]; col[i*3+1] = c[1]; col[i*3+2] = c[2];
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    const globe = new THREE.Points(geo, new THREE.PointsMaterial({ size: .035, vertexColors: true, transparent: true, opacity: .85, blending: THREE.AdditiveBlending, depthWrite: false }));
+    scene.add(globe);
+
+    // inner wireframe core
+    const core = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(1.45, 1),
+      new THREE.MeshBasicMaterial({ color: 0x7b5cff, wireframe: true, transparent: true, opacity: .22 })
+    );
+    scene.add(core);
+
+    // floating star dust
+    const SN = 900, sp = new Float32Array(SN * 3);
+    for (let i = 0; i < SN * 3; i++) sp[i] = (Math.random() - .5) * 30;
+    const sgeo = new THREE.BufferGeometry();
+    sgeo.setAttribute('position', new THREE.BufferAttribute(sp, 3));
+    const dust = new THREE.Points(sgeo, new THREE.PointsMaterial({ size: .022, color: 0x6688ff, transparent: true, opacity: .5, blending: THREE.AdditiveBlending, depthWrite: false }));
+    scene.add(dust);
+
+    let mx = 0, my = 0, scrollY = 0;
+    addEventListener('mousemove', e => { mx = (e.clientX / innerWidth - .5); my = (e.clientY / innerHeight - .5); }, { passive: true });
+    addEventListener('scroll', () => { scrollY = window.scrollY; }, { passive: true });
+
+    function resize() {
+      renderer.setSize(innerWidth, innerHeight);
+      camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+    }
+    resize(); addEventListener('resize', resize);
+
+    let t = 0;
+    (function loop() {
+      requestAnimationFrame(loop);
+      t += .0035;
+      globe.rotation.y = t; globe.rotation.x = Math.sin(t * .6) * .14;
+      core.rotation.y = -t * 1.4; core.rotation.z = t * .8;
+      dust.rotation.y = t * .25;
+      camera.position.x += (mx * 1.6 - camera.position.x) * .04;
+      camera.position.y += (-my * 1.2 - camera.position.y + scrollY * -.0012) * .04;
+      camera.lookAt(0, 0, 0);
+      const s = 1 + Math.sin(t * 2.2) * .02;
+      core.scale.set(s, s, s);
+      renderer.render(scene, camera);
+    })();
+  })();
+
+  // ── scroll reveal ──
+  const io = new IntersectionObserver(es => {
     es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
-  }, { threshold: 0.15 });
+  }, { threshold: .14 });
   document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  // ── 3D tilt cards ──
+  document.querySelectorAll('.tilt').forEach(card => {
+    card.addEventListener('mousemove', e => {
+      const r = card.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5;
+      card.style.transform = `rotateY(${x * 14}deg) rotateX(${y * -14}deg) translateZ(6px)`;
+      card.style.setProperty('--mx', (e.clientX - r.left) + 'px');
+      card.style.setProperty('--my', (e.clientY - r.top) + 'px');
+    });
+    card.addEventListener('mouseleave', () => { card.style.transform = ''; });
+  });
+
+  // ── capability marquee loop ──
+  const cap = document.getElementById('cap-track');
+  cap.innerHTML += cap.innerHTML;
 
   // ── downloads from latest GitHub release ──
   const REPO = 'imrakeshsoni/frontstores';
@@ -312,9 +646,9 @@
         'dl-android':   find(/\.apk$/i),
       };
       for (const [id, u] of Object.entries(urls)) if (u) document.getElementById(id).href = u;
-      document.getElementById('dl-version').textContent = `Latest ${releases[0].tag_name} · Free 30-day trial`;
+      document.getElementById('dl-version').textContent = `LATEST ${releases[0].tag_name} · FREE 30-DAY TRIAL`;
     } catch {
-      document.getElementById('dl-version').textContent = 'First release dropping shortly';
+      document.getElementById('dl-version').textContent = 'FIRST RELEASE DROPPING SHORTLY';
     }
   }
   loadRelease();
@@ -324,7 +658,7 @@
       const href = e.currentTarget.getAttribute('href');
       if (!href || href === '#') {
         e.preventDefault();
-        document.getElementById('dl-version').textContent = 'That build is still publishing — check back in a few minutes.';
+        document.getElementById('dl-version').textContent = 'THAT BUILD IS STILL PUBLISHING — CHECK BACK SOON';
       }
       ['mac-install-note', 'win-install-note', 'android-install-note'].forEach(n =>
         document.getElementById(n).style.display = (n === noteId) ? 'block' : 'none');
@@ -362,14 +696,12 @@
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     hideErrs();
-    // every field mandatory
-    const f = form;
     payload = {
-      name:      f.name.value.trim(),
-      shop_type: f.shop_type.value.trim(),
-      mobile:    f.mobile.value.trim(),
-      email:     f.email.value.trim(),
-      message:   f.message.value.trim(),
+      name:      form.name.value.trim(),
+      shop_type: form.shop_type.value.trim(),
+      mobile:    form.mobile.value.trim(),
+      email:     form.email.value.trim(),
+      message:   form.message.value.trim(),
     };
     if (Object.values(payload).some(v => !v)) { showErr(fErr, 'All fields are required.'); return; }
     if (!/^(\+?91)?[6-9]\d{9}$/.test(payload.mobile.replace(/[\s-]/g, ''))) { showErr(fErr, 'Enter a valid 10-digit Indian WhatsApp number.'); return; }
@@ -405,7 +737,7 @@
       document.getElementById('f-success').style.display = 'block';
     } catch (err) {
       showErr(oErr, err.message);
-      btn.disabled = false; btn.textContent = 'Verify & send message';
+      btn.disabled = false; btn.textContent = 'Verify & send →';
     }
   });
 
@@ -414,7 +746,6 @@
     if (sendsLeft <= 0) return;
     try {
       await requestOtp();
-      showErr(oErr, ''); oErr.style.display = 'none';
       document.getElementById('otp-input').value = '';
       document.getElementById('otp-input').focus();
     } catch (err) {
