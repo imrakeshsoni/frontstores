@@ -85,25 +85,24 @@
   .intro-stage { text-align: center; position: relative; z-index: 2; animation: slowpush 9s linear forwards; }
   @keyframes slowpush { from { transform: scale(1.06); } to { transform: scale(1); } }
   #intro-net { position: absolute; inset: 0; z-index: 0; opacity: 0; animation: introFade 2.5s .2s ease forwards; }
-  /* terminal-style typing line */
+  /* old-typewriter line — fixed-width stage so nothing shifts while typing */
   .type-line {
+    position: relative; display: inline-block;
     font-family: 'Sora', sans-serif; font-weight: 800;
-    font-size: clamp(2.2rem, 8.6vw, 6.6rem); line-height: 1.1; letter-spacing: -.02em;
+    font-size: clamp(1.5rem, 5vw, 3.6rem); line-height: 1.15; letter-spacing: -.01em;
     color: #fff; white-space: nowrap;
-    filter: drop-shadow(0 0 22px rgba(255,255,255,.5)) drop-shadow(0 0 70px rgba(155,130,255,.45));
-    animation: helloGlow 3.8s 1.2s ease-in-out infinite;
+    filter: drop-shadow(0 0 18px rgba(255,255,255,.4)) drop-shadow(0 0 55px rgba(155,130,255,.35));
   }
-  .type-line .holo-text { filter: drop-shadow(0 0 30px rgba(44,236,255,.6)); }
+  .type-line .sizer { visibility: hidden; } /* reserves the final width — keeps the line perfectly still */
+  .type-line .typed { position: absolute; left: 0; top: 0; white-space: nowrap; text-align: left; }
+  .type-line .holo-text { filter: drop-shadow(0 0 24px rgba(44,236,255,.5)); }
   .caret {
-    display: inline-block; width: .075em; height: .9em; margin-left: .07em;
+    display: inline-block; width: .07em; height: .88em; margin-left: .06em;
     background: #fff; border-radius: 2px; vertical-align: -.05em;
-    box-shadow: 0 0 18px rgba(255,255,255,.85), 0 0 55px rgba(155,130,255,.65);
+    box-shadow: 0 0 16px rgba(255,255,255,.8), 0 0 45px rgba(155,130,255,.55);
   }
   .caret.blink { animation: caretBlink 1s steps(1) infinite; }
   @keyframes caretBlink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
-  /* exit: the typed brand flies through the viewer, then the site hits */
-  #intro.zoomout .intro-stage { animation: stageZoom .95s cubic-bezier(.65,0,.3,1) forwards; }
-  @keyframes stageZoom { to { transform: scale(10); opacity: 0; filter: blur(24px); } }
   .intro-presents {
     font-family: 'Sora', sans-serif; font-weight: 600; font-size: clamp(13px, 2vw, 22px);
     letter-spacing: .6em; text-transform: uppercase; color: #f4f6ff; padding-left: .6em;
@@ -170,9 +169,8 @@
     animation-delay: var(--d, 0s);
   }
   @keyframes warpIn {
-    0% { opacity: 0; transform: scale(2.7) translateY(4vh); filter: blur(22px); }
-    60% { opacity: 1; }
-    100% { opacity: 1; transform: none; filter: none; }
+    0% { opacity: 0; transform: translateY(22px); }
+    100% { opacity: 1; transform: none; }
   }
   @media (prefers-reduced-motion: reduce) { .warp-item { opacity: 1 !important; animation: none !important; } }
 
@@ -487,7 +485,10 @@
   <div class="bar top"></div>
   <div class="bar bot"></div>
   <div class="intro-stage">
-    <div class="type-line"><span id="type-plain"></span><span id="type-holo" class="holo-text"></span><span class="caret blink" id="caret"></span></div>
+    <div class="type-line">
+      <span class="sizer">Welcome to Front<span class="holo-text">Stores</span>&nbsp;</span>
+      <span class="typed"><span id="type-plain"></span><span id="type-holo" class="holo-text"></span><span class="caret blink" id="caret"></span></span>
+    </div>
   </div>
 </div>
 
@@ -727,15 +728,13 @@
   function openIntro() {
     if (introDone) return;
     introDone = true;
-    intro.classList.add('zoomout');
-    setTimeout(() => {
-      intro.classList.add('open');
-      document.body.classList.add('warp'); // hero elements warp in from the viewer
-    }, 620);
-    setTimeout(() => { intro.classList.add('done'); netRunning = false; }, 1700);
+    // calm exit: just fade the intro away and let the site appear
+    intro.classList.add('open', 'done');
+    document.body.classList.add('warp');
+    setTimeout(() => { netRunning = false; }, 1300);
   }
   intro.addEventListener('click', openIntro);
-  setTimeout(openIntro, 14000); // safety fallback
+  setTimeout(openIntro, 12000); // safety fallback
   // reduced motion: intro is hidden by CSS — reveal content immediately
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) document.body.classList.add('warp');
 
@@ -745,34 +744,23 @@
     const holo = document.getElementById('type-holo');
     const caret = document.getElementById('caret');
     const sleep = ms => new Promise(r => setTimeout(r, ms));
-    const type = async (el, str, speed) => {
+    // steady old-typewriter rhythm: even keystrokes, tiny natural variance,
+    // a slightly longer rest on the spaces (carriage breath)
+    const type = async (el, str) => {
       for (const ch of str) {
         if (introDone) return;
         el.textContent += ch;
-        await sleep(speed + Math.random() * 40);
-      }
-    };
-    const erase = async (el, speed) => {
-      while (el.textContent.length) {
-        if (introDone) return;
-        el.textContent = el.textContent.slice(0, -1);
-        await sleep(speed);
+        await sleep(ch === ' ' ? 220 : 118 + Math.random() * 26);
       }
     };
 
-    await sleep(2100);                       // caret blinks twice
+    await sleep(1150);                       // caret blinks once
     caret.classList.remove('blink');
-    await type(plain, 'Welcome to', 80);     // type greeting
+    await type(plain, 'Welcome to Front');   // one continuous typed line
+    await type(holo, 'Stores');
     caret.classList.add('blink');
-    await sleep(950);
-    caret.classList.remove('blink');
-    await erase(plain, 45);                  // delete it
-    await sleep(380);
-    await type(plain, 'Front', 95);          // type the brand
-    await type(holo, 'Stores', 95);
-    caret.classList.add('blink');
-    await sleep(1500);                       // let it glow
-    openIntro();                             // fly through → site hits
+    await sleep(1400);                       // a quiet beat
+    openIntro();                             // gentle fade into the site
   })();
 
   // ── intro background: a living AI world — neural network + data streams ──
