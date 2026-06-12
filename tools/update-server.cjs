@@ -133,7 +133,14 @@ async function sendWaMessage(phoneId, token, to, text) {
     }, (res) => {
       let data = '';
       res.on('data', c => data += c);
-      res.on('end', () => { resolve({ status: res.statusCode, body: data }); });
+      res.on('end', () => {
+        // Meta rejects sends with 200-range only on success; expired tokens etc.
+        // come back as HTTP errors that were previously swallowed silently.
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          console.error(`❌ WA send failed (HTTP ${res.statusCode}) to ${to}: ${data.slice(0, 300)}`);
+        }
+        resolve({ status: res.statusCode, body: data });
+      });
     });
     req.on('error', (e) => { console.error('WA send error:', e.message); resolve({ status: 0, error: e.message }); });
     req.write(body);
