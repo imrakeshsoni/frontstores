@@ -1,9 +1,8 @@
 <!DOCTYPE html>
-<!-- [website] [tenant: FrontStores.com] — cinematic 3D holographic redesign.
-     Positioning: we build ALL software — offline desktop (data never leaves),
-     cloud web apps, Android/iPhone, fully customized. No company contact
-     details anywhere. Contact form: all fields mandatory + WhatsApp OTP,
-     verified submissions become CRM leads. -->
+<!-- [website] [tenant: FrontStores.com] — full-3D cinematic site v2.
+     Scroll-driven WebGL journey (wave grid → ring tunnel → geometry field),
+     CSS 3D cube, depth typography, glass stages for readability.
+     No company contact details. OTP contact form → CRM leads. -->
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -15,16 +14,17 @@
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #03040a;
-    --text: #eef1f7;
-    --muted: #8b93a5;
-    --dim: #545c6e;
-    --line: rgba(140,160,255,.14);
-    --holo1: #00e5ff;
-    --holo2: #7b5cff;
-    --holo3: #ff4ecd;
-    --holo4: #34f5c5;
+    --bg: #04060e;
+    --text: #f7f9fd;
+    --muted: #b4bdd1;
+    --dim: #76819b;
+    --line: rgba(150,170,255,.16);
+    --holo1: #22e9ff;
+    --holo2: #8f73ff;
+    --holo3: #ff5fd2;
+    --holo4: #43ffc9;
     --holo: linear-gradient(110deg, var(--holo1), var(--holo2) 38%, var(--holo3) 72%, var(--holo4));
+    --glass: rgba(7, 10, 22, .78);
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html { scroll-behavior: smooth; }
@@ -33,7 +33,7 @@
     font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
   }
-  ::selection { background: rgba(123,92,255,.45); }
+  ::selection { background: rgba(143,115,255,.45); }
   a { color: inherit; text-decoration: none; }
   h1,h2,h3 { font-family: 'Sora', sans-serif; letter-spacing: -.03em; }
   .holo-text {
@@ -42,6 +42,8 @@
     animation: holoflow 7s linear infinite;
   }
   @keyframes holoflow { to { background-position: 300% center; } }
+  /* depth typography — chromatic 3D offset */
+  .text3d { text-shadow: 0 0 40px rgba(143,115,255,.45), 2px 2px 0 rgba(255,95,210,.22), -2px -2px 0 rgba(34,233,255,.22); }
 
   /* ════════ CINEMATIC INTRO ════════ */
   #intro {
@@ -57,243 +59,284 @@
   .intro-stage { text-align: center; position: relative; z-index: 2; }
   .intro-presents {
     font-family: 'JetBrains Mono', monospace; font-size: clamp(10px, 1.4vw, 13px);
-    letter-spacing: .55em; text-transform: uppercase; color: var(--dim);
+    letter-spacing: .55em; text-transform: uppercase; color: #8b93a5;
     opacity: 0; animation: introFade 1.2s .4s ease forwards;
   }
   .intro-title {
     margin-top: 22px; font-family: 'Sora', sans-serif; font-weight: 800;
     font-size: clamp(2.6rem, 9vw, 7rem); letter-spacing: -.02em; line-height: 1;
-    opacity: 0; transform: scale(.86);
+    opacity: 0; transform: scale(.86) rotateX(24deg); transform-origin: 50% 100%;
     animation: introZoom 2.2s 1.1s cubic-bezier(.16,1,.3,1) forwards;
-    position: relative;
+    position: relative; perspective: 600px;
   }
-  .intro-title .holo-text { filter: drop-shadow(0 0 34px rgba(123,92,255,.55)); }
-  .intro-sweep {
-    position: absolute; inset: 0; pointer-events: none; overflow: hidden;
-  }
+  .intro-title .holo-text { filter: drop-shadow(0 0 34px rgba(143,115,255,.6)); }
+  .intro-sweep { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
   .intro-sweep::after {
     content: ''; position: absolute; top: 0; bottom: 0; width: 36%; left: -50%;
-    background: linear-gradient(100deg, transparent, rgba(255,255,255,.5), transparent);
-    transform: skewX(-18deg);
-    animation: sweep 1.5s 2.4s ease forwards;
+    background: linear-gradient(100deg, transparent, rgba(255,255,255,.55), transparent);
+    transform: skewX(-18deg); animation: sweep 1.5s 2.4s ease forwards;
   }
   @keyframes sweep { to { left: 130%; } }
   .intro-tag {
-    margin-top: 26px; font-size: clamp(.8rem, 1.6vw, 1rem); color: var(--muted);
+    margin-top: 26px; font-size: clamp(.8rem, 1.6vw, 1rem); color: #b4bdd1;
     letter-spacing: .25em; text-transform: uppercase;
     opacity: 0; animation: introFade 1.4s 2.8s ease forwards;
   }
   .intro-skip {
     position: absolute; bottom: 14vh; left: 50%; transform: translateX(-50%);
-    font-size: 11px; color: var(--dim); letter-spacing: .2em; text-transform: uppercase;
+    font-size: 11px; color: #76819b; letter-spacing: .2em; text-transform: uppercase;
     opacity: 0; animation: introFade 1s 2s ease forwards; z-index: 4;
   }
   @keyframes introFade { to { opacity: 1; } }
-  @keyframes introZoom { to { opacity: 1; transform: scale(1); } }
+  @keyframes introZoom { to { opacity: 1; transform: scale(1) rotateX(0); } }
   @media (prefers-reduced-motion: reduce) { #intro { display: none; } }
 
-  /* ════════ AMBIENT FX ════════ */
+  /* ════════ FX LAYERS ════════ */
   #webgl { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
   .scanlines {
-    position: fixed; inset: 0; z-index: 2; pointer-events: none; opacity: .05;
-    background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(160,200,255,.6) 2px 3px);
+    position: fixed; inset: 0; z-index: 2; pointer-events: none; opacity: .028;
+    background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(170,205,255,.6) 2px 3px);
     mix-blend-mode: overlay;
   }
-  .vignette { position: fixed; inset: 0; z-index: 2; pointer-events: none;
-    background: radial-gradient(ellipse 95% 85% at 50% 45%, transparent 55%, rgba(0,0,5,.75)); }
   main { position: relative; z-index: 5; }
 
   /* ════════ NAV ════════ */
   nav {
     position: fixed; top: 0; left: 0; right: 0; z-index: 60;
     display: flex; align-items: center; justify-content: space-between;
-    padding: 22px clamp(22px, 5vw, 64px);
-    background: linear-gradient(rgba(3,4,10,.9), transparent);
+    padding: 20px clamp(22px, 5vw, 64px);
+    background: linear-gradient(rgba(4,6,14,.94), rgba(4,6,14,.6) 70%, transparent);
   }
-  .logo { font-family: 'Sora', sans-serif; font-weight: 800; font-size: 19px; letter-spacing: -.01em;
-    text-shadow: 0 0 26px rgba(0,229,255,.35); }
-  .nav-links { display: flex; gap: 30px; font-size: 13px; color: var(--muted); letter-spacing: .04em; }
+  .logo { font-family: 'Sora', sans-serif; font-weight: 800; font-size: 19px;
+    text-shadow: 0 0 26px rgba(34,233,255,.4); }
+  .nav-links { display: flex; gap: 30px; font-size: 13.5px; color: var(--muted); letter-spacing: .04em; }
   .nav-links a { transition: color .25s, text-shadow .25s; }
-  .nav-links a:hover { color: #fff; text-shadow: 0 0 14px rgba(0,229,255,.8); }
+  .nav-links a:hover { color: #fff; text-shadow: 0 0 14px rgba(34,233,255,.9); }
   @media (max-width: 720px) { .nav-links { display: none; } }
 
   /* ════════ HERO ════════ */
   .hero {
     min-height: 100svh; display: flex; flex-direction: column;
     align-items: center; justify-content: center; text-align: center;
-    padding: 120px 24px 80px; position: relative; perspective: 1200px;
+    padding: 120px 24px 80px; position: relative; perspective: 1100px;
   }
+  .hero-inner { transform-style: preserve-3d; }
   .hero-chip {
+    display: inline-block;
     font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .4em;
     text-transform: uppercase; color: var(--holo1);
-    border: 1px solid rgba(0,229,255,.3); border-radius: 100px; padding: 9px 22px;
-    background: rgba(0,229,255,.05); box-shadow: 0 0 30px rgba(0,229,255,.12) inset, 0 0 24px rgba(0,229,255,.1);
+    border: 1px solid rgba(34,233,255,.35); border-radius: 100px; padding: 9px 22px;
+    background: rgba(4,8,18,.7); box-shadow: 0 0 30px rgba(34,233,255,.14) inset, 0 0 24px rgba(34,233,255,.12);
+    transform: translateZ(60px);
   }
   .hero h1 {
-    margin-top: 34px; font-size: clamp(2.6rem, 7.6vw, 6rem); font-weight: 800; line-height: 1.03;
-    transform-style: preserve-3d;
+    margin-top: 34px; font-size: clamp(2.5rem, 7.4vw, 5.8rem); font-weight: 800; line-height: 1.05;
+    transform: translateZ(90px);
   }
-  .hero h1 .ghost { color: var(--text); text-shadow: 0 0 60px rgba(123,92,255,.3); }
-  .hero-sub { margin-top: 26px; max-width: 640px; font-size: clamp(.98rem, 1.6vw, 1.16rem); line-height: 1.75; color: var(--muted); }
-  .hero-sub b { color: var(--text); font-weight: 600; }
-  .hero-cta { margin-top: 44px; display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+  .hero-sub {
+    margin-top: 26px; max-width: 660px; margin-left: auto; margin-right: auto;
+    font-size: clamp(1rem, 1.6vw, 1.18rem); line-height: 1.75; color: var(--muted);
+    background: rgba(4,7,16,.55); border-radius: 16px; padding: 14px 22px;
+    backdrop-filter: blur(6px); transform: translateZ(50px);
+  }
+  .hero-sub b { color: #fff; font-weight: 600; }
+  .hero-cta { margin-top: 42px; display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; transform: translateZ(70px); }
   .btn-holo {
     position: relative; display: inline-flex; align-items: center; gap: 10px;
     font-weight: 700; font-size: 15px; padding: 17px 38px; border-radius: 14px;
     color: #021018; background: var(--holo); background-size: 250% auto;
     border: none; cursor: pointer; font-family: 'Inter', sans-serif;
-    box-shadow: 0 0 38px rgba(0,229,255,.35), 0 10px 40px rgba(123,92,255,.35);
+    box-shadow: 0 0 38px rgba(34,233,255,.4), 0 10px 40px rgba(143,115,255,.4);
     transition: transform .25s, box-shadow .25s; animation: holoflow 5s linear infinite;
   }
-  .btn-holo:hover { transform: translateY(-3px) scale(1.02); box-shadow: 0 0 60px rgba(0,229,255,.55), 0 18px 60px rgba(123,92,255,.5); }
+  .btn-holo:hover { transform: translateY(-3px) scale(1.02); box-shadow: 0 0 60px rgba(34,233,255,.6), 0 18px 60px rgba(143,115,255,.55); }
   .btn-holo:disabled { opacity: .4; cursor: not-allowed; transform: none; }
   .btn-wire {
     display: inline-flex; align-items: center; gap: 9px; font-weight: 500; font-size: 15px;
-    padding: 17px 32px; border-radius: 14px; color: var(--text);
-    border: 1px solid var(--line); background: rgba(10,14,30,.45); backdrop-filter: blur(8px);
+    padding: 17px 32px; border-radius: 14px; color: #fff;
+    border: 1px solid var(--line); background: rgba(8,12,26,.7); backdrop-filter: blur(8px);
     transition: border-color .25s, box-shadow .25s;
   }
-  .btn-wire:hover { border-color: rgba(0,229,255,.5); box-shadow: 0 0 28px rgba(0,229,255,.18); }
-  .hero-stats { margin-top: 76px; display: flex; gap: clamp(26px, 6vw, 72px); flex-wrap: wrap; justify-content: center; }
+  .btn-wire:hover { border-color: rgba(34,233,255,.55); box-shadow: 0 0 28px rgba(34,233,255,.2); }
+  .hero-stats { margin-top: 70px; display: flex; gap: clamp(26px, 6vw, 72px); flex-wrap: wrap; justify-content: center; transform: translateZ(40px); }
   .hstat { text-align: center; }
-  .hstat b { display: block; font-family: 'Sora', sans-serif; font-size: clamp(1.5rem, 3vw, 2.2rem); font-weight: 800; }
+  .hstat b { display: block; font-family: 'Sora', sans-serif; font-size: clamp(1.5rem, 3vw, 2.2rem); font-weight: 800; color: #fff; }
   .hstat span { font-size: 11px; letter-spacing: .22em; text-transform: uppercase; color: var(--dim); }
   .scroll-hint { position: absolute; bottom: 26px; left: 50%; transform: translateX(-50%);
     font-size: 10px; letter-spacing: .3em; text-transform: uppercase; color: var(--dim); animation: bob 2.4s ease-in-out infinite; }
   @keyframes bob { 50% { transform: translate(-50%, 8px); } }
 
-  /* ════════ SECTIONS ════════ */
-  section { padding: 130px 24px; position: relative; }
-  .wrap { max-width: 1140px; margin: 0 auto; }
+  /* ════════ SECTIONS / GLASS STAGES ════════ */
+  section { padding: 110px 20px; position: relative; }
+  .wrap { max-width: 1150px; margin: 0 auto; }
+  .stage {
+    background: var(--glass); border: 1px solid var(--line); border-radius: 30px;
+    padding: clamp(40px, 6vw, 76px); backdrop-filter: blur(16px) saturate(1.3);
+    -webkit-backdrop-filter: blur(16px) saturate(1.3);
+    box-shadow: 0 30px 90px rgba(0,0,8,.5), 0 0 0 1px rgba(150,170,255,.05) inset;
+    transform-style: preserve-3d;
+  }
   .eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .45em;
-    text-transform: uppercase; color: var(--holo1); }
-  .sec-title { margin-top: 18px; font-size: clamp(1.9rem, 4.6vw, 3.4rem); font-weight: 800; line-height: 1.08; }
-  .sec-sub { margin-top: 18px; color: var(--muted); font-size: 1.04rem; line-height: 1.75; max-width: 640px; }
+    text-transform: uppercase; color: var(--holo1); text-shadow: 0 0 16px rgba(34,233,255,.5); }
+  .sec-title { margin-top: 18px; font-size: clamp(1.9rem, 4.4vw, 3.2rem); font-weight: 800; line-height: 1.1; color: #fff; }
+  .sec-sub { margin-top: 18px; color: var(--muted); font-size: 1.05rem; line-height: 1.75; max-width: 660px; }
   .center { text-align: center; }
   .center .sec-sub { margin-left: auto; margin-right: auto; }
-  .reveal { opacity: 0; transform: translateY(46px) rotateX(8deg); transform-origin: 50% 100%;
-    transition: opacity .9s ease, transform .9s cubic-bezier(.16,1,.3,1); }
+  .reveal { opacity: 0; transform: translateY(60px) rotateX(10deg) scale(.97); transform-origin: 50% 100%;
+    transition: opacity 1s ease, transform 1s cubic-bezier(.16,1,.3,1); }
   .reveal.in { opacity: 1; transform: none; }
 
-  /* ════════ 3D OFFER CARDS ════════ */
-  .offer-grid { margin-top: 70px; display: grid; grid-template-columns: repeat(auto-fit, minmax(255px, 1fr)); gap: 22px; perspective: 1400px; }
+  /* ════════ 3D PLATFORM CUBE ════════ */
+  .cube-row { margin-top: 60px; display: flex; align-items: center; justify-content: center; gap: clamp(30px, 6vw, 80px); flex-wrap: wrap; }
+  .cube-scene { width: 190px; height: 190px; perspective: 900px; flex-shrink: 0; }
+  .cube { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; animation: cubespin 16s linear infinite; }
+  .cube-scene:hover .cube { animation-play-state: paused; }
+  @keyframes cubespin { from { transform: rotateX(-18deg) rotateY(0); } to { transform: rotateX(-18deg) rotateY(360deg); } }
+  .face {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    border: 1px solid rgba(34,233,255,.4); border-radius: 18px;
+    background: linear-gradient(160deg, rgba(14,20,44,.92), rgba(6,9,20,.94));
+    box-shadow: 0 0 40px rgba(34,233,255,.12) inset;
+    font-family: 'Sora', sans-serif; font-weight: 700; font-size: 15px; color: #fff;
+    backface-visibility: hidden;
+  }
+  .face span { font-size: 34px; filter: drop-shadow(0 0 14px rgba(34,233,255,.6)); }
+  .face.f1 { transform: rotateY(0deg)   translateZ(95px); }
+  .face.f2 { transform: rotateY(90deg)  translateZ(95px); }
+  .face.f3 { transform: rotateY(180deg) translateZ(95px); }
+  .face.f4 { transform: rotateY(270deg) translateZ(95px); }
+  .face.f5 { transform: rotateX(90deg)  translateZ(95px); }
+  .face.f6 { transform: rotateX(-90deg) translateZ(95px); }
+  .cube-copy { max-width: 420px; text-align: left; }
+  .cube-copy h3 { font-size: 1.5rem; color: #fff; }
+  .cube-copy p { margin-top: 12px; color: var(--muted); line-height: 1.75; font-size: .98rem; }
+
+  /* ════════ OFFER CARDS (3D tilt + float) ════════ */
+  .offer-grid { margin-top: 64px; display: grid; grid-template-columns: repeat(auto-fit, minmax(245px, 1fr)); gap: 22px; perspective: 1400px; }
   .o-card {
     position: relative; border-radius: 22px; padding: 2px; transform-style: preserve-3d;
-    background: linear-gradient(140deg, rgba(0,229,255,.45), rgba(123,92,255,.25) 45%, rgba(255,78,205,.35));
+    background: linear-gradient(140deg, rgba(34,233,255,.5), rgba(143,115,255,.3) 45%, rgba(255,95,210,.4));
     transition: transform .18s ease-out; will-change: transform;
+    animation: floaty 7s ease-in-out infinite;
   }
+  .o-card:nth-child(2) { animation-delay: -1.8s; }
+  .o-card:nth-child(3) { animation-delay: -3.6s; }
+  .o-card:nth-child(4) { animation-delay: -5.4s; }
+  @keyframes floaty { 50% { translate: 0 -10px; } }
   .o-card-inner {
-    border-radius: 20px; padding: 36px 30px; height: 100%;
-    background: linear-gradient(165deg, rgba(13,18,38,.96), rgba(5,7,18,.98));
+    border-radius: 20px; padding: 34px 28px; height: 100%;
+    background: linear-gradient(165deg, rgba(15,21,44,.97), rgba(6,8,20,.98));
     transform-style: preserve-3d; position: relative; overflow: hidden;
   }
   .o-card-inner::before {
     content: ''; position: absolute; inset: 0; opacity: 0; transition: opacity .4s;
-    background: radial-gradient(500px circle at var(--mx,50%) var(--my,0%), rgba(0,229,255,.14), transparent 65%);
+    background: radial-gradient(500px circle at var(--mx,50%) var(--my,0%), rgba(34,233,255,.16), transparent 65%);
   }
   .o-card:hover .o-card-inner::before { opacity: 1; }
   .o-ico {
-    width: 60px; height: 60px; border-radius: 16px; display: grid; place-items: center; font-size: 28px;
-    background: rgba(0,229,255,.08); border: 1px solid rgba(0,229,255,.25);
-    box-shadow: 0 0 26px rgba(0,229,255,.14); transform: translateZ(46px);
+    width: 58px; height: 58px; border-radius: 16px; display: grid; place-items: center; font-size: 27px;
+    background: rgba(34,233,255,.1); border: 1px solid rgba(34,233,255,.3);
+    box-shadow: 0 0 26px rgba(34,233,255,.16); transform: translateZ(46px);
   }
-  .o-card h3 { margin-top: 22px; font-size: 1.28rem; font-weight: 700; transform: translateZ(34px); }
-  .o-card p { margin-top: 12px; font-size: .93rem; line-height: 1.7; color: var(--muted); transform: translateZ(22px); }
+  .o-card h3 { margin-top: 20px; font-size: 1.24rem; font-weight: 700; color: #fff; transform: translateZ(34px); }
+  .o-card p { margin-top: 12px; font-size: .94rem; line-height: 1.7; color: var(--muted); transform: translateZ(22px); }
   .o-foot { margin-top: 18px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px;
     letter-spacing: .2em; text-transform: uppercase; transform: translateZ(28px); }
 
   /* ════════ CHOICE PANEL ════════ */
-  .choice { margin-top: 70px; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; perspective: 1400px; }
+  .choice { margin-top: 64px; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; perspective: 1400px; }
   @media (max-width: 800px) { .choice { grid-template-columns: 1fr; } }
   .c-side {
-    border-radius: 22px; padding: 44px 38px; border: 1px solid var(--line);
-    background: rgba(8,11,26,.7); backdrop-filter: blur(10px); position: relative; overflow: hidden;
+    border-radius: 22px; padding: 42px 36px; border: 1px solid var(--line);
+    background: linear-gradient(165deg, rgba(13,18,40,.95), rgba(6,8,20,.96));
+    position: relative; overflow: hidden;
     transition: transform .18s ease-out, border-color .3s; transform-style: preserve-3d; will-change: transform;
   }
-  .c-side:hover { border-color: rgba(0,229,255,.4); }
-  .c-side h3 { font-size: 1.5rem; font-weight: 800; transform: translateZ(30px); }
-  .c-side .c-big { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .3em;
-    text-transform: uppercase; color: var(--holo4); }
+  .c-side:hover { border-color: rgba(34,233,255,.5); }
+  .c-side h3 { font-size: 1.5rem; font-weight: 800; color: #fff; transform: translateZ(30px); }
+  .c-big { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .3em;
+    text-transform: uppercase; color: var(--holo4); text-shadow: 0 0 14px rgba(67,255,201,.5); }
   .c-side ul { margin-top: 22px; list-style: none; display: flex; flex-direction: column; gap: 13px; transform: translateZ(18px); }
-  .c-side li { display: flex; gap: 12px; font-size: .95rem; color: #c6ccdb; line-height: 1.55; }
-  .c-side li::before { content: '◆'; color: var(--holo1); font-size: 10px; margin-top: 5px; flex-shrink: 0;
+  .c-side li { display: flex; gap: 12px; font-size: .97rem; color: #d6dbe8; line-height: 1.6; }
+  .c-side li b { color: #fff; }
+  .c-side li::before { content: '◆'; color: var(--holo1); font-size: 10px; margin-top: 6px; flex-shrink: 0;
     text-shadow: 0 0 10px var(--holo1); }
 
   /* ════════ CAPABILITY MARQUEE ════════ */
   .cap-band { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
-    padding: 26px 0; overflow: hidden; background: rgba(6,9,22,.6);
+    padding: 26px 0; overflow: hidden; background: rgba(5,8,18,.85); position: relative; z-index: 5;
     mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
     -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent); }
   .cap-track { display: flex; gap: 54px; width: max-content; animation: capscroll 44s linear infinite; }
   .cap-track span { font-family: 'JetBrains Mono', monospace; font-size: 13px; letter-spacing: .14em;
-    text-transform: uppercase; color: var(--dim); white-space: nowrap; }
+    text-transform: uppercase; color: #9aa4ba; white-space: nowrap; }
   .cap-track span i { font-style: normal; color: var(--holo2); margin-right: 10px; text-shadow: 0 0 12px var(--holo2); }
   @keyframes capscroll { to { transform: translateX(-50%); } }
 
   /* ════════ DOWNLOAD ════════ */
-  .dl-grid { margin-top: 60px; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; perspective: 1200px; }
+  .dl-grid { margin-top: 56px; display: grid; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); gap: 18px; perspective: 1200px; }
   .dl-card {
-    border-radius: 18px; padding: 34px 26px; text-align: center; cursor: pointer;
-    border: 1px solid var(--line); background: rgba(8,11,26,.7); backdrop-filter: blur(8px);
+    border-radius: 18px; padding: 32px 24px; text-align: center; cursor: pointer;
+    border: 1px solid var(--line); background: linear-gradient(165deg, rgba(13,18,40,.95), rgba(6,8,20,.96));
     transition: transform .2s, border-color .3s, box-shadow .3s;
   }
-  .dl-card:hover { transform: translateY(-6px); border-color: rgba(0,229,255,.45); box-shadow: 0 0 36px rgba(0,229,255,.16); }
-  .dl-ico { font-size: 34px; filter: drop-shadow(0 0 14px rgba(0,229,255,.4)); }
-  .dl-name { margin-top: 14px; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 1rem; }
-  .dl-meta { margin-top: 5px; font-size: .78rem; color: var(--dim); }
+  .dl-card:hover { transform: translateY(-6px) rotateX(4deg); border-color: rgba(34,233,255,.5); box-shadow: 0 14px 44px rgba(34,233,255,.16); }
+  .dl-ico { font-size: 34px; filter: drop-shadow(0 0 14px rgba(34,233,255,.45)); }
+  .dl-name { margin-top: 14px; font-family: 'Sora', sans-serif; font-weight: 700; font-size: 1rem; color: #fff; }
+  .dl-meta { margin-top: 5px; font-size: .8rem; color: var(--dim); }
   .dl-get { margin-top: 16px; display: inline-block; font-size: 12.5px; font-weight: 700; letter-spacing: .06em; }
   .dl-version { margin-top: 26px; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 11.5px; letter-spacing: .1em; color: var(--dim); }
   .install-note { display: none; max-width: 640px; margin: 26px auto 0; text-align: left;
     border: 1px solid var(--line); border-radius: 14px; padding: 20px 24px;
-    font-size: .88rem; line-height: 1.7; color: var(--muted); background: rgba(8,11,26,.85); }
-  .install-note strong { color: var(--text); }
-  .install-note code { display: inline-block; background: rgba(0,229,255,.08); border: 1px solid rgba(0,229,255,.2);
+    font-size: .9rem; line-height: 1.7; color: var(--muted); background: rgba(8,11,26,.95); }
+  .install-note strong { color: #fff; }
+  .install-note code { display: inline-block; background: rgba(34,233,255,.08); border: 1px solid rgba(34,233,255,.25);
     border-radius: 7px; padding: 3px 10px; font-family: 'JetBrains Mono', monospace; font-size: .8rem; color: var(--holo1); margin: 4px 0; }
 
   /* ════════ CONTACT ════════ */
-  .form-wrap { max-width: 660px; margin: 0 auto; }
-  .form { margin-top: 54px; display: flex; flex-direction: column; gap: 15px; text-align: left; }
+  .form-wrap { max-width: 720px; margin: 0 auto; }
+  .form { margin-top: 50px; display: flex; flex-direction: column; gap: 15px; text-align: left; }
   .f-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
   @media (max-width: 560px) { .f-row { grid-template-columns: 1fr; } }
   .inp, textarea.inp {
-    width: 100%; background: rgba(8,11,26,.8); border: 1px solid var(--line);
-    border-radius: 13px; padding: 16px 18px; color: var(--text);
+    width: 100%; background: rgba(10,14,30,.9); border: 1px solid var(--line);
+    border-radius: 13px; padding: 16px 18px; color: #fff;
     font-family: 'Inter', sans-serif; font-size: 14.5px; outline: none;
     transition: border-color .25s, box-shadow .25s;
   }
-  .inp::placeholder { color: var(--dim); }
-  .inp:focus { border-color: rgba(0,229,255,.55); box-shadow: 0 0 0 4px rgba(0,229,255,.08), 0 0 24px rgba(0,229,255,.12); }
+  .inp::placeholder { color: #8b93a8; }
+  .inp:focus { border-color: rgba(34,233,255,.6); box-shadow: 0 0 0 4px rgba(34,233,255,.1), 0 0 24px rgba(34,233,255,.14); }
   textarea.inp { resize: vertical; min-height: 110px; }
   .form .btn-holo { margin-top: 8px; justify-content: center; }
   .f-note { font-size: 12px; color: var(--dim); text-align: center; }
-  .f-error { display: none; font-size: 13.5px; color: #ff6b81; text-align: center; text-shadow: 0 0 12px rgba(255,80,120,.4); }
-  #otp-step { display: none; margin-top: 54px; text-align: center; }
-  .otp-sent { color: var(--muted); font-size: .96rem; line-height: 1.7; }
-  .otp-sent b { color: var(--text); }
+  .f-error { display: none; font-size: 13.5px; color: #ff7b91; text-align: center; text-shadow: 0 0 12px rgba(255,90,130,.4); }
+  #otp-step { display: none; margin-top: 50px; text-align: center; }
+  .otp-sent { color: var(--muted); font-size: .98rem; line-height: 1.7; }
+  .otp-sent b { color: #fff; }
   .otp-input {
     margin: 30px auto 0; display: block; width: 250px; text-align: center;
     letter-spacing: 16px; font-size: 1.6rem; font-weight: 600; font-family: 'JetBrains Mono', monospace;
-    background: rgba(8,11,26,.85); border: 1px solid var(--line); border-radius: 14px;
+    background: rgba(10,14,30,.95); border: 1px solid var(--line); border-radius: 14px;
     padding: 16px 0 16px 16px; color: var(--holo1); outline: none;
-    text-shadow: 0 0 16px rgba(0,229,255,.6);
+    text-shadow: 0 0 16px rgba(34,233,255,.6);
   }
-  .otp-input:focus { border-color: rgba(0,229,255,.6); box-shadow: 0 0 30px rgba(0,229,255,.15); }
+  .otp-input:focus { border-color: rgba(34,233,255,.65); box-shadow: 0 0 30px rgba(34,233,255,.18); }
   #otp-step .btn-holo { margin-top: 28px; }
   .otp-links { margin-top: 22px; font-size: 13px; color: var(--dim); }
   .otp-links a { color: var(--muted); border-bottom: 1px solid var(--line); cursor: pointer; }
   .otp-links a:hover { color: var(--holo1); }
   .otp-links a.off { opacity: .3; pointer-events: none; }
-  .f-success { display: none; margin-top: 54px; text-align: center; }
+  .f-success { display: none; margin-top: 50px; text-align: center; }
   .f-success .tick { width: 72px; height: 72px; margin: 0 auto; border-radius: 50%; display: grid; place-items: center;
-    font-size: 30px; color: var(--holo4); border: 1px solid rgba(52,245,197,.5);
-    background: rgba(52,245,197,.07); box-shadow: 0 0 44px rgba(52,245,197,.25); }
-  .f-success h3 { margin-top: 24px; font-size: 1.4rem; }
-  .f-success p { margin-top: 10px; color: var(--muted); font-size: .95rem; }
+    font-size: 30px; color: var(--holo4); border: 1px solid rgba(67,255,201,.55);
+    background: rgba(67,255,201,.08); box-shadow: 0 0 44px rgba(67,255,201,.3); }
+  .f-success h3 { margin-top: 24px; font-size: 1.4rem; color: #fff; }
+  .f-success p { margin-top: 10px; color: var(--muted); font-size: .96rem; }
 
   footer { position: relative; z-index: 5; border-top: 1px solid var(--line);
     padding: 42px clamp(22px, 5vw, 64px); display: flex; align-items: center;
-    justify-content: space-between; flex-wrap: wrap; gap: 16px; background: rgba(3,4,10,.85); }
-  .f-copy { font-size: 12px; color: var(--dim); }
+    justify-content: space-between; flex-wrap: wrap; gap: 16px; background: rgba(4,6,14,.96); }
+  .f-copy { font-size: 12.5px; color: var(--dim); }
   @media (max-width: 560px) { footer { justify-content: center; } }
 </style>
 </head>
@@ -316,7 +359,6 @@
 
 <canvas id="webgl"></canvas>
 <div class="scanlines"></div>
-<div class="vignette"></div>
 
 <main>
 <nav>
@@ -331,58 +373,78 @@
 
 <!-- HERO -->
 <header class="hero">
-  <div class="hero-chip">DESKTOP · WEB · ANDROID · IPHONE · CUSTOM</div>
-  <h1>
-    <span class="ghost">Need software for your business?</span><br>
-    <span class="holo-text">We'll build it. Exactly how you want.</span>
-  </h1>
-  <p class="hero-sub">Desktop, web, Android, iPhone — <b>offline-only</b> if you don't want to share your data, <b>cloud</b> if you want access from anywhere, or <b>fully custom</b>, tailored feature by feature. Whatever you imagine, we deliver.</p>
-  <div class="hero-cta">
-    <a href="#contact" class="btn-holo">Start your project ⚡</a>
-    <a href="#build" class="btn-wire">Explore ↓</a>
+  <div class="hero-inner" id="hero-inner">
+    <div class="hero-chip">DESKTOP · WEB · ANDROID · IPHONE · CUSTOM</div>
+    <h1>
+      <span class="text3d" style="color:#fff">Need software for your business?</span><br>
+      <span class="holo-text">We'll build it. Exactly how you want.</span>
+    </h1>
+    <p class="hero-sub">Desktop, web, Android, iPhone — <b>offline-only</b> if you don't want to share your data, <b>cloud</b> if you want access from anywhere, or <b>fully custom</b>, tailored feature by feature. Whatever you imagine, we deliver.</p>
+    <div class="hero-cta">
+      <a href="#contact" class="btn-holo">Start your project ⚡</a>
+      <a href="#build" class="btn-wire">Explore ↓</a>
+    </div>
+    <div class="hero-stats">
+      <div class="hstat"><b class="holo-text">∞</b><span>Customization</span></div>
+      <div class="hstat"><b>4</b><span>Platforms</span></div>
+      <div class="hstat"><b>0</b><span>Forced cloud</span></div>
+      <div class="hstat"><b>100%</b><span>Tailor-made</span></div>
+    </div>
   </div>
-  <div class="hero-stats">
-    <div class="hstat"><b class="holo-text">∞</b><span>Customization</span></div>
-    <div class="hstat"><b>4</b><span>Platforms</span></div>
-    <div class="hstat"><b>0</b><span>Forced cloud</span></div>
-    <div class="hstat"><b>100%</b><span>Tailor-made</span></div>
-  </div>
-  <div class="scroll-hint">Scroll</div>
+  <div class="scroll-hint">Scroll to fly through ▼</div>
 </header>
 
 <!-- WHAT WE BUILD -->
 <section id="build">
-  <div class="wrap center">
-    <div class="reveal">
+  <div class="wrap">
+    <div class="stage reveal center">
       <div class="eyebrow">// What we build</div>
       <h2 class="sec-title">Every kind of software.<br><span class="holo-text">One obsession with quality.</span></h2>
       <p class="sec-sub">Tell us what your business needs. We'll build it — on the platform that fits, with the features that matter, nothing you don't need.</p>
-    </div>
-    <div class="offer-grid">
-      <div class="o-card tilt reveal"><div class="o-card-inner">
-        <div class="o-ico">🖥️</div>
-        <h3>Desktop Apps</h3>
-        <p>Blazing-fast Windows &amp; Mac software that runs fully offline. Billing, inventory, reports — working even when the internet isn't.</p>
-        <div class="o-foot holo-text">// Local-first · Zero lag</div>
-      </div></div>
-      <div class="o-card tilt reveal"><div class="o-card-inner">
-        <div class="o-ico">🌐</div>
-        <h3>Cloud Web Apps</h3>
-        <p>Open from any browser, any device, anywhere. Multi-user, multi-branch, always in sync — hosted and managed for you.</p>
-        <div class="o-foot holo-text">// Anywhere access</div>
-      </div></div>
-      <div class="o-card tilt reveal"><div class="o-card-inner">
-        <div class="o-ico">📱</div>
-        <h3>Mobile Apps</h3>
-        <p>Native-feel Android and iPhone apps for you, your staff, and your customers — connected to your desktop or cloud system.</p>
-        <div class="o-foot holo-text">// Android + iOS</div>
-      </div></div>
-      <div class="o-card tilt reveal"><div class="o-card-inner">
-        <div class="o-ico">🛠️</div>
-        <h3>Fully Custom Builds</h3>
-        <p>Your workflow is unique — your software should be too. We add, remove and redesign features until it fits your business like a glove.</p>
-        <div class="o-foot holo-text">// Tailored end-to-end</div>
-      </div></div>
+
+      <div class="cube-row">
+        <div class="cube-scene">
+          <div class="cube">
+            <div class="face f1"><span>🖥️</span>Desktop</div>
+            <div class="face f2"><span>🌐</span>Web App</div>
+            <div class="face f3"><span>🤖</span>Android</div>
+            <div class="face f4"><span>🍎</span>iPhone</div>
+            <div class="face f5"><span>🛠️</span>Custom</div>
+            <div class="face f6"><span>⚡</span>Hybrid</div>
+          </div>
+        </div>
+        <div class="cube-copy">
+          <h3>One team. <span class="holo-text">Every platform.</span></h3>
+          <p>Hover the cube — every face is something we ship. Pick one platform or combine them: a desktop app for the counter, a web dashboard for the owner, a mobile app for the staff. All talking to each other.</p>
+        </div>
+      </div>
+
+      <div class="offer-grid">
+        <div class="o-card tilt"><div class="o-card-inner">
+          <div class="o-ico">🖥️</div>
+          <h3>Desktop Apps</h3>
+          <p>Blazing-fast Windows &amp; Mac software that runs fully offline. Billing, inventory, reports — working even when the internet isn't.</p>
+          <div class="o-foot holo-text">// Local-first · Zero lag</div>
+        </div></div>
+        <div class="o-card tilt"><div class="o-card-inner">
+          <div class="o-ico">🌐</div>
+          <h3>Cloud Web Apps</h3>
+          <p>Open from any browser, any device, anywhere. Multi-user, multi-branch, always in sync — hosted and managed for you.</p>
+          <div class="o-foot holo-text">// Anywhere access</div>
+        </div></div>
+        <div class="o-card tilt"><div class="o-card-inner">
+          <div class="o-ico">📱</div>
+          <h3>Mobile Apps</h3>
+          <p>Native-feel Android and iPhone apps for you, your staff, and your customers — connected to your desktop or cloud system.</p>
+          <div class="o-foot holo-text">// Android + iOS</div>
+        </div></div>
+        <div class="o-card tilt"><div class="o-card-inner">
+          <div class="o-ico">🛠️</div>
+          <h3>Fully Custom Builds</h3>
+          <p>Your workflow is unique — your software should be too. We add, remove and redesign features until it fits your business like a glove.</p>
+          <div class="o-foot holo-text">// Tailored end-to-end</div>
+        </div></div>
+      </div>
     </div>
   </div>
 </section>
@@ -396,32 +458,32 @@
 
 <!-- YOUR DATA YOUR RULES -->
 <section id="choice">
-  <div class="wrap center">
-    <div class="reveal">
+  <div class="wrap">
+    <div class="stage reveal center">
       <div class="eyebrow">// Your data, your rules</div>
       <h2 class="sec-title">Local-only? Cloud? <span class="holo-text">You decide.</span></h2>
       <p class="sec-sub">Most companies force you onto their cloud. We give you the choice — and build it your way.</p>
-    </div>
-    <div class="choice">
-      <div class="c-side tilt reveal">
-        <div class="c-big">Option 01 — Private</div>
-        <h3 style="margin-top:14px">🔒 Local-Only</h3>
-        <ul>
-          <li>Everything stays on <b>your computer</b> — nothing is ever uploaded</li>
-          <li>Works 100% without internet, forever</li>
-          <li>No cloud account, no servers, no breach risk</li>
-          <li>Instant — every screen opens in milliseconds</li>
-        </ul>
-      </div>
-      <div class="c-side tilt reveal">
-        <div class="c-big">Option 02 — Connected</div>
-        <h3 style="margin-top:14px">☁️ Cloud Web App</h3>
-        <ul>
-          <li>Open from shop, home, phone — anywhere</li>
-          <li>Team works together in real time</li>
-          <li>Automatic backups, managed hosting</li>
-          <li>Or go <b>hybrid</b> — local speed with cloud sync</li>
-        </ul>
+      <div class="choice">
+        <div class="c-side tilt">
+          <div class="c-big">Option 01 — Private</div>
+          <h3 style="margin-top:14px">🔒 Local-Only</h3>
+          <ul style="text-align:left">
+            <li>Everything stays on <b>your computer</b> — nothing is ever uploaded</li>
+            <li>Works 100% without internet, forever</li>
+            <li>No cloud account, no servers, no breach risk</li>
+            <li>Instant — every screen opens in milliseconds</li>
+          </ul>
+        </div>
+        <div class="c-side tilt">
+          <div class="c-big">Option 02 — Connected</div>
+          <h3 style="margin-top:14px">☁️ Cloud Web App</h3>
+          <ul style="text-align:left">
+            <li>Open from shop, home, phone — anywhere</li>
+            <li>Team works together in real time</li>
+            <li>Automatic backups, managed hosting</li>
+            <li>Or go <b>hybrid</b> — local speed with cloud sync</li>
+          </ul>
+        </div>
       </div>
     </div>
   </div>
@@ -429,88 +491,88 @@
 
 <!-- DOWNLOAD -->
 <section id="download">
-  <div class="wrap center">
-    <div class="reveal">
+  <div class="wrap">
+    <div class="stage reveal center">
       <div class="eyebrow">// Ready-made apps</div>
       <h2 class="sec-title">Try our apps <span class="holo-text">today</span></h2>
       <p class="sec-sub">30+ business types covered out of the box — pharmacy, restaurant, salon, gym, CRM and more. One installer, pick yours on first launch. Free 30-day trial.</p>
-    </div>
-    <div class="dl-grid reveal">
-      <a href="#" class="dl-card" id="dl-win">
-        <div class="dl-ico">🪟</div><div class="dl-name">Windows</div>
-        <div class="dl-meta">Windows 10 / 11 · 64-bit</div>
-        <span class="dl-get holo-text">DOWNLOAD ↓</span>
-      </a>
-      <a href="#" class="dl-card" id="dl-mac-arm">
-        <div class="dl-ico">🍎</div><div class="dl-name">Mac · Apple Silicon</div>
-        <div class="dl-meta">M1 / M2 / M3 / M4</div>
-        <span class="dl-get holo-text">DOWNLOAD ↓</span>
-      </a>
-      <a href="#" class="dl-card" id="dl-mac-intel">
-        <div class="dl-ico">🍎</div><div class="dl-name">Mac · Intel</div>
-        <div class="dl-meta">Older MacBook / iMac</div>
-        <span class="dl-get holo-text">DOWNLOAD ↓</span>
-      </a>
-      <a href="#" class="dl-card" id="dl-android">
-        <div class="dl-ico">🤖</div><div class="dl-name">Android</div>
-        <div class="dl-meta">Phone / Tablet · Android 8+</div>
-        <span class="dl-get holo-text">DOWNLOAD ↓</span>
-      </a>
-    </div>
-    <div class="dl-version" id="dl-version">FETCHING LATEST VERSION…</div>
+      <div class="dl-grid">
+        <a href="#" class="dl-card" id="dl-win">
+          <div class="dl-ico">🪟</div><div class="dl-name">Windows</div>
+          <div class="dl-meta">Windows 10 / 11 · 64-bit</div>
+          <span class="dl-get holo-text">DOWNLOAD ↓</span>
+        </a>
+        <a href="#" class="dl-card" id="dl-mac-arm">
+          <div class="dl-ico">🍎</div><div class="dl-name">Mac · Apple Silicon</div>
+          <div class="dl-meta">M1 / M2 / M3 / M4</div>
+          <span class="dl-get holo-text">DOWNLOAD ↓</span>
+        </a>
+        <a href="#" class="dl-card" id="dl-mac-intel">
+          <div class="dl-ico">🍎</div><div class="dl-name">Mac · Intel</div>
+          <div class="dl-meta">Older MacBook / iMac</div>
+          <span class="dl-get holo-text">DOWNLOAD ↓</span>
+        </a>
+        <a href="#" class="dl-card" id="dl-android">
+          <div class="dl-ico">🤖</div><div class="dl-name">Android</div>
+          <div class="dl-meta">Phone / Tablet · Android 8+</div>
+          <span class="dl-get holo-text">DOWNLOAD ↓</span>
+        </a>
+      </div>
+      <div class="dl-version" id="dl-version">FETCHING LATEST VERSION…</div>
 
-    <div id="mac-install-note" class="install-note">
-      <strong>Mac — one extra step.</strong> macOS may show "App is damaged" — a standard prompt for apps outside the App Store. FrontStores is safe. Copy the app to Applications, open Terminal, paste this and press Enter:<br>
-      <code>xattr -cr /Applications/FrontStores.app</code><br>
-      Then open it normally. One time only.
-    </div>
-    <div id="win-install-note" class="install-note">
-      <strong>Windows — SmartScreen popup.</strong> Windows may show "Windows protected your PC" — normal for new apps. FrontStores is safe. Click <strong>More info</strong> → <strong>Run anyway</strong>.
-    </div>
-    <div id="android-install-note" class="install-note">
-      <strong>Android — outside Play Store.</strong> Android may show "Install blocked for your safety" — normal for direct downloads. FrontStores is safe. Tap <strong>Settings</strong> → enable <strong>"Allow from this source"</strong> → tap <strong>Install</strong>.
+      <div id="mac-install-note" class="install-note">
+        <strong>Mac — one extra step.</strong> macOS may show "App is damaged" — a standard prompt for apps outside the App Store. FrontStores is safe. Copy the app to Applications, open Terminal, paste this and press Enter:<br>
+        <code>xattr -cr /Applications/FrontStores.app</code><br>
+        Then open it normally. One time only.
+      </div>
+      <div id="win-install-note" class="install-note">
+        <strong>Windows — SmartScreen popup.</strong> Windows may show "Windows protected your PC" — normal for new apps. FrontStores is safe. Click <strong>More info</strong> → <strong>Run anyway</strong>.
+      </div>
+      <div id="android-install-note" class="install-note">
+        <strong>Android — outside Play Store.</strong> Android may show "Install blocked for your safety" — normal for direct downloads. FrontStores is safe. Tap <strong>Settings</strong> → enable <strong>"Allow from this source"</strong> → tap <strong>Install</strong>.
+      </div>
     </div>
   </div>
 </section>
 
 <!-- CONTACT -->
 <section id="contact">
-  <div class="form-wrap center">
-    <div class="reveal">
+  <div class="form-wrap">
+    <div class="stage reveal center">
       <div class="eyebrow">// Start a project</div>
       <h2 class="sec-title">Tell us what <span class="holo-text">you dream of</span></h2>
       <p class="sec-sub">Describe your business and what you need — local, cloud, mobile or fully custom. We verify your number on WhatsApp. No spam, ever.</p>
-    </div>
 
-    <form class="form reveal" id="contact-form">
-      <div class="f-row">
-        <input class="inp" type="text" name="name" placeholder="Your name *" required maxlength="100" />
-        <input class="inp" type="text" name="shop_type" placeholder="Your business type *" required maxlength="50" />
-      </div>
-      <div class="f-row">
-        <input class="inp" type="tel" name="mobile" placeholder="WhatsApp number *" required maxlength="13" />
-        <input class="inp" type="email" name="email" placeholder="Email *" required maxlength="200" />
-      </div>
-      <textarea class="inp" name="message" placeholder="What should we build for you? *" required maxlength="1000"></textarea>
-      <div class="f-error" id="f-error"></div>
-      <button class="btn-holo" type="submit" id="f-btn">Verify on WhatsApp →</button>
-      <div class="f-note">All fields are required. A 6-digit code will be sent to your WhatsApp.</div>
-    </form>
+      <form class="form" id="contact-form">
+        <div class="f-row">
+          <input class="inp" type="text" name="name" placeholder="Your name *" required maxlength="100" />
+          <input class="inp" type="text" name="shop_type" placeholder="Your business type *" required maxlength="50" />
+        </div>
+        <div class="f-row">
+          <input class="inp" type="tel" name="mobile" placeholder="WhatsApp number *" required maxlength="13" />
+          <input class="inp" type="email" name="email" placeholder="Email *" required maxlength="200" />
+        </div>
+        <textarea class="inp" name="message" placeholder="What should we build for you? *" required maxlength="1000"></textarea>
+        <div class="f-error" id="f-error"></div>
+        <button class="btn-holo" type="submit" id="f-btn">Verify on WhatsApp →</button>
+        <div class="f-note">All fields are required. A 6-digit code will be sent to your WhatsApp.</div>
+      </form>
 
-    <div id="otp-step">
-      <div class="otp-sent">We sent a 6-digit code to your WhatsApp<br><b id="otp-phone"></b></div>
-      <input class="otp-input" id="otp-input" type="text" inputmode="numeric" maxlength="6" placeholder="······" autocomplete="one-time-code" />
-      <div class="f-error" id="otp-error" style="margin-top:18px"></div>
-      <button class="btn-holo" id="otp-verify">Verify &amp; send →</button>
-      <div class="otp-links">
-        <a id="otp-resend">Resend code</a> &nbsp;·&nbsp; <a id="otp-back">Change details</a>
+      <div id="otp-step">
+        <div class="otp-sent">We sent a 6-digit code to your WhatsApp<br><b id="otp-phone"></b></div>
+        <input class="otp-input" id="otp-input" type="text" inputmode="numeric" maxlength="6" placeholder="······" autocomplete="one-time-code" />
+        <div class="f-error" id="otp-error" style="margin-top:18px"></div>
+        <button class="btn-holo" id="otp-verify">Verify &amp; send →</button>
+        <div class="otp-links">
+          <a id="otp-resend">Resend code</a> &nbsp;·&nbsp; <a id="otp-back">Change details</a>
+        </div>
       </div>
-    </div>
 
-    <div class="f-success" id="f-success">
-      <div class="tick">✓</div>
-      <h3>Transmission received</h3>
-      <p>Your number is verified and your project brief is with us.<br>We'll reach out on WhatsApp.</p>
+      <div class="f-success" id="f-success">
+        <div class="tick">✓</div>
+        <h3>Transmission received</h3>
+        <p>Your number is verified and your project brief is with us.<br>We'll reach out on WhatsApp.</p>
+      </div>
     </div>
   </div>
 </section>
@@ -529,81 +591,127 @@
   const introTimer = setTimeout(openIntro, 4600);
   intro.addEventListener('click', () => { clearTimeout(introTimer); openIntro(); });
 
-  // ── WebGL holographic particle field ──
+  // ── WebGL: scroll-driven 3D flight ──
+  // The camera flies forward through three zones as you scroll:
+  //   zone 1 (hero)    — neon wave grid + floating wireframe polyhedra
+  //   zone 2 (middle)  — holographic ring tunnel
+  //   zone 3 (end)     — particle nebula burst
   (function () {
     const canvas = document.getElementById('webgl');
     if (!window.THREE || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { canvas.remove(); return; }
     let renderer;
     try { renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true }); }
     catch { canvas.remove(); return; }
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.8));
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 100);
-    camera.position.z = 7;
+    scene.fog = new THREE.FogExp2(0x04060e, 0.026);
+    const camera = new THREE.PerspectiveCamera(64, innerWidth / innerHeight, .1, 220);
 
-    // particle globe
-    const N = 2400, pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
-    const palette = [[0,.9,1],[.48,.36,1],[1,.3,.8],[.2,.96,.77]];
-    for (let i = 0; i < N; i++) {
-      const phi = Math.acos(2 * Math.random() - 1), th = Math.random() * Math.PI * 2;
-      const r = 2.6 + (Math.random() - .5) * .18;
-      pos[i*3]   = r * Math.sin(phi) * Math.cos(th);
-      pos[i*3+1] = r * Math.cos(phi);
-      pos[i*3+2] = r * Math.sin(phi) * Math.sin(th);
-      const c = palette[(Math.random() * palette.length) | 0];
-      col[i*3] = c[0]; col[i*3+1] = c[1]; col[i*3+2] = c[2];
+    const COL = { cyan: 0x22e9ff, violet: 0x8f73ff, pink: 0xff5fd2, mint: 0x43ffc9 };
+
+    // ── zone 1: neon wave grid floor ──
+    const GW = 90, GH = 60, gridGeo = new THREE.PlaneGeometry(160, 110, GW, GH);
+    const grid = new THREE.Mesh(gridGeo, new THREE.MeshBasicMaterial({ color: COL.violet, wireframe: true, transparent: true, opacity: .16 }));
+    grid.rotation.x = -Math.PI / 2; grid.position.y = -7;
+    scene.add(grid);
+    const gridBase = gridGeo.attributes.position.array.slice();
+
+    // floating wireframe polyhedra along the whole flight path
+    const shapes = [];
+    const geos = [new THREE.IcosahedronGeometry(1.1, 0), new THREE.OctahedronGeometry(1.3, 0), new THREE.TetrahedronGeometry(1.2, 0), new THREE.TorusGeometry(1, .3, 8, 22)];
+    const cols = [COL.cyan, COL.violet, COL.pink, COL.mint];
+    for (let i = 0; i < 26; i++) {
+      const m = new THREE.Mesh(geos[i % 4], new THREE.MeshBasicMaterial({ color: cols[i % 4], wireframe: true, transparent: true, opacity: .5 }));
+      m.position.set((Math.random() - .5) * 36, (Math.random() - .4) * 16, -6 - Math.random() * 95);
+      m.userData = { rx: (Math.random() - .5) * .012, ry: (Math.random() - .5) * .016, bob: Math.random() * Math.PI * 2 };
+      shapes.push(m); scene.add(m);
     }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    const globe = new THREE.Points(geo, new THREE.PointsMaterial({ size: .035, vertexColors: true, transparent: true, opacity: .85, blending: THREE.AdditiveBlending, depthWrite: false }));
-    scene.add(globe);
 
-    // inner wireframe core
-    const core = new THREE.Mesh(
-      new THREE.IcosahedronGeometry(1.45, 1),
-      new THREE.MeshBasicMaterial({ color: 0x7b5cff, wireframe: true, transparent: true, opacity: .22 })
-    );
-    scene.add(core);
-
-    // floating star dust
-    const SN = 900, sp = new Float32Array(SN * 3);
-    for (let i = 0; i < SN * 3; i++) sp[i] = (Math.random() - .5) * 30;
-    const sgeo = new THREE.BufferGeometry();
-    sgeo.setAttribute('position', new THREE.BufferAttribute(sp, 3));
-    const dust = new THREE.Points(sgeo, new THREE.PointsMaterial({ size: .022, color: 0x6688ff, transparent: true, opacity: .5, blending: THREE.AdditiveBlending, depthWrite: false }));
-    scene.add(dust);
-
-    let mx = 0, my = 0, scrollY = 0;
-    addEventListener('mousemove', e => { mx = (e.clientX / innerWidth - .5); my = (e.clientY / innerHeight - .5); }, { passive: true });
-    addEventListener('scroll', () => { scrollY = window.scrollY; }, { passive: true });
-
-    function resize() {
-      renderer.setSize(innerWidth, innerHeight);
-      camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+    // ── zone 2: holographic ring tunnel ──
+    const rings = [];
+    for (let i = 0; i < 22; i++) {
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(7.5, .05, 8, 64),
+        new THREE.MeshBasicMaterial({ color: i % 3 === 0 ? COL.pink : (i % 3 === 1 ? COL.cyan : COL.violet), transparent: true, opacity: .55 })
+      );
+      ring.position.z = -28 - i * 3.4;
+      ring.rotation.z = i * .25;
+      rings.push(ring); scene.add(ring);
     }
+
+    // ── zone 3 + everywhere: particle field ──
+    const PN = 2600, pp = new Float32Array(PN * 3), pc = new Float32Array(PN * 3);
+    const pal = [[.13,.91,1],[.56,.45,1],[1,.37,.82],[.26,1,.79]];
+    for (let i = 0; i < PN; i++) {
+      pp[i*3] = (Math.random() - .5) * 60;
+      pp[i*3+1] = (Math.random() - .5) * 34;
+      pp[i*3+2] = -Math.random() * 130;
+      const c = pal[(Math.random() * 4) | 0];
+      pc[i*3] = c[0]; pc[i*3+1] = c[1]; pc[i*3+2] = c[2];
+    }
+    const pgeo = new THREE.BufferGeometry();
+    pgeo.setAttribute('position', new THREE.BufferAttribute(pp, 3));
+    pgeo.setAttribute('color', new THREE.BufferAttribute(pc, 3));
+    scene.add(new THREE.Points(pgeo, new THREE.PointsMaterial({ size: .07, vertexColors: true, transparent: true, opacity: .8, blending: THREE.AdditiveBlending, depthWrite: false })));
+
+    let mx = 0, my = 0, prog = 0;
+    addEventListener('mousemove', e => { mx = e.clientX / innerWidth - .5; my = e.clientY / innerHeight - .5; }, { passive: true });
+    function scrollProg() {
+      const max = document.documentElement.scrollHeight - innerHeight;
+      return max > 0 ? window.scrollY / max : 0;
+    }
+    function resize() { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
     resize(); addEventListener('resize', resize);
 
     let t = 0;
     (function loop() {
       requestAnimationFrame(loop);
-      t += .0035;
-      globe.rotation.y = t; globe.rotation.x = Math.sin(t * .6) * .14;
-      core.rotation.y = -t * 1.4; core.rotation.z = t * .8;
-      dust.rotation.y = t * .25;
-      camera.position.x += (mx * 1.6 - camera.position.x) * .04;
-      camera.position.y += (-my * 1.2 - camera.position.y + scrollY * -.0012) * .04;
-      camera.lookAt(0, 0, 0);
-      const s = 1 + Math.sin(t * 2.2) * .02;
-      core.scale.set(s, s, s);
+      t += .016;
+      prog += (scrollProg() - prog) * .06; // smoothed scroll progress
+
+      // camera flight: z 8 → -88 across the page
+      camera.position.z = 8 - prog * 96;
+      camera.position.x += (mx * 2.2 - camera.position.x) * .05;
+      camera.position.y += (-my * 1.6 + Math.sin(t * .5) * .3 - camera.position.y) * .05;
+      camera.lookAt(camera.position.x * .4, camera.position.y * .4, camera.position.z - 10);
+
+      // wave the grid
+      const pos = gridGeo.attributes.position.array;
+      for (let i = 0; i < pos.length; i += 3) {
+        const x = gridBase[i], y = gridBase[i + 1];
+        pos[i + 2] = Math.sin(x * .25 + t * 1.4) * Math.cos(y * .22 + t) * 1.5;
+      }
+      gridGeo.attributes.position.needsUpdate = true;
+
+      // spin shapes
+      for (const s of shapes) {
+        s.rotation.x += s.userData.rx; s.rotation.y += s.userData.ry;
+        s.position.y += Math.sin(t + s.userData.bob) * .004;
+      }
+      // breathe the tunnel
+      rings.forEach((r, i) => {
+        r.rotation.z += .0035 * (i % 2 ? 1 : -1);
+        const s = 1 + Math.sin(t * 1.6 + i * .5) * .04;
+        r.scale.set(s, s, 1);
+      });
+
       renderer.render(scene, camera);
     })();
   })();
 
+  // ── hero 3D parallax (CSS layer depth) ──
+  const heroInner = document.getElementById('hero-inner');
+  if (heroInner && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    addEventListener('mousemove', e => {
+      const x = e.clientX / innerWidth - .5, y = e.clientY / innerHeight - .5;
+      heroInner.style.transform = `rotateY(${x * 7}deg) rotateX(${y * -7}deg)`;
+    }, { passive: true });
+  }
+
   // ── scroll reveal ──
   const io = new IntersectionObserver(es => {
     es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
-  }, { threshold: .14 });
+  }, { threshold: .12 });
   document.querySelectorAll('.reveal').forEach(el => io.observe(el));
 
   // ── 3D tilt cards ──
@@ -611,7 +719,7 @@
     card.addEventListener('mousemove', e => {
       const r = card.getBoundingClientRect();
       const x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5;
-      card.style.transform = `rotateY(${x * 14}deg) rotateX(${y * -14}deg) translateZ(6px)`;
+      card.style.transform = `rotateY(${x * 13}deg) rotateX(${y * -13}deg) translateZ(8px)`;
       card.style.setProperty('--mx', (e.clientX - r.left) + 'px');
       card.style.setProperty('--my', (e.clientY - r.top) + 'px');
     });
