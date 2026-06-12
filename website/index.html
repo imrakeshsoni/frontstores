@@ -82,6 +82,25 @@
   .intro-stage { text-align: center; position: relative; z-index: 2; animation: slowpush 9s linear forwards; }
   @keyframes slowpush { from { transform: scale(1.06); } to { transform: scale(1); } }
   #intro-net { position: absolute; inset: 0; z-index: 0; opacity: 0; animation: introFade 2.5s .2s ease forwards; }
+  /* terminal-style typing line */
+  .type-line {
+    font-family: 'Sora', sans-serif; font-weight: 800;
+    font-size: clamp(2.2rem, 8.6vw, 6.6rem); line-height: 1.1; letter-spacing: -.02em;
+    color: #fff; white-space: nowrap;
+    filter: drop-shadow(0 0 22px rgba(255,255,255,.5)) drop-shadow(0 0 70px rgba(155,130,255,.45));
+    animation: helloGlow 3.8s 1.2s ease-in-out infinite;
+  }
+  .type-line .holo-text { filter: drop-shadow(0 0 30px rgba(44,236,255,.6)); }
+  .caret {
+    display: inline-block; width: .075em; height: .9em; margin-left: .07em;
+    background: #fff; border-radius: 2px; vertical-align: -.05em;
+    box-shadow: 0 0 18px rgba(255,255,255,.85), 0 0 55px rgba(155,130,255,.65);
+  }
+  .caret.blink { animation: caretBlink 1s steps(1) infinite; }
+  @keyframes caretBlink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+  /* exit: the typed brand flies through the viewer, then the site hits */
+  #intro.zoomout .intro-stage { animation: stageZoom .95s cubic-bezier(.65,0,.3,1) forwards; }
+  @keyframes stageZoom { to { transform: scale(10); opacity: 0; filter: blur(24px); } }
   .intro-presents {
     font-family: 'Sora', sans-serif; font-weight: 600; font-size: clamp(13px, 2vw, 22px);
     letter-spacing: .6em; text-transform: uppercase; color: #f4f6ff; padding-left: .6em;
@@ -465,13 +484,7 @@
   <div class="bar top"></div>
   <div class="bar bot"></div>
   <div class="intro-stage">
-    <div class="intro-presents">Welcome&nbsp;To</div>
-    <div class="intro-title">
-      <span class="brandglow">Front<span class="holo-text">Stores</span></span>
-      <div class="intro-sweep"></div>
-    </div>
-    <div class="intro-rule"></div>
-    <div class="intro-tag">Desktop · Web · Mobile · Custom</div>
+    <div class="type-line"><span id="type-plain"></span><span id="type-holo" class="holo-text"></span><span class="caret blink" id="caret"></span></div>
   </div>
 </div>
 
@@ -703,18 +716,61 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
-  // ── cinematic intro ──
+  // ── cinematic intro: caret blinks twice → types "Welcome to" → deletes →
+  //    types "FrontStores" (brand colours) → zooms through the viewer → site hits ──
   const intro = document.getElementById('intro');
   let netRunning = true;
+  let introDone = false;
   function openIntro() {
-    intro.classList.add('open');
-    document.body.classList.add('warp'); // hero elements warp in from the viewer
-    setTimeout(() => { intro.classList.add('done'); netRunning = false; }, 1100);
+    if (introDone) return;
+    introDone = true;
+    intro.classList.add('zoomout');
+    setTimeout(() => {
+      intro.classList.add('open');
+      document.body.classList.add('warp'); // hero elements warp in from the viewer
+    }, 620);
+    setTimeout(() => { intro.classList.add('done'); netRunning = false; }, 1700);
   }
-  const introTimer = setTimeout(openIntro, 7400);
-  intro.addEventListener('click', () => { clearTimeout(introTimer); openIntro(); });
+  intro.addEventListener('click', openIntro);
+  setTimeout(openIntro, 14000); // safety fallback
   // reduced motion: intro is hidden by CSS — reveal content immediately
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) document.body.classList.add('warp');
+
+  (async function typeSequence() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const plain = document.getElementById('type-plain');
+    const holo = document.getElementById('type-holo');
+    const caret = document.getElementById('caret');
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    const type = async (el, str, speed) => {
+      for (const ch of str) {
+        if (introDone) return;
+        el.textContent += ch;
+        await sleep(speed + Math.random() * 40);
+      }
+    };
+    const erase = async (el, speed) => {
+      while (el.textContent.length) {
+        if (introDone) return;
+        el.textContent = el.textContent.slice(0, -1);
+        await sleep(speed);
+      }
+    };
+
+    await sleep(2100);                       // caret blinks twice
+    caret.classList.remove('blink');
+    await type(plain, 'Welcome to', 80);     // type greeting
+    caret.classList.add('blink');
+    await sleep(950);
+    caret.classList.remove('blink');
+    await erase(plain, 45);                  // delete it
+    await sleep(380);
+    await type(plain, 'Front', 95);          // type the brand
+    await type(holo, 'Stores', 95);
+    caret.classList.add('blink');
+    await sleep(1500);                       // let it glow
+    openIntro();                             // fly through → site hits
+  })();
 
   // ── intro background: a living AI world — neural network + data streams ──
   (function () {
