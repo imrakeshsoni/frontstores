@@ -987,6 +987,61 @@ const publicServer = http.createServer(async (req, res) => {
       const phone = normalizeIndianPhone(mobile);
       if (!phone) { res.writeHead(400); res.end('Enter a valid 10-digit Indian mobile number'); return; }
 
+      const f = {
+        name:      sanitize(name,      100),
+        shop_type: sanitize(shop_type,  50),
+        mobile:    phone,
+        email:     sanitize(email,     200),
+        message:   sanitize(message,  1000),
+      };
+
+      // Known customer? Number already a lead in the FrontStores.com CRM (bot
+      // or previously verified website contact) — skip the OTP entirely: save
+      // the message, refresh their lead, and greet them as a known contact.
+      const crmTenant = websiteCrmTenantId();
+      const allLeads = loadWaLeads();
+      const knownLead = crmTenant ? allLeads.find(l => l.tenant_id === crmTenant && l.from_phone === phone) : null;
+      const knownContact = loadContacts().find(ct => ct.verified && normalizeIndianPhone(ct.mobile) === phone);
+      if (knownLead || knownContact) {
+        const contacts = loadContacts();
+        contacts.unshift({
+          id: crypto.randomBytes(8).toString('hex'),
+          ...f,
+          verified: true,
+          known_number: true,
+          received_at: new Date().toISOString(),
+          resolved: false,
+        });
+        saveContacts(contacts.slice(0, 1000));
+        if (knownLead) {
+          // attach the new message to their existing lead and resync it to the app
+          knownLead.message_preview = `${knownLead.message_preview || ''} | Website (known number): ${f.message} | Email: ${f.email}`.slice(0, 900);
+          knownLead.updated_at = new Date().toISOString();
+          knownLead.imported = false;
+          saveWaLeads(allLeads);
+        } else if (crmTenant) {
+          allLeads.push({
+            id: crypto.randomUUID(),
+            tenant_id: crmTenant,
+            from_phone: phone,
+            from_name: f.name,
+            whatsapp_name: '',
+            company: '',
+            business_type: f.shop_type,
+            software_interest: f.shop_type,
+            assigned_to: loadSubs()[crmTenant]?.owner_name || '',
+            message_preview: `Website enquiry (known contact): ${f.message} | Email: ${f.email}`,
+            source: 'website',
+            received_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            imported: false,
+          });
+          saveWaLeads(allLeads);
+        }
+        console.log(`📩 Known number ${phone} — message accepted without OTP: ${f.name}`);
+        json(res, { ok: true, known: true }); return;
+      }
+
       // lazy purge of stale entries
       for (const [k, v] of contactOtps) { if (Date.now() - v.windowStart > OTP_WINDOW_MS) contactOtps.delete(k); }
 
@@ -1007,13 +1062,7 @@ const publicServer = http.createServer(async (req, res) => {
         windowStart: entry ? entry.windowStart : Date.now(),
         sends: (entry ? entry.sends : 0) + 1, // failed sends count too — caps WA API triggering
         attempts: 0,
-        form: {
-          name:      sanitize(name,      100),
-          shop_type: sanitize(shop_type,  50),
-          mobile:    phone,
-          email:     sanitize(email,     200),
-          message:   sanitize(message,  1000),
-        },
+        form: f,
       };
       contactOtps.set(phone, entry);
       if (!sent || sent.status < 200 || sent.status >= 300) {

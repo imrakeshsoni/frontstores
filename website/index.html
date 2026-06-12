@@ -776,6 +776,18 @@
     const d = await r.json();
     sendsLeft = d.sends_left ?? 0;
     if (sendsLeft <= 0) document.getElementById('otp-resend').classList.add('off');
+    return d;
+  }
+
+  function showSuccess(known) {
+    form.style.display = 'none';
+    otpStep.style.display = 'none';
+    const box = document.getElementById('f-success');
+    if (known) {
+      box.querySelector('h3').textContent = 'We already know you 👋';
+      box.querySelector('p').innerHTML = 'No verification needed — your number is already with us.<br>Your message has been noted; our team will reach out on WhatsApp.';
+    }
+    box.style.display = 'block';
   }
 
   form.addEventListener('submit', async (e) => {
@@ -792,13 +804,18 @@
     if (!/^(\+?91)?[6-9]\d{9}$/.test(payload.mobile.replace(/[\s-]/g, ''))) { showErr(fErr, 'Enter a valid 10-digit Indian WhatsApp number.'); return; }
 
     const btn = document.getElementById('f-btn');
-    btn.disabled = true; btn.textContent = 'Sending code…';
+    btn.disabled = true; btn.textContent = 'Sending…';
     try {
-      await requestOtp();
-      form.style.display = 'none';
-      otpStep.style.display = 'block';
-      document.getElementById('otp-phone').textContent = '+91 ' + payload.mobile.replace(/\D/g, '').slice(-10);
-      document.getElementById('otp-input').focus();
+      const d = await requestOtp();
+      if (d.known) {
+        // number already in our CRM — no OTP needed, message accepted directly
+        showSuccess(true);
+      } else {
+        form.style.display = 'none';
+        otpStep.style.display = 'block';
+        document.getElementById('otp-phone').textContent = '+91 ' + payload.mobile.replace(/\D/g, '').slice(-10);
+        document.getElementById('otp-input').focus();
+      }
     } catch (err) {
       showErr(fErr, err.message);
     }
@@ -818,8 +835,7 @@
         body: JSON.stringify({ mobile: payload.mobile, otp: code }),
       });
       if (!r.ok) throw new Error(await r.text() || 'Verification failed.');
-      otpStep.style.display = 'none';
-      document.getElementById('f-success').style.display = 'block';
+      showSuccess(false);
     } catch (err) {
       showErr(oErr, err.message);
       btn.disabled = false; btn.textContent = 'Verify & send →';
