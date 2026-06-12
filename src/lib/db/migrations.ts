@@ -72,6 +72,7 @@ import migration0071 from '../../../src-tauri/migrations/0071_crm_sales_service.
 import migration0072 from '../../../src-tauri/migrations/0072_crm_salesforce.sql?raw';
 import migration0073 from '../../../src-tauri/migrations/0073_crm_person_accounts.sql?raw';
 import migration0074 from '../../../src-tauri/migrations/0074_crm_account_links.sql?raw';
+import migration0075 from '../../../src-tauri/migrations/0075_crm_wa_messages.sql?raw';
 
 export interface Migration {
   name: string;
@@ -154,5 +155,6 @@ export async function readMigrations(): Promise<Migration[]> {
     { name: '0072_crm_salesforce', sql: migration0072 }, // [crm] [tenant: FrontStores.com]
     { name: '0073_crm_person_accounts', sql: migration0073 }, // [crm] [tenant: FrontStores.com]
     { name: '0074_crm_account_links', sql: migration0074 }, // [crm] [tenant: FrontStores.com]
+    { name: '0075_crm_wa_messages', sql: migration0075 }, // [crm] [all tenants]
   ];
 }

@@ -566,3 +566,55 @@ export async function syncWaLeadsFromServer(tenantId: string, ownerName = ''): P
   }
   return changedAny;
 }
+
+// ── WhatsApp chat transcript sync ────────────────────────────────────────────
+// [crm] [all tenants] — every message the bot exchanges (both directions) is
+// stored on the server and mirrored here so the full conversation is visible
+// in the CRM, not just the extracted lead fields.
+export interface CRMWaMessage {
+  id: string;
+  tenant_id: string;
+  from_phone: string;
+  direction: 'in' | 'out';
+  message: string;
+  sent_at: string | null;
+  updated_at: string | null;
+  deleted_at: string | null;
+}
+
+export async function listCRMWaMessages(tenantId: string, fromPhone: string): Promise<CRMWaMessage[]> {
+  const db = await getDb();
+  return db.select<CRMWaMessage[]>(
+    `SELECT * FROM crm_wa_messages WHERE tenant_id = ? AND from_phone = ? AND deleted_at IS NULL ORDER BY sent_at ASC`,
+    [tenantId, fromPhone]
+  );
+}
+
+export async function syncWaChatsFromServer(tenantId: string): Promise<boolean> {
+  if (!tenantId) return false;
+  const db = await getDb();
+  // Only ask the server for messages newer than what we already have
+  const [last] = await db.select<{ max_at: string | null }[]>(
+    `SELECT MAX(sent_at) AS max_at FROM crm_wa_messages WHERE tenant_id = ?`, [tenantId]
+  );
+  let chats: { from_phone: string; messages: { id: string; dir: string; text: string; at: string }[] }[] = [];
+  try {
+    const since = last?.max_at ? `?since=${encodeURIComponent(last.max_at)}` : '';
+    const res = await fetch(`${WA_LEADS_SERVER}/api/wa-chats/${tenantId}${since}`);
+    chats = (await res.json()).chats ?? [];
+  } catch { return false; } // offline — next poll retries
+  let changed = false;
+  for (const chat of chats) {
+    for (const m of chat.messages ?? []) {
+      if (!m.id || !m.text) continue;
+      const [exists] = await db.select<{ id: string }[]>(`SELECT id FROM crm_wa_messages WHERE id = ?`, [m.id]);
+      if (exists) continue;
+      await db.execute(
+        `INSERT INTO crm_wa_messages (id,tenant_id,from_phone,direction,message,sent_at,updated_at) VALUES (?,?,?,?,?,?,?)`,
+        [m.id, tenantId, chat.from_phone, m.dir === 'out' ? 'out' : 'in', m.text, m.at, now()]
+      );
+      changed = true;
+    }
+  }
+  return changed;
+}

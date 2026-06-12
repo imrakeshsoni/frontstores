@@ -737,12 +737,15 @@ export function AppLayout() {
     const ownerName = config?.owner_name ?? '';
     const sync = () => {
       import('@/lib/db/crm')
-        .then(({ syncWaLeadsFromServer }) => syncWaLeadsFromServer(tenantId, ownerName))
-        .then(changed => {
-          if (changed) {
+        .then(async ({ syncWaLeadsFromServer, syncWaChatsFromServer }) => {
+          const leadsChanged = await syncWaLeadsFromServer(tenantId, ownerName);
+          // [crm] [all tenants] — mirror full bot chat transcripts into the CRM
+          const chatsChanged = await syncWaChatsFromServer(tenantId).catch(() => false);
+          if (leadsChanged) {
             queryClient.invalidateQueries({ queryKey: ['crm-wa-inbox'] });
             queryClient.invalidateQueries({ queryKey: ['crm-leads'] });
           }
+          if (chatsChanged) queryClient.invalidateQueries({ queryKey: ['crm-wa-chat'] });
         })
         .catch(() => { /* offline or db busy — next poll retries */ });
     };

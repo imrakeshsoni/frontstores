@@ -148,6 +148,83 @@ async function sendWaMessage(phoneId, token, to, text) {
   });
 }
 
+// ── [crm] [all tenants] — WA bot hardening helpers ──────────────────────────
+const WA_BLOCKLIST_FILE = path.join(DATA_DIR, 'wa-blocklist.json');
+function loadWaBlocklist() { try { return JSON.parse(fs.readFileSync(WA_BLOCKLIST_FILE, 'utf8')); } catch { return {}; } }
+function saveWaBlocklist(d) { fs.writeFileSync(WA_BLOCKLIST_FILE, JSON.stringify(d, null, 2)); }
+
+// Profanity — English + common Hindi transliterations. Matched on word
+// boundaries so normal words containing these letters don't false-positive.
+const WA_PROFANITY = [
+  'fuck', 'fucking', 'fucker', 'shit', 'bitch', 'bastard', 'asshole', 'dick', 'cunt', 'whore', 'slut',
+  'bhosdike', 'bhosdi', 'bhosadike', 'madarchod', 'behenchod', 'bhenchod', 'bc', 'mc', 'chutiya',
+  'chutiye', 'gandu', 'gaandu', 'gand', 'lund', 'lauda', 'lawda', 'randi', 'harami', 'haramkhor',
+  'kamina', 'kamine', 'kutta', 'kutte', 'kutiya', 'saala', 'saale', 'tatti',
+];
+const WA_PROFANITY_RE = new RegExp(`(?:^|[^a-z])(${WA_PROFANITY.join('|')})(?:[^a-z]|$)`, 'i');
+function hasProfanity(text) { return WA_PROFANITY_RE.test(String(text || '')); }
+
+// Junk that should never be accepted as a "name" answer
+const WA_JUNK_WORDS = new Set([
+  'hi', 'hii', 'hiii', 'hello', 'helo', 'hey', 'ok', 'okay', 'k', 'yes', 'no', 'hmm', 'hmmm', 'haan',
+  'ha', 'nahi', 'what', 'why', 'who', 'kya', 'kyu', 'kaun', 'good', 'morning', 'evening', 'night',
+  'thanks', 'thank', 'thx', 'test', 'testing', '.', '?', 'xyz', 'abc', 'asdf',
+]);
+
+// Clean an answer before storing: strip control chars, markdown markers (they'd
+// break our *bold* replies), URLs, collapse whitespace, cap length.
+function cleanWaAnswer(text, maxLen = 120) {
+  return String(text || '')
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/https?:\/\/\S+/gi, '')
+    .replace(/[*_~`]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLen);
+}
+
+function looksLikeValidName(name) {
+  if (!name || name.length < 2 || name.length > 60) return false;
+  const letters = (name.match(/[a-zA-Zऀ-ॿ]/g) || []).length;
+  if (letters < 2) return false;
+  const digits = (name.match(/\d/g) || []).length;
+  if (digits > name.length / 2) return false;
+  if (WA_JUNK_WORDS.has(name.toLowerCase())) return false;
+  if (hasProfanity(name)) return false;
+  return true;
+}
+
+// Buffer rapid-fire messages: customers often send their answer split across
+// 2–4 messages. We wait a short beat and process them as one combined answer
+// instead of firing the next bot question after every fragment.
+const WA_BUFFER_MS = 3500;
+const waBuffers = new Map(); // key `${tenantId}:${from}` → { texts, profileName, timer }
+function bufferWaMessage(from, text, tenantId, profileName) {
+  const key = `${tenantId}:${from}`;
+  let buf = waBuffers.get(key);
+  if (!buf) { buf = { texts: [], profileName }; waBuffers.set(key, buf); }
+  if (buf.texts.length < 10) buf.texts.push(text);
+  if (profileName) buf.profileName = profileName;
+  clearTimeout(buf.timer);
+  buf.timer = setTimeout(() => {
+    waBuffers.delete(key);
+    const combined = buf.texts.join('\n').slice(0, 1500);
+    handleWaBotStep(from, combined, tenantId, buf.profileName, buf.texts).catch(e => console.error('WA bot error:', e.message));
+  }, WA_BUFFER_MS);
+}
+
+// Webhook dedupe — Meta retries deliveries; never process the same wamid twice
+const seenWaMessageIds = [];
+const seenWaMessageSet = new Set();
+function isDuplicateWaMessage(id) {
+  if (!id) return false;
+  if (seenWaMessageSet.has(id)) return true;
+  seenWaMessageSet.add(id);
+  seenWaMessageIds.push(id);
+  if (seenWaMessageIds.length > 1000) seenWaMessageSet.delete(seenWaMessageIds.shift());
+  return false;
+}
+
 // [website] [tenant: FrontStores.com] — WhatsApp OTP store for the website contact
 // form. Keyed by normalized phone. Max 2 OTP sends per number per 15 minutes,
 // 5-minute code expiry, max 5 wrong attempts per code. In-memory: a server restart
@@ -197,63 +274,164 @@ function upsertWaLeadRecord(c, from, tenantId) {
   if (c.first_message) parts.push(`First message: ${c.first_message}`);
   if (c.business_type) parts.push(`Business: ${c.business_type}`);
   if (c.software_interest) parts.push(`Needs: ${c.software_interest}`);
-  rec.message_preview = parts.join('. ');
+  if (c.last_followup) parts.push(`Latest follow-up: ${c.last_followup}`);
+  rec.message_preview = parts.join('. ').slice(0, 900);
   rec.updated_at = new Date().toISOString();
+  // Fresh customer activity makes the lead relevant again — clear the imported
+  // flag so the CRM app re-pulls and merges the new details on its next poll.
+  rec.imported = false;
   if (idx >= 0) leads[idx] = rec; else leads.push(rec);
   saveWaLeads(leads);
   c.lead_record_id = rec.id;
 }
 
-// Bot conversation step logic
-async function handleWaBotStep(from, text, tenantId, profileName = '') {
+// Append one message to the conversation transcript (synced into the CRM app)
+function logWaChat(c, dir, text) {
+  if (!c.messages) c.messages = [];
+  c.messages.push({ id: crypto.randomUUID(), dir, text: String(text || '').slice(0, 1500), at: new Date().toISOString() });
+  if (c.messages.length > 300) c.messages = c.messages.slice(-300);
+}
+
+// How long after completing the questions a customer is treated as "returning"
+const WA_RETURN_AFTER_MS = 6 * 60 * 60 * 1000;
+// Throttle for repeat acknowledgements so the bot never spams "got it" replies
+const WA_ACK_THROTTLE_MS = 10 * 60 * 1000;
+// Per-sender flood protection: more than this many messages per minute = pause
+const WA_FLOOD_LIMIT = 12;
+const WA_FLOOD_PAUSE_MS = 10 * 60 * 1000;
+const WA_MAX_STRIKES = 3;
+
+// Bot conversation engine — friendly, validated, abuse-resistant.
+// rawTexts is the un-combined message list when several arrived in a burst.
+async function handleWaBotStep(from, text, tenantId, profileName = '', rawTexts = null) {
   const convos = loadWaConvos();
   const key = `${tenantId}:${from}`;
   const creds = loadWaCreds()[tenantId];
   if (!creds) return; // no WA credentials registered for this tenant
 
   let c = convos[key] || { step: 0, from_phone: from, tenant_id: tenantId, started_at: new Date().toISOString() };
+  const save = () => { convos[key] = c; saveWaConvos(convos); };
+  const nowMs = Date.now();
 
-  const reply = async (msg) => {
+  // ── flood protection: pause the bot if someone is spamming ──
+  c.msg_times = (c.msg_times || []).filter(t => nowMs - t < 60 * 1000);
+  c.msg_times.push(nowMs);
+  for (const t of (rawTexts || [text])) logWaChat(c, 'in', t);
+  c.last_inbound_at = new Date().toISOString();
+  if (c.paused_until && nowMs < c.paused_until) { save(); return; } // silently log while paused
+  if (c.msg_times.length > WA_FLOOD_LIMIT) {
+    c.paused_until = nowMs + WA_FLOOD_PAUSE_MS;
+    const msg = `You're sending messages a little too fast 🙏 I've noted everything — our team will read it all. Let's continue in a few minutes.`;
+    logWaChat(c, 'out', msg);
+    save();
     await sendWaMessage(creds.phone_id, creds.token, from, msg);
-  };
-
-  // [crm] [all tenants] — the bot speaks on behalf of the tenant's own business
-  const shopName = loadSubs()[tenantId]?.shop_name || 'our business';
-
-  if (c.step === 0) {
-    // First contact — greet and ask name
-    c.first_message = text.trim();
-    c.profile_name = profileName || '';
-    c.step = 1;
-    await reply(`👋 Hello! Welcome to *${shopName}*.\n\nThanks for reaching out — I'd like to take a few quick details so our team can help you better.\n\nCould you please tell me *your name*?`);
-  } else if (c.step === 1) {
-    c.name = text.trim();
-    c.step = 2;
-    await reply(`Nice to meet you, ${c.name}! 😊\n\nWhat is the *name of your business or company*?\n\n(If this is a personal enquiry, just reply "personal")`);
-  } else if (c.step === 2) {
-    c.company = text.trim();
-    c.step = 3;
-    await reply(`Got it — *${c.company}*.\n\nWhat *type of business* do you run? (e.g. Medical Store, Restaurant, Grocery, Salon, etc.)`);
-  } else if (c.step === 3) {
-    c.business_type = text.trim();
-    c.step = 4;
-    await reply(`Interesting! And finally — *what are you looking for*? How can we help you?`);
-  } else if (c.step === 4) {
-    c.software_interest = text.trim();
-    c.step = 5;
-    c.completed_at = new Date().toISOString();
-    await reply(`Thank you, ${c.name}! 🙏\n\nOur team has your details and will get back to you shortly.\n\n— *${shopName}*`);
-  } else {
-    // Already captured
-    await reply(`Hi ${c.name || 'there'}! We already have your information. Our team will be in touch with you soon. 😊`);
+    return;
   }
 
-  // [crm] [all tenants] — lead exists from the FIRST message and is updated
-  // after every answer; always auto-assigned to the tenant's owner
-  upsertWaLeadRecord(c, from, tenantId);
+  const reply = async (msg) => {
+    logWaChat(c, 'out', msg);
+    await sendWaMessage(creds.phone_id, creds.token, from, msg);
+  };
+  const shopName = loadSubs()[tenantId]?.shop_name || 'our business';
 
-  convos[key] = c;
-  saveWaConvos(convos);
+  // ── profanity: warn → final warning → block ──
+  if (hasProfanity(text)) {
+    c.strikes = (c.strikes || 0) + 1;
+    if (c.strikes >= WA_MAX_STRIKES) {
+      const bl = loadWaBlocklist();
+      bl[key] = { blocked_at: new Date().toISOString(), reason: 'profanity (3 strikes)' };
+      saveWaBlocklist(bl);
+      const msg = `This conversation has been closed due to repeated inappropriate language.`;
+      logWaChat(c, 'out', msg);
+      upsertWaLeadRecord(c, from, tenantId);
+      save();
+      await sendWaMessage(creds.phone_id, creds.token, from, msg);
+      console.log(`🚫 WA blocked ${from} (tenant ${tenantId.substring(0, 8)}) — 3 profanity strikes`);
+      return;
+    }
+    upsertWaLeadRecord(c, from, tenantId);
+    save();
+    await reply(c.strikes === 1
+      ? `Let's keep things respectful, please 🙏 I'm here to help you!\n\n${waQuestionForStep(c, shopName)}`
+      : `⚠️ Final reminder — please keep the language respectful, or I'll have to end this chat.\n\n${waQuestionForStep(c, shopName)}`);
+    save();
+    return;
+  }
+
+  // ── returning customer: completed earlier, now messaging again ──
+  if (c.step >= 5) {
+    const completedAgo = nowMs - new Date(c.completed_at || c.started_at).getTime();
+    const sinceAck = nowMs - new Date(c.last_ack_at || 0).getTime();
+    c.last_followup = cleanWaAnswer(text, 500);
+    if (completedAgo > WA_RETURN_AFTER_MS && sinceAck > WA_RETURN_AFTER_MS) {
+      c.last_ack_at = new Date().toISOString();
+      await reply(`Welcome back${c.name ? `, ${c.name}` : ''}! 👋 Great to hear from you again.\n\nI've passed your message straight to our team — they'll get back to you shortly. Anything else you'd like to add?`);
+    } else if (sinceAck > WA_ACK_THROTTLE_MS) {
+      c.last_ack_at = new Date().toISOString();
+      await reply(`Got it ✅ — added to your enquiry. Our team will see this right away.`);
+    } // else: log silently, no reply spam
+    upsertWaLeadRecord(c, from, tenantId);
+    save();
+    return;
+  }
+
+  // ── question flow with validation ──
+  if (c.step === 0) {
+    c.first_message = cleanWaAnswer(text, 500);
+    c.profile_name = cleanWaAnswer(profileName, 60);
+    c.step = 1;
+    const hello = c.profile_name ? `Hi ${c.profile_name}! 👋` : `Hi there! 👋`;
+    await reply(`${hello} Welcome to *${shopName}* — thanks so much for reaching out 😊\n\nI'll just take a few quick details so the right person can help you.\n\nFirst — *what's your name?*`);
+  } else if (c.step === 1) {
+    const name = cleanWaAnswer(text, 60);
+    if (!looksLikeValidName(name)) {
+      c.name_tries = (c.name_tries || 0) + 1;
+      if (c.name_tries <= 2) {
+        await reply(c.name_tries === 1
+          ? `Sorry, I didn't quite catch that 😅 Could you type *just your name*? (e.g. "Ramesh Kumar")`
+          : `No worries — even just your *first name* is fine 🙂`);
+        upsertWaLeadRecord(c, from, tenantId);
+        save();
+        return;
+      }
+      // twice re-asked — fall back to their WhatsApp profile name and move on
+      c.name = c.profile_name || name || 'Unknown';
+      c.name_unverified = true;
+    } else {
+      c.name = name;
+    }
+    c.step = 2;
+    await reply(`Lovely to meet you, *${c.name}*! 😊\n\nWhat's the *name of your business or company*?\n\n_(Personal enquiry? Just reply "personal")_`);
+  } else if (c.step === 2) {
+    const company = cleanWaAnswer(text, 80);
+    c.company = /^(personal|none|na|n\/a|nahi|no)$/i.test(company) ? 'Personal' : (company || 'Personal');
+    c.step = 3;
+    await reply(`Got it — *${c.company}* ✅\n\nWhat *type of business* is it? _(e.g. Medical Store, Restaurant, Grocery, Salon…)_`);
+  } else if (c.step === 3) {
+    c.business_type = cleanWaAnswer(text, 60) || 'Not specified';
+    c.step = 4;
+    await reply(`Nice! 👌 Last one — *what are you looking for?* Tell me a little about what you need, and I'll make sure the right person sees it.`);
+  } else if (c.step === 4) {
+    c.software_interest = cleanWaAnswer(text, 500) || 'Not specified';
+    c.step = 5;
+    c.completed_at = new Date().toISOString();
+    c.last_ack_at = new Date().toISOString();
+    await reply(`Perfect, thank you ${c.name}! 🙏\n\nHere's what I've noted:\n👤 *${c.name}*\n🏢 *${c.company}*\n📋 *${c.business_type}*\n💬 _"${c.software_interest.slice(0, 120)}"_\n\nOur team has your details and will reach out shortly. Have a great day!\n— *${shopName}*`);
+  }
+
+  upsertWaLeadRecord(c, from, tenantId);
+  save();
+}
+
+// The current question for a step — used to re-ask after a profanity warning
+function waQuestionForStep(c, shopName) {
+  switch (c.step) {
+    case 1: return `So — *what's your name?*`;
+    case 2: return `What's the *name of your business or company*?`;
+    case 3: return `What *type of business* is it?`;
+    case 4: return `*What are you looking for?* How can we help?`;
+    default: return `How can we help you today?`;
+  }
 }
 // A session is considered abandoned (crashed app, force-quit, etc.) if no heartbeat for this long —
 // after which another device may claim it. Heartbeats should run well inside this window.
@@ -2009,21 +2187,62 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
         const messages = change?.value?.messages;
         if (!messages || messages.length === 0) { res.writeHead(200); res.end('ok'); return; }
 
-        const msg = messages[0];
-        const from = msg.from; // sender phone
-        const text = msg.text?.body || '';
-        if (!text) { res.writeHead(200); res.end('ok'); return; }
-
         // Match tenant by the business phone number ID that received the message
         const businessPhoneId = change?.value?.metadata?.phone_number_id || '';
         const creds = loadWaCreds();
         const tenantEntry = Object.entries(creds).find(([, c]) => c.phone_id === businessPhoneId);
         const tenantId = tenantEntry ? tenantEntry[0] : 'default';
-        console.log(`💬 WA message from ${from} → phone_id ${businessPhoneId} → tenant ${tenantEntry ? tenantId.substring(0, 8) : 'UNMATCHED (no creds registered for this phone_id!)'}`);
 
-        // [crm] [tenant: FrontStores.com] — capture the sender's WhatsApp profile name
+        // Optional webhook authenticity check — verifies the payload really came
+        // from Meta. Active only when an app_secret is saved with the credentials.
+        const appSecret = tenantEntry?.[1]?.app_secret;
+        if (appSecret) {
+          const sig = req.headers['x-hub-signature-256'] || '';
+          const expected = 'sha256=' + crypto.createHmac('sha256', appSecret).update(body).digest('hex');
+          if (sig !== expected) {
+            console.log(`🚫 WA webhook signature mismatch — payload rejected`);
+            res.writeHead(403); res.end('bad signature'); return;
+          }
+        }
+
+        // Meta can batch several messages in one delivery — process each one
+        const blocklist = loadWaBlocklist();
         const profileName = change?.value?.contacts?.[0]?.profile?.name || '';
-        await handleWaBotStep(from, text, tenantId, profileName);
+        for (const msg of messages.slice(0, 10)) {
+          const from = String(msg.from || '').replace(/\D/g, ''); // sender phone, digits only
+          if (!from || from.length < 10 || from.length > 15) continue;
+          if (from === String(tenantEntry?.[1]?.display_phone || '')) continue; // never talk to ourselves
+
+          // Dedupe — Meta retries webhook deliveries; process each wamid once
+          if (isDuplicateWaMessage(msg.id)) continue;
+
+          // Blocked sender (3 profanity strikes) — drop silently
+          if (blocklist[`${tenantId}:${from}`]) continue;
+
+          // entry.id is the WhatsApp Business Account (WABA) id — logged to make
+          // token/asset permission problems diagnosable
+          console.log(`💬 WA message from ${from} → phone_id ${businessPhoneId} (WABA ${entry?.id || '?'}) → tenant ${tenantEntry ? tenantId.substring(0, 8) : 'UNMATCHED (no creds registered for this phone_id!)'}`);
+
+          const text = (msg.text?.body || '').slice(0, 1500);
+          if (!text) {
+            // Non-text (image/audio/sticker/…) — acknowledge once politely, max once per 10 min
+            if (tenantEntry) {
+              const convos = loadWaConvos();
+              const c = convos[`${tenantId}:${from}`];
+              const sinceNote = Date.now() - new Date(c?.last_media_note_at || 0).getTime();
+              if (c && sinceNote > 10 * 60 * 1000) {
+                c.last_media_note_at = new Date().toISOString();
+                convos[`${tenantId}:${from}`] = c; saveWaConvos(convos);
+                await sendWaMessage(tenantEntry[1].phone_id, tenantEntry[1].token, from,
+                  `I can only read *text messages* for now 🙏 Could you type that out for me?`);
+              }
+            }
+            continue;
+          }
+
+          // Buffered: rapid multi-part messages are combined into one answer
+          bufferWaMessage(from, text, tenantId, profileName);
+        }
       } catch (e) {
         console.error('WA webhook error:', e.message);
       }
@@ -2059,6 +2278,24 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
     delete creds[tenantId];
     saveWaCreds(creds);
     json(res, { ok: true }); return;
+  }
+
+  // [crm] [all tenants] — Full WhatsApp chat transcripts for the CRM app.
+  // ?since=ISO returns only messages after that time, so polls stay tiny.
+  if (req.method === 'GET' && pathname.startsWith('/api/wa-chats/')) {
+    const tenantId = pathname.split('/')[3];
+    if (!tenantId) { res.writeHead(400); res.end('bad request'); return; }
+    const sinceParam = url.searchParams.get('since');
+    const since = sinceParam ? new Date(sinceParam).getTime() : 0;
+    const convos = loadWaConvos();
+    const chats = [];
+    for (const [k, c] of Object.entries(convos)) {
+      if (!k.startsWith(`${tenantId}:`) || !c.messages) continue;
+      const msgs = c.messages.filter(m => new Date(m.at).getTime() > since);
+      if (msgs.length === 0) continue;
+      chats.push({ from_phone: c.from_phone, from_name: c.name || c.profile_name || '', messages: msgs });
+    }
+    json(res, { chats }); return;
   }
 
   // [crm] [all tenants] — Get pending WA leads for the app to sync.

@@ -2,10 +2,10 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Download, MessageSquare, CheckCircle2 } from 'lucide-react';
+import { Download, MessageSquare, CheckCircle2, MessagesSquare, ChevronUp } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { toast } from 'sonner';
-import { listCRMWaInbox, importWaLeadToLead, listCRMTeamMembers } from '@/lib/db/crm';
+import { listCRMWaInbox, importWaLeadToLead, listCRMTeamMembers, listCRMWaMessages } from '@/lib/db/crm';
 import { CRMPage, PageHead, Segments, Panel, EmptyState, Badge, Avatar, Btn, C, timeAgo } from './components/kit';
 
 export function WhatsAppInboxPage() {
@@ -14,6 +14,7 @@ export function WhatsAppInboxPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [tab, setTab] = useState<'pending' | 'all'>('pending');
+  const [openChat, setOpenChat] = useState<string | null>(null); // from_phone of expanded transcript
 
   const { data: entries = [] } = useQuery({
     queryKey: ['crm-wa-inbox', tenantId, tab],
@@ -68,8 +69,9 @@ export function WhatsAppInboxPage() {
                     </div>
                   )}
                   <div style={{ fontSize: '11px', color: C.faint, marginTop: '4px' }}>{timeAgo(e.received_at)}</div>
+                  {openChat === e.from_phone && <ChatTranscript tenantId={tenantId} phone={e.from_phone} />}
                 </div>
-                <div style={{ flexShrink: 0 }}>
+                <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' }}>
                   {e.imported_at ? (
                     <Btn variant="subtle" small onClick={() => navigate('/crm/leads')}>
                       <CheckCircle2 size={12} style={{ color: C.green }} /> Imported
@@ -79,6 +81,10 @@ export function WhatsAppInboxPage() {
                       <Download size={12} /> Import to Leads
                     </Btn>
                   )}
+                  <Btn variant="subtle" small onClick={() => setOpenChat(openChat === e.from_phone ? null : e.from_phone)}>
+                    {openChat === e.from_phone ? <ChevronUp size={12} /> : <MessagesSquare size={12} />}
+                    {openChat === e.from_phone ? 'Hide chat' : 'View chat'}
+                  </Btn>
                 </div>
               </div>
             ))}
@@ -86,5 +92,39 @@ export function WhatsAppInboxPage() {
         )}
       </Panel>
     </CRMPage>
+  );
+}
+
+// [crm] [all tenants] — full bot conversation, WhatsApp-style bubbles.
+// Every message in and out of the bot is logged on the server and mirrored
+// into crm_wa_messages, so the team sees the entire chat — not just the
+// extracted lead fields.
+function ChatTranscript({ tenantId, phone }: { tenantId: string; phone: string }) {
+  const { data: msgs = [] } = useQuery({
+    queryKey: ['crm-wa-chat', tenantId, phone],
+    queryFn: () => listCRMWaMessages(tenantId, phone),
+    enabled: !!tenantId && !!phone,
+  });
+  if (msgs.length === 0) {
+    return <div style={{ fontSize: '12px', color: C.faint, marginTop: '8px' }}>No chat history synced yet — it appears within ~30 seconds of the next poll.</div>;
+  }
+  return (
+    <div style={{ marginTop: '10px', background: C.surface2, borderRadius: '10px', padding: '12px', maxHeight: '320px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      {msgs.map(m => (
+        <div key={m.id} style={{ display: 'flex', justifyContent: m.direction === 'out' ? 'flex-end' : 'flex-start' }}>
+          <div style={{
+            maxWidth: '78%', fontSize: '12px', lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+            padding: '7px 11px', borderRadius: m.direction === 'out' ? '12px 12px 3px 12px' : '12px 12px 12px 3px',
+            background: m.direction === 'out' ? C.greenBg : C.surface,
+            color: C.text, border: `1px solid ${C.border}`,
+          }}>
+            {m.message}
+            <div style={{ fontSize: '10px', color: C.faint, marginTop: '3px', textAlign: 'right' }}>
+              {m.direction === 'out' ? '🤖 bot · ' : ''}{m.sent_at ? timeAgo(m.sent_at) : ''}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
