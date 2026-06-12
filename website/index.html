@@ -162,6 +162,72 @@
   @keyframes introFade { to { opacity: 1; } }
   @media (prefers-reduced-motion: reduce) { #intro { display: none; } }
 
+  /* ════════ PLANE + BANNER MOVIE OPENING ════════ */
+  .shade { position: absolute; left: 0; right: 0; height: 50.5%; background: #000; z-index: 3;
+    transition: transform 1.5s cubic-bezier(.72,0,.2,1); }
+  .shade.top { top: 0; } .shade.bot { bottom: 0; }
+  #intro.open .shade.top { transform: translateY(-101%); }
+  #intro.open .shade.bot { transform: translateY(101%); }
+
+  #plane-rig {
+    position: fixed; top: 0; left: 0; z-index: 1200; pointer-events: none;
+    display: flex; align-items: center;
+    transform: translate(115vw, 26vh);
+    will-change: transform;
+  }
+  #plane-rig.gone { display: none; }
+  .plane { width: 96px; height: auto; flex-shrink: 0; filter: drop-shadow(0 8px 16px rgba(0,0,0,.55)); }
+  .rope { width: 34px; height: 2px; flex-shrink: 0;
+    background: linear-gradient(90deg, rgba(255,255,255,.8), rgba(255,255,255,.3)); }
+  .banner {
+    font-family: 'Sora', sans-serif; font-weight: 800;
+    font-size: 24px; white-space: nowrap; color: #101830;
+    padding: 10px 26px 10px 18px;
+    background:
+      repeating-linear-gradient(90deg, rgba(8,16,40,.07) 0 18px, transparent 18px 36px),
+      linear-gradient(180deg, #ffffff, #dde5f5 60%, #c7d2ea);
+    border: 2px solid rgba(150,175,235,.8);
+    border-left: none;
+    clip-path: polygon(0 0, 100% 0, 96% 25%, 100% 50%, 96% 75%, 100% 100%, 0 100%);
+    box-shadow: 0 10px 30px rgba(0,0,10,.45);
+    transform-origin: left center;
+    animation: clothWave 1.05s ease-in-out infinite;
+  }
+  .banner b { font-weight: 800; }
+  @keyframes clothWave {
+    0%, 100% { transform: skewY(2.2deg) scaleY(1); }
+    25% { transform: skewY(-.6deg) scaleY(.985); }
+    50% { transform: skewY(-2.4deg) scaleY(1); }
+    75% { transform: skewY(.8deg) scaleY(1.015); }
+  }
+  /* pass 1 — banner flyby right → left, then banks away into the distance */
+  #plane-rig.fly1 { animation: flyBanner 5.4s cubic-bezier(.35,.12,.55,.9) forwards; }
+  @keyframes flyBanner {
+    0%   { transform: translate(115vw, 24vh) scale(1); }
+    50%  { transform: translate(26vw, 20vh) scale(1); }
+    74%  { transform: translate(-16vw, 24vh) scale(.85); }
+    100% { transform: translate(-70vw, -4vh) scale(.45); }
+  }
+  /* pass 2 — dives into the open website and through the headline */
+  #plane-rig.dive { animation: diveHit 1.9s cubic-bezier(.5,.05,.55,.95) forwards; }
+  #plane-rig.dive .rope, #plane-rig.dive .banner { display: none; }
+  @keyframes diveHit {
+    0%   { transform: translate(112vw, -6vh) scale(.5) rotate(-9deg); opacity: 1; }
+    52%  { transform: translate(44vw, 17vh) scale(.95) rotate(2deg); opacity: 1; }
+    86%  { transform: translate(8vw, 26vh) scale(.7) rotate(7deg); opacity: .5; }
+    100% { transform: translate(-6vw, 30vh) scale(.4) rotate(9deg); opacity: 0; } /* disappears inside the site */
+  }
+
+  /* headline letters break apart in 3D and self-heal */
+  .hero h1 { perspective: 750px; }
+  .hero h1 .ltr { display: inline-block; transform-style: preserve-3d;
+    transition: transform .5s cubic-bezier(.55,0,.9,.55), opacity .5s; }
+  .hero h1.shatter .ltr {
+    transform: translate3d(var(--sx,0), var(--sy,0), var(--sz,0)) rotate3d(1, .6, .3, var(--sr,0deg));
+    opacity: 0;
+  }
+  .hero h1.heal .ltr { transition: transform .9s cubic-bezier(.16,1,.3,1), opacity .9s; }
+
   /* ════════ WARP-IN REVEAL — everything flies in from the viewer ════════ */
   .warp-item { opacity: 0; transform-style: preserve-3d; will-change: transform, opacity, filter; }
   body.warp .warp-item {
@@ -482,14 +548,35 @@
 <!-- ════════ CINEMATIC INTRO ════════ -->
 <div id="intro">
   <canvas id="intro-net"></canvas>
-  <div class="bar top"></div>
-  <div class="bar bot"></div>
-  <div class="intro-stage">
-    <div class="type-line">
-      <span class="sizer">Welcome to Front<span class="holo-text">Stores</span>&nbsp;</span>
-      <span class="typed"><span id="type-plain"></span><span id="type-holo" class="holo-text"></span><span class="caret blink" id="caret"></span></span>
-    </div>
-  </div>
+  <div class="shade top"></div>
+  <div class="shade bot"></div>
+</div>
+
+<!-- the aircraft + welcome banner — flies the opening pass, then crashes the headline -->
+<div id="plane-rig" aria-hidden="true">
+  <svg class="plane" viewBox="0 0 230 120" fill="none">
+    <ellipse cx="14" cy="62" rx="4" ry="26" fill="#9fb4d8" opacity=".55">
+      <animateTransform attributeName="transform" type="rotate" from="0 14 62" to="180 14 62" dur="0.08s" repeatCount="indefinite"/>
+    </ellipse>
+    <circle cx="16" cy="62" r="6" fill="#3a4356"/>
+    <path d="M18 52 C40 44, 120 44, 168 54 L196 58 C204 59 204 67 196 68 L120 76 C70 80 34 76 20 70 C14 67 14 56 18 52 Z" fill="#d23b2e"/>
+    <path d="M150 56 L196 30 L208 32 L178 58 Z" fill="#d23b2e"/>
+    <path d="M196 58 L218 52 L220 58 L196 64 Z" fill="#a8281d"/>
+    <path d="M60 50 C70 44 92 44 100 50 L96 56 L62 56 Z" fill="#27314a"/>
+    <rect x="38" y="22" width="92" height="10" rx="5" fill="#f2c84b"/>
+    <rect x="46" y="74" width="86" height="10" rx="5" fill="#f2c84b"/>
+    <rect x="56" y="30" width="4" height="46" fill="#caa53a"/>
+    <rect x="106" y="30" width="4" height="46" fill="#caa53a"/>
+    <line x1="58" y1="32" x2="108" y2="74" stroke="#caa53a" stroke-width="2"/>
+    <circle cx="56" cy="96" r="9" fill="#22293a"/>
+    <circle cx="56" cy="96" r="4" fill="#5b687f"/>
+    <rect x="52" y="74" width="4" height="16" fill="#a8281d"/>
+    <circle cx="92" cy="96" r="9" fill="#22293a"/>
+    <circle cx="92" cy="96" r="4" fill="#5b687f"/>
+    <rect x="88" y="74" width="4" height="16" fill="#a8281d"/>
+  </svg>
+  <div class="rope"></div>
+  <div class="banner">Welcome to&nbsp;<b>Front<span class="holo-text">Stores</span></b></div>
 </div>
 
 <canvas id="webgl"></canvas>
@@ -720,47 +807,84 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
-  // ── cinematic intro: caret blinks twice → types "Welcome to" → deletes →
-  //    types "FrontStores" (brand colours) → zooms through the viewer → site hits ──
+  // ── movie opening: plane tows the welcome banner right→left over black,
+  //    the black parts from the centre, site appears, the plane dives in,
+  //    smashes through the headline letters and vanishes inside; the broken
+  //    letters fly back together on their own ──
   const intro = document.getElementById('intro');
+  const rig = document.getElementById('plane-rig');
+  const heroH1 = document.querySelector('.hero h1');
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   let netRunning = true;
   let introDone = false;
+  let skipped = false;
+
+  // split the headline into letters so the plane can break them
+  (function splitLetters() {
+    if (!heroH1) return;
+    heroH1.querySelectorAll(':scope > span').forEach(line => {
+      const isHolo = line.classList.contains('holo-text');
+      const txt = line.textContent;
+      if (isHolo) line.classList.remove('holo-text'); // gradient moves to each letter
+      line.textContent = '';
+      for (const ch of txt) {
+        const s = document.createElement('span');
+        s.className = 'ltr' + (isHolo ? ' holo-text' : '');
+        s.innerHTML = ch === ' ' ? '&nbsp;' : ch;
+        line.appendChild(s);
+      }
+    });
+  })();
+
+  function shatter() {
+    if (!heroH1) return;
+    heroH1.querySelectorAll('.ltr').forEach(l => {
+      l.style.setProperty('--sx', (Math.random() * 480 - 240).toFixed(0) + 'px');
+      l.style.setProperty('--sy', (Math.random() * 320 - 160).toFixed(0) + 'px');
+      l.style.setProperty('--sz', (Math.random() * 420 - 80).toFixed(0) + 'px');
+      l.style.setProperty('--sr', (Math.random() * 440 - 220).toFixed(0) + 'deg');
+    });
+    heroH1.classList.add('shatter');
+  }
+  function heal() {
+    if (!heroH1) return;
+    heroH1.classList.add('heal');
+    heroH1.classList.remove('shatter');
+    setTimeout(() => heroH1.classList.remove('heal'), 1000);
+  }
+
   function openIntro() {
     if (introDone) return;
     introDone = true;
-    // calm exit: just fade the intro away and let the site appear
-    intro.classList.add('open', 'done');
-    document.body.classList.add('warp');
-    setTimeout(() => { netRunning = false; }, 1300);
+    intro.classList.add('open');               // black parts from the centre
+    document.body.classList.add('warp');       // site rises in softly
+    setTimeout(() => { intro.classList.add('done'); netRunning = false; }, 1600);
   }
-  intro.addEventListener('click', openIntro);
-  setTimeout(openIntro, 12000); // safety fallback
-  // reduced motion: intro is hidden by CSS — reveal content immediately
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) document.body.classList.add('warp');
+  intro.addEventListener('click', () => {      // click = skip everything
+    skipped = true;
+    rig.classList.add('gone');
+    heroH1?.classList.remove('shatter');
+    openIntro();
+  });
+  setTimeout(() => { if (!introDone) { skipped = true; rig.classList.add('gone'); openIntro(); } }, 16000);
+  if (reduced) { rig.classList.add('gone'); document.body.classList.add('warp'); }
 
-  (async function typeSequence() {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const plain = document.getElementById('type-plain');
-    const holo = document.getElementById('type-holo');
-    const caret = document.getElementById('caret');
+  (async function movie() {
+    if (reduced) return;
     const sleep = ms => new Promise(r => setTimeout(r, ms));
-    // steady old-typewriter rhythm: even keystrokes, tiny natural variance,
-    // a slightly longer rest on the spaces (carriage breath)
-    const type = async (el, str) => {
-      for (const ch of str) {
-        if (introDone) return;
-        el.textContent += ch;
-        await sleep(ch === ' ' ? 220 : 118 + Math.random() * 26);
-      }
-    };
-
-    await sleep(1150);                       // caret blinks once
-    caret.classList.remove('blink');
-    await type(plain, 'Welcome to Front');   // one continuous typed line
-    await type(holo, 'Stores');
-    caret.classList.add('blink');
-    await sleep(1400);                       // a quiet beat
-    openIntro();                             // gentle fade into the site
+    await sleep(650);
+    if (skipped) return;
+    rig.classList.add('fly1');                 // banner flyby (5.4s)
+    await sleep(4500); if (skipped) return;
+    openIntro();                               // curtains part while plane banks away
+    await sleep(1450); if (skipped) return;
+    rig.classList.remove('fly1');
+    rig.classList.add('dive');                 // dive at the headline (1.9s)
+    await sleep(1000); if (skipped) return;
+    shatter();                                 // impact — letters explode in 3D
+    await sleep(950); if (skipped) return;
+    rig.classList.add('gone');                 // plane is gone, inside the site
+    heal();                                    // letters fly back together
   })();
 
   // ── intro background: a living AI world — neural network + data streams ──
