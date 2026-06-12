@@ -57,7 +57,7 @@
 
   /* ════════ CINEMATIC INTRO ════════ */
   #intro {
-    position: fixed; inset: 0; z-index: 1000; background: #000;
+    position: fixed; inset: 0; z-index: 1000; background: transparent;
     display: flex; align-items: center; justify-content: center;
     cursor: pointer; transition: opacity 1.1s ease, visibility 1.1s;
   }
@@ -84,7 +84,7 @@
   @keyframes flicker { 0%,100% { opacity: 1; } 92% { opacity: 1; } 93% { opacity: .55; } 94% { opacity: 1; } 96% { opacity: .75; } 97% { opacity: 1; } }
   .intro-stage { text-align: center; position: relative; z-index: 2; animation: slowpush 9s linear forwards; }
   @keyframes slowpush { from { transform: scale(1.06); } to { transform: scale(1); } }
-  #intro-net { position: absolute; inset: 0; z-index: 0; opacity: 0; animation: introFade 2.5s .2s ease forwards; }
+  #intro-net { position: absolute; inset: 0; z-index: 2; opacity: 0; animation: introFade 2.5s .2s ease forwards; }
   /* old-typewriter line — fixed-width stage so nothing shifts while typing */
   .type-line {
     position: relative; display: inline-block;
@@ -164,12 +164,29 @@
 
   /* ════════ PLANE + BANNER MOVIE OPENING ════════ */
   #intro { perspective: 1300px; }
-  .shade { position: absolute; left: 0; right: 0; height: 50.5%; background: #000; z-index: 3;
-    transition: transform 2.8s cubic-bezier(.62,0,.16,1); }
+  .shade { position: absolute; left: 0; right: 0; height: 50.5%; background: #000; z-index: 1;
+    transition: transform 2.8s cubic-bezier(.62,0,.16,1), opacity 2.8s ease; }
   .shade.top { top: 0; transform-origin: 50% 0; }
   .shade.bot { bottom: 0; transform-origin: 50% 100%; }
-  #intro.open .shade.top { transform: translateY(-101%) rotateX(26deg); }
-  #intro.open .shade.bot { transform: translateY(101%) rotateX(-26deg); }
+  #intro.open .shade.top { transform: translateY(-101%) rotateX(26deg); opacity: .25; }
+  #intro.open .shade.bot { transform: translateY(101%) rotateX(-26deg); opacity: .25; }
+
+  /* movie title cards — appear with a push-zoom, dissolve away */
+  .titles { position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; pointer-events: none; }
+  .tcard {
+    position: absolute; text-align: center; opacity: 0;
+    font-family: 'Sora', sans-serif; font-weight: 800; line-height: 1.2;
+    font-size: clamp(1.7rem, 5.6vw, 4.4rem); letter-spacing: -.02em; color: #fff;
+    filter: drop-shadow(0 0 26px rgba(255,255,255,.45)) drop-shadow(0 0 80px rgba(155,130,255,.4));
+    white-space: nowrap;
+  }
+  .tcard.show { animation: titleCard 2.5s cubic-bezier(.3,.1,.3,1) forwards; }
+  @keyframes titleCard {
+    0%   { opacity: 0; transform: scale(.55); filter: blur(14px) drop-shadow(0 0 26px rgba(255,255,255,.45)); }
+    22%  { opacity: 1; transform: scale(1);   filter: blur(0)    drop-shadow(0 0 26px rgba(255,255,255,.45)); }
+    74%  { opacity: 1; transform: scale(1.06); filter: blur(0)   drop-shadow(0 0 26px rgba(255,255,255,.45)); }
+    100% { opacity: 0; transform: scale(1.5);  filter: blur(12px) drop-shadow(0 0 26px rgba(255,255,255,.45)); }
+  }
 
   #plane-rig {
     position: fixed; top: 0; left: 0; z-index: 1200; pointer-events: none;
@@ -178,12 +195,12 @@
     will-change: transform;
   }
   #plane-rig.gone { display: none; }
-  .plane { width: 96px; height: auto; flex-shrink: 0; filter: drop-shadow(0 8px 16px rgba(0,0,0,.55)); }
-  .rope { width: 34px; height: 2px; flex-shrink: 0;
+  .plane { width: clamp(120px, 13vw, 190px); height: auto; flex-shrink: 0; filter: drop-shadow(0 8px 16px rgba(0,0,0,.55)); }
+  .rope { width: clamp(36px, 4vw, 60px); height: 2px; flex-shrink: 0;
     background: linear-gradient(90deg, rgba(255,255,255,.8), rgba(255,255,255,.3)); }
   .banner {
     font-family: 'Sora', sans-serif; font-weight: 800;
-    font-size: 24px; white-space: nowrap; color: #101830;
+    font-size: clamp(26px, 3vw, 42px); white-space: nowrap; color: #101830;
     padding: 10px 26px 10px 18px;
     background:
       repeating-linear-gradient(90deg, rgba(8,16,40,.07) 0 18px, transparent 18px 36px),
@@ -202,27 +219,21 @@
     50% { transform: skewY(-2.4deg) scaleY(1); }
     75% { transform: skewY(.8deg) scaleY(1.015); }
   }
-  /* pass 1 — slow entry, then a full round trip INSIDE the screen:
-     left across the top, banks down the left side, sweeps the bottom into
-     the distance, climbs the right side and settles top-right — while the
-     website opens beneath it */
-  #plane-rig.fly1 { animation: flyBanner 10s cubic-bezier(.4,.1,.5,.9) forwards; }
+  /* pass 1 — the big banner pass: comes in from the right, sails across
+     with a gentle bob, and leaves on the left */
+  #plane-rig.fly1 { animation: flyBanner 8s cubic-bezier(.38,.12,.6,.88) forwards; }
   @keyframes flyBanner {
-    0%   { transform: translate(112vw, 20vh) scale(1) rotate(0deg); }
-    20%  { transform: translate(52vw, 17vh) scale(1) rotate(-1deg); }
-    34%  { transform: translate(12vw, 24vh) scale(.95) rotate(4deg); }
-    47%  { transform: translate(6vw, 52vh) scale(.8) rotate(10deg); }
-    61%  { transform: translate(38vw, 70vh) scale(.62) rotate(3deg); }
-    74%  { transform: translate(68vw, 56vh) scale(.56) rotate(-6deg); }
-    87%  { transform: translate(74vw, 22vh) scale(.52) rotate(-8deg); }
-    100% { transform: translate(70vw, 7vh) scale(.5) rotate(-2deg); }
+    0%   { transform: translate(112vw, 22vh) scale(1) rotate(0deg); }
+    30%  { transform: translate(58vw, 18vh) scale(1) rotate(-1.5deg); }
+    60%  { transform: translate(16vw, 23vh) scale(1) rotate(1.5deg); }
+    100% { transform: translate(-85vw, 18vh) scale(.96) rotate(-1deg); }
   }
-  /* pass 2 — from its top-right perch it dives through the headline and
-     vanishes inside the site (never leaves the screen) */
-  #plane-rig.dive { animation: diveHit 2.4s cubic-bezier(.5,.05,.55,.95) forwards; }
+  /* pass 2 — returns over the open website, dives through the headline and
+     vanishes inside */
+  #plane-rig.dive { animation: diveHit 2.6s cubic-bezier(.5,.05,.55,.95) forwards; }
   #plane-rig.dive .rope, #plane-rig.dive .banner { display: none; }
   @keyframes diveHit {
-    0%   { transform: translate(70vw, 7vh) scale(.5) rotate(-2deg); opacity: 1; }
+    0%   { transform: translate(112vw, -5vh) scale(.55) rotate(-9deg); opacity: 1; }
     55%  { transform: translate(42vw, 17vh) scale(.9) rotate(4deg); opacity: 1; }
     85%  { transform: translate(15vw, 27vh) scale(.5) rotate(8deg); opacity: .55; }
     100% { transform: translate(9vw, 31vh) scale(.26) rotate(10deg); opacity: 0; }
@@ -562,6 +573,11 @@
   <canvas id="intro-net"></canvas>
   <div class="shade top"></div>
   <div class="shade bot"></div>
+  <div class="titles">
+    <div class="tcard" id="tc1">Front<span class="holo-text">Stores</span></div>
+    <div class="tcard" id="tc2">All apps. <span class="holo-text">One place.</span></div>
+    <div class="tcard" id="tc3">Every solution you need.<br><span class="holo-text">Built for you.</span></div>
+  </div>
 </div>
 
 <!-- the aircraft + welcome banner — flies the opening pass, then crashes the headline -->
@@ -877,9 +893,9 @@
   function openIntro() {
     if (introDone) return;
     introDone = true;
-    intro.classList.add('open');               // black parts from the centre
+    intro.classList.add('open');               // black folds away to top & bottom
     document.body.classList.add('warp');       // site rises in softly
-    setTimeout(() => { intro.classList.add('done'); netRunning = false; }, 1600);
+    setTimeout(() => { intro.classList.add('done'); netRunning = false; }, 3000);
   }
   intro.addEventListener('click', () => {      // click = skip everything
     skipped = true;
@@ -895,15 +911,22 @@
     const sleep = ms => new Promise(r => setTimeout(r, ms));
     await sleep(650);
     if (skipped) return;
-    rig.classList.add('fly1');                 // slow banner pass + in-screen round trip (10s)
-    await sleep(4600); if (skipped) return;
-    openIntro();                               // 3D curtains part slowly while the plane circles
-    await sleep(5600); if (skipped) return;    // round trip finishes on its top-right perch
+    rig.classList.add('fly1');                 // big banner pass — comes and goes (8s)
+    await sleep(8100); if (skipped) return;
+
+    // movie title cards on black, one push-zoom at a time
+    for (const id of ['tc1', 'tc2', 'tc3']) {
+      document.getElementById(id).classList.add('show');
+      await sleep(2350); if (skipped) return;
+    }
+
+    openIntro();                               // black dissolves to top & bottom edges
+    await sleep(2600); if (skipped) return;
     rig.classList.remove('fly1');
-    rig.classList.add('dive');                 // dive at the headline (2.4s)
-    await sleep(1350); if (skipped) return;
+    rig.classList.add('dive');                 // plane returns, dives at the headline (2.6s)
+    await sleep(1450); if (skipped) return;
     shatter();                                 // impact — letters explode in 3D
-    await sleep(1100); if (skipped) return;
+    await sleep(1150); if (skipped) return;
     rig.classList.add('gone');                 // plane is gone, inside the site
     heal();                                    // letters fly back together
   })();
