@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Plus, Search, Edit2, Trash2, Package } from 'lucide-react';
@@ -26,19 +26,20 @@ type ProductForm = {
   total_units: string;
   loose_selling_price: string;
   min_stock_qty: string;
+  gm_volume: string;
   requires_prescription: boolean;
   location_section: string;
   location_rack: string;
   location_shelf: string;
 };
 
-const ML_VOLUME_OPTIONS = [30, 60, 80, 100, 120, 150, 180, 200, 220, 250, 300, 350, 400, 450, 500, 550, 600, 650, 900, 1000];
+const ML_VOLUME_OPTIONS = [5, 10, 20, 30, 60, 80, 100, 120, 150, 180, 200, 220, 250, 300, 350, 400, 450, 500, 550, 600, 650, 900, 1000];
 const DOSAGE_FORM_OPTIONS = ['Tablet', 'Syrup', 'Powder', 'Drop', 'Injection', 'Opthalmic', 'Ointment', 'Inhalation'];
 
 const emptyForm: ProductForm = {
   name: '', sku: '', barcode: '', unit: 'piece', dosage_form: '', ml_volume: '',
   mrp: '', selling_price: '', wholesale_price: '', cost_price: '', gst_rate: '12', total_units: '',
-  loose_selling_price: '', min_stock_qty: '', requires_prescription: false,
+  loose_selling_price: '', min_stock_qty: '', gm_volume: '', requires_prescription: false,
   location_section: '', location_rack: '', location_shelf: '',
 };
 
@@ -52,12 +53,20 @@ export function ProductsPage() {
   const activeShopType = useActiveShopType();
   const isMedicalStore = isMedicalShopType(activeShopType);
   const isGrocery = isGroceryShopType(activeShopType);
-  const defaultGstRate = isGrocery ? '0' : '12';
+  const defaultGstRate = isGrocery ? '0' : isMedicalStore ? '5' : '12';
   const unitOptions = isMedicalStore
     ? ['ml', 'piece', 'strip', 'dozen', 'unit']
     : ['kg', 'gram', 'litre', 'ml', 'piece', 'strip', 'box', 'pack', 'dozen', 'unit'];
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+
+  // [medical] [all tenants] — keyboard nav refs for product form footer
+  const minStockRef = useRef<HTMLInputElement>(null);
+  const nrxRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const createNewRef = useRef<HTMLButtonElement>(null);
+  const createInventoryRef = useRef<HTMLButtonElement>(null);
+  const createProductRef = useRef<HTMLButtonElement>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['products', search, page, tenantId],
@@ -82,6 +91,7 @@ export function ProductsPage() {
         total_units: editing.total_units ? String(editing.total_units) : '',
         loose_selling_price: editing.loose_selling_price ? String(editing.loose_selling_price) : '',
         min_stock_qty: editing.min_stock_qty ? String(editing.min_stock_qty) : '',
+        gm_volume: editing.gm_volume ?? '',
         requires_prescription: !!editing.requires_prescription,
         location_section: '',
         location_rack: '',
@@ -120,6 +130,7 @@ export function ProductsPage() {
         gst_rate: Number(form.gst_rate || 0),
         dosage_form: isMedicalStore && form.dosage_form ? form.dosage_form : null,
         ml_volume: form.unit === 'ml' && form.ml_volume ? form.ml_volume : null,
+        gm_volume: form.dosage_form === 'Ointment' && form.gm_volume ? form.gm_volume : null,
         total_units: isMedicalStore && form.unit === 'strip' && form.total_units ? Number(form.total_units) : null,
         min_stock_qty: form.min_stock_qty ? Number(form.min_stock_qty) : 0,
         requires_prescription: isMedicalStore ? form.requires_prescription : false,
@@ -333,6 +344,15 @@ export function ProductsPage() {
                     </select>
                   </div>
                 )}
+                {isMedicalStore && form.dosage_form === 'Ointment' && (
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">Volume (grams)</label>
+                    <select className="input" value={form.gm_volume} onChange={(e) => setForm((c) => ({ ...c, gm_volume: e.target.value }))}>
+                      <option value="">Select volume</option>
+                      {[5, 10, 15, 20, 25, 30, 35, 50].map((v) => <option key={v} value={`${v}g`}>{v} g</option>)}
+                    </select>
+                  </div>
+                )}
                 {isMedicalStore && form.unit === 'strip' && (
                   <div>
                     <label className="mb-2 block text-sm font-medium text-slate-700">Total Units per Strip</label>
@@ -381,7 +401,16 @@ export function ProductsPage() {
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">Low Stock Alert Qty</label>
-                  <input type="number" min="0" className="input" value={form.min_stock_qty} onChange={(e) => setForm((c) => ({ ...c, min_stock_qty: e.target.value }))} />
+                  <input
+                    ref={minStockRef}
+                    type="number" min="0" className="input"
+                    value={form.min_stock_qty}
+                    onChange={(e) => setForm((c) => ({ ...c, min_stock_qty: e.target.value }))}
+                    onKeyDown={(e) => {
+                      if (!isMedicalStore) return;
+                      if (e.key === 'Tab') { e.preventDefault(); nrxRef.current?.focus(); }
+                    }}
+                  />
                 </div>
               </div>
             </div>
@@ -391,9 +420,16 @@ export function ProductsPage() {
                 {isMedicalStore && (
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-medium text-slate-700">NRX</span>
-                    <button type="button"
+                    <button
+                      ref={nrxRef}
+                      type="button"
                       onClick={() => setForm((c) => ({ ...c, requires_prescription: !c.requires_prescription }))}
-                      className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors ${form.requires_prescription ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') { e.preventDefault(); setForm((c) => ({ ...c, requires_prescription: !c.requires_prescription })); }
+                        else if (e.key === 'Tab') { e.preventDefault(); createProductRef.current?.focus(); }
+                        else if (e.key === 'Shift') { e.preventDefault(); minStockRef.current?.focus(); }
+                      }}
+                      className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-1 ${form.requires_prescription ? 'bg-emerald-500' : 'bg-slate-300'}`}
                     >
                       <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${form.requires_prescription ? 'translate-x-5' : 'translate-x-1'}`} />
                     </button>
@@ -401,22 +437,55 @@ export function ProductsPage() {
                 )}
               </div>
               <div className="flex gap-3">
-                <button className="btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
+                <button
+                  ref={cancelRef}
+                  className="btn-secondary"
+                  onClick={() => setShowForm(false)}
+                  onKeyDown={(e) => {
+                    if (!isMedicalStore) return;
+                    if (e.key === 'Tab') { e.preventDefault(); createNewRef.current?.focus(); }
+                    else if (e.key === 'Shift') { e.preventDefault(); nrxRef.current?.focus(); }
+                  }}
+                >Cancel</button>
                 {editing ? (
                   <button className="btn-primary" onClick={() => saveMutation.mutate('close')} disabled={saveMutation.isPending}>
                     {saveMutation.isPending ? 'Saving…' : 'Update Product'}
                   </button>
                 ) : (
                   <>
-                    <button className="btn-secondary" onClick={() => saveMutation.mutate('new')} disabled={saveMutation.isPending}>
-                      {saveMutation.isPending ? 'Saving…' : 'Create And New'}
-                    </button>
-                    <button className="btn-secondary" onClick={() => saveMutation.mutate('inventory')} disabled={saveMutation.isPending}>
-                      {saveMutation.isPending ? 'Saving…' : 'Create And Add Inventory'}
-                    </button>
-                    <button className="btn-primary" onClick={() => saveMutation.mutate('close')} disabled={saveMutation.isPending}>
-                      {saveMutation.isPending ? 'Saving…' : 'Create Product'}
-                    </button>
+                    <button
+                      ref={createNewRef}
+                      className="btn-secondary"
+                      onClick={() => saveMutation.mutate('new')}
+                      disabled={saveMutation.isPending}
+                      onKeyDown={(e) => {
+                        if (!isMedicalStore) return;
+                        if (e.key === 'Tab') { e.preventDefault(); createInventoryRef.current?.focus(); }
+                        else if (e.key === 'Shift') { e.preventDefault(); cancelRef.current?.focus(); }
+                      }}
+                    >{saveMutation.isPending ? 'Saving…' : 'Create And New'}</button>
+                    <button
+                      ref={createInventoryRef}
+                      className="btn-secondary"
+                      onClick={() => saveMutation.mutate('inventory')}
+                      disabled={saveMutation.isPending}
+                      onKeyDown={(e) => {
+                        if (!isMedicalStore) return;
+                        if (e.key === 'Tab') { e.preventDefault(); createProductRef.current?.focus(); }
+                        else if (e.key === 'Shift') { e.preventDefault(); createNewRef.current?.focus(); }
+                      }}
+                    >{saveMutation.isPending ? 'Saving…' : 'Create And Add Inventory'}</button>
+                    <button
+                      ref={createProductRef}
+                      className="btn-primary"
+                      onClick={() => saveMutation.mutate('close')}
+                      disabled={saveMutation.isPending}
+                      onKeyDown={(e) => {
+                        if (!isMedicalStore) return;
+                        if (e.key === 'Tab') { e.preventDefault(); cancelRef.current?.focus(); }
+                        else if (e.key === 'Shift') { e.preventDefault(); createInventoryRef.current?.focus(); }
+                      }}
+                    >{saveMutation.isPending ? 'Saving…' : 'Create Product'}</button>
                   </>
                 )}
               </div>

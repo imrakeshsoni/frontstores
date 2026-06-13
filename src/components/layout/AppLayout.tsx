@@ -1,7 +1,6 @@
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { SwitchAppModal } from '@/modules/switch/SwitchAppModal';
-import { setAINavigator } from '@/lib/voice/aiNavigator';
 import { useTheme } from '@/lib/theme/useTheme';
 import {
   Car,
@@ -98,8 +97,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '@/app/store/app.store';
 import { verifyAuth } from '@/lib/db/auth';
 import { getShopTypeLabel } from '@/lib/shop/shopType';
-import { VoiceAssistant } from '@/components/voice/VoiceAssistant';
-import { StudyVoiceAssistant } from '@/modules/study/StudyVoiceAssistant';
 import { AnnouncementPopup } from '@/components/announcements/AnnouncementPopup';
 import { pollAnnouncements, getUnreadCount } from '@/lib/db/announcements';
 import { setAnnouncementNewHandler, setSyncStateHandler, removeSyncStateHandler, getSyncState, type SyncState } from '@/lib/autoSync';
@@ -118,13 +115,18 @@ export const NAV_ITEMS = [
   { to: '/purchase-orders', icon: ClipboardList,   label: 'Purchase Orders', iconBg: '#d1fae5', iconColor: '#059669' },
   { to: '/reports',         icon: BarChart3,       label: 'Reports',         iconBg: '#e0f2fe', iconColor: '#0284c7' },
   { to: '/settings',        icon: Settings,        label: 'Settings',        iconBg: '#f1f5f9', iconColor: '#64748b' },
-  // [medical] [all tenants] — Pharmacy features
-  { to: '/pharmacy/batches',   icon: Boxes,         label: 'Batch Manager',     iconBg: '#dcfce7', iconColor: '#16a34a' },
-  { to: '/pharmacy/rx',        icon: FileText,      label: 'Prescriptions',     iconBg: '#dbeafe', iconColor: '#2563eb' },
-  { to: '/pharmacy/patients',  icon: Users,         label: 'Patient History',   iconBg: '#fce7f3', iconColor: '#db2777' },
-  { to: '/pharmacy/schedule',  icon: ClipboardList, label: 'Schedule Register', iconBg: '#fee2e2', iconColor: '#dc2626' },
-  { to: '/pharmacy/returns',   icon: PackagePlus,   label: 'Supplier Returns',  iconBg: '#fef3c7', iconColor: '#d97706' },
-  { to: '/pharmacy/salt',      icon: FlaskConical,  label: 'Salt Search',       iconBg: '#cffafe', iconColor: '#0891b2' },
+];
+
+// [medical] [all tenants]
+export const MEDICAL_NAV_ITEMS = [
+  { to: '/dashboard',  icon: LayoutDashboard, label: 'Dashboard',     iconBg: '#ede9fe', iconColor: '#7c3aed' },
+  { to: '/pos',        icon: ShoppingCart,    label: 'POS / Billing', iconBg: '#dcfce7', iconColor: '#16a34a' },
+  { to: '/products',   icon: Package,         label: 'Products',      iconBg: '#ffedd5', iconColor: '#ea580c' },
+  { to: '/inventory',  icon: Boxes,           label: 'Inventory',     iconBg: '#cffafe', iconColor: '#0891b2' },
+  { to: '/orders',     icon: Receipt,         label: 'Orders',        iconBg: '#dbeafe', iconColor: '#2563eb' },
+  { to: '/customers',  icon: Users,           label: 'Customers',     iconBg: '#fce7f3', iconColor: '#db2777' },
+  { to: '/suppliers',  icon: Truck,           label: 'Suppliers',     iconBg: '#fef9c3', iconColor: '#ca8a04' },
+  { to: '/reports',    icon: BarChart3,       label: 'Reports',       iconBg: '#e0f2fe', iconColor: '#0284c7' },
 ];
 
 // [grocery] [all tenants]
@@ -171,51 +173,6 @@ export const CLINIC_NAV_ITEMS = [
   { to: '/expenses',            icon: Wallet,          label: 'Expenses',        iconBg: '#fee2e2', iconColor: '#dc2626' },
   { to: '/clinic/reports',      icon: BarChart3,       label: 'Reports',         iconBg: '#e0f2fe', iconColor: '#0284c7' },
   { to: '/settings',            icon: Settings,        label: 'Settings',        iconBg: '#f1f5f9', iconColor: '#64748b' },
-];
-
-// [study] [all tenants]
-export const STUDY_NAV_ITEMS = [
-  { to: '/study/dashboard',    icon: LayoutDashboard, label: 'Dashboard',     iconBg: '#ede9fe', iconColor: '#7c3aed' },
-  { to: '/study/ask',          icon: Brain,           label: 'Ask AI',        iconBg: '#dbeafe', iconColor: '#2563eb' },
-  { to: '/study/mock-tests',   icon: ClipboardList,   label: 'Mock Tests',    iconBg: '#dcfce7', iconColor: '#16a34a' },
-  { to: '/study/flashcards',   icon: BookOpen,        label: 'Flashcards',    iconBg: '#fef3c7', iconColor: '#d97706' },
-  { to: '/study/resources',    icon: Boxes,           label: 'My Resources',  iconBg: '#fce7f3', iconColor: '#db2777' },
-  { to: '/study/tracker',      icon: FlameIcon,       label: 'Study Tracker', iconBg: '#fee2e2', iconColor: '#dc2626' },
-  { to: '/study/timetable',    icon: Calendar,        label: 'Timetable',     iconBg: '#ede9fe', iconColor: '#7c3aed' },
-  { to: '/study/pomodoro',     icon: Timer,           label: 'Pomodoro',      iconBg: '#fee2e2', iconColor: '#dc2626' },
-  { to: '/study/exams',        icon: GraduationCap,   label: 'Exams',         iconBg: '#fef3c7', iconColor: '#d97706' },
-  { to: '/study/assignments',  icon: CheckSquare,     label: 'Assignments',   iconBg: '#dcfce7', iconColor: '#16a34a' },
-  { to: '/study/goals',        icon: Target,          label: 'Goals',         iconBg: '#dbeafe', iconColor: '#2563eb' },
-  { to: '/study/formulas',     icon: BookMarked,      label: 'Formula Bank',  iconBg: '#dcfce7', iconColor: '#16a34a' },
-  { to: '/study/badges',       icon: Trophy,          label: 'Achievements',  iconBg: '#fef3c7', iconColor: '#d97706' },
-  { to: '/study/mindmaps',     icon: Network,         label: 'Mind Maps',     iconBg: '#ede9fe', iconColor: '#7c3aed' },
-  { to: '/study/pyq',          icon: FileArchive,     label: 'PYQ Papers',    iconBg: '#fee2e2', iconColor: '#dc2626' },
-  { to: '/study/chapters',     icon: ListChecks,      label: 'Chapters',      iconBg: '#dcfce7', iconColor: '#16a34a' },
-  { to: '/study/revision',     icon: Map,             label: 'Revision Plan', iconBg: '#dbeafe', iconColor: '#2563eb' },
-  { to: '/study/calendar',     icon: CalendarDays,    label: 'Calendar',      iconBg: '#dbeafe', iconColor: '#2563eb' },
-  { to: '/study/analytics',    icon: BarChart3,       label: 'Analytics',     iconBg: '#ede9fe', iconColor: '#7c3aed' },
-  { to: '/study/converter',    icon: Ruler,           label: 'Unit Converter',iconBg: '#dcfce7', iconColor: '#16a34a' },
-  { to: '/study/calculator',   icon: Calculator,      label: 'Calculator',    iconBg: '#ede9fe', iconColor: '#7c3aed' },
-  { to: '/study/parents',      icon: GraduationCap,   label: 'Parent View',   iconBg: '#f0fdf4', iconColor: '#16a34a' },
-  { to: '/study/notes',        icon: FileText,        label: 'Rich Notes',    iconBg: '#dbeafe', iconColor: '#2563eb' },
-  { to: '/study/whiteboard',   icon: PenLine,         label: 'Whiteboard',    iconBg: '#f0fdf4', iconColor: '#16a34a' },
-  { to: '/study/doubts',       icon: HelpCircle,      label: 'Doubt Bank',    iconBg: '#fee2e2', iconColor: '#dc2626' },
-  { to: '/study/results',      icon: TrendingUp,      label: 'Exam Results',  iconBg: '#dcfce7', iconColor: '#16a34a' },
-  { to: '/study/attendance',   icon: UserCheck,       label: 'Attendance',    iconBg: '#dcfce7', iconColor: '#16a34a' },
-  { to: '/study/focus',        icon: CircleDot,       label: "Today's Focus", iconBg: '#dbeafe', iconColor: '#2563eb' },
-  { to: '/study/registrations',icon: ClipboardListIcon, label: 'Exam Regs',   iconBg: '#ede9fe', iconColor: '#7c3aed' },
-  { to: '/study/vocabulary',   icon: BookA,           label: 'Vocabulary',    iconBg: '#fef3c7', iconColor: '#d97706' },
-  { to: '/study/periodic',     icon: FlaskConical,    label: 'Periodic Table',iconBg: '#dcfce7', iconColor: '#16a34a' },
-  { to: '/study/videos',       icon: Video,           label: 'Video Links',   iconBg: '#fee2e2', iconColor: '#dc2626' },
-  { to: '/study/concepts',     icon: Layers,          label: 'Concept Cards', iconBg: '#fef3c7', iconColor: '#d97706' },
-  { to: '/study/sleep',        icon: Moon,            label: 'Sleep Tracker', iconBg: '#ede9fe', iconColor: '#7c3aed' },
-  { to: '/study/wrapped',      icon: Gift,            label: 'Study Wrapped', iconBg: '#fce7f3', iconColor: '#db2777' },
-  { to: '/study/writing',      icon: Edit3,           label: 'Writing',       iconBg: '#dbeafe', iconColor: '#2563eb' },
-  { to: '/study/brain-break',  icon: Gamepad2,        label: 'Brain Break',   iconBg: '#dcfce7', iconColor: '#16a34a' },
-  { to: '/study/constants',    icon: Sigma,           label: 'Constants',     iconBg: '#ede9fe', iconColor: '#7c3aed' },
-  { to: '/study/backup',       icon: HardDrive,       label: 'Backup',        iconBg: '#dbeafe', iconColor: '#2563eb' },
-  { to: '/study/local-ai',     icon: Brain,           label: 'Local AI Setup',iconBg: '#ede9fe', iconColor: '#7c3aed' },
-  { to: '/study/setup',        icon: Settings,        label: 'Profile',       iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
 
 // [coaching] [all tenants]
@@ -565,12 +522,12 @@ export const TYRESCRAP_NAV_ITEMS = [
 export function getNavItemsForShopType(shopType: string | undefined, settings: any, isEmployeeMode = false) {
   const reRole = settings?.re_role ?? 'resale';
   return (
+    shopType === 'medical'     ? MEDICAL_NAV_ITEMS :
     shopType === 'restaurant'  ? RESTAURANT_NAV_ITEMS :
     shopType === 'grocery'     ? GROCERY_NAV_ITEMS :
     shopType === 'carwash'     ? (isEmployeeMode ? CARWASH_EMPLOYEE_NAV_ITEMS : CARWASH_NAV_ITEMS) :
     shopType === 'clinic'      ? CLINIC_NAV_ITEMS :
     shopType === 'beauty'      ? BEAUTY_NAV_ITEMS :
-    shopType === 'study'       ? STUDY_NAV_ITEMS :
     shopType === 'coaching'    ? COACHING_NAV_ITEMS :
     shopType === 'gym'         ? GYM_NAV_ITEMS :
     shopType === 'jewellery'   ? JEWELLERY_NAV_ITEMS :
@@ -702,10 +659,6 @@ export function AppLayout() {
     }
   }, [location.pathname, staffTabAccess, activeNavItems, navigate]);
 
-  useEffect(() => {
-    setAINavigator((path) => navigate(path));
-  }, [navigate]);
-
   // [core] [all apps] [all tenants] — silently poll for new announcements (no manual "update" needed)
   const tenantId = config?.tenant_id ?? '';
   const queryClient = useQueryClient();
@@ -754,17 +707,6 @@ export function AppLayout() {
     return () => clearInterval(id);
   }, [tenantId, config?.shop_type, config?.owner_name, queryClient]);
 
-  // [study] [all tenants] — apply saved theme on mount, remove on shop type change
-  useEffect(() => {
-    if (config?.shop_type === 'study') {
-      import('@/lib/study/studyThemes').then(({ applyStudyThemeById, getSavedThemeId }) => {
-        applyStudyThemeById(getSavedThemeId());
-      });
-      return () => {
-        import('@/lib/study/studyThemes').then(({ removeStudyTheme }) => removeStudyTheme());
-      };
-    }
-  }, [config?.shop_type]);
 
   useEffect(() => {
     if (config?.shop_type === 'medical') {
@@ -1406,8 +1348,6 @@ export function AppLayout() {
         </main>
       </div>
 
-      {/* Voice assistants — only StudyMate; removed from other shop apps [carwash] [all tenants] */}
-      {config?.shop_type === 'study' && <StudyVoiceAssistant />}
       {/* [core] [all tenants] — Mobile bottom nav (shown only on small screens) */}
       <div className="lg:hidden">
         <MobileNav />

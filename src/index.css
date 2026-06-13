@@ -289,121 +289,6 @@
   html.carwash-theme.dark [style*="background: #ede9fe"], html.carwash-theme.dark [style*="background:#ede9fe"] { background: rgba(124,58,237,0.18) !important; }
   html.carwash-theme.dark [style*="background: #f3f4f6"], html.carwash-theme.dark [style*="background:#f3f4f6"] { background: rgba(156,163,175,0.14) !important; }
 
-  /* [study] [all tenants] — Night-friendly midnight purple theme for StudyMate */
-  /* [study] [all tenants] — Dynamic theme shell. Colors injected via JS studyThemes.ts */
-  html.study-theme {
-    --shadow-sm: 0 1px 3px rgba(0,0,0,.22), 0 1px 2px rgba(0,0,0,.14);
-    --shadow-md: 0 4px 16px rgba(0,0,0,.28), 0 1px 4px rgba(0,0,0,.14);
-    --shadow-lg: 0 8px 32px rgba(0,0,0,.36), 0 2px 8px rgba(0,0,0,.20);
-  }
-  html.study-dark  { color-scheme: dark; }
-  html.study-light { color-scheme: light; }
-
-  /* Sidebar */
-  html.study-theme aside {
-    background: linear-gradient(180deg, var(--study-sidebar-from) 0%, var(--study-sidebar-to) 100%) !important;
-    border-right-color: var(--surface-border) !important;
-  }
-
-  /* Primary button — always readable */
-  html.study-theme .btn-primary {
-    background: var(--accent) !important;
-    color: var(--accent-text, #ffffff) !important;
-    box-shadow: 0 4px 16px var(--accent-soft) !important;
-  }
-  html.study-theme .btn-primary:hover { background: var(--accent-hover) !important; }
-
-  /* ── Nav text & hover (overrides hardcoded Tailwind) ─────────────────── */
-  html.study-theme nav a {
-    color: var(--text-secondary) !important;
-  }
-  html.study-theme nav a:hover {
-    background: var(--hover-bg) !important;
-    color: var(--hover-text) !important;
-  }
-  html.study-theme nav a.text-slate-900,
-  html.study-theme nav a[style*="color: rgb(28, 100"] {
-    color: var(--text-primary) !important;
-  }
-
-  /* ── All hardcoded Tailwind text colors → CSS vars ────────────────────── */
-  html.study-theme .text-slate-900,
-  html.study-theme .text-slate-800,
-  html.study-theme .text-slate-700 { color: var(--text-primary) !important; }
-
-  html.study-theme .text-slate-600,
-  html.study-theme .text-slate-500 { color: var(--text-secondary) !important; }
-
-  html.study-theme .text-slate-400,
-  html.study-theme .text-slate-300 { color: var(--text-tertiary) !important; }
-
-  /* ── Background overrides ─────────────────────────────────────────────── */
-  html.study-dark .bg-white,
-  html.study-dark .bg-slate-50,
-  html.study-dark .bg-slate-100  { background: var(--surface-2) !important; }
-
-  html.study-dark .bg-white\/70  { background: var(--surface) !important; }
-
-  /* ── Hover background overrides ───────────────────────────────────────── */
-  html.study-theme .hover\:bg-slate-50:hover,
-  html.study-theme .hover\:bg-slate-100:hover { background: var(--hover-bg) !important; }
-
-  html.study-dark .hover\:bg-slate-900:hover  { background: var(--hover-bg) !important; }
-  html.study-dark .hover\:text-white:hover    { color: var(--hover-text) !important; }
-
-  /* ── Borders ──────────────────────────────────────────────────────────── */
-  html.study-dark .border-black\/\[0\.06\] { border-color: var(--surface-border) !important; }
-  html.study-dark .border-slate-200        { border-color: var(--surface-border) !important; }
-
-  /* ── Input / textarea / select — always readable ─────────────────────── */
-  html.study-theme input,
-  html.study-theme textarea,
-  html.study-theme select {
-    color: var(--text-primary) !important;
-  }
-  html.study-dark input::placeholder,
-  html.study-dark textarea::placeholder {
-    color: var(--text-tertiary) !important;
-    opacity: 1 !important;
-  }
-  html.study-dark select option {
-    background: var(--surface) !important;
-    color: var(--text-primary) !important;
-  }
-
-  /* ── Input focus rings ────────────────────────────────────────────────── */
-  html.study-theme input:focus,
-  html.study-theme textarea:focus,
-  html.study-theme select:focus {
-    border-color: var(--accent) !important;
-    box-shadow: 0 0 0 3px var(--accent-ring) !important;
-    outline: none !important;
-  }
-
-  /* ── Red/danger hover buttons — keep visible ──────────────────────────── */
-  html.study-dark .hover\:bg-red-50:hover  { background: rgba(239,68,68,0.15) !important; }
-  html.study-dark .hover\:bg-blue-50:hover { background: rgba(59,130,246,0.15) !important; }
-  html.study-dark .hover\:text-red-600:hover,
-  html.study-dark .hover\:text-red-500:hover   { color: #f87171 !important; }
-  html.study-dark .hover\:text-blue-600:hover  { color: #60a5fa !important; }
-  html.study-dark .hover\:text-blue-500:hover  { color: #7dd3fc !important; }
-
-  /* ── Green success hover ──────────────────────────────────────────────── */
-  html.study-dark .hover\:text-green-600:hover { color: #4ade80 !important; }
-
-  /* ── Light theme specific fixes ───────────────────────────────────────── */
-  html.study-light nav a { color: #374151 !important; }
-  html.study-light nav a:hover { color: #111827 !important; background: var(--hover-bg) !important; }
-  html.study-light .hover\:bg-slate-900:hover { background: var(--hover-bg) !important; }
-  html.study-light .hover\:text-white:hover   { color: #111827 !important; }
-
-  /* ── Checkbox & toggle visibility ────────────────────────────────────── */
-  html.study-dark input[type="checkbox"] {
-    accent-color: var(--accent);
-  }
-
-  /* ── Animate pulse visibility ─────────────────────────────────────────── */
-  html.study-dark .animate-pulse { opacity: 0.6 !important; }
 
   * { box-sizing: border-box; }
 
@@ -520,6 +405,8 @@
     box-shadow: var(--shadow-sm);
   }
   .btn-secondary:hover { background: var(--surface-2); }
+  .btn-primary:focus-visible, .btn-primary:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn-secondary:focus-visible, .btn-secondary:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
   .btn-danger {
     @apply btn text-white;
     background-color: #FF3B30;

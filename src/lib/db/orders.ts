@@ -204,6 +204,14 @@ export async function voidOrder(tenantId: string, orderId: string): Promise<void
   }
 }
 
+export async function updateOrderDate(tenantId: string, orderId: string, orderDate: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `UPDATE orders SET order_date = ?, updated_at = ? WHERE id = ? AND tenant_id = ?`,
+    [orderDate, now(), orderId, tenantId]
+  );
+}
+
 export async function getSalesSummary(tenantId: string, from: string, to: string): Promise<{
   total_revenue: number; total_orders: number; total_tax: number; total_discount: number;
   by_payment: { payment_method: string; count: number; total: number }[];

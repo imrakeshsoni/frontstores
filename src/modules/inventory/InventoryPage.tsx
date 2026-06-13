@@ -38,7 +38,7 @@ export function InventoryPage() {
   const dropdownItemRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const [dropdownIndex, setDropdownIndex] = useState(-1);
   const [adjustment, setAdjustment] = useState({
-    productId: '', quantity: '1', direction: 'add', type: 'adjustment',
+    productId: '', quantity: '', direction: 'add', type: 'purchase',
     supplierId: '', invoiceNumber: '', challanNumber: '', batchNo: '', expiryDate: '', notes: '',
   });
   const navigationState = (location.state ?? null) as InventoryNavigationState | null;
@@ -107,7 +107,7 @@ export function InventoryPage() {
   }, [allProducts, productSearchInput]);
 
   const resetAdjustment = () => {
-    setAdjustment({ productId: '', quantity: '1', direction: 'add', type: 'adjustment', supplierId: '', invoiceNumber: '', challanNumber: '', batchNo: '', expiryDate: '', notes: '' });
+    setAdjustment({ productId: '', quantity: '', direction: 'add', type: 'purchase', supplierId: '', invoiceNumber: '', challanNumber: '', batchNo: '', expiryDate: '', notes: '' });
     setProductSearchInput('');
   };
 

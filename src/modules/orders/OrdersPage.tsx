@@ -247,6 +247,14 @@ export function OrdersPage() {
                           onClick={() => setSelectedOrderId(selectedOrderId === o.id ? null : o.id)}>
                           <Eye className="h-3.5 w-3.5" />
                         </button>
+                        <button className="rounded-full bg-emerald-50 p-1.5 text-emerald-600 hover:bg-emerald-100"
+                          title="Print invoice"
+                          onClick={async () => {
+                            const full = await getOrderWithItems(tenantId, o.id);
+                            if (full) handlePrintOrder(full);
+                          }}>
+                          <Printer className="h-3.5 w-3.5" />
+                        </button>
                         {o.payment_status !== 'cancelled' && (
                           <button className="rounded-full bg-rose-50 p-1.5 text-rose-500 hover:bg-rose-100"
                             onClick={() => { setSelectedOrderId(o.id); setShowVoidConfirm(true); }}>

@@ -21,6 +21,7 @@ export interface Product {
   requires_prescription: boolean;
   total_units: number | null;
   ml_volume: string | null;
+  gm_volume: string | null;
   stock_qty: number;
   min_stock_qty: number;
   wholesale_price?: number | null;
@@ -100,13 +101,13 @@ export async function createProduct(tenantId: string, data: Omit<Product, 'id' |
   await db.execute(
     `INSERT INTO products (id, tenant_id, name, sku, barcode, category, brand, description,
       unit, mrp, selling_price, cost_price, gst_rate, hsn_code, dosage_form, salt_composition,
-      manufacturer, requires_prescription, total_units, ml_volume, min_stock_qty, is_active)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      manufacturer, requires_prescription, total_units, ml_volume, gm_volume, min_stock_qty, is_active)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [id, tenantId, data.name, data.sku ?? null, data.barcode ?? null, data.category ?? null,
      data.brand ?? null, data.description ?? null, data.unit, data.mrp, data.selling_price,
      data.cost_price ?? null, data.gst_rate, data.hsn_code ?? null, data.dosage_form ?? null,
      data.salt_composition ?? null, data.manufacturer ?? null, data.requires_prescription ? 1 : 0,
-     data.total_units ?? null, data.ml_volume ?? null, data.min_stock_qty, data.is_active ? 1 : 0]
+     data.total_units ?? null, data.ml_volume ?? null, data.gm_volume ?? null, data.min_stock_qty, data.is_active ? 1 : 0]
   );
   const rows = await db.select<any[]>(`SELECT * FROM products WHERE id = ?`, [id]);
   return mapProduct(rows[0]);
@@ -116,7 +117,7 @@ const PRODUCT_UPDATE_FIELDS = new Set([
   'name','sku','barcode','category','brand','description','unit',
   'mrp','selling_price','wholesale_price','cost_price','gst_rate','hsn_code',
   'dosage_form','salt_composition','manufacturer','requires_prescription',
-  'total_units','ml_volume','min_stock_qty','is_active','updated_at',
+  'total_units','ml_volume','gm_volume','min_stock_qty','is_active','updated_at',
 ]);
 
 export async function updateProduct(tenantId: string, id: string, data: Partial<Product>): Promise<void> {

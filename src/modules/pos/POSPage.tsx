@@ -14,12 +14,13 @@ import type { CartItem } from '@/app/store/cart.store';
 import { isMedicalShopType, useActiveShopType } from '@/lib/shop/shopType';
 import { listProducts, createProduct, getProductByBarcode, searchProductsForPOS } from '@/lib/db/products';
 import { listCustomers, createCustomer } from '@/lib/db/customers';
-import { createOrder } from '@/lib/db/orders';
+import { createOrder, updateOrderDate } from '@/lib/db/orders';
 import { sendWhatsApp, shareWhatsApp } from '@/lib/whatsapp';
 
 type PaymentMethod = 'cash' | 'upi' | 'card' | 'credit';
 
 type InvoiceSnapshot = {
+  orderId: string;
   billNumber: string;
   createdAt: string;
   paymentMethod: PaymentMethod;
@@ -490,6 +491,7 @@ export function POSPage() {
         payment_method: paymentMethod,
         payment_status: paymentMethod === 'credit' ? 'pending' : 'paid',
         amount_paid: paymentMethod === 'credit' ? 0 : total,
+        order_date: (canEditInvoiceDateTime && invoiceDateTime) ? invoiceDateTime : undefined,
       });
     },
     onSuccess: (order) => {
@@ -536,8 +538,9 @@ export function POSPage() {
       const totalDiscount = cart.items.reduce((sum, item) => sum + (item.discount ?? 0), 0);
 
       setInvoiceSnapshot({
+        orderId: order.id,
         billNumber: order.bill_number,
-        createdAt: order.created_at ?? new Date().toISOString(),
+        createdAt: order.order_date ?? order.created_at ?? new Date().toISOString(),
         paymentMethod,
         paymentStatus: paymentMethod === 'credit' ? 'pending' : 'paid',
         patientName,
@@ -590,6 +593,7 @@ export function POSPage() {
         gst_rate: Number(productForm.gstRate || 0),
         dosage_form: productForm.dosageForm || null,
         ml_volume: productForm.unit === 'ml' && productForm.mlVolume ? productForm.mlVolume : null,
+        gm_volume: null,
         total_units: productForm.unit === 'strip' && productForm.totalUnits ? Number(productForm.totalUnits) : null,
         min_stock_qty: productForm.lowStockQuantity ? Number(productForm.lowStockQuantity) : 0,
         requires_prescription: productForm.nrx,
@@ -610,6 +614,20 @@ export function POSPage() {
       });
     },
     onError: (err: any) => toast.error(err.message ?? 'Unable to save product'),
+  });
+
+  // [medical] [all tenants] — save edited invoice date back to the order in DB
+  const saveDateMutation = useMutation({
+    mutationFn: async () => {
+      if (!invoiceSnapshot?.orderId || !invoiceDateTime) throw new Error('No date to save');
+      await updateOrderDate(tenantId, invoiceSnapshot.orderId, invoiceDateTime);
+    },
+    onSuccess: () => {
+      toast.success('Invoice date updated');
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['today-orders'] });
+    },
+    onError: (err: any) => toast.error(err.message ?? 'Could not update date'),
   });
 
   const createCreditCustomerMutation = useMutation({
@@ -2211,9 +2229,18 @@ ${invoiceSnapshot.gstAmount > 0 ? `<div class="row"><span>GST</span><span>₹${i
                     <div className="space-y-1">
                       <div><span className="font-bold">Date.</span> {getInvoiceDisplayDate(invoiceSnapshot, invoiceDateTime, canEditInvoiceDateTime).toLocaleString('en-IN')}</div>
                       {canEditInvoiceDateTime && (
-                        <div className="flex flex-wrap gap-2 mt-1">
+                        <div className="flex flex-wrap gap-2 mt-1 items-center">
                           <input type="date" className="input h-9 min-w-[148px] px-3 py-1 text-sm" value={invoiceDateTime.slice(0, 10)} onChange={(e) => setInvoiceDateTime((current) => mergeInvoiceDatePart(current, e.target.value, 'date'))} />
                           <input type="time" className="input h-9 min-w-[120px] px-3 py-1 text-sm" value={invoiceDateTime.slice(11, 16)} onChange={(e) => setInvoiceDateTime((current) => mergeInvoiceDatePart(current, e.target.value, 'time'))} />
+                          {invoiceDateTime && (
+                            <button
+                              onClick={() => saveDateMutation.mutate()}
+                              disabled={saveDateMutation.isPending}
+                              className="btn-primary h-9 px-3 py-1 text-xs"
+                            >
+                              {saveDateMutation.isPending ? 'Saving…' : 'Save Date'}
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
