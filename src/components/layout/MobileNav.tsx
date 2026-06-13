@@ -1,13 +1,11 @@
 import { NavLink } from 'react-router-dom'
 import { LayoutDashboard, ShoppingCart, Package, Users, Settings, RefreshCw } from 'lucide-react'
-import { useAppStore } from '@/app/store/app.store'
 
 /**
  * Bottom navigation bar shown on mobile/Android.
  * Shows the 5 most important tabs for quick access.
  */
 export function MobileNav() {
-  const config = useAppStore(s => s.config)
   const tabs = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/pos', icon: ShoppingCart, label: 'POS' },
@@ -17,15 +15,7 @@ export function MobileNav() {
     { to: '/settings', icon: Settings, label: 'Settings' },
   ]
 
-  // Study app has different nav
-  const studyTabs = [
-    { to: '/dashboard', icon: LayoutDashboard, label: 'Home' },
-    { to: '/products', icon: Package, label: 'Notes' },
-    { to: '/sync', icon: RefreshCw, label: 'Sync' },
-    { to: '/settings', icon: Settings, label: 'Settings' },
-  ]
-
-  const activeTabs = config?.shop_type === 'study' ? studyTabs : tabs
+  const activeTabs = tabs
 
   return (
     <nav style={{

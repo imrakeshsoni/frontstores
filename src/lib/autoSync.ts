@@ -1,4 +1,4 @@
-// [all apps] [all tenants] — Auto-sync: push on events, SSE real-time pull, 3-min fallback
+// [all apps] [all tenants] — Auto-sync: push on events, periodic polling pull (Cloudflare Worker has no SSE/Durable Objects)
 import { pushDelta, pullDelta, refreshCloudSyncStatus, pushToCloudDb, refreshCloudDbStatus } from './db/cloudSync';
 import { pollAnnouncements } from './db/announcements';
 import { getAppConfig } from './db/config';
@@ -37,15 +37,12 @@ const SERVER = 'https://update.frontstores.com';
 let _tenantId = '';
 let _pushTimer: ReturnType<typeof setTimeout> | null = null;
 let _pullInterval: ReturnType<typeof setInterval> | null = null;
-let _sse: EventSource | null = null;
-let _sseReconnectTimer: ReturnType<typeof setTimeout> | null = null;
-let _sseReconnectDelay = 5000;
-// [all apps] [all tenants] — dedicated announcement SSE, no Cloud Sync required
-let _announceSSE: EventSource | null = null;
-let _announceReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let _announceInterval: ReturnType<typeof setInterval> | null = null;
+let _lastCloudDbRequestStatus: string | null = null;
 
-const PUSH_DEBOUNCE_MS = 300;     // ~instant push — just enough to batch a single multi-row write (e.g. order + line items) into one request
-const PULL_INTERVAL_MS = 30 * 1000; // 30s fallback poll if SSE drops, so the other device never waits long
+const PUSH_DEBOUNCE_MS = 300;       // ~instant push — just enough to batch a single multi-row write (e.g. order + line items) into one request
+const PULL_INTERVAL_MS = 30 * 1000; // poll for sync deltas + cloud-db approval
+const ANNOUNCE_INTERVAL_MS = 60 * 1000; // poll for new announcements
 
 // Callback registered by SyncPage to refresh Cloud DB status after SSE approval
 let _onCloudDbApproved: (() => void) | null = null;
@@ -61,27 +58,28 @@ export function initAutoSync(tenantId: string) {
   ]).then(async () => {
     const config = await getAppConfig().catch(() => null);
     if (!(config?.settings as any)?.cloud_sync_enabled) setSyncState({ status: 'disabled' });
-    connectSSE();
-    connectAnnounceSSE(); // [all apps] [all tenants] — works without Cloud Sync
     silentPull();
     silentCloudDbPush(); // push to cloud DB if enabled
   }).catch(() => {
     setSyncState({ status: navigator.onLine ? 'error' : 'offline' });
-    connectSSE();
-    connectAnnounceSSE();
     silentPull();
   });
-  // Fallback poll in case SSE drops
+  // Periodic polling — Cloudflare Worker has no SSE/Durable Objects, so this
+  // is the only mechanism for picking up remote changes (sync deltas,
+  // cloud-db approval, new announcements).
   if (_pullInterval) clearInterval(_pullInterval);
-  _pullInterval = setInterval(() => silentPull(), PULL_INTERVAL_MS);
+  _pullInterval = setInterval(() => { silentPull(); pollCloudDbApproval(); }, PULL_INTERVAL_MS);
+  if (_announceInterval) clearInterval(_announceInterval);
+  pollAnnouncements(_tenantId).then(() => _onAnnouncementNew?.());
+  _announceInterval = setInterval(() => {
+    pollAnnouncements(_tenantId).then(() => _onAnnouncementNew?.());
+  }, ANNOUNCE_INTERVAL_MS);
 }
 
 export function stopAutoSync() {
   if (_pullInterval) { clearInterval(_pullInterval); _pullInterval = null; }
+  if (_announceInterval) { clearInterval(_announceInterval); _announceInterval = null; }
   if (_pushTimer) { clearTimeout(_pushTimer); _pushTimer = null; }
-  disconnectSSE();
-  if (_announceReconnectTimer) { clearTimeout(_announceReconnectTimer); _announceReconnectTimer = null; }
-  if (_announceSSE) { _announceSSE.close(); _announceSSE = null; }
 }
 
 // Call this after any significant data change — debounces and pushes to Cloud Sync + Cloud DB
@@ -130,75 +128,18 @@ async function silentCloudDbPush() {
   try { await pushToCloudDb(_tenantId); } catch { /* non-critical */ }
 }
 
-// [all apps] [all tenants] — connect to announcement SSE regardless of Cloud Sync status
-function connectAnnounceSSE() {
+// [all apps] [all tenants] — poll for Cloud DB approval (replaces 'cloud-db-approved' SSE event)
+async function pollCloudDbApproval() {
   if (!_tenantId) return;
-  if (_announceReconnectTimer) { clearTimeout(_announceReconnectTimer); _announceReconnectTimer = null; }
-  if (_announceSSE) { _announceSSE.close(); _announceSSE = null; }
-  try {
-    const es = new EventSource(`${SERVER}/announce/events`);
-    _announceSSE = es;
-    es.addEventListener('announcement-new', () => {
-      pollAnnouncements(_tenantId).then(() => _onAnnouncementNew?.());
-    });
-    es.onerror = () => {
-      es.close();
-      _announceSSE = null;
-      _announceReconnectTimer = setTimeout(() => connectAnnounceSSE(), 15000);
-    };
-  } catch { /* EventSource unavailable */ }
-}
-
-function disconnectSSE() {
-  if (_sseReconnectTimer) { clearTimeout(_sseReconnectTimer); _sseReconnectTimer = null; }
-  if (_sse) { _sse.close(); _sse = null; }
-}
-
-async function connectSSE() {
-  if (!_tenantId) return;
-  disconnectSSE();
-
   const config = await getAppConfig().catch(() => null);
   const s = config?.settings as any ?? {};
-  if (!s.cloud_sync_enabled || !s.cloud_sync_code) return; // not activated yet
-
-  const url = `${SERVER}/sync/events/${_tenantId}?sync_code=${encodeURIComponent(s.cloud_sync_code)}`;
+  if (s.cloud_db_request_status !== 'pending') { _lastCloudDbRequestStatus = s.cloud_db_request_status ?? null; return; }
   try {
-    const es = new EventSource(url);
-    _sse = es;
-
-    es.addEventListener('connected', () => {
-      _sseReconnectDelay = 5000; // reset backoff on successful connect
-    });
-
-    es.addEventListener('data-changed', () => {
-      silentPull();
-    });
-
-    // [all apps] [all tenants] — instantly fetch new announcements when admin pushes one
-    es.addEventListener('announcement-new', () => {
-      pollAnnouncements(_tenantId).then(() => _onAnnouncementNew?.());
-    });
-
-    // [all apps] [all tenants] — instantly enable Cloud DB when admin approves (no polling delay)
-    es.addEventListener('cloud-db-approved', () => {
-      refreshCloudDbStatus(_tenantId).then(() => {
-        silentCloudDbPush(); // push immediately after approval
-        _onCloudDbApproved?.();
-      });
-    });
-
-    es.onerror = () => {
-      es.close();
-      _sse = null;
-      setSyncState({ status: navigator.onLine ? 'error' : 'offline' });
-      // Reconnect with exponential backoff, cap at 2 minutes
-      _sseReconnectTimer = setTimeout(() => {
-        _sseReconnectDelay = Math.min(_sseReconnectDelay * 2, 120_000);
-        connectSSE();
-      }, _sseReconnectDelay);
-    };
-  } catch {
-    // EventSource not available (e.g. test env) — fallback polling covers it
-  }
+    const status = await refreshCloudDbStatus(_tenantId);
+    if (_lastCloudDbRequestStatus === 'pending' && status.requestStatus === 'approved') {
+      silentCloudDbPush(); // push immediately after approval
+      _onCloudDbApproved?.();
+    }
+    _lastCloudDbRequestStatus = status.requestStatus ?? null;
+  } catch { /* non-critical */ }
 }

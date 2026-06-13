@@ -87,14 +87,6 @@ const THEMES: Record<string, AppTheme> = {
     cardBg: 'rgba(80, 7, 36, 0.85)', cardBorder: 'rgba(244, 114, 182, 0.3)',
     inputBg: 'rgba(131, 24, 67, 0.4)', labelColor: '#fbcfe8',
   },
-  study: {
-    bgFrom: '#06121f', bgTo: '#0c1e35',
-    accent: '#7dd3fc', accentDark: '#0ea5e9', accentLight: '#e0f2fe',
-    icon: '📚',
-    tagline: 'Your AI Study Companion',
-    cardBg: 'rgba(12, 30, 53, 0.92)', cardBorder: 'rgba(125, 211, 252, 0.28)',
-    inputBg: 'rgba(24, 51, 86, 0.85)', labelColor: '#bae6fd',
-  },
 };
 
 const DEFAULT_THEME: AppTheme = {
@@ -132,17 +124,7 @@ export function AppLoginScreen() {
     await loadConfig();
   }
 
-  // For study type, load the user's saved theme colors for the login screen
   const baseTheme = THEMES[shopType] ?? DEFAULT_THEME;
-  const [studyColors, setStudyColors] = useState<{ accent: string; bg: string } | null>(null);
-  useEffect(() => {
-    if (shopType !== 'study') return;
-    import('@/lib/study/studyThemes').then(({ STUDY_THEMES, getSavedThemeId }) => {
-      const saved = STUDY_THEMES.find(t => t.id === getSavedThemeId());
-      if (saved) setStudyColors({ accent: saved.accent, bg: saved.bg });
-    });
-  }, [shopType]);
-  void studyColors; // superseded by the unified brand design below
   // [core] [all apps] [all tenants] — unified FrontStores spectrum design:
   // the login screen matches frontstores.com for every app. Per-app icon and
   // tagline remain; colours are one premium brand system.

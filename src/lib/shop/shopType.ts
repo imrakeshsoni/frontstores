@@ -1,6 +1,6 @@
 import { useAppStore } from '@/app/store/app.store';
 
-export type ShopType = 'medical' | 'restaurant' | 'grocery' | 'carwash' | 'clinic' | 'beauty' | 'study' | 'coaching' | 'gym' | 'jewellery' | 'realestate' | 'hotel' | 'tailor' | 'hardware' | 'repair' | 'drivingschool' | 'laundry' | 'catering' | 'pestcontrol' | 'clothing' | 'bakery' | 'optician' | 'petrolpump' | 'furniture' | 'printing' | 'ca' | 'events' | 'travel' | 'insurance' | 'homeservice' | 'tyrescrap' | 'crm';
+export type ShopType = 'medical' | 'restaurant' | 'grocery' | 'carwash' | 'clinic' | 'beauty' | 'coaching' | 'gym' | 'jewellery' | 'realestate' | 'hotel' | 'tailor' | 'hardware' | 'repair' | 'drivingschool' | 'laundry' | 'catering' | 'pestcontrol' | 'clothing' | 'bakery' | 'optician' | 'petrolpump' | 'furniture' | 'printing' | 'ca' | 'events' | 'travel' | 'insurance' | 'homeservice' | 'tyrescrap' | 'crm';
 
 const SHOP_TYPE_LABELS: Record<string, string> = {
   medical: 'Medical Store / Pharmacy', // [medical] [all tenants]
@@ -9,7 +9,6 @@ const SHOP_TYPE_LABELS: Record<string, string> = {
   carwash: 'Car Wash',
   clinic: 'Hospital / Clinic',
   beauty: 'Beauty Parlor',
-  study: 'StudyMate',
   coaching: 'Coaching Institute',
   gym: 'Gym / Fitness',
   jewellery: 'Jewellery Shop',
@@ -104,15 +103,6 @@ export const APP_REGISTRY: AppRegistryEntry[] = [
     color: '#db2777',
     bgColor: '#fce7f3',
     dashboardRoute: '/beauty/dashboard',
-  },
-  {
-    type: 'study',
-    label: 'StudyMate',
-    icon: '📚',
-    description: 'AI study tools for school & college students',
-    color: '#7c3aed',
-    bgColor: '#ede9fe',
-    dashboardRoute: '/study/dashboard',
   },
   {
     type: 'coaching',

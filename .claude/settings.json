@@ -67,10 +67,26 @@
       "Bash(curl -s -X POST http://localhost:3001/api/shop-ai -H 'Content-Type: application/json' -d '{\"sessionId\":\"r3\",\"shopContext\":{\"shopName\":\"Roshan Medical\"},\"message\":\"what is running low on stock\"}')",
       "Bash(curl -s -X POST http://localhost:3001/api/shop-ai -H 'Content-Type: application/json' -d '{\"sessionId\":\"r4\",\"shopContext\":{\"shopName\":\"Roshan Medical\"},\"message\":\"I want to add a new product\"}')",
       "Bash(curl -s -X POST http://localhost:3001/api/shop-ai -H 'Content-Type: application/json' -d '{\"sessionId\":\"r5\",\"shopContext\":{\"shopName\":\"Roshan Medical\"},\"message\":\"search for crocin\"}')",
-      "Bash(launchctl list *)"
+      "Bash(launchctl list *)",
+      "Bash(cat .env)",
+      "Bash(cat .gitignore)",
+      "Bash(rm -rf server/migrations/_runner.js)",
+      "Bash(mkdir -p migrations)",
+      "Bash(cp server/migrations/0001_initial.sql migrations/0001_initial.sql)",
+      "Bash(cp server/migrations/0002_appointments_verify.sql migrations/0002_appointments_verify.sql)",
+      "Bash(sqlite3 data/ngo-webapp.sqlite \"SELECT tenant_id, ngo_name, subdomain, status FROM tenants;\")",
+      "Bash(sqlite3 data/ngo-webapp.sqlite \"SELECT count\\(*\\) FROM users;\")",
+      "Bash(sqlite3 data/ngo-webapp.sqlite \"SELECT count\\(*\\) FROM members;\")",
+      "Bash(sqlite3 data/ngo-webapp.sqlite \"SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != '_migrations';\")",
+      "Bash(read t *)",
+      "Bash(sqlite3 data/ngo-webapp.sqlite 'SELECT count\\(*\\) FROM __TRACKED_VAR__;')",
+      "Bash(cd \"/Users/rakeshsoni/Documents/Cloud Software\" && ls && cat ngo-webapp/package.json)",
+      "Read(//Users/rakeshsoni/Documents/Cloud Software/**)",
+      "Bash(ADMIN_PASSWORD=qodXjlMOr4YZG25wDSLoRANZ python3 tools/seed-large-blobs.py https://update.frontstores.com)"
     ],
     "additionalDirectories": [
-      "/Users/rakeshsoni/Documents/Cloud Software/ngo-webapp"
+      "/Users/rakeshsoni/Documents/Cloud Software/ngo-webapp",
+      "/Users/rakeshsoni/Documents/Cloud Software/update-server-webapp"
     ]
   },
   "hooks": {

@@ -6,7 +6,6 @@ import App from './App';
 import './index.css';
 import { reportError } from './lib/errorReporter';
 import { flushQueue } from './lib/syncQueue';
-import { setAIQueryClient } from './lib/voice/aiQueryInvalidator';
 
 // Check for updates silently on startup — only notify if this release affects the user's app.
 // Release notes contain app tags like [medical] [all apps] — user only gets update if their
@@ -66,8 +65,6 @@ const queryClient = new QueryClient({
     },
   },
 });
-setAIQueryClient(queryClient);
-
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>

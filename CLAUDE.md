@@ -60,7 +60,6 @@ Which app are you working on?
 27) CRM / Sales Tracker (crm)
 
 ── Education ──
-28) StudyMate — Student App (study)
 29) Coaching Institute (coaching)
 
 ── Fitness ──
@@ -142,7 +141,6 @@ frontstores.com hosts multiple separate apps. Each app is a different downloadab
 | Car Wash | frontstores.com/carwash | `carwash` | ✅ Active |
 | Hospital / Clinic | frontstores.com/clinic | `clinic` | ✅ Active |
 | Beauty Parlor / Salon | frontstores.com/beauty | `beauty` | ✅ Active |
-| StudyMate (Student App) | frontstores.com/study | `study` | ✅ Active |
 | CRM / Sales Tracker | frontstores.com/crm | `crm` | ✅ Active |
 
 All apps are built from this single codebase. The `shopType` field in `app_config` controls which features are visible.
