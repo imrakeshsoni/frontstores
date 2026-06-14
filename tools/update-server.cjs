@@ -257,7 +257,13 @@ function websiteCrmTenantId() {
 // question, and auto-assigned to that tenant's owner.
 function upsertWaLeadRecord(c, from, tenantId) {
   const leads = loadWaLeads();
-  const idx = c.lead_record_id ? leads.findIndex(l => l.id === c.lead_record_id) : -1;
+  // Dedup: look up by stored ID first; fall back to phone+tenant so a server
+  // restart or webhook race never creates a second lead for the same number.
+  let idx = c.lead_record_id ? leads.findIndex(l => l.id === c.lead_record_id) : -1;
+  if (idx < 0) {
+    idx = leads.findIndex(l => l.from_phone === from && l.tenant_id === tenantId);
+    if (idx >= 0) c.lead_record_id = leads[idx].id; // sync the ID back into conversation state
+  }
   const rec = idx >= 0 ? leads[idx] : {
     id: crypto.randomUUID(),
     tenant_id: tenantId,
@@ -265,13 +271,14 @@ function upsertWaLeadRecord(c, from, tenantId) {
     received_at: c.started_at,
     imported: false,
   };
-  rec.from_name = c.name || c.profile_name || '';
-  // The WhatsApp profile name is kept as its OWN field — the typed name never
-  // overwrites it; the CRM shows both.
-  rec.whatsapp_name = c.profile_name || '';
-  rec.company = c.company || '';
-  rec.business_type = c.business_type || '';
-  rec.software_interest = c.software_interest || '';
+  rec.from_name = c.name || rec.from_name || '';
+  // WhatsApp profile name is a separate field — captured silently on the very
+  // first message and never overwritten by the typed name the user gives later.
+  if (c.profile_name && !rec.whatsapp_name) rec.whatsapp_name = c.profile_name;
+  else if (c.profile_name) rec.whatsapp_name = c.profile_name;
+  rec.company = c.company || rec.company || '';
+  rec.business_type = c.business_type || rec.business_type || '';
+  rec.software_interest = c.software_interest || rec.software_interest || '';
   rec.assigned_to = loadSubs()[tenantId]?.owner_name || '';
   const parts = [];
   if (c.first_message) parts.push(`First message: ${c.first_message}`);
@@ -280,9 +287,14 @@ function upsertWaLeadRecord(c, from, tenantId) {
   if (c.last_followup) parts.push(`Latest follow-up: ${c.last_followup}`);
   rec.message_preview = parts.join('. ').slice(0, 900);
   rec.updated_at = new Date().toISOString();
-  // Fresh customer activity makes the lead relevant again — clear the imported
-  // flag so the CRM app re-pulls and merges the new details on its next poll.
-  rec.imported = false;
+  // If this lead was already converted to a CRM contact, mark it as a returning
+  // contact message instead of a new lead — the app routes it to the WA inbox.
+  if (rec.converted_to_contact) {
+    rec.is_returning_contact = true;
+  } else {
+    // Fresh activity: re-export so the CRM app pulls and merges the new details.
+    rec.imported = false;
+  }
   if (idx >= 0) leads[idx] = rec; else leads.push(rec);
   saveWaLeads(leads);
   c.lead_record_id = rec.id;
@@ -2374,6 +2386,31 @@ Create 8-15 flashcards covering all key concepts. Return ONLY the JSON array, no
       const leads = loadWaLeads();
       const idx = leads.findIndex(l => l.id === leadId && l.tenant_id === tenantId);
       if (idx >= 0) { leads[idx].imported = true; saveWaLeads(leads); }
+      json(res, { ok: true }); return;
+    });
+    return;
+  }
+
+  // [crm] [all tenants] — Mark a WA lead as converted to a CRM contact so future
+  // messages from the same phone are routed as inbox messages, not new leads.
+  if (req.method === 'POST' && pathname.startsWith('/api/wa-leads/') && pathname.endsWith('/mark-converted')) {
+    const parts = pathname.split('/');
+    const tenantId  = parts[3];
+    const leadId    = parts[4];
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', () => {
+      let contactId = '';
+      try { contactId = JSON.parse(body).contact_id || ''; } catch {}
+      const leads = loadWaLeads();
+      const idx = leads.findIndex(l => l.id === leadId && l.tenant_id === tenantId);
+      if (idx >= 0) {
+        leads[idx].imported = true;
+        leads[idx].converted_to_contact = true;
+        leads[idx].converted_contact_id = contactId;
+        leads[idx].converted_at = new Date().toISOString();
+        saveWaLeads(leads);
+      }
       json(res, { ok: true }); return;
     });
     return;

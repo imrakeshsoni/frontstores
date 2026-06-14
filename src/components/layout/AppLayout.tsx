@@ -117,6 +117,11 @@ export const NAV_ITEMS = [
   { to: '/settings',        icon: Settings,        label: 'Settings',        iconBg: '#f1f5f9', iconColor: '#64748b' },
 ];
 
+// [admin] [all tenants] — FrontStores owner admin panel
+export const ADMIN_NAV_ITEMS = [
+  { to: '/admin', icon: LayoutDashboard, label: 'Admin Panel', iconBg: '#1c1917', iconColor: '#d97706' },
+];
+
 // [medical] [all tenants]
 export const MEDICAL_NAV_ITEMS = [
   { to: '/dashboard',  icon: LayoutDashboard, label: 'Dashboard',     iconBg: '#ede9fe', iconColor: '#7c3aed' },
@@ -522,6 +527,7 @@ export const TYRESCRAP_NAV_ITEMS = [
 export function getNavItemsForShopType(shopType: string | undefined, settings: any, isEmployeeMode = false) {
   const reRole = settings?.re_role ?? 'resale';
   return (
+    shopType === 'admin'       ? ADMIN_NAV_ITEMS :
     shopType === 'medical'     ? MEDICAL_NAV_ITEMS :
     shopType === 'restaurant'  ? RESTAURANT_NAV_ITEMS :
     shopType === 'grocery'     ? GROCERY_NAV_ITEMS :

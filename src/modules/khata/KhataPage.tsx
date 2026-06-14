@@ -5,6 +5,7 @@ import { listKhataCustomers, listKhataEntries, addKhataEntry, deleteKhataEntry, 
 import { listCustomers } from '@/lib/db/customers';
 import { toast } from 'sonner';
 import { IndianRupee, Plus, Trash2, X, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 export function KhataPage() {
   const tenantId = useAppStore((s) => s.config?.tenant_id ?? '');
@@ -13,6 +14,7 @@ export function KhataPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<KhataCustomerSummary | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ customer_id: '', type: 'debit' as 'debit' | 'credit', amount: '', notes: '' });
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
 
   const { data: summary = [] } = useQuery({
     queryKey: ['khata-summary', tenantId],
@@ -54,6 +56,7 @@ export function KhataPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['khata-summary'] });
       qc.invalidateQueries({ queryKey: ['khata-entries'] });
+      setDeleteTarget(null);
       toast.success('Entry deleted');
     },
   });
@@ -153,7 +156,7 @@ export function KhataPage() {
                     <p className={`font-bold text-sm ${e.type === 'debit' ? 'text-red-400' : 'text-green-400'}`}>
                       {e.type === 'debit' ? '+' : '-'}{fmt(e.amount)}
                     </p>
-                    <button onClick={() => deleteMutation.mutate(e.id)} className="text-slate-600 hover:text-red-400 transition-colors p-1">
+                    <button onClick={() => setDeleteTarget(e)} className="text-slate-600 hover:text-red-400 transition-colors p-1">
                       <Trash2 size={14} />
                     </button>
                   </div>
@@ -216,6 +219,13 @@ export function KhataPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete entry"
+        message="Are you sure you want to delete this khata entry?"
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+      />
     </div>
   );
 }

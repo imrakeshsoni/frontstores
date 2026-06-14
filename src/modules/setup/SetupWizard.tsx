@@ -41,6 +41,7 @@ const SHOP_TYPES = [
   { value: 'travel',       label: 'Travel Agency',             icon: '✈️', desc: 'Trip bookings, itinerary, visa tracking, payment collection' },
   { value: 'insurance',    label: 'Insurance Agent',           icon: '🛡️', desc: 'Policies, renewal reminders, claims, commission tracking' },
   { value: 'homeservice',  label: 'Home Service / Electrician',icon: '🔌', desc: 'Job cards, technicians, parts stock, AMC contracts' },
+  { value: 'admin',       label: 'FrontStores Admin',          icon: '🛡️', desc: 'Owner admin panel — manage tenants, subscriptions, errors' },
 ];
 
 const RE_ROLES = [

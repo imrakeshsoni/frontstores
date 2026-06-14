@@ -87,9 +87,10 @@ export async function getExpiryAlerts(tenantId: string, daysAhead = 90): Promise
   const db = await getDb();
   const cutoff = new Date(); cutoff.setDate(cutoff.getDate() + daysAhead);
   return db.select<any[]>(
-    `SELECT ib.*, p.name as product_name, p.mrp
+    `SELECT ib.*, p.name as product_name, p.mrp, s.name as supplier_name
      FROM inventory_batches ib
      JOIN products p ON p.id = ib.product_id
+     LEFT JOIN suppliers s ON s.id = ib.supplier_id
      WHERE ib.tenant_id = ? AND ib.deleted_at IS NULL AND ib.quantity > 0
        AND ib.expiry_date IS NOT NULL AND ib.expiry_date <= ?
      ORDER BY ib.expiry_date ASC`,

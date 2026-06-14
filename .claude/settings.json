@@ -1,6 +1,7 @@
 {
   "permissions": {
     "allow": [
+      "Bash(*)",
       "Bash(cloud-sql-proxy *)",
       "Bash(PGPASSWORD=* psql *)",
       "Bash(curl https://*)",
@@ -82,11 +83,20 @@
       "Bash(sqlite3 data/ngo-webapp.sqlite 'SELECT count\\(*\\) FROM __TRACKED_VAR__;')",
       "Bash(cd \"/Users/rakeshsoni/Documents/Cloud Software\" && ls && cat ngo-webapp/package.json)",
       "Read(//Users/rakeshsoni/Documents/Cloud Software/**)",
-      "Bash(ADMIN_PASSWORD=qodXjlMOr4YZG25wDSLoRANZ python3 tools/seed-large-blobs.py https://update.frontstores.com)"
+      "Bash(ADMIN_PASSWORD=qodXjlMOr4YZG25wDSLoRANZ python3 tools/seed-large-blobs.py https://update.frontstores.com)",
+      "Bash(cat /Users/rakeshsoni/Library/Preferences/.wrangler/config/default.toml 2>/dev/null | head -5)",
+      "Read(//Users/rakeshsoni/Library/Preferences/.wrangler/config/**)",
+      "Skill(update-config)",
+      "Skill(update-config:*)"
     ],
     "additionalDirectories": [
       "/Users/rakeshsoni/Documents/Cloud Software/ngo-webapp",
-      "/Users/rakeshsoni/Documents/Cloud Software/update-server-webapp"
+      "/Users/rakeshsoni/Documents/Cloud Software/update-server-webapp",
+      "/Users/rakeshsoni/Documents/Cloud Software/crm-webapp/migrations",
+      "/Users/rakeshsoni/Documents/Cloud Software/crm-webapp/server/routes",
+      "/Users/rakeshsoni/Documents/Cloud Software/crm-webapp/src/modules/team",
+      "/Users/rakeshsoni/Documents/Cloud Software/crm-webapp/src/modules/settings",
+      "/Users/rakeshsoni/Documents/Cloud Software/crm-webapp/src"
     ]
   },
   "hooks": {

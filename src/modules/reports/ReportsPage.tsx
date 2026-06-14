@@ -259,38 +259,43 @@ export function ReportsPage() {
             const filtered = (expiryData ?? []).filter((a: any) => a.expiry_date >= today && a.expiry_date <= cutoff);
             const expired = (expiryData ?? []).filter((a: any) => a.expiry_date < today);
             const daysUntil = (d: string) => Math.ceil((new Date(d).getTime() - Date.now()) / 86400000);
+            const rows = [...expired, ...filtered.sort((a: any, b: any) => a.expiry_date.localeCompare(b.expiry_date))];
             return (
-              <div className="space-y-3">
-                {expired.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-red-500 mb-2">EXPIRED ({expired.length})</p>
-                    {expired.map((a: any) => (
-                      <div key={a.id} className="card-strong flex items-center justify-between p-3 mb-2 border border-red-200">
-                        <div><p className="font-semibold text-sm">{a.product_name}</p><p className="text-xs text-slate-400">Batch: {a.batch_no ?? '—'} · {a.quantity} units</p></div>
-                        <span className="badge badge-red">{a.expiry_date}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {filtered.length === 0 && expired.length === 0 && <p className="text-sm text-emerald-600">No batches expiring in the next {expiryWindow} days</p>}
-                {filtered.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-amber-600 mb-2">EXPIRING IN {expiryWindow} DAYS ({filtered.length})</p>
-                    {filtered.sort((a: any, b: any) => a.expiry_date.localeCompare(b.expiry_date)).map((a: any) => {
-                      const days = daysUntil(a.expiry_date);
-                      return (
-                        <div key={a.id} className="card-strong flex items-center justify-between p-3 mb-2">
-                          <div><p className="font-semibold text-sm">{a.product_name}</p><p className="text-xs text-slate-400">Batch: {a.batch_no ?? '—'} · {a.quantity} units</p></div>
-                          <div className="text-right">
-                            <span className={`badge ${days <= 30 ? 'badge-red' : 'badge-yellow'}`}>{a.expiry_date}</span>
-                            <p className="text-xs text-slate-400 mt-1">{days} days left</p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Product</th>
+                    <th>Batch No</th>
+                    <th>Supplier</th>
+                    <th className="text-right">Quantity</th>
+                    <th>Expiry Date</th>
+                    <th className="text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.length === 0 && (
+                    <tr><td colSpan={6} className="text-center text-sm text-emerald-600 py-6">No batches expiring in the next {expiryWindow} days</td></tr>
+                  )}
+                  {rows.map((a: any) => {
+                    const expiredRow = a.expiry_date < today;
+                    const days = daysUntil(a.expiry_date);
+                    return (
+                      <tr key={a.id}>
+                        <td className="font-semibold">{a.product_name}</td>
+                        <td className="text-slate-500">{a.batch_no ?? '—'}</td>
+                        <td className="text-slate-500">{a.supplier_name ?? '—'}</td>
+                        <td className="text-right">{a.quantity}</td>
+                        <td>{a.expiry_date}</td>
+                        <td className="text-right">
+                          {expiredRow
+                            ? <span className="badge badge-red">Expired</span>
+                            : <span className={`badge ${days <= 30 ? 'badge-red' : 'badge-yellow'}`}>{days} days left</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             );
           })()}
         </div>

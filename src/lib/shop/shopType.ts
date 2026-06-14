@@ -1,6 +1,6 @@
 import { useAppStore } from '@/app/store/app.store';
 
-export type ShopType = 'medical' | 'restaurant' | 'grocery' | 'carwash' | 'clinic' | 'beauty' | 'coaching' | 'gym' | 'jewellery' | 'realestate' | 'hotel' | 'tailor' | 'hardware' | 'repair' | 'drivingschool' | 'laundry' | 'catering' | 'pestcontrol' | 'clothing' | 'bakery' | 'optician' | 'petrolpump' | 'furniture' | 'printing' | 'ca' | 'events' | 'travel' | 'insurance' | 'homeservice' | 'tyrescrap' | 'crm';
+export type ShopType = 'medical' | 'restaurant' | 'grocery' | 'carwash' | 'clinic' | 'beauty' | 'coaching' | 'gym' | 'jewellery' | 'realestate' | 'hotel' | 'tailor' | 'hardware' | 'repair' | 'drivingschool' | 'laundry' | 'catering' | 'pestcontrol' | 'clothing' | 'bakery' | 'optician' | 'petrolpump' | 'furniture' | 'printing' | 'ca' | 'events' | 'travel' | 'insurance' | 'homeservice' | 'tyrescrap' | 'crm' | 'admin';
 
 const SHOP_TYPE_LABELS: Record<string, string> = {
   medical: 'Medical Store / Pharmacy', // [medical] [all tenants]

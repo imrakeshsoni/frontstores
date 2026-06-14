@@ -5,6 +5,7 @@ import { useAppStore } from '@/app/store/app.store';
 import { listExpenses, addExpense, deleteExpense, getExpenseSummary, EXPENSE_CATEGORIES } from '@/lib/db/expenses';
 import { toast } from 'sonner';
 import { Plus, Trash2, X, Download, IndianRupee, Calendar } from 'lucide-react';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { format, subDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from 'date-fns';
 
 const fmt = (n: number) => `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
@@ -44,6 +45,7 @@ export function ExpensesPage() {
   const [activeRange, setActiveRange] = useState(2); // "This Month" default
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState(emptyForm());
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
 
   const { data: expenses = [], isLoading } = useQuery({
     queryKey: ['expenses', tenantId, from, to],
@@ -80,7 +82,7 @@ export function ExpensesPage() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteExpense(tenantId, id),
-    onSuccess: () => { invalidate(); toast.success('Expense deleted'); },
+    onSuccess: () => { invalidate(); setDeleteTarget(null); toast.success('Expense deleted'); },
   });
 
   function applyRange(idx: number) {
@@ -230,7 +232,7 @@ export function ExpensesPage() {
               {fmt(e.amount)}
             </p>
             {/* Delete */}
-            <button onClick={() => deleteMutation.mutate(e.id)}
+            <button onClick={() => setDeleteTarget(e)}
               className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-red-500 hover:bg-red-50 shrink-0">
               <Trash2 className="h-4 w-4" />
             </button>
@@ -294,6 +296,13 @@ export function ExpensesPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete expense"
+        message="Are you sure you want to delete this expense record?"
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+      />
     </div>
   );
 }

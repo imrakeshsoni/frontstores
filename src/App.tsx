@@ -28,6 +28,9 @@ const KhataPage           = lazy(() => import('@/modules/khata/KhataPage').then(
 const ExpensesPage        = lazy(() => import('@/modules/expenses/ExpensesPage').then(m => ({ default: m.ExpensesPage })));
 const PurchaseOrdersPage  = lazy(() => import('@/modules/purchase-orders/PurchaseOrdersPage').then(m => ({ default: m.PurchaseOrdersPage })));
 // [coaching] [all tenants]
+// [admin] [all tenants] — FrontStores owner admin panel
+const AdminPage = lazy(() => import('@/modules/admin/AdminPage').then(m => ({ default: m.AdminPage })));
+
 const CoachingDashboard  = lazy(() => import('@/modules/coaching/CoachingDashboard').then(m => ({ default: m.CoachingDashboard })));
 const CoachingStudents   = lazy(() => import('@/modules/coaching/StudentsPage').then(m => ({ default: m.StudentsPage })));
 const CoachingBatches    = lazy(() => import('@/modules/coaching/BatchesPage').then(m => ({ default: m.BatchesPage })));
@@ -352,7 +355,7 @@ export default function App() {
     hasAuth(tenantId).then(async exists => {
       setAuthExists(exists);
       // [all apps] [all tenants] — dev mode: skip login entirely
-      if (import.meta.env.DEV) {
+      if (import.meta.env.DEV && false) {
         sessionStorage.setItem('fs_logged_in_username', 'owner');
         setAuthenticated(true);
         setAuthChecked(true);
@@ -454,6 +457,7 @@ export default function App() {
               config?.shop_type === 'insurance'    ? '/insurance/dashboard' :
               config?.shop_type === 'homeservice'  ? '/homeservice/dashboard' :
               config?.shop_type === 'tyrescrap'    ? '/tyrescrap/dashboard' : // [tyrescrap] [all tenants]
+              config?.shop_type === 'admin'        ? '/admin' : // [admin] [all tenants]
               '/dashboard'
             } replace />} />
             <Route path="dashboard"  element={<Dashboard />} />
@@ -469,6 +473,8 @@ export default function App() {
             <Route path="reports"    element={<ReportsPage />} />
             <Route path="settings"   element={<SettingsPage />} />
             <Route path="announcements" element={<AnnouncementsPage />} />
+            {/* [admin] [all tenants] — FrontStores owner admin panel */}
+            <Route path="admin" element={<AdminPage />} />
             {/* [medical] [all tenants] — Pharmacy */}
             <Route path="pharmacy/batches"  element={<BatchManagerPage />} />
             <Route path="pharmacy/rx"       element={<PrescriptionsPage />} />

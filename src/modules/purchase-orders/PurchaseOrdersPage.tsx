@@ -8,6 +8,7 @@ import { listSuppliers } from '@/lib/db/suppliers';
 import { listProducts } from '@/lib/db/products';
 import { addStock } from '@/lib/db/inventory';
 import { PageIntro } from '@/components/ui/PageIntro';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-slate-800 text-slate-300',
@@ -22,6 +23,7 @@ export function PurchaseOrdersPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [selectedPO, setSelectedPO] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [deletePOTarget, setDeletePOTarget] = useState<string | null>(null);
 
   const { data } = useQuery({
     queryKey: ['purchase-orders', tenantId, statusFilter],
@@ -65,7 +67,12 @@ export function PurchaseOrdersPage() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deletePO(tenantId, id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['purchase-orders'] }); toast.success('Deleted'); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['purchase-orders'] });
+      toast.success('Deleted');
+      setDeletePOTarget(null);
+      setSelectedPO(null);
+    },
   });
 
   const pos = data?.items ?? [];
@@ -147,7 +154,7 @@ export function PurchaseOrdersPage() {
                 </button>
               )}
               {selectedPOData.status === 'draft' && (
-                <button onClick={() => { if (confirm('Delete this PO?')) deleteMutation.mutate(selectedPO); }} className="btn-secondary text-xs px-3 py-1.5 text-red-400">Delete</button>
+                <button onClick={() => setDeletePOTarget(selectedPO)} className="btn-secondary text-xs px-3 py-1.5 text-red-400">Delete</button>
               )}
               <button onClick={() => setSelectedPO(null)} className="btn-secondary text-xs px-3 py-1.5"><X size={14} /></button>
             </div>
@@ -178,6 +185,13 @@ export function PurchaseOrdersPage() {
       )}
 
       {showCreate && <CreatePOModal tenantId={tenantId} onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); qc.invalidateQueries({ queryKey: ['purchase-orders'] }); }} />}
+      <ConfirmDialog
+        open={!!deletePOTarget}
+        title="Delete purchase order"
+        message="Are you sure you want to delete this purchase order?"
+        onCancel={() => setDeletePOTarget(null)}
+        onConfirm={() => deletePOTarget && deleteMutation.mutate(deletePOTarget)}
+      />
     </div>
   );
 }

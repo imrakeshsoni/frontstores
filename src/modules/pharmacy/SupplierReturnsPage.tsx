@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { PackagePlus, Plus, X } from 'lucide-react';
 import { useAppStore } from '@/app/store/app.store';
 import { getSupplierReturns, saveSupplierReturn, deleteSupplierReturn, type RxSupplierReturn } from '@/lib/db/pharmacy';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 interface ReturnForm {
   supplier_id: string;
@@ -27,6 +28,7 @@ export function SupplierReturnsPage() {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<ReturnForm>(EMPTY);
+  const [deleteTarget, setDeleteTarget] = useState<RxSupplierReturn | null>(null);
 
   const { data: returns = [], isLoading } = useQuery({
     queryKey: ['rx_supplier_returns', tenantId],
@@ -49,7 +51,7 @@ export function SupplierReturnsPage() {
 
   const delMut = useMutation({
     mutationFn: (id: string) => deleteSupplierReturn(tenantId, id),
-    onSuccess: () => { toast.success('Deleted'); qc.invalidateQueries({ queryKey: ['rx_supplier_returns'] }); },
+    onSuccess: () => { toast.success('Deleted'); setDeleteTarget(null); qc.invalidateQueries({ queryKey: ['rx_supplier_returns'] }); },
   });
 
   const totalAmount = returns.reduce((s, r) => s + r.amount, 0);
@@ -145,7 +147,7 @@ export function SupplierReturnsPage() {
                   <td className="px-4 py-3 text-xs max-w-[150px] truncate" style={{ color: 'var(--text-tertiary)' }}>{r.reason || '—'}</td>
                   <td className="px-4 py-3 text-xs">{r.return_date}</td>
                   <td className="px-4 py-3">
-                    <button onClick={() => { if (confirm('Delete this return?')) delMut.mutate(r.id); }}
+                    <button onClick={() => setDeleteTarget(r)}
                       className="text-xs px-2 py-1 rounded-lg border" style={{ borderColor: '#fca5a5', color: '#dc2626' }}>Del</button>
                   </td>
                 </tr>
@@ -154,6 +156,13 @@ export function SupplierReturnsPage() {
           </table>
         </div>
       )}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete return"
+        message={`Are you sure you want to delete the return for "${deleteTarget?.product_name ?? ''}"?`}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => deleteTarget && delMut.mutate(deleteTarget.id)}
+      />
     </div>
   );
 }

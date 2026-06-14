@@ -71,6 +71,7 @@ Which app are you working on?
 ── Web Apps ──
 38) 🌐➕ Create new web app
 39) NGO Web App (ngo-webapp) — multi-tenant NGO sites, live at ngo.frontstores.com
+40) CRM Web App (crm-webapp) — CRM for sales teams, live at crm.frontstores.com
 
 ── System ──
 32) Core / Shared (affects all apps)

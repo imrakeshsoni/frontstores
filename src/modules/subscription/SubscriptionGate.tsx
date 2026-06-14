@@ -14,6 +14,9 @@ type Status = 'loading' | 'active' | 'warning' | 'locked' | 'pending';
 
 export function SubscriptionGate({ children }: { children: React.ReactNode }) {
   const config = useAppStore((s) => s.config);
+  // [admin] [all tenants] — admin app bypasses subscription system entirely
+  if (config?.shop_type === 'admin') return <>{children}</>;
+
   const loadConfig    = useAppStore((s) => s.loadConfig);
   const refreshConfig = useAppStore((s) => s.refreshConfig);
   const [status, setStatus] = useState<Status>('loading');

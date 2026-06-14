@@ -10,6 +10,7 @@ import { listCustomers, createCustomer, updateCustomer, deleteCustomer } from '@
 import { findVehiclesByPhone, upsertVehicle, listAllVehicleTypes, getJobsByCustomerPhone, findDuplicateCustomerGroups, mergeCustomers, type CarwashVehicle, type DuplicateGroup } from '@/lib/db/carwash';
 import { PageIntro } from '@/components/ui/PageIntro';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 type CustomerForm = { name: string; phone: string; email: string; tags: string };
 const emptyForm: CustomerForm = { name: '', phone: '', email: '', tags: '' };
@@ -29,6 +30,7 @@ export function CustomersPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
   const [editing, setEditing] = useState<any | null>(null);
   const [form, setForm] = useState<CustomerForm>(emptyForm);
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
@@ -162,6 +164,7 @@ export function CustomersPage() {
     onSuccess: () => {
       toast.success('Customer removed');
       setSelectedCustomer(null);
+      setDeleteTarget(null);
       queryClient.invalidateQueries({ queryKey: ['customers'] });
     },
   });
@@ -297,7 +300,7 @@ export function CustomersPage() {
                   </td>
                   <td className="text-right text-slate-500">{c.loyalty_points}</td>
                   <td className="text-right">
-                    <button onClick={e => { e.stopPropagation(); deleteMutation.mutate(c.id); }}
+                    <button onClick={e => { e.stopPropagation(); setDeleteTarget(c); }}
                       className="rounded-full bg-rose-50 p-2 text-rose-500 hover:bg-rose-100">
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -403,7 +406,7 @@ export function CustomersPage() {
 
                 {/* Delete button */}
                 <div className="pt-4" style={{ borderTop: '1px solid var(--surface-border)' }}>
-                  <button onClick={() => { if (confirm(`Delete ${selectedCustomer.name}?`)) deleteMutation.mutate(selectedCustomer.id); }}
+                  <button onClick={() => setDeleteTarget(selectedCustomer)}
                     className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
                     style={{ background: 'rgba(239,68,68,0.12)', color: '#f87171' }}>
                     <Trash2 className="h-3.5 w-3.5" /> Delete Customer
@@ -840,6 +843,12 @@ export function CustomersPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        message={`Are you sure you want to delete "${deleteTarget?.name ?? ''}"?`}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+      />
     </div>
   );
 }

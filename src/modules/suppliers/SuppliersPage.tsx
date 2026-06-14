@@ -6,6 +6,7 @@ import { useAppStore } from '@/app/store/app.store';
 import { listSuppliers, createSupplier, updateSupplier, deleteSupplier } from '@/lib/db/suppliers';
 import { PageIntro } from '@/components/ui/PageIntro';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 type SupplierForm = { name: string; gstin: string; phone: string; email: string; address: string; drug_license_no: string; notes: string };
 const emptyForm: SupplierForm = { name: '', gstin: '', phone: '', email: '', address: '', drug_license_no: '', notes: '' };
@@ -18,6 +19,7 @@ export function SuppliersPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
   const [form, setForm] = useState<SupplierForm>(emptyForm);
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['suppliers', search, page, tenantId],
@@ -72,6 +74,7 @@ export function SuppliersPage() {
     mutationFn: (id: string) => deleteSupplier(tenantId, id),
     onSuccess: () => {
       toast.success('Supplier removed');
+      setDeleteTarget(null);
       queryClient.invalidateQueries({ queryKey: ['suppliers'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-suppliers'] });
     },
@@ -139,7 +142,7 @@ export function SuppliersPage() {
                         onClick={() => { setEditing(s); setShowForm(true); }}>
                         <Search className="h-4 w-4" />
                       </button>
-                      <button onClick={() => deleteMutation.mutate(s.id)}
+                      <button onClick={() => setDeleteTarget(s)}
                         className="rounded-full bg-rose-50 p-2 text-rose-500 hover:bg-rose-100">
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -194,6 +197,12 @@ export function SuppliersPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        message={`Are you sure you want to delete "${deleteTarget?.name ?? ''}"?`}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+      />
     </div>
   );
 }

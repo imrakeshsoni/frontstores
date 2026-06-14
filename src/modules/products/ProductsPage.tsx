@@ -7,6 +7,7 @@ import { useAppStore } from '@/app/store/app.store';
 import { listProducts, createProduct, updateProduct, deleteProduct } from '@/lib/db/products';
 import { PageIntro } from '@/components/ui/PageIntro';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { isMedicalShopType, isGroceryShopType, useActiveShopType } from '@/lib/shop/shopType';
 
 type ProductSaveMode = 'close' | 'inventory' | 'new';
@@ -34,7 +35,7 @@ type ProductForm = {
 };
 
 const ML_VOLUME_OPTIONS = [5, 10, 20, 30, 60, 80, 100, 120, 150, 180, 200, 220, 250, 300, 350, 400, 450, 500, 550, 600, 650, 900, 1000];
-const DOSAGE_FORM_OPTIONS = ['Tablet', 'Syrup', 'Powder', 'Drop', 'Injection', 'Opthalmic', 'Ointment', 'Inhalation'];
+const DOSAGE_FORM_OPTIONS = ['Tablet', 'Syrup', 'Powder', 'Drop', 'Injection', 'Opthalmic', 'Ointment', 'Inhalation', 'Lotion'];
 
 const emptyForm: ProductForm = {
   name: '', sku: '', barcode: '', unit: 'piece', dosage_form: '', ml_volume: '',
@@ -48,6 +49,7 @@ export function ProductsPage() {
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
   const [form, setForm] = useState<ProductForm>(emptyForm);
   const tenantId = useAppStore((s) => s.config?.tenant_id ?? '');
   const activeShopType = useActiveShopType();
@@ -129,7 +131,7 @@ export function ProductsPage() {
         cost_price: form.cost_price ? Number(form.cost_price) : null,
         gst_rate: Number(form.gst_rate || 0),
         dosage_form: isMedicalStore && form.dosage_form ? form.dosage_form : null,
-        ml_volume: form.unit === 'ml' && form.ml_volume ? form.ml_volume : null,
+        ml_volume: (form.unit === 'ml' || form.dosage_form === 'Lotion') && form.ml_volume ? form.ml_volume : null,
         gm_volume: form.dosage_form === 'Ointment' && form.gm_volume ? form.gm_volume : null,
         total_units: isMedicalStore && form.unit === 'strip' && form.total_units ? Number(form.total_units) : null,
         min_stock_qty: form.min_stock_qty ? Number(form.min_stock_qty) : 0,
@@ -174,6 +176,7 @@ export function ProductsPage() {
       queryClient.invalidateQueries({ queryKey: ['inventory-products'] });
       queryClient.invalidateQueries({ queryKey: ['product-search'] });
       queryClient.invalidateQueries({ queryKey: ['pos-top-products'] });
+      setDeleteTarget(null);
     },
   });
 
@@ -268,7 +271,7 @@ export function ProductsPage() {
                         onClick={() => { setEditing(p); setShowForm(true); }}>
                         <Edit2 className="h-4 w-4" />
                       </button>
-                      <button onClick={() => deleteMutation.mutate(p.id)}
+                      <button onClick={() => setDeleteTarget(p)}
                         className="rounded-full bg-rose-50 p-2 text-rose-500 hover:bg-rose-100">
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -342,6 +345,18 @@ export function ProductsPage() {
                       <option value="">Select volume</option>
                       {ML_VOLUME_OPTIONS.map((v) => <option key={v} value={v}>{v} ml</option>)}
                     </select>
+                  </div>
+                )}
+                {isMedicalStore && form.dosage_form === 'Lotion' && (
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">Volume (ml)</label>
+                    <input
+                      type="number"
+                      className="input"
+                      placeholder="Enter volume in ml"
+                      value={form.ml_volume}
+                      onChange={(e) => setForm((c) => ({ ...c, ml_volume: e.target.value }))}
+                    />
                   </div>
                 )}
                 {isMedicalStore && form.dosage_form === 'Ointment' && (
@@ -493,6 +508,12 @@ export function ProductsPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        message={`Are you sure you want to delete "${deleteTarget?.name ?? ''}"?`}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+      />
     </div>
   );
 }
