@@ -1,6 +1,7 @@
 #!/bin/bash
 # Build & install the native "FrontStores Admin" Mac app.
-# - Wraps the local admin panel (http://127.0.0.1:3002) in a real app window
+# - Wraps the live admin panel (https://update.frontstores.com/admin — Cloudflare
+#   Worker + D1) in a real app window
 # - Auto-signs in (no password prompt) using a local-only token file
 # - Auto-launches at login via a LaunchAgent
 #
@@ -17,11 +18,17 @@ PLIST_DIR="$HOME/Library/LaunchAgents"
 SERVER_PLIST="$PLIST_DIR/com.frontstores.server.plist"
 LAUNCH_PLIST="$PLIST_DIR/com.frontstores.adminapp.plist"
 
-# ── 1. Read the admin password from the running server's plist ──────────────
-ADMIN_PASSWORD=$(grep -A1 'ADMIN_PASSWORD' "$SERVER_PLIST" 2>/dev/null | grep '<string>' | sed 's/.*<string>\(.*\)<\/string>.*/\1/' | xargs)
+# ── 1. Resolve the admin password ────────────────────────────────────────────
+# Source of truth is now the Cloudflare Worker's ADMIN_PASSWORD secret. Prefer
+# the existing local token file; fall back to the (retired) Mac server plist.
+ADMIN_PASSWORD=$(cat "$TOKEN_FILE" 2>/dev/null | xargs)
 if [ -z "$ADMIN_PASSWORD" ]; then
-  echo "❌ Could not find ADMIN_PASSWORD in $SERVER_PLIST"
-  echo "   Run tools/install-tunnel-service.sh first to set up the admin server."
+  ADMIN_PASSWORD=$(grep -A1 'ADMIN_PASSWORD' "$SERVER_PLIST" 2>/dev/null | grep '<string>' | sed 's/.*<string>\(.*\)<\/string>.*/\1/' | xargs)
+fi
+if [ -z "$ADMIN_PASSWORD" ]; then
+  echo "❌ Could not find the admin password (no token file at $TOKEN_FILE)."
+  echo "   It must match the Worker's ADMIN_PASSWORD secret. Set it with:"
+  echo "   printf '%s' 'YOUR_PASSWORD' > \"$TOKEN_FILE\" && chmod 600 \"$TOKEN_FILE\""
   exit 1
 fi
 

@@ -1,5 +1,6 @@
 import { getDb } from './db/index';
 import { toast } from 'sonner';
+import { runAutoBackup } from './db/autoBackup';
 
 export async function runStartupChecks(tenantId: string, shopType?: string) {
   if (!tenantId) return;
@@ -10,6 +11,8 @@ export async function runStartupChecks(tenantId: string, shopType?: string) {
     await checkExpiringMemberships(tenantId);
     await checkLowCarwashInventory(tenantId);
   }
+  // Best-effort daily local backup safety net — never blocks or breaks launch.
+  void runAutoBackup(tenantId);
 }
 
 // Re-queue registration on every launch if it was never successfully synced to server.

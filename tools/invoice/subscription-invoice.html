@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<!-- [website] [tenant: FrontStores.com] — plain (non-GST) invoice generator for the
+     subscription. The seller is NOT registered under GST, so this is a simple
+     invoice with NO GST/tax breakup (charging GST without registration is illegal).
+     Open in a browser, click fields to edit, then Print → Save as PDF.
+     Fill the SELLER block once with your real business name + address. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FrontStores — Subscription Invoice</title>
+<style>
+  :root { --ink:#15171c; --muted:#5b6170; --line:#d9dde6; --accent:#1f2740; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:#eef1f6; color:var(--ink);
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:13px; }
+  .bar { background:var(--accent); color:#fff; padding:10px 16px; display:flex; gap:12px; align-items:center;
+    justify-content:space-between; position:sticky; top:0; z-index:5; }
+  .bar button { background:#fff; color:var(--accent); border:0; border-radius:8px; padding:8px 16px;
+    font-weight:700; font-size:13px; cursor:pointer; }
+  .sheet { background:#fff; max-width:820px; margin:18px auto; padding:34px 38px;
+    box-shadow:0 6px 24px rgba(20,23,28,.12); border-radius:6px; }
+  h1 { font-size:22px; letter-spacing:.06em; text-transform:uppercase; margin:0 0 2px; }
+  .tag { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.16em; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:22px; margin:22px 0; }
+  .blk h3 { margin:0 0 6px; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+  .blk .l { display:block; padding:2px 0; }
+  table { width:100%; border-collapse:collapse; margin-top:10px; }
+  th,td { border:1px solid var(--line); padding:9px 12px; text-align:left; vertical-align:top; }
+  th { background:#f3f5f9; font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
+  td.r, th.r { text-align:right; }
+  .totals { width:300px; margin-left:auto; margin-top:12px; }
+  .totals td { border:0; padding:4px 12px; }
+  .totals .grand td { border-top:2px solid var(--accent); font-weight:800; font-size:16px; padding-top:8px; }
+  .foot { margin-top:26px; color:var(--muted); font-size:11px; line-height:1.7; border-top:1px solid var(--line); padding-top:14px; }
+  [contenteditable]:focus { background:#fffceb; box-shadow:0 0 0 2px #ffe08a; border-radius:3px; outline:none; }
+  .hint { color:#b54708; }
+  @media print {
+    .bar,.noprint { display:none !important; }
+    body { background:#fff; }
+    .sheet { box-shadow:none; margin:0; max-width:none; padding:0; }
+  }
+</style>
+</head>
+<body>
+<div class="bar noprint">
+  <span><b>Invoice generator</b> — click any field to edit, then Print → Save as PDF</span>
+  <div>
+    <button onclick="recalc()">Recalculate total</button>
+    <button onclick="window.print()">Print / Save PDF</button>
+  </div>
+</div>
+
+<div class="sheet">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start">
+    <div>
+      <h1>Invoice</h1>
+      <span class="tag">FrontStores Subscription</span>
+    </div>
+    <div style="text-align:right">
+      <div><span class="tag">Invoice No.</span> <b contenteditable>FS/2026-27/001</b></div>
+      <div><span class="tag">Date</span> <b contenteditable>15 Jun 2026</b></div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="blk">
+      <h3>From (Seller)</h3>
+      <span class="l"><b contenteditable>[Your Business Name]</b></span>
+      <span class="l" contenteditable>[Address line]</span>
+      <span class="l" contenteditable>[City, State – PIN]</span>
+      <span class="l" contenteditable>[Phone / email]</span>
+    </div>
+    <div class="blk">
+      <h3>Bill To (Customer)</h3>
+      <span class="l"><b contenteditable>[Customer Shop Name]</b></span>
+      <span class="l" contenteditable>[Owner name]</span>
+      <span class="l" contenteditable>[City, State – PIN]</span>
+      <span class="l" contenteditable>[Phone]</span>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:38px">#</th>
+        <th>Description</th>
+        <th class="r" style="width:140px">Amount (₹)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td contenteditable>FrontStores software subscription — monthly licence (billing period <b>15 Jun 2026 – 14 Jul 2026</b>)</td>
+        <td class="r">₹ <span contenteditable id="amt" oninput="recalc()">999.00</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <table class="totals">
+    <tr class="grand"><td>Total</td><td class="r">₹ <span id="t-grand">999.00</span></td></tr>
+  </table>
+
+  <div class="foot">
+    <div><b>Amount in words:</b> <span id="words">Rupees Nine Hundred Ninety Nine only</span></div>
+    <div style="margin-top:8px"><b>Payment:</b> <span contenteditable>Received via UPI / bank transfer.</span></div>
+    <div style="margin-top:8px">This is a computer-generated invoice and does not require a signature.</div>
+    <div style="margin-top:6px">Note: Seller is not registered under GST; no GST is charged on this invoice.</div>
+    <div style="margin-top:14px; text-align:right">For <b>[Your Business Name]</b></div>
+  </div>
+</div>
+
+<script>
+  function recalc(){
+    const amt = parseFloat((document.getElementById('amt').textContent||'0').replace(/[^0-9.]/g,'')) || 0;
+    document.getElementById('t-grand').textContent = amt.toFixed(2);
+    document.getElementById('words').textContent = inWords(Math.round(amt));
+  }
+  function inWords(num){
+    if (num === 0) return 'Rupees Zero only';
+    const a=['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+    const b=['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+    function two(n){ return n<20 ? a[n] : b[Math.floor(n/10)] + (n%10 ? ' '+a[n%10] : ''); }
+    function three(n){ return (n>=100 ? a[Math.floor(n/100)]+' Hundred'+(n%100?' ':'') : '') + (n%100 ? two(n%100) : ''); }
+    let out='', crore=Math.floor(num/1e7); num%=1e7;
+    let lakh=Math.floor(num/1e5); num%=1e5;
+    let thou=Math.floor(num/1e3); num%=1e3;
+    if(crore) out+=two(crore)+' Crore ';
+    if(lakh) out+=two(lakh)+' Lakh ';
+    if(thou) out+=two(thou)+' Thousand ';
+    if(num) out+=three(num);
+    return 'Rupees '+out.trim()+' only';
+  }
+  recalc();
+</script>
+</body>
+</html>

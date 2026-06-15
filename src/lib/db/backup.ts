@@ -1,7 +1,7 @@
 import { getDb, now } from './index';
 
 // Tables exported in order (parent before child for FK safety on restore)
-const BACKUP_TABLES = [
+export const BACKUP_TABLES = [
   'app_config',
   'app_auth',
   'bill_sequences',
@@ -48,22 +48,26 @@ function fromB64(s: string): Uint8Array {
 
 // ── Export ────────────────────────────────────────────────────────────────────
 
-export async function exportBackup(tenantId: string, password: string): Promise<Blob> {
+// Dump every backup table for one tenant. Shared by the encrypted export and the
+// automatic local backup. Missing tables (older schema) are skipped silently.
+export async function dumpTenantTables(tenantId: string): Promise<Record<string, unknown[]>> {
   const db = await getDb();
-
-  // Dump every table for this tenant
   const tables: Record<string, unknown[]> = {};
   for (const table of BACKUP_TABLES) {
     try {
-      const rows = await db.select<unknown[]>(
+      tables[table] = await db.select<unknown[]>(
         `SELECT * FROM ${table} WHERE tenant_id = ?`, [tenantId],
       );
-      tables[table] = rows;
     } catch {
-      // Table may not exist in this version — skip silently
       tables[table] = [];
     }
   }
+  return tables;
+}
+
+export async function exportBackup(tenantId: string, password: string): Promise<Blob> {
+  // Dump every table for this tenant
+  const tables = await dumpTenantTables(tenantId);
 
   const payload = JSON.stringify({ tables, exported_at: now() });
 

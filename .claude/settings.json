@@ -83,7 +83,6 @@
       "Bash(sqlite3 data/ngo-webapp.sqlite 'SELECT count\\(*\\) FROM __TRACKED_VAR__;')",
       "Bash(cd \"/Users/rakeshsoni/Documents/Cloud Software\" && ls && cat ngo-webapp/package.json)",
       "Read(//Users/rakeshsoni/Documents/Cloud Software/**)",
-      "Bash(ADMIN_PASSWORD=qodXjlMOr4YZG25wDSLoRANZ python3 tools/seed-large-blobs.py https://update.frontstores.com)",
       "Bash(cat /Users/rakeshsoni/Library/Preferences/.wrangler/config/default.toml 2>/dev/null | head -5)",
       "Read(//Users/rakeshsoni/Library/Preferences/.wrangler/config/**)",
       "Skill(update-config)",
@@ -105,9 +104,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "launchctl list com.frontstores.server 2>/dev/null | grep -q '\"PID\"' || launchctl load ~/Library/LaunchAgents/com.frontstores.server.plist 2>/dev/null; launchctl list com.frontstores.tunnel 2>/dev/null | grep -q '\"PID\"' || launchctl load ~/Library/LaunchAgents/com.frontstores.tunnel.plist 2>/dev/null; echo '{\"systemMessage\": \"FrontStores server + tunnel running. Admin panel: use the native FrontStores Admin app. Password: qodXjlMOr4YZG25wDSLoRANZ\"}'",
+            "command": "echo '{\"systemMessage\": \"All FrontStores infra is on Cloudflare now (Workers + D1 + R2). The local Mac update-server AND cloudflared tunnel are retired — their launch agents are disabled (*.plist.disabled in ~/Library/LaunchAgents). update.frontstores.com and ngo.frontstores.com are served directly by Workers. Admin: native FrontStores Admin app (auto-signs in) or https://update.frontstores.com/admin. Admin password lives only in ~/Library/Application Support/FrontStores/admin_local.token and the Worker secret.\"}'",
             "timeout": 15,
-            "statusMessage": "Starting FrontStores server & tunnel..."
+            "statusMessage": "FrontStores on Cloudflare (Mac infra retired)"
           }
         ]
       }
