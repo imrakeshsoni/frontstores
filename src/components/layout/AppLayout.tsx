@@ -563,6 +563,28 @@ export function getNavItemsForShopType(shopType: string | undefined, settings: a
   );
 }
 
+// [core] [all apps] [all tenants] — the union of every top-level tab path that ANY
+// app puts in its sidebar. Used to enforce that a tab hidden from a shop type's nav
+// is also unreachable by direct URL: a path is only bounced if it's a real tab
+// somewhere AND not in the current shop's nav. Sub-pages (e.g. /pharmacy/*, deep
+// /carwash/jobs/:id links) never appear here, so they stay reachable.
+const ALL_NAV_ARRAYS = [
+  NAV_ITEMS, ADMIN_NAV_ITEMS, MEDICAL_NAV_ITEMS, GROCERY_NAV_ITEMS, RESTAURANT_NAV_ITEMS,
+  CLINIC_NAV_ITEMS, COACHING_NAV_ITEMS, GYM_NAV_ITEMS, JEWELLERY_NAV_ITEMS, REPAIR_NAV_ITEMS,
+  DRIVINGSCHOOL_NAV_ITEMS, HOTEL_NAV_ITEMS, CLOTHING_NAV_ITEMS, BAKERY_NAV_ITEMS,
+  OPTICIAN_NAV_ITEMS, TAILOR_NAV_ITEMS, HARDWARE_NAV_ITEMS, LAUNDRY_NAV_ITEMS,
+  CATERING_NAV_ITEMS, PESTCONTROL_NAV_ITEMS, PETROLPUMP_NAV_ITEMS, FURNITURE_NAV_ITEMS,
+  PRINTING_NAV_ITEMS, CA_NAV_ITEMS, CRM_NAV_ITEMS, EVENTS_NAV_ITEMS, TRAVEL_NAV_ITEMS,
+  INSURANCE_NAV_ITEMS, HOMESERVICE_NAV_ITEMS, BEAUTY_NAV_ITEMS, CARWASH_NAV_ITEMS,
+  CARWASH_EMPLOYEE_NAV_ITEMS, TYRESCRAP_NAV_ITEMS,
+  getRealEstateNavItems('resale'), getRealEstateNavItems('rental'),
+];
+const navTop = (to: string) => '/' + to.split('/')[1];
+export const ALL_NAV_TOPS = new Set(ALL_NAV_ARRAYS.flat().map((item) => navTop(item.to)));
+// Pinned destinations that are always reachable even when not in a shop's nav array
+// (Settings + the bell live in the header/user menu, not the scrollable nav).
+const ALWAYS_ALLOWED_TOPS = ['/settings', '/announcements', '/admin'];
+
 export function AppLayout() {
   const { config, setAuthenticated } = useAppStore();
   const navigate = useNavigate();
@@ -664,6 +686,20 @@ export function AppLayout() {
       navigate(activeNavItems[0]?.to ?? '/announcements', { replace: true });
     }
   }, [location.pathname, staffTabAccess, activeNavItems, navigate]);
+
+  // [core] [all apps] [all tenants] — tabs hidden from a shop type's sidebar must be
+  // fully gone, not just hidden: a hidden tab (e.g. Khata/Expenses/Purchase Orders
+  // for medical) should bounce to the dashboard even when reached by direct URL. We
+  // only bounce paths that are a real tab in SOME app but not in this shop's nav, so
+  // legitimate sub-pages (/pharmacy/*, /carwash/jobs/:id, etc.) are never affected.
+  useEffect(() => {
+    const currentTop = '/' + location.pathname.split('/')[1];
+    const allowedTops = new Set(allNavItems.map((item) => '/' + item.to.split('/')[1]));
+    ALWAYS_ALLOWED_TOPS.forEach((t) => allowedTops.add(t));
+    if (ALL_NAV_TOPS.has(currentTop) && !allowedTops.has(currentTop)) {
+      navigate(allNavItems[0]?.to ?? '/dashboard', { replace: true });
+    }
+  }, [location.pathname, allNavItems, navigate]);
 
   // [core] [all apps] [all tenants] — silently poll for new announcements (no manual "update" needed)
   const tenantId = config?.tenant_id ?? '';

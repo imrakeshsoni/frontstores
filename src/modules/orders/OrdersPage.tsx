@@ -71,9 +71,12 @@ export function OrdersPage() {
     const footerNote  = s.invoiceFooterNote   || 'Thanks for your purchase';
     const sigLabel    = s.invoiceSignatureLabel || 'Authorised Signature';
     const dlNumbers   = config?.drug_license_no || '';
-    const dateStr     = new Date(order.order_date).toLocaleString('en-IN', {
+    const gstin       = config?.gstin || '';
+    const fmtDate     = (d: string) => new Date(d).toLocaleString('en-IN', {
       day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
     });
+    const dateStr     = fmtDate(order.order_date);
+    const saleDateStr = order.sale_date ? fmtDate(order.sale_date) : '';
 
     const itemRows = order.items.map((item: any, idx: number) => {
       const mrp      = Number(item.mrp  || item.unit_price);
@@ -82,9 +85,10 @@ export function OrdersPage() {
       const disc     = Number(item.discount || 0);
       const gst      = Number(item.gst_rate || 0);
       const total    = Number(item.total);
+      const hsn = item.hsn_code ? ` · HSN: ${item.hsn_code}` : '';
       return `<tr>
         <td class="td-center">${idx + 1}</td>
-        <td class="td-name">${item.product_name}${item.batch_no ? `<br><span style="font-size:9px;color:#64748b">Batch: ${item.batch_no}</span>` : ''}</td>
+        <td class="td-name">${item.product_name}${item.batch_no || item.hsn_code ? `<br><span style="font-size:9px;color:#64748b">${item.batch_no ? `Batch: ${item.batch_no}` : ''}${hsn}</span>` : ''}</td>
         <td class="td-center">${qty}</td>
         <td class="td-amount">${mrp.toFixed(2)}</td>
         <td class="td-amount">${value.toFixed(2)}</td>
@@ -135,7 +139,9 @@ export function OrdersPage() {
   </div>
   <div class="meta">
     <div><span>DL No.</span> ${dlNumbers || '-'}</div>
-    <div><span>Date.</span> ${dateStr}</div>
+    ${gstin ? `<div><span>GSTIN.</span> ${gstin}</div>` : ''}
+    <div><span>Invoice Date.</span> ${dateStr}</div>
+    ${saleDateStr ? `<div><span>Sale Date.</span> ${saleDateStr}</div>` : ''}
     <div><span>Patient.</span> ${order.patient_name || order.customer_name || '-'}</div>
     <div><span>Doctor.</span> ${order.doctor_name || '-'}</div>
     <div><span>Bill No.</span> ${order.bill_number}</div>
@@ -154,8 +160,11 @@ export function OrdersPage() {
     </tr></thead>
     <tbody>
       ${itemRows}
+      ${Number(order.discount) > 0 ? `<tr><td colspan="6" rowspan="${Number(order.tax_total) > 0 ? 4 : 2}" style="vertical-align:bottom;border-right:none">${footerNote}</td><td class="total-label">Taxable</td><td class="td-amount">${(Number(order.subtotal) + Number(order.discount)).toFixed(2)}</td></tr>
+      <tr><td class="total-label">Discount</td><td class="td-amount">- ${Number(order.discount).toFixed(2)}</td></tr>` : `<tr><td colspan="6" rowspan="${Number(order.tax_total) > 0 ? 3 : 1}" style="vertical-align:bottom;border-right:none">${footerNote}</td><td class="total-label">Taxable</td><td class="td-amount">${Number(order.subtotal).toFixed(2)}</td></tr>`}
+      ${Number(order.tax_total) > 0 ? `<tr><td class="total-label">CGST</td><td class="td-amount">${(Number(order.tax_total) / 2).toFixed(2)}</td></tr>
+      <tr><td class="total-label">SGST</td><td class="td-amount">${(Number(order.tax_total) / 2).toFixed(2)}</td></tr>` : ''}
       <tr class="total-row">
-        <td colspan="6">${footerNote}</td>
         <td class="total-label">Total ₹</td>
         <td class="total-value">${Number(order.total).toFixed(2)}</td>
       </tr>
@@ -287,7 +296,8 @@ export function OrdersPage() {
               </div>
             </div>
             <div className="space-y-1 text-sm">
-              <div className="flex justify-between"><span className="text-slate-500">Date</span><span>{format(new Date(selectedOrder.order_date), 'dd MMM yyyy, HH:mm')}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Invoice Date</span><span>{format(new Date(selectedOrder.order_date), 'dd MMM yyyy, HH:mm')}</span></div>
+              {selectedOrder.sale_date && <div className="flex justify-between"><span className="text-slate-500">Sale Date</span><span>{format(new Date(selectedOrder.sale_date), 'dd MMM yyyy, HH:mm')}</span></div>}
               {selectedOrder.customer_name && <div className="flex justify-between"><span className="text-slate-500">Customer</span><span>{selectedOrder.customer_name}</span></div>}
               {selectedOrder.patient_name && <div className="flex justify-between"><span className="text-slate-500">Patient</span><span>{selectedOrder.patient_name}</span></div>}
               {selectedOrder.doctor_name && <div className="flex justify-between"><span className="text-slate-500">Doctor</span><span>{selectedOrder.doctor_name}</span></div>}
@@ -308,9 +318,15 @@ export function OrdersPage() {
               ))}
             </div>
             <div className="mt-4 border-t pt-4 space-y-1 text-sm">
-              <div className="flex justify-between"><span className="text-slate-500">Subtotal</span><span>{formatCurrency(selectedOrder.subtotal)}</span></div>
+              {/* subtotal is stored net of discount, so show gross here to keep the breakdown reconciling to Total */}
+              <div className="flex justify-between"><span className="text-slate-500">Subtotal</span><span>{formatCurrency(selectedOrder.subtotal + selectedOrder.discount)}</span></div>
               {selectedOrder.discount > 0 && <div className="flex justify-between text-rose-600"><span>Discount</span><span>- {formatCurrency(selectedOrder.discount)}</span></div>}
-              {selectedOrder.tax_total > 0 && <div className="flex justify-between"><span className="text-slate-500">Tax (GST)</span><span>{formatCurrency(selectedOrder.tax_total)}</span></div>}
+              {selectedOrder.tax_total > 0 && (
+                <>
+                  <div className="flex justify-between"><span className="text-slate-500">CGST</span><span>{formatCurrency(selectedOrder.tax_total / 2)}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">SGST</span><span>{formatCurrency(selectedOrder.tax_total / 2)}</span></div>
+                </>
+              )}
               <div className="flex justify-between font-semibold text-base border-t pt-2"><span>Total</span><span>{formatCurrency(selectedOrder.total)}</span></div>
             </div>
           </div>

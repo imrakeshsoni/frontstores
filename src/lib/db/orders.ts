@@ -16,6 +16,7 @@ export interface OrderItem {
   total: number;
   batch_no: string | null;
   expiry_date: string | null;
+  hsn_code: string | null;
 }
 
 export interface Order {
@@ -35,7 +36,8 @@ export interface Order {
   payment_status: string;
   amount_paid: number;
   notes: string | null;
-  order_date: string;
+  order_date: string;   // invoice date — editable by the shopkeeper
+  sale_date: string;    // actual sale date/time — set once, never edited (audit record)
   items?: OrderItem[];
   created_at: string;
   updated_at: string;
@@ -119,27 +121,28 @@ export async function createOrder(tenantId: string, data: {
   // BEGIN/COMMIT span different connections and deadlock. Each execute auto-commits.
   const orderId    = uuid();
   const billNumber = await getNextBillNumber(tenantId);
-  const orderDate  = data.order_date ?? now();
+  const saleDate   = now();                       // actual sell time — immutable audit record
+  const orderDate  = data.order_date ?? saleDate; // invoice date — may be adjusted later
 
   await db.execute(
     `INSERT INTO orders (id, tenant_id, bill_number, customer_id, customer_name, customer_phone,
       patient_name, doctor_name, subtotal, discount, tax_total, total, payment_method,
-      payment_status, amount_paid, notes, order_date)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      payment_status, amount_paid, notes, order_date, sale_date)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [orderId, tenantId, billNumber, data.customer_id ?? null, data.customer_name ?? null,
      data.customer_phone ?? null, data.patient_name ?? null, data.doctor_name ?? null,
      calcSubtotal, calcDiscount, calcTaxTotal, calcTotal, data.payment_method,
-     data.payment_status, data.amount_paid, data.notes ?? null, orderDate]
+     data.payment_status, data.amount_paid, data.notes ?? null, orderDate, saleDate]
   );
 
   for (const item of lineItems) {
     await db.execute(
       `INSERT INTO order_items (id, tenant_id, order_id, product_id, product_name, quantity,
-        unit_price, mrp, discount, gst_rate, total, batch_no, expiry_date)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        unit_price, mrp, discount, gst_rate, total, batch_no, expiry_date, hsn_code)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [uuid(), tenantId, orderId, item.product_id ?? null, item.product_name, item.quantity,
        item.unit_price, item.mrp ?? null, item.discount, item.gst_rate, item.total,
-       item.batch_no ?? null, item.expiry_date ?? null]
+       item.batch_no ?? null, item.expiry_date ?? null, item.hsn_code ?? null]
     );
     if (item.product_id) {
       await updateStock(tenantId, item.product_id, -item.quantity);
@@ -149,6 +152,19 @@ export async function createOrder(tenantId: string, data: {
         [uuid(), tenantId, item.product_id, -item.quantity, 'sale', orderId]
       );
     }
+  }
+
+  // [medical] [all tenants] — a credit bill is money the customer now owes. Post it to
+  // the Khata ledger as a debit so the outstanding shows up on the Khata page AND so the
+  // credit-limit check above sees real exposure on the next sale. Cash/UPI/card bills are
+  // settled immediately and are not ledgered.
+  if (data.payment_method === 'credit' && data.customer_id && calcTotal > 0) {
+    await db.execute(
+      `INSERT INTO khata_entries (id, tenant_id, customer_id, order_id, type, amount, notes, entry_date, created_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      [uuid(), tenantId, data.customer_id, orderId, 'debit', calcTotal,
+       `Credit bill ${billNumber}`, orderDate, now(), now()]
+    );
   }
 
   const rows = await db.select<any[]>(`SELECT * FROM orders WHERE id = ?`, [orderId]);
@@ -190,6 +206,12 @@ export async function voidOrder(tenantId: string, orderId: string): Promise<void
 
   await db.execute(
     `UPDATE orders SET payment_status = 'cancelled', deleted_at = ?, updated_at = ? WHERE id = ? AND tenant_id = ?`,
+    [now(), now(), orderId, tenantId]
+  );
+  // [medical] [all tenants] — if this was a credit bill it posted a Khata debit; voiding
+  // the bill must reverse that receivable so the customer's outstanding drops back.
+  await db.execute(
+    `UPDATE khata_entries SET deleted_at = ?, updated_at = ? WHERE order_id = ? AND tenant_id = ? AND deleted_at IS NULL`,
     [now(), now(), orderId, tenantId]
   );
   for (const item of order.items ?? []) {

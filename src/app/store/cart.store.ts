@@ -9,6 +9,7 @@ export interface CartItem {
   unitPrice: number;
   quantity: number;
   gstRate: number;
+  hsnCode?: string | null;
   discount: number;
   discountPercent?: number;
   batchNo?: string;
@@ -183,8 +184,11 @@ export const useCartStore = create<CartState>((set, get) => ({
   },
 
   total: () => {
-    const { subtotal, taxAmount, globalDiscount } = get();
-    return Math.max(0, subtotal() + taxAmount() - globalDiscount);
+    // Mirrors the server recompute in createOrder (subtotal is already net of line
+    // discounts). No global discount: it was never wired to any UI and the server
+    // ignored it, so subtracting it here only risked charged ≠ recorded.
+    const { subtotal, taxAmount } = get();
+    return Math.max(0, subtotal() + taxAmount());
   },
 
   itemCount: () => get().items.reduce((sum, i) => sum + i.quantity + (i.isLoose ? (i.looseQty ?? 0) : 0), 0),

@@ -23,6 +23,7 @@ type InvoiceSnapshot = {
   orderId: string;
   billNumber: string;
   createdAt: string;
+  saleDate: string;
   paymentMethod: PaymentMethod;
   paymentStatus: string;
   patientName: string;
@@ -32,6 +33,7 @@ type InvoiceSnapshot = {
   items: Array<{
     name: string;
     batchNo?: string;
+    hsnCode?: string | null;
     manufactureDate?: string;
     expiry?: string;
     quantityLabel: string;
@@ -430,6 +432,7 @@ export function POSPage() {
       unitPrice,
       looseUnitPrice: Number(product.loose_selling_price ?? 0) || undefined,
       gstRate: Number(product.gst_rate ?? 0),
+      hsnCode: product.hsn_code ?? null,
       discount: 0,
       batchNo,
       manufactureDate,
@@ -482,6 +485,7 @@ export function POSPage() {
             total: itemTotal,
             batch_no: i.batchNo || null,
             expiry_date: i.expiryDate || null,
+            hsn_code: i.hsnCode ?? null,
           };
         }),
         subtotal,
@@ -520,6 +524,7 @@ export function POSPage() {
         return {
           name: item.name,
           batchNo: item.batchNo,
+          hsnCode: item.hsnCode,
           manufactureDate: item.manufactureDate,
           expiry: item.expiryDate,
           quantityLabel,
@@ -541,6 +546,7 @@ export function POSPage() {
         orderId: order.id,
         billNumber: order.bill_number,
         createdAt: order.order_date ?? order.created_at ?? new Date().toISOString(),
+        saleDate: order.sale_date ?? order.created_at ?? new Date().toISOString(),
         paymentMethod,
         paymentStatus: paymentMethod === 'credit' ? 'pending' : 'paid',
         patientName,
@@ -746,7 +752,7 @@ export function POSPage() {
       return `
         <tr>
           <td class="td-center">${idx + 1}</td>
-          <td class="td-name">${item.name}</td>
+          <td class="td-name">${item.name}${item.hsnCode ? `<br><span style="font-size:9px;color:#64748b">HSN: ${item.hsnCode}</span>` : ''}</td>
           <td class="td-center">${item.quantityLabel}</td>
           <td class="td-amount">${item.unitPrice.toFixed(2)}</td>
           <td class="td-amount">${lineValueAmount.toFixed(2)}</td>
@@ -760,6 +766,12 @@ export function POSPage() {
       day: '2-digit', month: 'short', year: 'numeric',
       hour: '2-digit', minute: '2-digit',
     });
+    const saleDateStr = invoiceSnapshot.saleDate
+      ? new Date(invoiceSnapshot.saleDate).toLocaleString('en-IN', {
+          day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+        })
+      : '';
+    const grossValue = invoiceSnapshot.subtotal + invoiceSnapshot.totalDiscount;
 
     printViaIframe(`<!DOCTYPE html>
 <html>
@@ -835,7 +847,8 @@ export function POSPage() {
   <div class="meta">
     <div class="meta-col">
       <div><span>Bill No.</span> ${invoiceSnapshot.billNumber}</div>
-      <div><span>Date.</span> ${dateStr}</div>
+      <div><span>Invoice Date.</span> ${dateStr}</div>
+      ${saleDateStr && saleDateStr !== dateStr ? `<div><span>Sale Date.</span> ${saleDateStr}</div>` : ''}
       <div><span>Payment.</span> ${invoiceSnapshot.paymentMethod === 'credit' ? 'Credit' : invoiceSnapshot.paymentMethod.toUpperCase()}</div>
     </div>
     <div class="meta-col">
@@ -858,8 +871,15 @@ export function POSPage() {
     </thead>
     <tbody>
       ${itemRows}
+      ${invoiceSnapshot.totalDiscount > 0
+        ? `<tr><td colspan="6" rowspan="${invoiceSnapshot.gstAmount > 0 ? 4 : 2}" style="vertical-align:bottom;border-right:none">${footerNote}</td><td class="total-label">Taxable</td><td class="td-amount">${grossValue.toFixed(2)}</td></tr>
+      <tr><td class="total-label">Discount</td><td class="td-amount">- ${invoiceSnapshot.totalDiscount.toFixed(2)}</td></tr>`
+        : `<tr><td colspan="6" rowspan="${invoiceSnapshot.gstAmount > 0 ? 3 : 1}" style="vertical-align:bottom;border-right:none">${footerNote}</td><td class="total-label">Taxable</td><td class="td-amount">${invoiceSnapshot.subtotal.toFixed(2)}</td></tr>`}
+      ${invoiceSnapshot.gstAmount > 0
+        ? `<tr><td class="total-label">CGST</td><td class="td-amount">${(invoiceSnapshot.gstAmount / 2).toFixed(2)}</td></tr>
+      <tr><td class="total-label">SGST</td><td class="td-amount">${(invoiceSnapshot.gstAmount / 2).toFixed(2)}</td></tr>`
+        : ''}
       <tr class="total-row">
-        <td colspan="6">${footerNote}</td>
         <td class="total-label">Total ₹</td>
         <td class="total-value">${invoiceSnapshot.total.toFixed(2)}</td>
       </tr>
@@ -2801,7 +2821,8 @@ function CartPanel({
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 border-t border-slate-200/60 bg-white/60 p-4 text-sm">
             <div className="flex justify-between text-slate-600">
               <span>Subtotal</span>
-              <span>{formatCurrency(cart.subtotal())}</span>
+              {/* cart.subtotal() is net of discount — add it back so the breakdown reconciles to Total */}
+              <span>{formatCurrency(cart.subtotal() + cart.items.reduce((sum, item) => sum + Number(item.discount ?? 0), 0))}</span>
             </div>
             <div className="flex justify-between text-slate-600">
               <span>Total Discount</span>
