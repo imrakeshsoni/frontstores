@@ -76,6 +76,7 @@ import migration0075 from '../../../src-tauri/migrations/0075_crm_wa_messages.sq
 import migration0076 from '../../../src-tauri/migrations/0076_crm_whatsapp_name.sql?raw';
 import migration0077 from '../../../src-tauri/migrations/0077_product_gm_volume.sql?raw';
 import migration0078 from '../../../src-tauri/migrations/0078_sale_date_hsn.sql?raw';
+import migration0079 from '../../../src-tauri/migrations/0079_audit_log.sql?raw';
 
 export interface Migration {
   name: string;
@@ -162,5 +163,6 @@ export async function readMigrations(): Promise<Migration[]> {
     { name: '0076_crm_whatsapp_name', sql: migration0076 }, // [crm] [all tenants]
     { name: '0077_product_gm_volume', sql: migration0077 }, // [medical] [all tenants]
     { name: '0078_sale_date_hsn', sql: migration0078 }, // [medical] [all tenants]
+    { name: '0079_audit_log', sql: migration0079 }, // [core] [all apps] [all tenants]
   ];
 }

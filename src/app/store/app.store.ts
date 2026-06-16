@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { AppConfig, getAppConfig } from '@/lib/db/config';
 import { setReporterTenantId } from '@/lib/errorReporter';
+import { setAuditTenantId } from '@/lib/db/audit';
 import { runStartupChecks } from '@/lib/startupChecks';
 
 interface AppState {
@@ -32,6 +33,7 @@ export const useAppStore = create<AppState>((set) => ({
       const config = await getAppConfig();
       if (config?.tenant_id) {
         setReporterTenantId(config.tenant_id);
+        setAuditTenantId(config.tenant_id);
         if (config.is_setup_complete) runStartupChecks(config.tenant_id, config.shop_type).catch(() => {});
       }
       set({ config, isSetupComplete: config?.is_setup_complete ?? false, isLoading: false });
@@ -43,12 +45,12 @@ export const useAppStore = create<AppState>((set) => ({
   refreshConfig: async () => {
     try {
       const config = await getAppConfig();
-      if (config?.tenant_id) setReporterTenantId(config.tenant_id);
+      if (config?.tenant_id) { setReporterTenantId(config.tenant_id); setAuditTenantId(config.tenant_id); }
       set({ config, isSetupComplete: config?.is_setup_complete ?? false });
     } catch { /* silent */ }
   },
 
-  setConfig: (config) => { setReporterTenantId(config.tenant_id); set({ config, isSetupComplete: config.is_setup_complete }); },
+  setConfig: (config) => { setReporterTenantId(config.tenant_id); setAuditTenantId(config.tenant_id); set({ config, isSetupComplete: config.is_setup_complete }); },
   setAuthenticated: (v) => set({ isAuthenticated: v }),
   setLastBilledCustomer: (c) => set({ lastBilledCustomer: c }),
 }));

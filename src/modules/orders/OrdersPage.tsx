@@ -71,7 +71,9 @@ export function OrdersPage() {
     const footerNote  = s.invoiceFooterNote   || 'Thanks for your purchase';
     const sigLabel    = s.invoiceSignatureLabel || 'Authorised Signature';
     const dlNumbers   = config?.drug_license_no || '';
-    const gstin       = config?.gstin || '';
+    // Hide GSTIN if the shop has GST turned off (not registered). CGST/SGST rows already
+    // hide themselves when there is no tax on the order.
+    const gstin       = ((config?.settings as any)?.enable_gst !== false) ? (config?.gstin || '') : '';
     const fmtDate     = (d: string) => new Date(d).toLocaleString('en-IN', {
       day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
     });

@@ -10,6 +10,7 @@ import { updateAppConfig, getOrCreateShopCode } from '@/lib/db/config';
 import { changePassword, changeUsername, getAuthUsername, getExportLogs, logExport } from '@/lib/db/auth';
 import { listStaffUsers, createStaffUser, deactivateStaffUser, generateJoinPin, countActiveStaffUsers, getStaffUserFee, getOnlineStaffUsernames, type StaffUser } from '@/lib/db/staffUsers';
 import { exportBackup } from '@/lib/db/backup';
+import { exportAuditTrail, type AuditRow } from '@/lib/db/audit';
 import { PageIntro } from '@/components/ui/PageIntro';
 import { useTheme } from '@/lib/theme/useTheme';
 import { reportError } from '@/lib/errorReporter';
@@ -616,6 +617,8 @@ export function SettingsPage() {
         </div>
       );
 
+      case 'audittrail': return <AuditTrailSection tenantId={tenantId} shopName={config?.shop_name ?? 'shop'} />;
+
       case 'audit': return (
         <div className="p-4">
           {(exportLogs?.length ?? 0) === 0
@@ -645,6 +648,7 @@ export function SettingsPage() {
     billing: '⌨️ Billing Preferences', gst: '🧾 Tax / GST', whatsapp: '📱 WhatsApp Business',
     pinlock: '🔐 Section PIN Lock', autolock: '🔒 Auto-Lock', password: '🔑 Login & Password',
     staff: '👥 Staff Logins', backup: '💾 Data Backup', migrate: '🖥️ Switch Computer', audit: '📋 Export Audit Log',
+    audittrail: '📜 Audit Trail',
   };
 
   // ── Inline status values for row subtitles ────────────────────────────────────
@@ -707,6 +711,7 @@ export function SettingsPage() {
       {renderGroup('Data', <>
         {renderRow('backup', '💾', 'Data Backup', 'JSON, CSV, WhatsApp report')}
         {renderRow('migrate', '🖥️', 'Switch Computer', 'Encrypted .fsbak file')}
+        {config?.shop_type === 'medical' && renderRow('audittrail', '📜', 'Audit Trail', 'Download every change (last 1 year)')}
         {renderRow('audit', '📋', 'Export Audit Log', `${exportLogs?.length ?? 0} export${exportLogs?.length === 1 ? '' : 's'}`, undefined, true)}
       </>)}
 
@@ -731,6 +736,112 @@ export function SettingsPage() {
         document.body
       )}
 
+    </div>
+  );
+}
+
+// [medical] [all tenants] — Audit Trail: download a complete record of every change.
+// The log is captured automatically at the DB layer (lib/db/audit.ts), so this UI just
+// queries + exports it; it needs zero changes when new features are added later.
+function pad2(n: number) { return String(n).padStart(2, '0'); }
+function localFromRange(range: '1m' | '6m' | '1y' | 'all'): string {
+  if (range === 'all') return '1970-01-01 00:00:00';
+  const d = new Date();
+  if (range === '1m') d.setMonth(d.getMonth() - 1);
+  else if (range === '6m') d.setMonth(d.getMonth() - 6);
+  else d.setFullYear(d.getFullYear() - 1);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} 00:00:00`;
+}
+const ACTION_LABEL: Record<string, string> = { CREATE: 'Added', UPDATE: 'Changed', DELETE: 'Deleted' };
+
+function AuditTrailSection({ tenantId, shopName }: { tenantId: string; shopName: string }) {
+  const [range, setRange] = useState<'1m' | '6m' | '1y' | 'all'>('1y');
+  const [recent, setRecent] = useState<AuditRow[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!tenantId) return;
+    exportAuditTrail(tenantId, localFromRange('1y'))
+      .then((rows) => { if (!cancelled) setRecent(rows.slice(0, 40)); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [tenantId]);
+
+  const rangeLabel: Record<typeof range, string> = { '1m': 'Last 1 month', '6m': 'Last 6 months', '1y': 'Last 1 year', all: 'All time' };
+
+  const download = async () => {
+    if (!tenantId) return;
+    setLoading(true);
+    try {
+      const rows = await exportAuditTrail(tenantId, localFromRange(range));
+      if (rows.length === 0) { toast.error('No changes recorded for this period yet'); return; }
+      const header = ['Date & Time', 'Action', 'Section', 'Description', 'Changed By', 'Record ID', 'Details'];
+      const esc = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const body = rows.map((r) => [
+        r.created_at,
+        ACTION_LABEL[r.action] ?? r.action,
+        r.table_name.replace(/_/g, ' '),
+        r.summary,
+        r.actor,
+        r.record_id ?? '',
+        r.details,
+      ].map(esc).join(','));
+      const csv = [header.map(esc).join(','), ...body].join('\n');
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `audit_trail_${shopName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      await logExport(tenantId, `audit_trail_${range}`, rows.length).catch(() => {});
+      toast.success(`Audit trail downloaded — ${rows.length} changes`);
+    } catch (e: any) {
+      toast.error('Download failed: ' + (e?.message ?? String(e)));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="p-4 space-y-3">
+      <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+        A complete, automatic record of every change in your shop — sales, products, stock, prices, customers, khata and more.
+        New features are captured automatically too. Download it any time for your records or for an audit.
+      </p>
+      <div>
+        <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Period</label>
+        <select value={range} onChange={(e) => setRange(e.target.value as typeof range)} className="input w-full">
+          <option value="1m">Last 1 month</option>
+          <option value="6m">Last 6 months</option>
+          <option value="1y">Last 1 year</option>
+          <option value="all">All time</option>
+        </select>
+      </div>
+      <button className="btn-secondary w-full" disabled={loading || !tenantId} onClick={download}>
+        {loading ? '⏳ Preparing…' : `↓ Download Audit Trail (CSV) · ${rangeLabel[range]}`}
+      </button>
+      <div>
+        <p className="text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Recent changes</p>
+        {recent.length === 0
+          ? <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>No changes recorded yet.</p>
+          : <div className="space-y-1.5 max-h-64 overflow-y-auto">
+              {recent.map((r) => (
+                <div key={r.id} className="card-strong flex items-center justify-between gap-3 p-2.5">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                      {ACTION_LABEL[r.action] ?? r.action} · {r.table_name.replace(/_/g, ' ')}
+                    </p>
+                    <p className="text-xs truncate" style={{ color: 'var(--text-tertiary)' }}>by {r.actor}</p>
+                  </div>
+                  <p className="text-xs shrink-0" style={{ color: 'var(--text-tertiary)' }}>
+                    {new Date(r.created_at.replace(' ', 'T')).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+              ))}
+            </div>
+        }
+      </div>
+      <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>💡 The audit trail cannot be edited from inside the app — it is a permanent record.</p>
     </div>
   );
 }

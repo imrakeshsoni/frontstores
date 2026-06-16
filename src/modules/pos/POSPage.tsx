@@ -188,6 +188,10 @@ export function POSPage() {
 
   // Invoice template from local config settings
   const settings = (config?.settings ?? {}) as any;
+  // [medical] [all tenants] — when the shop has no GST registration the owner turns GST
+  // OFF (Settings → Tax/GST). Then no tax is charged, GST% defaults to 0, and the bill
+  // prints with no GSTIN / CGST / SGST — a plain Bill of Supply.
+  const gstEnabled = settings.enable_gst !== false;
   const invoiceTemplate = {
     dlNumbers: config?.drug_license_no ?? '',
     storeDisplayName: settings.invoiceStoreDisplayName || config?.shop_name || '',
@@ -431,7 +435,7 @@ export function POSPage() {
       unit: product.unit ?? 'pc',
       unitPrice,
       looseUnitPrice: Number(product.loose_selling_price ?? 0) || undefined,
-      gstRate: Number(product.gst_rate ?? 0),
+      gstRate: gstEnabled ? Number(product.gst_rate ?? 0) : 0,
       hsnCode: product.hsn_code ?? null,
       discount: 0,
       batchNo,
@@ -562,7 +566,7 @@ export function POSPage() {
         storeName: invoiceTemplate.storeDisplayName || config?.shop_name || '',
         storeAddress: invoiceTemplate.addressLine || '',
         storePhone: config?.phone ?? '',
-        storeGstin: config?.gstin ?? '',
+        storeGstin: gstEnabled ? (config?.gstin ?? '') : '',
         headerLeft: invoiceTemplate.headerLeft || 'Chemist & Druggist',
         headerRight: invoiceTemplate.headerRight || 'Cash/Credit Memo',
         whatsappNumber: invoiceTemplate.whatsappNumber ?? '',
@@ -596,7 +600,7 @@ export function POSPage() {
         mrp: productForm.mrp ? Number(productForm.mrp) : 0,
         selling_price: productForm.mrp ? Number(productForm.mrp) : 0,
         cost_price: null,
-        gst_rate: Number(productForm.gstRate || 0),
+        gst_rate: gstEnabled ? Number(productForm.gstRate || 0) : 0,
         dosage_form: productForm.dosageForm || null,
         ml_volume: productForm.unit === 'ml' && productForm.mlVolume ? productForm.mlVolume : null,
         gm_volume: null,
@@ -2409,14 +2413,16 @@ ${invoiceSnapshot.gstAmount > 0 ? `<div class="row"><span>GST</span><span>₹${i
                   <input className="input" value={productForm.looseSellingPrice} onChange={(e) => setProductForm((current) => ({ ...current, looseSellingPrice: e.target.value }))} />
                 </div>
               )}
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">GST Rate</label>
-                <select className="input" value={productForm.gstRate} onChange={(e) => setProductForm((current) => ({ ...current, gstRate: e.target.value }))}>
-                  {[0, 5, 12, 18, 28].map((rate) => (
-                    <option key={rate} value={rate}>{rate}%</option>
-                  ))}
-                </select>
-              </div>
+              {gstEnabled && (
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">GST Rate</label>
+                  <select className="input" value={productForm.gstRate} onChange={(e) => setProductForm((current) => ({ ...current, gstRate: e.target.value }))}>
+                    {[0, 5, 12, 18, 28].map((rate) => (
+                      <option key={rate} value={rate}>{rate}%</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">Low Stock Quantity</label>
                 <input type="number" min="0" className="input" value={productForm.lowStockQuantity} onChange={(e) => setProductForm((current) => ({ ...current, lowStockQuantity: e.target.value }))} />

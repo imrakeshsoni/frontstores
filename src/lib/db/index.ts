@@ -131,9 +131,13 @@ function _wrapExecuteForSync(db: Database) {
     if (
       (op === 'INSERT' || op === 'UPDATE' || op === 'DELETE') &&
       !upper.includes('_MIGRATIONS') &&
-      !upper.includes('SYNC_QUEUE')
+      !upper.includes('SYNC_QUEUE') &&
+      !upper.includes('AUDIT_LOG')
     ) {
       import('../autoSync').then(({ triggerAutoSync }) => triggerAutoSync()).catch(() => {});
+      // [core] [all apps] [all tenants] — auto audit trail. Uses originalExecute so the
+      // audit insert bypasses this wrapper (no recursion, no sync of the log itself).
+      import('./audit').then(({ recordAudit }) => recordAudit(originalExecute, sql, bindValues)).catch(() => {});
     }
     return result;
   }) as typeof db.execute;
