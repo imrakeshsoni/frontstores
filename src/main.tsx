@@ -27,12 +27,28 @@ async function checkForUpdate() {
 
     if (!isAllApps && !isThisApp) return; // This release doesn't affect this user's app
 
+    // Keep a handle for the manual "Install" button in Settings (fallback if the
+    // silent install below fails, e.g. the internet drops mid-download).
     (window as any).__pendingUpdate = update;
+
+    // [core] [all apps] [all tenants] — silent auto-update: download + install in the
+    // background so the shopkeeper never has to click anything. We do NOT call relaunch()
+    // ourselves, so the running session is not torn down by us — the new version applies
+    // the next time they open the app. (macOS stages it for next launch; Windows applies
+    // it via the installer.) The manual Settings button still works for an instant update.
+    try {
+      await update.downloadAndInstall();
+      (window as any).__updateReady = true; // Settings can show "Update installed — restart to apply"
+    } catch {
+      // Offline or interrupted — leave __pendingUpdate so the manual button can retry.
+    }
   } catch {
     // Non-fatal — ignore silently
   }
 }
-setTimeout(checkForUpdate, 4000);
+// Wait until the app has settled (and the shopkeeper is unlikely to be mid-bill at the
+// very first seconds after launch) before doing any background update work.
+setTimeout(checkForUpdate, 8000);
 
 // Flush queued sync items on start and whenever internet comes back
 flushQueue();
