@@ -359,13 +359,17 @@ export function ProductsPage() {
                     />
                   </div>
                 )}
+                {/* [medical] [all tenants] — Ointment gram volume is entered manually (no preset options) */}
                 {isMedicalStore && form.dosage_form === 'Ointment' && (
                   <div>
                     <label className="mb-2 block text-sm font-medium text-slate-700">Volume (grams)</label>
-                    <select className="input" value={form.gm_volume} onChange={(e) => setForm((c) => ({ ...c, gm_volume: e.target.value }))}>
-                      <option value="">Select volume</option>
-                      {[5, 10, 15, 20, 25, 30, 35, 50].map((v) => <option key={v} value={`${v}g`}>{v} g</option>)}
-                    </select>
+                    <input
+                      type="number"
+                      className="input"
+                      placeholder="Enter volume in grams"
+                      value={form.gm_volume}
+                      onChange={(e) => setForm((c) => ({ ...c, gm_volume: e.target.value }))}
+                    />
                   </div>
                 )}
                 {isMedicalStore && form.unit === 'strip' && (
