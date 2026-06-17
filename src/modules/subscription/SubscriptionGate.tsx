@@ -16,6 +16,9 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
   const config = useAppStore((s) => s.config);
   // [admin] [all tenants] — admin app bypasses subscription system entirely
   if (config?.shop_type === 'admin') return <>{children}</>;
+  // [all apps] [all tenants] — dev mode: never show the subscription lock locally.
+  // Guarded by import.meta.env.DEV so production customer builds always enforce it.
+  if (import.meta.env.DEV) return <>{children}</>;
 
   const loadConfig    = useAppStore((s) => s.loadConfig);
   const refreshConfig = useAppStore((s) => s.refreshConfig);

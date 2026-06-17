@@ -12,7 +12,7 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<meta name="description" content="Business software for every trade — billing, inventory, CRM, ERP, accounting, HRMS and 30+ ready apps. Cloud by default, use on any device; local-only on request. GST-ready. 30-day free trial." />
+<meta name="description" content="Business software for every trade — billing, inventory, CRM, ERP, accounting, HRMS and ready-to-use apps. Cloud by default, use on any device; local-only on request. GST-ready. 30-day free trial." />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -443,7 +443,7 @@
         <span>GST Billing</span><span>Cloud by default</span>
         <span>Inventory</span><span>Khata / Credit</span>
         <span>WhatsApp</span><span>Use on any device</span>
-        <span>30+ Businesses</span><span>Multi-user</span>
+        <span>Made for India</span><span>Multi-user</span>
       </div>
       <p class="hero-statement"><b>Run your business</b> from anywhere — every feature your trade needs, securely on the cloud and ready on <b>any device.</b> Prefer total privacy? Go fully local on request.</p>
       <div class="hero-cta">
@@ -478,7 +478,7 @@
   <div class="home-block">
     <div class="view-head home-head"><div class="idx mono">How it works</div><h2 class="view-title home-title">Up and running in three steps</h2></div>
     <div class="steps">
-      <div class="step"><div class="n">01</div><h4>Pick your business</h4><p>Choose your shop type — pharmacy, grocery, salon, restaurant and 25+ more.</p></div>
+      <div class="step"><div class="n">01</div><h4>Pick your business</h4><p>Choose your shop type — pharmacy, hardware, restaurant or car wash.</p></div>
       <div class="step"><div class="n">02</div><h4>Set up in minutes</h4><p>Install the app and add your shop details. Everything syncs securely to the cloud automatically — no technical setup.</p></div>
       <div class="step"><div class="n">03</div><h4>Use it anywhere</h4><p>Bill, track stock, dues and reports — from your counter, home or phone. Your data is always in sync across devices.</p></div>
     </div>
@@ -495,7 +495,7 @@
   </div>
   <div class="search-bar">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-    <input type="text" id="appSearch" placeholder="Search: pharmacy, restaurant, salon, gym, CRM…" autocomplete="off" />
+    <input type="text" id="appSearch" placeholder="Search: pharmacy, hardware, restaurant, car wash…" autocomplete="off" />
   </div>
   <div class="chips" id="catChips"></div>
   <div class="app-grid" id="appGrid"></div>
@@ -505,7 +505,7 @@
   <div class="home-block">
     <div class="view-head home-head"><div class="idx mono">Popular solutions</div><h2 class="view-title home-title">Loved across trades</h2></div>
     <div class="app-grid" id="featuredGrid"></div>
-    <div style="margin-top:24px"><a href="#solutions" class="btn btn-out">See all 30+ apps →</a></div>
+    <div style="margin-top:24px"><a href="#solutions" class="btn btn-out">See all apps →</a></div>
   </div>
 
   <!-- product screenshots -->
@@ -835,7 +835,7 @@
   // Featured solutions on the home page (reuses the same card + detail modal)
   const featuredGrid = document.getElementById('featuredGrid');
   if (featuredGrid) {
-    const FEATURED = ['medical', 'restaurant', 'grocery', 'beauty', 'crm', 'gym'];
+    const FEATURED = ['medical', 'hardware', 'restaurant', 'carwash'];
     const picks = FEATURED.map(id => (window.APPS || []).find(a => a.id === id)).filter(Boolean);
     featuredGrid.innerHTML = picks.map(cardHtml).join('');
     featuredGrid.querySelectorAll('.app-card').forEach(card =>
