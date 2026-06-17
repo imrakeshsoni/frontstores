@@ -12,6 +12,8 @@ import { flushQueue } from './lib/syncQueue';
 // shop type is tagged, or if [all apps] / [all tenants] / [core] is present. [core] [all tenants]
 async function checkForUpdate() {
   try {
+    // Already downloaded + staged this session — don't re-download every interval.
+    if ((window as any).__updateReady) return;
     const { check } = await import('@tauri-apps/plugin-updater');
     const update = await check();
     if (!update) return;
@@ -49,6 +51,10 @@ async function checkForUpdate() {
 // Wait until the app has settled (and the shopkeeper is unlikely to be mid-bill at the
 // very first seconds after launch) before doing any background update work.
 setTimeout(checkForUpdate, 8000);
+// [core] [all apps] [all tenants] — re-check every 2h so an app left open all day
+// still picks up a new release the same day. Still silent: downloads in the
+// background and applies on next open, so it never interrupts a bill.
+setInterval(checkForUpdate, 2 * 60 * 60 * 1000);
 
 // Flush queued sync items on start and whenever internet comes back
 flushQueue();
