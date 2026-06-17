@@ -501,13 +501,6 @@
   <div class="app-grid" id="appGrid"></div>
   <div class="no-results" id="noResults" style="display:none">No matching software found. <a href="#contact">Tell us what you need →</a></div>
 
-  <!-- featured solutions -->
-  <div class="home-block">
-    <div class="view-head home-head"><div class="idx mono">Popular solutions</div><h2 class="view-title home-title">Loved across trades</h2></div>
-    <div class="app-grid" id="featuredGrid"></div>
-    <div style="margin-top:24px"><a href="#solutions" class="btn btn-out">See all apps →</a></div>
-  </div>
-
   <!-- product screenshots -->
   <div class="home-block">
     <div class="view-head home-head"><div class="idx mono">See it in action</div><h2 class="view-title home-title">Real software, real work</h2></div>
@@ -831,16 +824,6 @@
   }
   searchInp.addEventListener('input', e => { query = e.target.value; render(); });
   render();
-
-  // Featured solutions on the home page (reuses the same card + detail modal)
-  const featuredGrid = document.getElementById('featuredGrid');
-  if (featuredGrid) {
-    const FEATURED = ['medical', 'hardware', 'restaurant', 'carwash'];
-    const picks = FEATURED.map(id => (window.APPS || []).find(a => a.id === id)).filter(Boolean);
-    featuredGrid.innerHTML = picks.map(cardHtml).join('');
-    featuredGrid.querySelectorAll('.app-card').forEach(card =>
-      card.addEventListener('click', () => openModal(card.dataset.id)));
-  }
 
   // ════════ APP DETAIL MODAL ════════
   const overlay = document.getElementById('appModal');
