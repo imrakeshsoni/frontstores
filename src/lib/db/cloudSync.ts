@@ -96,21 +96,21 @@ export async function getPricing(tenantId: string): Promise<{ plan_fee: number; 
     return {
       plan_fee:       data.plan_fee       ?? 999,
       staff_user_fee: data.staff_user_fee ?? 200,
-      cloud_sync_fee: data.cloud_sync_fee ?? 299,
+      cloud_sync_fee: data.cloud_sync_fee ?? 0, // Cloud Sync included free
     };
   } catch {
-    return { plan_fee: 999, staff_user_fee: 200, cloud_sync_fee: 299 };
+    return { plan_fee: 999, staff_user_fee: 200, cloud_sync_fee: 0 };
   }
 }
 
-// [all apps] [all tenants] — Fetch cloud sync fee from server before showing confirmation
+// [all apps] [all tenants] — Cloud Sync is free/included now; kept for backward compat.
 export async function getCloudSyncFee(tenantId: string): Promise<{ fee: number; currency: string }> {
   try {
     const res = await fetch(`${SERVER}/cloud-sync/fee/${tenantId}`, { signal: AbortSignal.timeout(6000) });
     const data = await res.json() as { fee?: number; currency?: string };
-    return { fee: data.fee ?? 299, currency: data.currency ?? 'INR' };
+    return { fee: data.fee ?? 0, currency: data.currency ?? 'INR' };
   } catch {
-    return { fee: 299, currency: 'INR' };
+    return { fee: 0, currency: 'INR' };
   }
 }
 
@@ -194,6 +194,30 @@ export async function setBillingDevice(tenantId: string, username: string): Prom
 
 export function getBillingUser(settings: any): string {
   return (settings?.billing_user as string) || 'owner';
+}
+
+// [all apps] [all tenants] — Local-only toggle. Cloud is ON by default; turning Local-only
+// ON stops all cloud sync and keeps data on this machine. Turning it OFF re-activates cloud.
+// Returns the resulting local_only state so the UI can reflect it.
+export function isLocalOnly(settings: any): boolean {
+  return !!settings?.local_only;
+}
+
+export async function setLocalOnly(tenantId: string, on: boolean): Promise<{ ok: boolean; error?: string; localOnly: boolean }> {
+  const config = await getAppConfig();
+  const s = config?.settings as any ?? {};
+  if (on) {
+    // Switching to Local only — stop cloud sync. Deactivate server-side if it was active.
+    if (s.cloud_sync_enabled) { try { await deactivateCloudSync(tenantId); } catch { /* local state wins */ } }
+    const after = (await getAppConfig())?.settings as any ?? s;
+    await updateAppConfig({ settings: { ...after, local_only: true } });
+    return { ok: true, localOnly: true };
+  }
+  // Switching back to cloud — clear the flag, then (re)activate cloud sync.
+  await updateAppConfig({ settings: { ...s, local_only: false } });
+  const r = await activateCloudSync(tenantId);
+  if (!r.ok) return { ok: false, error: r.error, localOnly: false };
+  return { ok: true, localOnly: false };
 }
 
 // Legacy — kept for backward compat; replaced by activateCloudSync

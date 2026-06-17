@@ -98,6 +98,7 @@ import { useAppStore } from '@/app/store/app.store';
 import { verifyAuth } from '@/lib/db/auth';
 import { getShopTypeLabel } from '@/lib/shop/shopType';
 import { AnnouncementPopup } from '@/components/announcements/AnnouncementPopup';
+import { CloudBackupNotice } from '@/components/cloud/CloudBackupNotice';
 import { pollAnnouncements, getUnreadCount } from '@/lib/db/announcements';
 import { setAnnouncementNewHandler, setSyncStateHandler, removeSyncStateHandler, getSyncState, type SyncState } from '@/lib/autoSync';
 import { MobileNav } from './MobileNav';
@@ -701,6 +702,8 @@ export function AppLayout() {
       {showSwitchModal && <SwitchAppModal onClose={() => setShowSwitchModal(false)} />}
       {/* [core] [all apps] [all tenants] — silent announcement popup, shown once per new message */}
       <AnnouncementPopup />
+      {/* [core] [all apps] [all tenants] — one-time cloud-by-default notice with Local-only opt-out */}
+      <CloudBackupNotice />
 
       {/* [carwash] [all tenants] — Owner login modal (used to exit employee mode) */}
       {showOwnerLogin && (

@@ -15,7 +15,7 @@ import { PageIntro } from '@/components/ui/PageIntro';
 import { useTheme } from '@/lib/theme/useTheme';
 import { reportError } from '@/lib/errorReporter';
 import { triggerAutoSync } from '@/lib/autoSync';
-import { getCloudSyncStatus, refreshCloudSyncStatus, activateCloudSync, deactivateCloudSync, getCloudSyncFee, getPricing, setBillingDevice, getBillingUser } from '@/lib/db/cloudSync';
+import { getCloudSyncStatus, refreshCloudSyncStatus, activateCloudSync, deactivateCloudSync, getCloudSyncFee, getPricing, setBillingDevice, getBillingUser, setLocalOnly, isLocalOnly } from '@/lib/db/cloudSync';
 import { getNavItemsForShopType } from '@/components/layout/AppLayout';
 
 type SettingsForm = {
@@ -325,8 +325,8 @@ export function SettingsPage() {
       case 'updates': return renderUpdatesPanel();
 
       case 'billing-summary': {
-        const syncStatus = (config?.settings as any)?.cloud_sync_enabled;
-        const total = planFee + (activeCount * staffFee) + (syncStatus ? syncFee : 0);
+        // Cloud Sync is included free (cloud-by-default). Billing = base plan + per-staff-user.
+        const total = planFee + (activeCount * staffFee);
         const nextBilling = (() => { const d = new Date(); d.setMonth(d.getMonth() + 1); d.setDate(1); return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }); })();
         return (
           <div className="p-4 space-y-3">
@@ -341,8 +341,8 @@ export function SettingsPage() {
                 <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>₹{activeCount * staffFee}/month</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Cloud Sync</span>
-                <span style={{ fontWeight: 600, color: syncStatus ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>{syncStatus ? `₹${syncFee}/month` : 'Off'}</span>
+                <span style={{ color: 'var(--text-secondary)' }}>Cloud backup &amp; sync</span>
+                <span style={{ fontWeight: 600, color: '#16a34a' }}>Included free</span>
               </div>
               <div style={{ borderTop: '1px solid var(--surface-border)', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', fontSize: '15px' }}>
                 <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Total</span>
@@ -643,7 +643,7 @@ export function SettingsPage() {
   };
 
   const panelTitles: Record<string, string> = {
-    'billing-summary': '💳 Your Plan', updates: '🔄 App Updates', cloudsync: '☁️ Cloud Sync', appearance: '🎨 Appearance',
+    'billing-summary': '💳 Your Plan', updates: '🔄 App Updates', cloudsync: '☁️ Cloud Backup', appearance: '🎨 Appearance',
     shop: '🏪 Shop Details', logo: '🖼️ Business Logo', invoice: '🧾 Invoice Template',
     billing: '⌨️ Billing Preferences', gst: '🧾 Tax / GST', whatsapp: '📱 WhatsApp Business',
     pinlock: '🔐 Section PIN Lock', autolock: '🔒 Auto-Lock', password: '🔑 Login & Password',
@@ -680,7 +680,7 @@ export function SettingsPage() {
       {renderGroup('General', <>
         {renderRow('updates', '🔄', 'App Updates', currentVersion ? `v${currentVersion}${updateStatus === 'found' ? ' · Update available' : ''}` : 'Check for updates',
           updateStatus === 'found' ? badge('Update', 'blue') : undefined)}
-        {renderRow('cloudsync', '☁️', 'Cloud Sync', undefined, undefined)}
+        {renderRow('cloudsync', '☁️', 'Cloud Backup', (config?.settings as any)?.local_only ? 'Local only · data stays on this PC' : 'On · included free · Local-only option', undefined)}
         {isOwner && renderRow('billing-summary', '💳', 'Your Plan', (() => {
           const total = planFee + (activeCount * staffFee) + (syncFee > 0 ? 0 : 0);
           return `₹${planFee}/mo plan · ${activeCount > 0 ? `${activeCount} staff +₹${activeCount * staffFee} · ` : ''}₹${planFee + activeCount * staffFee}/month`;
@@ -1481,35 +1481,25 @@ function SectionPinLockSection() {
   );
 }
 
-// ── Cloud Sync Section ────────────────────────────────────────────────────────
-// [all apps] [all tenants] — simple Cloud Sync toggle: request → admin approval → silent auto-sync
-// [all apps] [all tenants] — Cloud Sync section: self-activate/deactivate with pro-rated billing confirmation
+// ── Cloud backup / Local-only Section ─────────────────────────────────────────
+// [all apps] [all tenants] — Cloud is ON by default (free, included). This section is just a
+// "Local only" switch (default OFF). Turning it ON keeps all data on this machine and stops
+// every cloud push/pull. No fees, no activation/approval flow — see setLocalOnly().
 function CloudSyncSection() {
   const tenantId = useAppStore(s => s.config?.tenant_id ?? '');
+  const settings = useAppStore(s => (s.config?.settings as any) ?? {});
+  const refreshConfig = useAppStore(s => s.refreshConfig);
   const [busy, setBusy] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [fee, setFee] = useState<number | null>(null);
-  const [prorated, setProrated] = useState<number | null>(null);
-  const [nextCycleFee, setNextCycleFee] = useState<number | null>(null);
-  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
+  const [localOnly, setLocalOnlyState] = useState<boolean>(isLocalOnly(settings));
+
+  useEffect(() => { setLocalOnlyState(isLocalOnly(settings)); }, [settings?.local_only]);
 
   const { data: syncStatus, refetch: refetchStatus } = useQuery({
     queryKey: ['cloud-sync-status', tenantId],
     queryFn: () => refreshCloudSyncStatus(tenantId),
-    enabled: !!tenantId,
+    enabled: !!tenantId && !localOnly,
     refetchInterval: 60_000,
   });
-
-  // Always fetch latest pricing on mount — staleTime: 0 so admin changes are immediately visible
-  const { data: pricing } = useQuery({
-    queryKey: ['pricing', tenantId],
-    queryFn: () => getPricing(tenantId),
-    enabled: !!tenantId,
-    staleTime: 0,
-  });
-  const cloudSyncFee = pricing?.cloud_sync_fee ?? 299;
-
-  const enabled = !!syncStatus?.enabled;
 
   const lastSynced = syncStatus?.lastSyncedAt
     ? (() => {
@@ -1521,66 +1511,51 @@ function CloudSyncSection() {
       })()
     : null;
 
-  const calcProrated = (fullFee: number) => {
-    const now = new Date();
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const daysRemaining = daysInMonth - now.getDate() + 1;
-    return Math.round(fullFee * daysRemaining / daysInMonth);
-  };
-
-  const handleToggleOn = () => {
+  const handleToggle = async () => {
     if (busy) return;
-    const f = cloudSyncFee;
-    setFee(f);
-    setProrated(calcProrated(f));
-    setNextCycleFee(f);
-    setShowConfirm(true);
-  };
-
-  const handleConfirmActivate = async () => {
-    setShowConfirm(false);
+    const turningOn = !localOnly; // turning Local-only ON
+    if (turningOn && !window.confirm(
+      'Turn on Local only?\n\nYour data will stop syncing to the cloud and stay on this computer only. Staff on other devices will no longer see live data.'
+    )) return;
     setBusy(true);
     try {
-      const result = await activateCloudSync(tenantId);
-      if (!result.ok) { toast.error(result.error ?? 'Could not activate Cloud Sync'); return; }
-      toast.success('☁️ Cloud Sync activated!');
+      const r = await setLocalOnly(tenantId, turningOn);
+      if (!r.ok) { toast.error(r.error ?? 'Could not change setting'); return; }
+      setLocalOnlyState(r.localOnly);
+      await refreshConfig();
       refetchStatus();
+      toast.success(r.localOnly
+        ? 'Local only is ON — your data stays on this computer.'
+        : '☁️ Cloud backup is ON — your data will sync automatically.');
     } finally { setBusy(false); }
   };
 
-  const handleDeactivate = async () => {
-    setShowDeactivateConfirm(false);
-    setBusy(true);
-    try {
-      const result = await deactivateCloudSync(tenantId);
-      if (!result.ok) { toast.error(result.error ?? 'Could not deactivate'); return; }
-      toast.success('Cloud Sync deactivated. Current billing cycle charge still applies.');
-      refetchStatus();
-    } finally { setBusy(false); }
-  };
-
-  const toggleColor = enabled ? '#16a34a' : '#cbd5e1';
+  // Toggle shows "on" (slate) when Local-only is active.
+  const toggleColor = localOnly ? '#64748b' : '#cbd5e1';
 
   return (
     <div className="card p-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: enabled ? 'rgba(22,163,74,0.12)' : 'rgba(14,165,233,0.10)' }}>
-            <Cloud className="h-4 w-4" style={{ color: enabled ? '#16a34a' : '#0ea5e9' }} />
+            style={{ background: localOnly ? 'rgba(100,116,139,0.12)' : 'rgba(22,163,74,0.12)' }}>
+            <Cloud className="h-4 w-4" style={{ color: localOnly ? '#64748b' : '#16a34a' }} />
           </div>
           <div>
-            <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>☁️ Cloud Sync</p>
+            <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+              {localOnly ? '🔒 Local only' : '☁️ Cloud backup'}
+            </p>
             <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
-              {enabled
-                ? lastSynced ? `Active · last synced ${lastSynced}` : 'Active · syncing your data'
-                : `Sync data across devices · ₹${cloudSyncFee}/month`}
+              {localOnly
+                ? 'Data stays on this computer — never sent to cloud'
+                : lastSynced ? `On · backed up ${lastSynced} · included free` : 'On · backing up your data · included free'}
             </p>
           </div>
         </div>
         <button
-          onClick={enabled ? () => setShowDeactivateConfirm(true) : handleToggleOn}
+          onClick={handleToggle}
           disabled={busy}
+          role="switch" aria-checked={localOnly} aria-label="Local only"
           style={{
             width: '44px', height: '24px', borderRadius: '999px',
             background: toggleColor,
@@ -1590,7 +1565,7 @@ function CloudSyncSection() {
           }}>
           <span style={{
             position: 'absolute', top: '3px',
-            left: enabled ? '23px' : '3px',
+            left: localOnly ? '23px' : '3px',
             width: '18px', height: '18px', borderRadius: '50%',
             background: '#fff', transition: 'left 0.2s',
             boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
@@ -1598,58 +1573,11 @@ function CloudSyncSection() {
         </button>
       </div>
 
-      {!enabled && (
-        <p className="text-xs mt-3 pt-3" style={{ color: 'var(--text-tertiary)', borderTop: '1px solid var(--surface-border)' }}>
-          Your data stays on your device. Cloud Sync adds silent backup and multi-device access — works offline, syncs when connection returns.
-        </p>
-      )}
-
-      {/* Activate confirmation modal */}
-      {showConfirm && fee !== null && createPortal(
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: 'var(--surface)', borderRadius: '18px', padding: '28px', maxWidth: '380px', width: '90%', border: '1px solid var(--surface-border)' }}>
-            <p style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>Enable Cloud Sync?</p>
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px', lineHeight: 1.5 }}>
-              Your data will be synced across all your devices in real time.
-            </p>
-            <div style={{ background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.2)', borderRadius: '12px', padding: '14px', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>This billing cycle (pro-rated)</span>
-                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>₹{prorated}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>From next billing cycle</span>
-                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>₹{nextCycleFee}/month</span>
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--surface-border)' }}>
-                Billing on 1st of every month. You can deactivate anytime — current cycle charge still applies. No refund for mid-cycle cancellation.
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => setShowConfirm(false)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={handleConfirmActivate} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: '#0ea5e9', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>Activate · ₹{prorated}</button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* Deactivate confirmation modal */}
-      {showDeactivateConfirm && createPortal(
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: 'var(--surface)', borderRadius: '18px', padding: '28px', maxWidth: '360px', width: '90%', border: '1px solid var(--surface-border)' }}>
-            <p style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>Deactivate Cloud Sync?</p>
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px', lineHeight: 1.5 }}>
-              Current billing cycle charge will still apply. Cloud Sync will stop at the end of this cycle and you won't be charged from next month.
-            </p>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => setShowDeactivateConfirm(false)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>Keep Active</button>
-              <button onClick={handleDeactivate} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: '#ef4444', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>Deactivate</button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+      <p className="text-xs mt-3 pt-3" style={{ color: 'var(--text-tertiary)', borderTop: '1px solid var(--surface-border)' }}>
+        {localOnly
+          ? 'Turn this off to back up your data to the cloud and let staff access it from other devices.'
+          : 'Your data is automatically backed up and synced across your devices. Turn on “Local only” to keep everything on this computer instead.'}
+      </p>
     </div>
   );
 }

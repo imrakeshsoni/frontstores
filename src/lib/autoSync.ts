@@ -1,5 +1,5 @@
 // [all apps] [all tenants] — Auto-sync: push on events, periodic polling pull (Cloudflare Worker has no SSE/Durable Objects)
-import { pushDelta, pullDelta, refreshCloudSyncStatus, pushToCloudDb, refreshCloudDbStatus } from './db/cloudSync';
+import { pushDelta, pullDelta, refreshCloudSyncStatus, pushToCloudDb, refreshCloudDbStatus, activateCloudSync } from './db/cloudSync';
 import { pollAnnouncements } from './db/announcements';
 import { getAppConfig } from './db/config';
 
@@ -51,6 +51,11 @@ export function setCloudDbApprovedHandler(cb: () => void) { _onCloudDbApproved =
 export function initAutoSync(tenantId: string) {
   _tenantId = tenantId;
   setSyncState({ status: navigator.onLine ? 'syncing' : 'offline' });
+  // [all apps] [all tenants] — Cloud-by-default: unless the owner has chosen "Local only",
+  // ensure Cloud Sync is active. This flips existing tenants ON the first time they launch
+  // an updated build and provisions their sync/cloud-db codes via self-activate. Owners who
+  // turned on Local only are never auto-activated. Failures are non-fatal (retried next launch).
+  ensureCloudByDefault(tenantId);
   // Refresh both sync and cloud-db status on startup
   Promise.allSettled([
     refreshCloudSyncStatus(tenantId),
@@ -82,6 +87,18 @@ export function stopAutoSync() {
   if (_pushTimer) { clearTimeout(_pushTimer); _pushTimer = null; }
 }
 
+// [all apps] [all tenants] — Cloud-by-default activator. No-op if the owner chose Local only,
+// or if Cloud Sync is already active. Otherwise self-activates so data starts backing up.
+async function ensureCloudByDefault(tenantId: string) {
+  try {
+    const config = await getAppConfig().catch(() => null);
+    const s = (config?.settings as any) ?? {};
+    if (s.local_only) return;            // owner opted out — never auto-enable
+    if (s.cloud_sync_enabled) return;    // already on
+    await activateCloudSync(tenantId);   // provisions codes + sets cloud_sync_enabled/cloud_db_enabled locally
+  } catch { /* non-fatal — retried next launch */ }
+}
+
 // Call this after any significant data change — debounces and pushes to Cloud Sync + Cloud DB
 export function triggerAutoSync(immediate = false) {
   if (!_tenantId) return;
@@ -90,6 +107,7 @@ export function triggerAutoSync(immediate = false) {
   _pushTimer = setTimeout(async () => {
     const config = await getAppConfig();
     const s = config?.settings as any ?? {};
+    if (s.local_only) return;            // Local-only: data never leaves this machine
     if (s.cloud_sync_enabled) {
       setSyncState({ status: 'syncing' });
       try {
@@ -110,6 +128,7 @@ async function silentPull() {
   if (!_tenantId) return;
   const config = await getAppConfig();
   const s = config?.settings as any ?? {};
+  if (s.local_only) return;            // Local-only: never pull from cloud
   if (!s.cloud_sync_enabled) return;
   setSyncState({ status: 'syncing' });
   try {
@@ -124,6 +143,7 @@ async function silentCloudDbPush() {
   if (!_tenantId) return;
   const config = await getAppConfig();
   const s = config?.settings as any ?? {};
+  if (s.local_only) return;            // Local-only: never push full DB snapshot
   if (!s.cloud_db_enabled || !s.cloud_db_code) return;
   try { await pushToCloudDb(_tenantId); } catch { /* non-critical */ }
 }
