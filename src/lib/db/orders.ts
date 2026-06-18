@@ -124,51 +124,80 @@ export async function createOrder(tenantId: string, data: {
   const saleDate   = now();                       // actual sell time — immutable audit record
   const orderDate  = data.order_date ?? saleDate; // invoice date — may be adjusted later
 
-  await db.execute(
-    `INSERT INTO orders (id, tenant_id, bill_number, customer_id, customer_name, customer_phone,
-      patient_name, doctor_name, subtotal, discount, tax_total, total, payment_method,
-      payment_status, amount_paid, notes, order_date, sale_date)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [orderId, tenantId, billNumber, data.customer_id ?? null, data.customer_name ?? null,
-     data.customer_phone ?? null, data.patient_name ?? null, data.doctor_name ?? null,
-     calcSubtotal, calcDiscount, calcTaxTotal, calcTotal, data.payment_method,
-     data.payment_status, data.amount_paid, data.notes ?? null, orderDate, saleDate]
-  );
-
-  for (const item of lineItems) {
+  // [all apps] [all tenants] — tauri-plugin-sql can't span a real BEGIN/COMMIT across its
+  // connection pool (see note above), so we guard the multi-write checkout with a
+  // compensating rollback instead: if any write fails partway through, undo the order
+  // header, restock anything already deducted, and drop the khata debit. This stops a
+  // crash mid-checkout from leaving a half-written bill or a phantom receivable.
+  const stockApplied: { productId: string; qty: number }[] = [];
+  try {
     await db.execute(
-      `INSERT INTO order_items (id, tenant_id, order_id, product_id, product_name, quantity,
-        unit_price, mrp, discount, gst_rate, total, batch_no, expiry_date, hsn_code)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [uuid(), tenantId, orderId, item.product_id ?? null, item.product_name, item.quantity,
-       item.unit_price, item.mrp ?? null, item.discount, item.gst_rate, item.total,
-       item.batch_no ?? null, item.expiry_date ?? null, item.hsn_code ?? null]
+      `INSERT INTO orders (id, tenant_id, bill_number, customer_id, customer_name, customer_phone,
+        patient_name, doctor_name, subtotal, discount, tax_total, total, payment_method,
+        payment_status, amount_paid, notes, order_date, sale_date)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [orderId, tenantId, billNumber, data.customer_id ?? null, data.customer_name ?? null,
+       data.customer_phone ?? null, data.patient_name ?? null, data.doctor_name ?? null,
+       calcSubtotal, calcDiscount, calcTaxTotal, calcTotal, data.payment_method,
+       data.payment_status, data.amount_paid, data.notes ?? null, orderDate, saleDate]
     );
-    if (item.product_id) {
-      await updateStock(tenantId, item.product_id, -item.quantity);
+
+    for (const item of lineItems) {
       await db.execute(
-        `INSERT INTO inventory_adjustments (id, tenant_id, product_id, quantity, type, reference_id)
-         VALUES (?,?,?,?,?,?)`,
-        [uuid(), tenantId, item.product_id, -item.quantity, 'sale', orderId]
+        `INSERT INTO order_items (id, tenant_id, order_id, product_id, product_name, quantity,
+          unit_price, mrp, discount, gst_rate, total, batch_no, expiry_date, hsn_code)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [uuid(), tenantId, orderId, item.product_id ?? null, item.product_name, item.quantity,
+         item.unit_price, item.mrp ?? null, item.discount, item.gst_rate, item.total,
+         item.batch_no ?? null, item.expiry_date ?? null, item.hsn_code ?? null]
+      );
+      if (item.product_id) {
+        await updateStock(tenantId, item.product_id, -item.quantity);
+        stockApplied.push({ productId: item.product_id, qty: item.quantity });
+        await db.execute(
+          `INSERT INTO inventory_adjustments (id, tenant_id, product_id, quantity, type, reference_id)
+           VALUES (?,?,?,?,?,?)`,
+          [uuid(), tenantId, item.product_id, -item.quantity, 'sale', orderId]
+        );
+      }
+    }
+
+    // [medical] [all tenants] — a credit bill is money the customer now owes. Post it to
+    // the Khata ledger as a debit so the outstanding shows up on the Khata page AND so the
+    // credit-limit check above sees real exposure on the next sale. Cash/UPI/card bills are
+    // settled immediately and are not ledgered.
+    if (data.payment_method === 'credit' && data.customer_id && calcTotal > 0) {
+      await db.execute(
+        `INSERT INTO khata_entries (id, tenant_id, customer_id, order_id, type, amount, notes, entry_date, created_at, updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?)`,
+        [uuid(), tenantId, data.customer_id, orderId, 'debit', calcTotal,
+         `Credit bill ${billNumber}`, orderDate, now(), now()]
       );
     }
+  } catch (err) {
+    // Best-effort compensation — never throw from here; surface the original failure.
+    try {
+      for (const s of stockApplied) {
+        await updateStock(tenantId, s.productId, s.qty);
+      }
+      await db.execute(
+        `UPDATE orders SET payment_status = 'cancelled', deleted_at = ?, updated_at = ? WHERE id = ? AND tenant_id = ?`,
+        [now(), now(), orderId, tenantId]
+      );
+      await db.execute(
+        `UPDATE khata_entries SET deleted_at = ?, updated_at = ? WHERE order_id = ? AND tenant_id = ? AND deleted_at IS NULL`,
+        [now(), now(), orderId, tenantId]
+      );
+    } catch { /* swallow — the original error is what the caller needs to see */ }
+    throw err;
   }
 
-  // [medical] [all tenants] — a credit bill is money the customer now owes. Post it to
-  // the Khata ledger as a debit so the outstanding shows up on the Khata page AND so the
-  // credit-limit check above sees real exposure on the next sale. Cash/UPI/card bills are
-  // settled immediately and are not ledgered.
-  if (data.payment_method === 'credit' && data.customer_id && calcTotal > 0) {
-    await db.execute(
-      `INSERT INTO khata_entries (id, tenant_id, customer_id, order_id, type, amount, notes, entry_date, created_at, updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?)`,
-      [uuid(), tenantId, data.customer_id, orderId, 'debit', calcTotal,
-       `Credit bill ${billNumber}`, orderDate, now(), now()]
-    );
-  }
-
-  const rows = await db.select<any[]>(`SELECT * FROM orders WHERE id = ?`, [orderId]);
-  return rows[0] as Order;
+  // [all apps] [all tenants] — return the PERSISTED order with its line items so callers
+  // (e.g. the printed invoice) render from the stored source of truth, not from a
+  // client-side cart recomputation that can diverge on rounding / discount clamping.
+  const saved = await getOrderWithItems(tenantId, orderId);
+  if (!saved) throw new Error('Order saved but could not be reloaded');
+  return saved;
 }
 
 export async function listOrders(tenantId: string, opts: {

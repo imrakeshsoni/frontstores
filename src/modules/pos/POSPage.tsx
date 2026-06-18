@@ -509,42 +509,47 @@ export function POSPage() {
         id: order.customer_id ?? null,
         name: order.customer_name ?? null,
       });
-      // [medical] [all tenants]
-      const snapshotItems = cart.items.map((item) => {
-        const isStrip = item.unit === 'strip' && Number(item.totalUnits ?? 0) > 0;
-        const stripUnits = Number(item.totalUnits ?? 0);
-        const looseQty = item.looseQty ?? 0;
-        const totalTablets = isStrip ? item.quantity * stripUnits + (item.isLoose ? looseQty : 0) : 0;
+      // [all apps] [all tenants] — build the invoice from the PERSISTED order (server-recomputed
+      // money: discount clamping, rounding, totals) zipped with the cart line for display-only
+      // labels (strip/loose qty, manufacture date). order.items preserves billable-item order,
+      // so index i lines up with the i-th billable cart row. The printed bill now matches the DB.
+      const billableForLabels = cart.items.filter((i) => getCartItemBillableQuantity(i) > 0);
+      const snapshotItems = (order.items ?? []).map((oi, idx) => {
+        const ci = billableForLabels[idx];
+        const isStrip = ci?.unit === 'strip' && Number(ci?.totalUnits ?? 0) > 0;
+        const stripUnits = Number(ci?.totalUnits ?? 0);
+        const looseQty = ci?.looseQty ?? 0;
+        const totalTablets = isStrip ? oi.quantity * stripUnits + (ci?.isLoose ? looseQty : 0) : 0;
         let quantityLabel: string;
-        if (item.isLoose && looseQty > 0) {
+        if (ci?.isLoose && looseQty > 0) {
           quantityLabel = isStrip
-            ? `${item.quantity} strip + ${looseQty} loose (${totalTablets} tabs)`
-            : `${item.quantity} ${item.unit} + ${looseQty} loose`;
+            ? `${ci.quantity} strip + ${looseQty} loose (${totalTablets} tabs)`
+            : `${ci.quantity} ${ci.unit} + ${looseQty} loose`;
+        } else if (ci) {
+          quantityLabel = isStrip
+            ? `${ci.quantity} strip (${totalTablets} tabs)`
+            : `${ci.quantity} ${ci.unit}`;
         } else {
-          quantityLabel = isStrip
-            ? `${item.quantity} strip (${totalTablets} tabs)`
-            : `${item.quantity} ${item.unit}`;
+          quantityLabel = String(oi.quantity);
         }
+        // server net = round2(unit_price × qty) − clamped discount, matching createOrder's per-line math
+        const lineNet = Number((oi.unit_price * oi.quantity).toFixed(2)) - oi.discount;
         return {
-          name: item.name,
-          batchNo: item.batchNo,
-          hsnCode: item.hsnCode,
-          manufactureDate: item.manufactureDate,
-          expiry: item.expiryDate,
+          name: oi.product_name,
+          batchNo: oi.batch_no ?? undefined,
+          hsnCode: oi.hsn_code,
+          manufactureDate: ci?.manufactureDate,
+          expiry: oi.expiry_date ?? undefined,
           quantityLabel,
-          quantity: item.quantity,
-          unit: item.unit,
-          totalUnits: item.totalUnits,
-          unitPrice: item.unitPrice,
-          amount:
-            item.unitPrice * item.quantity +
-            (item.isLoose ? (item.looseUnitPrice ?? 0) * looseQty : 0) -
-            item.discount,
-          gstRate: item.gstRate ?? 0,
-          discountAmount: item.discount ?? 0,
+          quantity: oi.quantity,
+          unit: ci?.unit,
+          totalUnits: ci?.totalUnits,
+          unitPrice: ci?.unitPrice ?? oi.unit_price,
+          amount: lineNet,
+          gstRate: oi.gst_rate ?? 0,
+          discountAmount: oi.discount ?? 0,
         };
       });
-      const totalDiscount = cart.items.reduce((sum, item) => sum + (item.discount ?? 0), 0);
 
       setInvoiceSnapshot({
         orderId: order.id,
@@ -558,10 +563,10 @@ export function POSPage() {
         customerName: cart.customerName ?? '',
         customerPhone: cart.customerPhone ?? '',
         items: snapshotItems,
-        subtotal: cart.subtotal(),
-        gstAmount: cart.taxAmount(),
-        totalDiscount,
-        total: cart.total(),
+        subtotal: order.subtotal,
+        gstAmount: order.tax_total,
+        totalDiscount: order.discount,
+        total: order.total,
         dlNumbers: invoiceTemplate.dlNumbers ?? '',
         storeName: invoiceTemplate.storeDisplayName || config?.shop_name || '',
         storeAddress: invoiceTemplate.addressLine || '',
@@ -738,16 +743,21 @@ export function POSPage() {
   const handlePrintInvoiceA5 = () => {
     if (!invoiceSnapshot) return;
 
-    const storeName = invoiceSnapshot.storeName || 'Medical Store';
-    const address = invoiceSnapshot.storeAddress || '';
-    const storePhone = invoiceSnapshot.storePhone || '';
-    const storeGstin = invoiceSnapshot.storeGstin || '';
-    const headerLeft = invoiceSnapshot.headerLeft;
-    const dlNumbers = invoiceSnapshot.dlNumbers;
-    const headerRight = invoiceSnapshot.headerRight;
-    const whatsapp = invoiceSnapshot.whatsappNumber;
-    const footerNote = invoiceSnapshot.footerNote;
-    const signatureLabel = invoiceSnapshot.signatureLabel;
+    // [all apps] [all tenants] — escape all free-text fields: a product/store name with
+    // <, &, or markup would otherwise corrupt the invoice (and is a latent injection vector).
+    const storeName = escapeHtml(invoiceSnapshot.storeName || 'Medical Store');
+    const address = escapeHtml(invoiceSnapshot.storeAddress || '');
+    const storePhone = escapeHtml(invoiceSnapshot.storePhone || '');
+    const storeGstin = escapeHtml(invoiceSnapshot.storeGstin || '');
+    const headerLeft = escapeHtml(invoiceSnapshot.headerLeft);
+    const dlNumbers = escapeHtml(invoiceSnapshot.dlNumbers);
+    const headerRight = escapeHtml(invoiceSnapshot.headerRight);
+    const whatsapp = escapeHtml(invoiceSnapshot.whatsappNumber);
+    const footerNote = escapeHtml(invoiceSnapshot.footerNote);
+    const signatureLabel = escapeHtml(invoiceSnapshot.signatureLabel);
+    const billNumber = escapeHtml(invoiceSnapshot.billNumber);
+    const patientLabel = escapeHtml(invoiceSnapshot.patientName || invoiceSnapshot.customerName || '-');
+    const doctorLabel = escapeHtml(invoiceSnapshot.doctorName || '-');
     const invoiceDate = getInvoiceDisplayDate(invoiceSnapshot, invoiceDateTime, canEditInvoiceDateTime);
 
     const itemRows = invoiceSnapshot.items.map((item, idx) => {
@@ -756,8 +766,8 @@ export function POSPage() {
       return `
         <tr>
           <td class="td-center">${idx + 1}</td>
-          <td class="td-name">${item.name}${item.hsnCode ? `<br><span style="font-size:9px;color:#64748b">HSN: ${item.hsnCode}</span>` : ''}</td>
-          <td class="td-center">${item.quantityLabel}</td>
+          <td class="td-name">${escapeHtml(item.name)}${item.hsnCode ? `<br><span style="font-size:9px;color:#64748b">HSN: ${escapeHtml(item.hsnCode)}</span>` : ''}</td>
+          <td class="td-center">${escapeHtml(item.quantityLabel)}</td>
           <td class="td-amount">${item.unitPrice.toFixed(2)}</td>
           <td class="td-amount">${lineValueAmount.toFixed(2)}</td>
           <td class="td-center">${item.gstRate > 0 ? `${item.gstRate}%` : '-'}</td>
@@ -776,12 +786,15 @@ export function POSPage() {
         })
       : '';
     const grossValue = invoiceSnapshot.subtotal + invoiceSnapshot.totalDiscount;
+    // Split GST so the two halves always sum back to the GST embedded in Total (no paise drift).
+    const cgst = Math.round((invoiceSnapshot.gstAmount / 2) * 100) / 100;
+    const sgst = Number((invoiceSnapshot.gstAmount - cgst).toFixed(2));
 
     printViaIframe(`<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>${invoiceSnapshot.billNumber}</title>
+  <title>${billNumber}</title>
   <style>
     @page { size: A5 portrait; margin: 8mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -850,14 +863,14 @@ export function POSPage() {
   </div>
   <div class="meta">
     <div class="meta-col">
-      <div><span>Bill No.</span> ${invoiceSnapshot.billNumber}</div>
+      <div><span>Bill No.</span> ${billNumber}</div>
       <div><span>Invoice Date.</span> ${dateStr}</div>
       ${saleDateStr && saleDateStr !== dateStr ? `<div><span>Sale Date.</span> ${saleDateStr}</div>` : ''}
       <div><span>Payment.</span> ${invoiceSnapshot.paymentMethod === 'credit' ? 'Credit' : invoiceSnapshot.paymentMethod.toUpperCase()}</div>
     </div>
     <div class="meta-col">
-      <div><span>Name of Patient.</span> ${invoiceSnapshot.patientName || invoiceSnapshot.customerName || '-'}</div>
-      <div><span>Rx. by Doctor / Other.</span> ${invoiceSnapshot.doctorName || '-'}</div>
+      <div><span>Name of Patient.</span> ${patientLabel}</div>
+      <div><span>Rx. by Doctor / Other.</span> ${doctorLabel}</div>
     </div>
   </div>
   <table>
@@ -866,7 +879,7 @@ export function POSPage() {
         <th style="width:5%;text-align:center">Sr.</th>
         <th style="width:27%">Product</th>
         <th style="width:12%;text-align:center;border-left:1px solid #bfdbfe">Qty</th>
-        <th class="th-amount" style="width:12%;border-left:1px solid #bfdbfe">MRP</th>
+        <th class="th-amount" style="width:12%;border-left:1px solid #bfdbfe">Rate</th>
         <th class="th-amount" style="width:12%;border-left:1px solid #bfdbfe">Value</th>
         <th style="width:8%;text-align:center;border-left:1px solid #bfdbfe">GST%</th>
         <th class="th-amount" style="width:10%;border-left:1px solid #bfdbfe">Discount</th>
@@ -876,12 +889,12 @@ export function POSPage() {
     <tbody>
       ${itemRows}
       ${invoiceSnapshot.totalDiscount > 0
-        ? `<tr><td colspan="6" rowspan="${invoiceSnapshot.gstAmount > 0 ? 4 : 2}" style="vertical-align:bottom;border-right:none">${footerNote}</td><td class="total-label">Taxable</td><td class="td-amount">${grossValue.toFixed(2)}</td></tr>
+        ? `<tr><td colspan="6" rowspan="${invoiceSnapshot.gstAmount > 0 ? 4 : 2}" style="vertical-align:bottom;border-right:none">${footerNote}</td><td class="total-label">Gross</td><td class="td-amount">${grossValue.toFixed(2)}</td></tr>
       <tr><td class="total-label">Discount</td><td class="td-amount">- ${invoiceSnapshot.totalDiscount.toFixed(2)}</td></tr>`
         : `<tr><td colspan="6" rowspan="${invoiceSnapshot.gstAmount > 0 ? 3 : 1}" style="vertical-align:bottom;border-right:none">${footerNote}</td><td class="total-label">Taxable</td><td class="td-amount">${invoiceSnapshot.subtotal.toFixed(2)}</td></tr>`}
       ${invoiceSnapshot.gstAmount > 0
-        ? `<tr><td class="total-label">CGST</td><td class="td-amount">${(invoiceSnapshot.gstAmount / 2).toFixed(2)}</td></tr>
-      <tr><td class="total-label">SGST</td><td class="td-amount">${(invoiceSnapshot.gstAmount / 2).toFixed(2)}</td></tr>`
+        ? `<tr><td class="total-label">CGST</td><td class="td-amount">${cgst.toFixed(2)}</td></tr>
+      <tr><td class="total-label">SGST</td><td class="td-amount">${sgst.toFixed(2)}</td></tr>`
         : ''}
       <tr class="total-row">
         <td class="total-label">Total ₹</td>
@@ -900,14 +913,20 @@ export function POSPage() {
 
   const handlePrintThermal = () => {
     if (!invoiceSnapshot) return;
-    const storeName = invoiceSnapshot.storeName || 'Store';
+    const storeName = escapeHtml(invoiceSnapshot.storeName || 'Store');
+    const storeAddress = escapeHtml(invoiceSnapshot.storeAddress);
+    const storePhone = escapeHtml(invoiceSnapshot.storePhone);
+    const storeGstin = escapeHtml(invoiceSnapshot.storeGstin);
+    const whatsappNumber = escapeHtml(invoiceSnapshot.whatsappNumber);
+    const customerName = escapeHtml(invoiceSnapshot.customerName);
+    const billNumber = escapeHtml(invoiceSnapshot.billNumber);
     const invoiceDate = getInvoiceDisplayDate(invoiceSnapshot, invoiceDateTime, canEditInvoiceDateTime);
     const dateStr = invoiceDate.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     const itemRows = invoiceSnapshot.items.map((item, idx) =>
-      `<div class="item"><span class="item-name">${idx + 1}. ${item.name}</span><span class="item-amt">₹${getInvoiceItemTotalAmount(item).toFixed(2)}</span></div>
-       <div class="item-sub">${item.quantityLabel} × ₹${item.unitPrice.toFixed(2)}${item.discountAmount > 0 ? ` | Disc ₹${item.discountAmount.toFixed(2)}` : ''}</div>`
+      `<div class="item"><span class="item-name">${idx + 1}. ${escapeHtml(item.name)}</span><span class="item-amt">₹${getInvoiceItemTotalAmount(item).toFixed(2)}</span></div>
+       <div class="item-sub">${escapeHtml(item.quantityLabel)} × ₹${item.unitPrice.toFixed(2)}${item.discountAmount > 0 ? ` | Disc ₹${item.discountAmount.toFixed(2)}` : ''}</div>`
     ).join('');
-    printViaIframe(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${invoiceSnapshot.billNumber}</title>
+    printViaIframe(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${billNumber}</title>
 <style>
   @page { size: 58mm auto; margin: 2mm 3mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -924,13 +943,13 @@ export function POSPage() {
   .footer { text-align: center; font-size: 9px; margin-top: 4px; color: #555; }
 </style></head><body>
 <div class="store">${storeName}</div>
-${invoiceSnapshot.storeAddress ? `<div class="center" style="font-size:9px">${invoiceSnapshot.storeAddress}</div>` : ''}
-${invoiceSnapshot.storePhone ? `<div class="center" style="font-size:9px">Ph: ${invoiceSnapshot.storePhone}</div>` : ''}
-${invoiceSnapshot.storeGstin ? `<div class="center" style="font-size:9px">GSTIN: ${invoiceSnapshot.storeGstin}</div>` : ''}
-${invoiceSnapshot.whatsappNumber ? `<div class="center" style="font-size:9px">${invoiceSnapshot.whatsappNumber}</div>` : ''}
+${storeAddress ? `<div class="center" style="font-size:9px">${storeAddress}</div>` : ''}
+${storePhone ? `<div class="center" style="font-size:9px">Ph: ${storePhone}</div>` : ''}
+${storeGstin ? `<div class="center" style="font-size:9px">GSTIN: ${storeGstin}</div>` : ''}
+${whatsappNumber ? `<div class="center" style="font-size:9px">${whatsappNumber}</div>` : ''}
 <div class="divider"></div>
-<div class="row"><span>Bill: ${invoiceSnapshot.billNumber}</span><span>${dateStr}</span></div>
-${invoiceSnapshot.customerName ? `<div>Customer: ${invoiceSnapshot.customerName}</div>` : ''}
+<div class="row"><span>Bill: ${billNumber}</span><span>${dateStr}</span></div>
+${customerName ? `<div>Customer: ${customerName}</div>` : ''}
 <div class="divider"></div>
 ${itemRows}
 <div class="divider"></div>
@@ -2283,7 +2302,7 @@ ${invoiceSnapshot.gstAmount > 0 ? `<div class="row"><span>GST</span><span>₹${i
                         <th className="border-r border-blue-900 px-4 py-3 text-center">Sr.</th>
                         <th className="border-r border-blue-900 px-4 py-3 text-left">Product</th>
                         <th className="border-r border-blue-900 px-4 py-3 text-center">Qty</th>
-                        <th className="border-r border-blue-900 px-4 py-3 text-right">MRP</th>
+                        <th className="border-r border-blue-900 px-4 py-3 text-right">Rate</th>
                         <th className="border-r border-blue-900 px-4 py-3 text-right">Value</th>
                         <th className="border-r border-blue-900 px-4 py-3 text-right">GST%</th>
                         <th className="border-r border-blue-900 px-4 py-3 text-right">Discount</th>
@@ -2937,6 +2956,16 @@ function getInvoiceItemValueAmount(item: Pick<InvoiceSnapshot['items'][number], 
 
 function getInvoiceItemTotalAmount(item: Pick<InvoiceSnapshot['items'][number], 'amount' | 'gstRate'>) {
   return Number((getInvoiceItemValueAmount(item) + getInvoiceItemTaxAmount(item)).toFixed(2));
+}
+
+// [all apps] [all tenants] — escape free-text before interpolating into printed-invoice HTML.
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function isPrintableKey(key: string) {
