@@ -1,6 +1,6 @@
-// [admin] [all tenants] — shared API client for native admin panel → localhost:3002
+// [admin] [all tenants] — shared API client for native admin panel → cloud Worker (update.frontstores.com)
 
-export const ADMIN_API = 'http://127.0.0.1:3002';
+export const ADMIN_API = 'https://update.frontstores.com';
 const PWD_KEY = 'fs_admin_password';
 
 export function getAdminPassword(): string {

@@ -95,21 +95,12 @@
       "/Users/rakeshsoni/Documents/Cloud Software/crm-webapp/server/routes",
       "/Users/rakeshsoni/Documents/Cloud Software/crm-webapp/src/modules/team",
       "/Users/rakeshsoni/Documents/Cloud Software/crm-webapp/src/modules/settings",
-      "/Users/rakeshsoni/Documents/Cloud Software/crm-webapp/src"
-    ]
-  },
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo '{\"systemMessage\": \"All FrontStores infra is on Cloudflare now (Workers + D1 + R2). The local Mac update-server AND cloudflared tunnel are retired — their launch agents are disabled (*.plist.disabled in ~/Library/LaunchAgents). update.frontstores.com and ngo.frontstores.com are served directly by Workers. Admin: native FrontStores Admin app (auto-signs in) or https://update.frontstores.com/admin. Admin password lives only in ~/Library/Application Support/FrontStores/admin_local.token and the Worker secret.\"}'",
-            "timeout": 15,
-            "statusMessage": "FrontStores on Cloudflare (Mac infra retired)"
-          }
-        ]
-      }
+      "/Users/rakeshsoni/Documents/Cloud Software/crm-webapp/src",
+      "/Users/rakeshsoni/Documents/Cloud Software/license-webapp/migrations",
+      "/Users/rakeshsoni/Documents/Cloud Software/license-webapp/server",
+      "/Users/rakeshsoni/Documents/Cloud Software/license-webapp/tools",
+      "/Users/rakeshsoni/Documents/Cloud Software/restaurant-webapp",
+      "/Users/rakeshsoni/Documents/Cloud Software/crm-webapp"
     ]
   }
 }

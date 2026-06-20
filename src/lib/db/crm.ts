@@ -491,6 +491,9 @@ export async function importWaLeadToLead(tenantId: string, waInboxId: string, ow
 // tenant runs the bot on their own WhatsApp Business number). A lead is
 // auto-created the moment a customer sends their first message, kept updated
 // as they answer each bot question, and assigned to the tenant's owner.
+// [crm] [all tenants] — DEPRECATED (2026-06-19): WhatsApp is now owned by the web CRM
+// (crm.frontstores.com). The functions below are no longer called from the app (the
+// AppLayout poll was removed). Kept temporarily for reference/rollback; safe to delete.
 const WA_LEADS_SERVER = 'https://update.frontstores.com';
 
 interface ServerWaLead {

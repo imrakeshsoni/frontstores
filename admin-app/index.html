@@ -403,23 +403,6 @@
     .alert-val { font-size: 28px; font-weight: 900; color: var(--text); }
     .alert-desc { font-size: 13px; color: var(--muted); }
 
-    /* HEALTH */
-    .health-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
-    .health-card {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 4px; padding: 22px 24px;
-      box-shadow: 0 1px 6px rgba(0,0,0,.05);
-    }
-    .health-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-    .health-name { font-size: 15px; font-weight: 700; color: var(--text); }
-    .health-dot { width: 10px; height: 10px; border-radius: 50%; }
-    .health-dot-ok  { background: #16a34a; box-shadow: 0 0 8px rgba(22,163,74,.5); }
-    .health-dot-bad { background: #dc2626; box-shadow: 0 0 8px rgba(220,38,38,.5); }
-    .health-status-ok  { color: #16a34a; font-size: 13px; font-weight: 600; }
-    .health-status-bad { color: #dc2626; font-size: 13px; font-weight: 600; }
-    .health-detail { font-size: 12px; color: var(--muted); margin-top: 6px; }
-    .uptime-card { grid-column: span 2; }
-
     /* ACTIVITY */
     .activity-table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; box-shadow: 0 1px 6px rgba(0,0,0,.05); }
     .act-row { display: grid; grid-template-columns: 160px 160px 120px 1fr; gap: 0; border-bottom: 1px solid var(--border); }
@@ -516,29 +499,30 @@
       <div class="sb-brand-sub">Admin Console</div>
     </div>
     <nav class="sb-nav">
-      <div class="nav-item active" id="tab-customers" onclick="switchTab('customers')">
-        <span class="nav-icon">👥</span> Customers
-        <span class="nav-badge nav-badge-purple" id="pending-badge">0</span>
+      <!-- Licenses / Errors / Announcements moved to the Cloudflare Worker console
+           (update.frontstores.com/license/console). These now open it in a new tab
+           so nobody edits the stale Mac copy. Badge spans kept (hidden) so shared
+           JS that writes to them does not break. -->
+      <div class="nav-item" id="tab-licenses" onclick="openConsole()">
+        <span class="nav-icon">🔑</span> Licenses ↗
+        <span class="nav-badge nav-badge-purple" id="pending-badge" style="display:none">0</span>
       </div>
-      <div class="nav-item" id="tab-contacts" onclick="switchTab('contacts')">
+      <div class="nav-item active" id="tab-contacts" onclick="switchTab('contacts')">
         <span class="nav-icon">💬</span> Contacts
         <span class="nav-badge" id="contact-badge">0</span>
       </div>
-      <div class="nav-item" id="tab-errors" onclick="switchTab('errors')">
-        <span class="nav-icon">⚠️</span> Errors
-        <span class="nav-badge" id="error-badge">0</span>
+      <div class="nav-item" id="tab-errors" onclick="openConsole()">
+        <span class="nav-icon">⚠️</span> Errors ↗
+        <span class="nav-badge" id="error-badge" style="display:none">0</span>
       </div>
       <div class="nav-item" id="tab-analytics" onclick="switchTab('analytics')">
         <span class="nav-icon">📊</span> Analytics
       </div>
-      <div class="nav-item" id="tab-health" onclick="switchTab('health')">
-        <span class="nav-icon">⚡</span> Health
-      </div>
       <div class="nav-item" id="tab-activity" onclick="switchTab('activity')">
         <span class="nav-icon">📋</span> Activity Log
       </div>
-      <div class="nav-item" id="tab-announcements" onclick="switchTab('announcements')">
-        <span class="nav-icon">📣</span> Announcements
+      <div class="nav-item" id="tab-announcements" onclick="openConsole()">
+        <span class="nav-icon">📣</span> Announcements ↗
       </div>
       <div class="nav-item" id="tab-devices" onclick="switchTab('devices')">
         <span class="nav-icon">📱</span> Devices <span id="devices-badge" style="display:none;background:#f59e0b;color:#111;border-radius:20px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:4px">0</span>
@@ -558,14 +542,14 @@
   <div class="main-area">
     <div class="page-header">
       <div>
-        <div class="page-title" id="page-title">Customers</div>
-        <div class="page-sub" id="page-sub">All registered shops</div>
+        <div class="page-title" id="page-title">Contacts</div>
+        <div class="page-sub" id="page-sub">Website contact-form leads</div>
       </div>
     </div>
     <div class="main">
 
-      <!-- CUSTOMERS TAB -->
-      <div class="tab-page active" id="page-customers">
+      <!-- CUSTOMERS TAB — superseded by the Worker console; no longer reachable from nav -->
+      <div class="tab-page" id="page-customers">
         <div class="toolbar">
           <input class="search-input" id="search" placeholder="Search by shop name, owner or ID…" oninput="renderCustomers()" />
           <button class="filter-btn active" id="tag-all"    onclick="setTagFilter('all')">All</button>
@@ -580,7 +564,7 @@
       </div>
 
       <!-- CONTACTS TAB -->
-      <div class="tab-page" id="page-contacts">
+      <div class="tab-page active" id="page-contacts">
         <div class="errors-toolbar">
           <input class="search-input" id="con-search" placeholder="Search contacts…" oninput="renderContacts()" style="max-width:300px" />
           <button class="filter-btn active" id="cf-all"      onclick="setCFilter('all')">All</button>
@@ -665,63 +649,6 @@
               <div class="alert-val" id="an-churn" style="color:#fb7185">—</div>
               <div class="alert-desc">churned this month</div>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- HEALTH TAB -->
-      <div class="tab-page" id="page-health">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-          <div style="font-size:13px;color:var(--muted)">Auto-refreshes every 30s</div>
-          <div style="display:flex;gap:8px">
-            <button class="export-btn" style="background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:#34d399" onclick="startAllServices()">▶ Start All</button>
-            <button class="export-btn" onclick="loadHealth()">↻ Refresh Now</button>
-          </div>
-        </div>
-        <div class="health-grid">
-          <div class="health-card" id="hc-ollama">
-            <div class="health-header">
-              <div class="health-name">🤖 Ollama AI</div>
-              <div class="health-dot health-dot-bad" id="hd-ollama"></div>
-            </div>
-            <div id="hs-ollama" class="health-status-bad">Checking…</div>
-            <div id="hm-ollama" class="health-detail"></div>
-            <div style="margin-top:12px;display:flex;gap:8px" id="ha-ollama">
-              <button class="action-btn" style="font-size:12px;padding:5px 12px;background:rgba(52,211,153,.1);border-color:rgba(52,211,153,.3);color:#34d399" onclick="serviceAction('ollama','start')">▶ Start</button>
-              <button class="action-btn" style="font-size:12px;padding:5px 12px;background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.25);color:#f87171" onclick="serviceAction('ollama','stop')">■ Stop</button>
-            </div>
-          </div>
-          <div class="health-card" id="hc-cloudflare">
-            <div class="health-header">
-              <div class="health-name">☁️ Cloudflare Tunnel</div>
-              <div class="health-dot health-dot-bad" id="hd-cloudflare"></div>
-            </div>
-            <div id="hs-cloudflare" class="health-status-bad">Checking…</div>
-            <div class="health-detail">cloudflared process</div>
-            <div style="margin-top:12px;display:flex;gap:8px" id="ha-cloudflare">
-              <button class="action-btn" style="font-size:12px;padding:5px 12px;background:rgba(52,211,153,.1);border-color:rgba(52,211,153,.3);color:#34d399" onclick="serviceAction('cloudflare','start')">▶ Start</button>
-              <button class="action-btn" style="font-size:12px;padding:5px 12px;background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.25);color:#f87171" onclick="serviceAction('cloudflare','stop')">■ Stop</button>
-            </div>
-          </div>
-          <div class="health-card" id="hc-tts">
-            <div class="health-header">
-              <div class="health-name">🔊 TTS Server (Kokoro)</div>
-              <div class="health-dot health-dot-bad" id="hd-tts"></div>
-            </div>
-            <div id="hs-tts" class="health-status-bad">Checking…</div>
-            <div class="health-detail">Port 8880</div>
-            <div style="margin-top:12px;display:flex;gap:8px" id="ha-tts">
-              <button class="action-btn" style="font-size:12px;padding:5px 12px;background:rgba(52,211,153,.1);border-color:rgba(52,211,153,.3);color:#34d399" onclick="serviceAction('tts','start')">▶ Start</button>
-              <button class="action-btn" style="font-size:12px;padding:5px 12px;background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.25);color:#f87171" onclick="serviceAction('tts','stop')">■ Stop</button>
-            </div>
-          </div>
-          <div class="health-card uptime-card">
-            <div class="health-header">
-              <div class="health-name">⏱️ Server Uptime</div>
-              <div class="health-dot health-dot-ok"></div>
-            </div>
-            <div id="hs-uptime" class="health-status-ok">—</div>
-            <div class="health-detail">FrontStores update server (this process)</div>
           </div>
         </div>
       </div>
@@ -811,7 +738,6 @@ const TYPE_COLORS = ['#8b5cf6','#06b6d4','#10b981','#f59e0b','#f43f5e','#3b82f6'
 
 let password = '', allCustomers = [], allErrors = [], allContacts = [], allActivity = [];
 let filter = 'all', tagFilter = 'all', eFilter = 'all', cFilter = 'all', openId = null;
-let healthInterval = null;
 // Track "seen" counts per tab so badges only show NEW items since last visit
 let seenCounts = { errors: null, contacts: null, customers: null, devices: null, staffrequests: null };
 // Customer table sort state
@@ -847,7 +773,6 @@ function logout() {
   password = '';
   allCustomers = []; allErrors = []; openId = null;
   clearTimeout(_idleTimer);
-  if (healthInterval) { clearInterval(healthInterval); healthInterval = null; }
   document.getElementById('app').classList.remove('visible');
   document.getElementById('login-screen').style.display = '';
   document.getElementById('pwd-input').value = '';
@@ -863,16 +788,21 @@ const PAGE_META = {
   contacts:  { title:'Contacts',  sub:'Enquiries from potential customers' },
   errors:    { title:'Error Log', sub:'Crashes reported from customer apps' },
   analytics: { title:'Analytics', sub:'Revenue, growth and churn overview' },
-  health:    { title:'Health',    sub:'Service status and uptime' },
   activity:  { title:'Activity Log', sub:'Admin actions history' },
   announcements: { title:'Announcements', sub:'Silent push notices shown to every tenant, instantly' },
   syncrequests: { title:'Cloud Requests', sub:'Cloud Sync and Cloud Storage requests awaiting approval' },
   staffrequests: { title:'Staff Logins', sub:'Staff login requests from owners, awaiting approval' },
 };
 
+// Licenses, Errors and Announcements now live in the Cloudflare Worker console
+// (D1-backed, Mac-independent). Open it in a new tab instead of the stale local tabs.
+function openConsole() {
+  window.open('https://update.frontstores.com/license/console', '_blank', 'noopener');
+}
+
 function switchTab(t) {
   if (document.getElementById('customer-detail')?.classList.contains('open')) closePanel();
-  ['customers','contacts','errors','analytics','health','activity','announcements','devices','syncrequests','staffrequests'].forEach(x => {
+  ['customers','contacts','errors','analytics','activity','announcements','devices','syncrequests','staffrequests'].forEach(x => {
     document.getElementById('tab-'+x)?.classList.toggle('active', x===t);
     document.getElementById('page-'+x)?.classList.toggle('active', x===t);
   });
@@ -886,8 +816,6 @@ function switchTab(t) {
   if (t === 'devices')   { seenCounts.devices  = -1; }  // flag: loadDevices will skip badge on this visit
   if (t === 'staffrequests') { seenCounts.staffrequests = -1; } // flag: loadStaffUserRequests will skip badge
   if (t === 'analytics') loadAnalytics();
-  if (t === 'health')    { loadHealth(); if (!healthInterval) healthInterval = setInterval(loadHealth, 30000); }
-  else                   { if (healthInterval) { clearInterval(healthInterval); healthInterval = null; } }
   if (t === 'activity')  loadActivity();
   if (t === 'announcements') loadAnnouncements();
   if (t === 'devices')   loadDevices();
@@ -1352,6 +1280,8 @@ function renderPanel(c) {
         : `<button class="action-btn btn-unfreeze" style="margin-bottom:10px" onclick="doAction('${tid}','unfreeze',this)">↩ Restore Access</button>`
       }
 
+      <button class="action-btn" style="background:rgba(100,116,139,.12);border:1px solid rgba(100,116,139,.3);color:#94a3b8;margin-bottom:10px" onclick="purgeCloud('${tid}',this)">☁️✕ Purge Cloud Copy</button>
+
       ${hasUnlockCode ? `
       <div style="border-top:1px solid var(--border);margin:12px 0"></div>
       <div style="background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.2);border-radius:12px;padding:14px;margin-bottom:10px">
@@ -1466,6 +1396,21 @@ async function doAction(id, action, el) {
     const r = await api(`/admin/api/customers/${id}/${action}`, { method:'POST' });
     if (!r.ok) { showToast('Action failed', true); return; }
     showToast(`✅ ${msgs[action]||action} — ${c?.shop_name||id.substring(0,8)}`);
+    await loadAll();
+  } catch { showToast('⚠ Connection error', true); }
+  finally { if (el) { el.classList.remove('loading'); el.innerHTML = origText; } }
+}
+
+async function purgeCloud(id, el) {
+  const c = allCustomers.find(x=>x.tenant_id===id);
+  const name = c?.shop_name || id.substring(0,8);
+  if (!confirm(`Permanently delete the CLOUD COPY of "${name}"?\n\nThis removes their backup/sync data from the server and turns cloud off.\nTheir on-device data is NOT affected. Use when the owner chose Local only and asked for cloud removal.`)) return;
+  const origText = el?.innerHTML;
+  if (el) { el.classList.add('loading'); el.innerHTML = `<span class="spin">↻</span> Purging…`; }
+  try {
+    const r = await api('/admin/api/purge-cloud', { method:'POST', body: JSON.stringify({ tenant_id: id }) });
+    if (!r.ok) { showToast('Purge failed', true); return; }
+    showToast(`✅ Cloud copy purged — ${name}`);
     await loadAll();
   } catch { showToast('⚠ Connection error', true); }
   finally { if (el) { el.classList.remove('loading'); el.innerHTML = origText; } }
@@ -2115,72 +2060,6 @@ async function loadAnalytics() {
       </div>`;
     }).join('');
   } catch(e) { console.error('analytics error', e); }
-}
-
-// HEALTH
-async function loadHealth() {
-  try {
-    const r = await api('/admin/api/health');
-    if (!r.ok) return;
-    const d = await r.json();
-
-    function setHealth(key, ok, detail) {
-      document.getElementById('hd-'+key).className = 'health-dot ' + (ok?'health-dot-ok':'health-dot-bad');
-      document.getElementById('hs-'+key).className = ok ? 'health-status-ok' : 'health-status-bad';
-      document.getElementById('hs-'+key).textContent = ok ? 'Online' : 'Offline';
-      const dm = document.getElementById('hm-'+key);
-      if (dm) dm.textContent = detail || '';
-      // [admin] [all tenants] — show Start when offline, Stop when online
-      const ha = document.getElementById('ha-'+key);
-      if (ha) {
-        const btns = ha.querySelectorAll('button');
-        if (btns[0]) btns[0].style.display = ok ? 'none' : '';  // Start
-        if (btns[1]) btns[1].style.display = ok ? '' : 'none';  // Stop
-      }
-    }
-
-    setHealth('ollama', d.ollama.ok, d.ollama.ok ? 'Models: ' + (d.ollama.models||[]).join(', ') : 'Not running on port 11434');
-    setHealth('cloudflare', d.cloudflare.ok, d.cloudflare.ok ? 'cloudflared process running' : 'Process not found');
-    setHealth('tts', d.tts.ok, d.tts.ok ? 'Kokoro on port 8880' : 'Not running on port 8880');
-
-    const uptime = d.server_uptime_seconds || 0;
-    const days   = Math.floor(uptime / 86400);
-    const hours  = Math.floor((uptime % 86400) / 3600);
-    const mins   = Math.floor((uptime % 3600) / 60);
-    document.getElementById('hs-uptime').textContent = `${days}d ${hours}h ${mins}m`;
-  } catch(e) { console.error('health error', e); }
-}
-
-// [admin] [all tenants] — start/stop services from Health page
-async function serviceAction(service, action) {
-  const btn = event.target;
-  btn.disabled = true;
-  btn.textContent = action === 'start' ? '…Starting' : '…Stopping';
-  try {
-    const r = await api('/admin/api/service-control', { method: 'POST', body: JSON.stringify({ service, action }) });
-    const d = await r.json();
-    if (d.ok) {
-      showToast(action === 'start' ? `▶ ${service} starting…` : `■ ${service} stopping…`);
-      setTimeout(loadHealth, 2500);
-    } else {
-      showToast(`⚠ ${d.error || 'Failed'}`, true);
-    }
-  } catch(e) {
-    showToast('⚠ Could not reach server', true);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = action === 'start' ? '▶ Start' : '■ Stop';
-  }
-}
-
-async function startAllServices() {
-  showToast('▶ Starting all services…');
-  await Promise.allSettled([
-    api('/admin/api/service-control', { method: 'POST', body: JSON.stringify({ service: 'cloudflare', action: 'start' }) }),
-    api('/admin/api/service-control', { method: 'POST', body: JSON.stringify({ service: 'ollama',     action: 'start' }) }),
-    api('/admin/api/service-control', { method: 'POST', body: JSON.stringify({ service: 'tts',        action: 'start' }) }),
-  ]);
-  setTimeout(loadHealth, 3000);
 }
 
 // ACTIVITY

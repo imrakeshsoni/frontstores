@@ -1,8 +1,0 @@
-{
-  "identifier": "default",
-  "description": "Admin app permissions",
-  "windows": ["main"],
-  "permissions": [
-    "core:default"
-  ]
-}

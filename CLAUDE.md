@@ -70,8 +70,8 @@ Which app are you working on?
 
 ── Web Apps ──
 38) 🌐➕ Create new web app
-39) NGO Web App (ngo-webapp) — multi-tenant NGO sites, live at ngo.frontstores.com
-40) CRM Web App (crm-webapp) — CRM for sales teams, live at crm.frontstores.com
+39) CRM Web App (crm-webapp) — CRM for sales teams, live at crm.frontstores.com
+40) Restaurant Web App (restaurant-webapp) — QR table-ordering + KDS + POS + billing, live at restaurant.frontstores.com
 
 ── System ──
 32) Core / Shared (affects all apps)
@@ -92,7 +92,7 @@ If user picks **37 (General Question)**, answer the question directly — no Q2 
   1. Ask: what is the web app's name/purpose?
   2. Ask: what are the core features needed?
   3. Scaffold a new project folder named `<name>-webapp/` (separate from `frontstores/` desktop codebase)
-  4. Add it to a "Web Apps" list in this file (under 39) so it shows up in future Q1 menus
+  4. Add it to the "Web Apps" list in this file so it shows up in future Q1 menus
   5. Set up its own server route/subdomain served via this Mac's Cloudflare Tunnel
 
 ---
@@ -167,11 +167,11 @@ App installer            → GitHub Releases (free, .exe + .dmg)
 App runtime              → Tauri desktop app on user's machine
 Local database           → SQLite via tauri-plugin-sql (src-tauri/migrations/)
 All data                 → Stays on user's machine (offline-first)
-Update server            → This Mac via Cloudflare Tunnel (tools/update-server.cjs)
-Optional cloud sync      → This Mac via Cloudflare Tunnel (paid feature, future)
+Update/license/sync     → Cloudflare Worker (update.frontstores.com — D1 + R2), see update-server-webapp/
+Admin panel             → Same Worker (/admin) — Mac is fully bypassed
 ```
 
-**Zero cloud cost. Only cost: domain renewal ~₹800-1200/year.**
+**Mac-independent. Only cost: domain renewal + Cloudflare (free tier).**
 
 ---
 
@@ -227,15 +227,14 @@ frontstores/
     tauri.conf.json           App config, window size, updater endpoint
     Cargo.toml                Rust dependencies + all Tauri plugins
   admin-app/
-    index.html                Admin panel — login, customers tab, errors tab
+    index.html                Admin panel UI — served by the Worker at update.frontstores.com/admin
   website/
     index.html                Download page (hosted on Cloudflare Pages)
   tools/
-    update-server.cjs         Node.js server — updates, license, registration, errors
-    install-tunnel-service.sh Mac launchd service installer (server + cloudflared)
-    data/
-      tenants.json            All registered tenants (auto-populated on signup)
-      errors.json             Error reports from customer apps
+    admin-app-native/         Native Mac wrapper that opens update.frontstores.com/admin
+    install-admin-app.sh      Installs the native admin wrapper + auto-launch on login
+    data/                     Legacy local data snapshots (source of truth is now D1)
+  ../update-server-webapp/    Cloudflare Worker backend (D1 + R2) — updates, license, sync, admin API
   .github/workflows/
     build.yml                 Builds Windows .exe + Mac .dmg on version tag push
 ```
@@ -251,7 +250,7 @@ frontstores/
 | State management | Zustand (app.store.ts) |
 | Local database | SQLite via tauri-plugin-sql |
 | Auto-updater | Tauri updater → GitHub Releases API |
-| Update server | Node.js (tools/update-server.cjs) + Cloudflare Tunnel |
+| Backend (updates/license/sync/admin) | Cloudflare Worker + D1 + R2 (update-server-webapp/) |
 | Website | Static HTML (Cloudflare Pages) |
 | CI/CD | GitHub Actions (free) |
 
@@ -298,11 +297,11 @@ cd src-tauri && cargo check
 # Release new version — triggers GitHub Actions to build Windows + Mac
 git tag v1.0.X && git push origin main && git push origin v1.0.X
 
-# Start update server
-node tools/update-server.cjs
+# Deploy the backend (updates/license/sync/admin) — Cloudflare Worker
+cd ../update-server-webapp && npx wrangler deploy
 
-# Install as Mac background service (auto-start on login)
-bash tools/install-tunnel-service.sh
+# Install the native admin app on this Mac (opens update.frontstores.com/admin)
+bash tools/install-admin-app.sh
 ```
 
 ---

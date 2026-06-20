@@ -1,8 +1,9 @@
-// [admin] [all tenants] — Native admin panel, auto-syncs from localhost:3002 on open
+// [admin] [all tenants] — Native admin panel, talks to the cloud Worker (update.frontstores.com)
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Users, Bug, Mail, BarChart3, RefreshCw, LogOut, ChevronLeft, CheckCircle, Snowflake, Ban, Eye, EyeOff } from 'lucide-react';
 import {
+  ADMIN_API,
   getAdminPassword, saveAdminPassword, clearAdminPassword,
   adminGet, adminPost, subStatus, daysLeft,
   type Tenant, type ErrorReport, type Contact,
@@ -22,14 +23,14 @@ function PasswordGate({ children }: { children: React.ReactNode }) {
     if (!input.trim()) return;
     setTesting(true); setError('');
     try {
-      const res = await fetch('http://127.0.0.1:3002/admin/api/customers', {
+      const res = await fetch(`${ADMIN_API}/admin/api/customers`, {
         headers: { 'Authorization': `Basic ${btoa(':' + input)}` },
       });
       if (res.status === 401) { setError('Wrong password'); return; }
       if (!res.ok) { setError('Server error'); return; }
       saveAdminPassword(input); setPwd(input);
     } catch {
-      setError('Cannot connect. Is update-server.cjs running on port 3002?');
+      setError('Cannot connect to update.frontstores.com. Check your internet connection.');
     } finally { setTesting(false); }
   }
 
@@ -38,7 +39,7 @@ function PasswordGate({ children }: { children: React.ReactNode }) {
       <form onSubmit={handleLogin} className="bg-slate-900 border border-slate-800 rounded-xl p-8 w-full max-w-sm">
         <div className="w-12 h-12 bg-amber-500/10 rounded-xl flex items-center justify-center mb-5"><span className="text-2xl">🛡️</span></div>
         <h1 className="text-white text-xl font-bold mb-1">Admin Panel</h1>
-        <p className="text-slate-400 text-sm mb-6">Enter your ADMIN_PASSWORD to connect to localhost:3002</p>
+        <p className="text-slate-400 text-sm mb-6">Enter your ADMIN_PASSWORD to connect to update.frontstores.com</p>
         <div className="relative mb-3">
           <input type={showPwd ? 'text' : 'password'} value={input} onChange={e => setInput(e.target.value)}
             placeholder="Admin password" autoFocus
@@ -437,7 +438,7 @@ export function AdminPage() {
           <div className="flex items-center gap-3">
             <span className="text-lg">🛡️</span>
             <span className="text-white font-bold">FrontStores Admin</span>
-            <span className="text-slate-500 text-xs">localhost:3002</span>
+            <span className="text-slate-500 text-xs">update.frontstores.com</span>
           </div>
           <div className="flex items-center gap-1">
             {TABS.map(t => {

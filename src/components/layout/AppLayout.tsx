@@ -404,31 +404,10 @@ export function AppLayout() {
     return () => { clearInterval(id); setAnnouncementNewHandler(() => {}); };
   }, [tenantId, queryClient]);
 
-  // [crm] [all tenants] — auto-pull WhatsApp bot leads from the server: each
-  // tenant runs the bot on their own WhatsApp Business number. A lead appears
-  // the moment a customer messages, keeps updating as they answer the bot's
-  // questions, and is assigned to the tenant's owner.
-  useEffect(() => {
-    if (!tenantId || config?.shop_type !== 'crm') return;
-    const ownerName = config?.owner_name ?? '';
-    const sync = () => {
-      import('@/lib/db/crm')
-        .then(async ({ syncWaLeadsFromServer, syncWaChatsFromServer }) => {
-          const leadsChanged = await syncWaLeadsFromServer(tenantId, ownerName);
-          // [crm] [all tenants] — mirror full bot chat transcripts into the CRM
-          const chatsChanged = await syncWaChatsFromServer(tenantId).catch(() => false);
-          if (leadsChanged) {
-            queryClient.invalidateQueries({ queryKey: ['crm-wa-inbox'] });
-            queryClient.invalidateQueries({ queryKey: ['crm-leads'] });
-          }
-          if (chatsChanged) queryClient.invalidateQueries({ queryKey: ['crm-wa-chat'] });
-        })
-        .catch(() => { /* offline or db busy — next poll retries */ });
-    };
-    sync();
-    const id = setInterval(sync, 30_000);
-    return () => clearInterval(id);
-  }, [tenantId, config?.shop_type, config?.owner_name, queryClient]);
+  // [crm] [all tenants] — SUNSET (2026-06-19): the desktop CRM's WhatsApp engine is
+  // retired in favour of the web CRM (crm.frontstores.com), which owns WhatsApp leads,
+  // chats and credentials. The old server-side bot lead/chat polling against
+  // update.frontstores.com/api/wa-* has been removed; nothing to pull here anymore.
 
 
   useEffect(() => {
