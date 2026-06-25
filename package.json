@@ -8,7 +8,9 @@
     "tauri": "tauri",
     "preview": "vite preview",
     "lint": "eslint src --ext .ts,.tsx",
-    "heart": "node voice-assistant/server.cjs"
+    "heart": "node voice-assistant/server.cjs",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.4.2",
