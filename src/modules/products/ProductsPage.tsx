@@ -35,7 +35,7 @@ type ProductForm = {
 };
 
 const ML_VOLUME_OPTIONS = [5, 10, 20, 30, 60, 80, 100, 120, 150, 180, 200, 220, 250, 300, 350, 400, 450, 500, 550, 600, 650, 900, 1000];
-const DOSAGE_FORM_OPTIONS = ['Tablet', 'Syrup', 'Powder', 'Drop', 'Injection', 'Opthalmic', 'Ointment', 'Inhalation', 'Lotion'];
+const DOSAGE_FORM_OPTIONS = ['Tablet', 'Syrup', 'Powder', 'Drop', 'Injection', 'Opthalmic', 'Ointment', 'Inhalation', 'Lotion', 'Other']; // [medical] [all tenants] — added 'Other'
 
 const emptyForm: ProductForm = {
   name: '', sku: '', barcode: '', unit: 'piece', dosage_form: '', ml_volume: '',

@@ -35,6 +35,8 @@ export function InventoryPage() {
   const [showProductDropdown, setShowProductDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const productSearchRef = useRef<HTMLInputElement>(null);
+  const quantityRef = useRef<HTMLInputElement>(null);           // [medical] [all tenants] — focus target when product is pre-filled
+  const adjustModalRef = useRef<HTMLDivElement>(null);          // [medical] [all tenants] — focus-trap root for Adjust Stock modal
   const dropdownItemRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const [dropdownIndex, setDropdownIndex] = useState(-1);
   const [adjustment, setAdjustment] = useState({
@@ -53,11 +55,16 @@ export function InventoryPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Auto-focus product search when modal opens
+  // [medical] [all tenants] — Pull keyboard focus INTO the modal when it opens, so Tab/typing
+  // works immediately without a click. If a product is pre-filled (opened from Add Product →
+  // Create Inventory) jump to Quantity; otherwise focus the product search.
   useEffect(() => {
-    if (showAdjust && !adjustment.productId) {
-      setTimeout(() => productSearchRef.current?.focus(), 50);
-    }
+    if (!showAdjust) return;
+    const t = setTimeout(() => {
+      if (adjustment.productId) quantityRef.current?.focus();
+      else productSearchRef.current?.focus();
+    }, 50);
+    return () => clearTimeout(t);
   }, [showAdjust]);
 
   useEffect(() => {
@@ -109,6 +116,28 @@ export function InventoryPage() {
   const resetAdjustment = () => {
     setAdjustment({ productId: '', quantity: '', direction: 'add', type: 'purchase', supplierId: '', invoiceNumber: '', challanNumber: '', batchNo: '', expiryDate: '', notes: '' });
     setProductSearchInput('');
+  };
+
+  // [medical] [all tenants] — Keep Tab focus inside the Adjust Stock modal (don't leak to the
+  // page behind it). Wraps from last field back to first and vice-versa with Shift+Tab.
+  const trapModalTab = (e: React.KeyboardEvent) => {
+    if (e.key !== 'Tab') return;
+    const root = adjustModalRef.current;
+    if (!root) return;
+    const focusables = Array.from(
+      root.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )
+    ).filter((el) => el.offsetParent !== null);
+    if (focusables.length === 0) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    const active = document.activeElement as HTMLElement | null;
+    if (e.shiftKey) {
+      if (active === first || !root.contains(active)) { e.preventDefault(); last.focus(); }
+    } else {
+      if (active === last || !root.contains(active)) { e.preventDefault(); first.focus(); }
+    }
   };
 
   const adjustMutation = useMutation({
@@ -290,7 +319,7 @@ export function InventoryPage() {
       {/* Adjust Stock Modal */}
       {showAdjust && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-          <div className="card-strong flex max-h-[90vh] w-full max-w-xl flex-col rounded-[2rem] p-6">
+          <div ref={adjustModalRef} onKeyDown={trapModalTab} className="card-strong flex max-h-[90vh] w-full max-w-xl flex-col rounded-[2rem] p-6">
             <div className="mb-6 flex items-center justify-between">
               <h2 className="text-2xl">Adjust Stock</h2>
               <button className="btn-secondary" onClick={() => setShowAdjust(false)}>Close</button>
@@ -387,7 +416,7 @@ export function InventoryPage() {
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">Quantity *</label>
-                <input type="number" min="0.01" step="any" className="input" value={adjustment.quantity}
+                <input ref={quantityRef} type="number" min="0.01" step="any" className="input" value={adjustment.quantity}
                   onChange={(e) => setAdjustment((c) => ({ ...c, quantity: e.target.value }))} />
                 {selectedProduct && (
                   <p className="mt-1 text-xs text-slate-500">Current stock: {selectedProduct.stock_qty} {selectedProduct.unit}</p>
