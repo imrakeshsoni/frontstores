@@ -44,11 +44,15 @@ jobs:
           xattr -cr /Applications/FrontStores.app
           NOTES
 
+          # [core] Staged rollout — publish as PRE-RELEASE so GitHub's `releases/latest`
+          # (what the Tauri updater reads) keeps pointing at the last promoted stable. No tenant
+          # auto-updates yet. Canary-test this build on one shop, then run the "Promote Release"
+          # workflow to flip it to latest and roll it out to everyone.
           gh release create "$TAG" \
             --title "FrontStores $TAG" \
             --notes-file notes.md \
             --draft=false \
-            --prerelease=false
+            --prerelease=true
 
   # ── Platform builds ─────────────────────────────────────────────────────────
   build:

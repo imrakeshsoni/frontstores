@@ -1,0 +1,36 @@
+# [core] Promote a canary (pre-release) build to everyone.
+# After a release has been tested on the canary shop, run this workflow with its version tag.
+# It flips the release from pre-release → latest, so GitHub's `releases/latest/download/latest.json`
+# (the Tauri updater endpoint) now serves this version and ALL tenants auto-update on next check.
+name: Promote Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag to roll out to all users (e.g. v1.5.0)'
+        required: true
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Verify the release exists and has a manifest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ inputs.version }}"
+          echo "Checking $TAG has latest.json (the updater manifest)…"
+          gh release view "$TAG" --repo ${{ github.repository }} --json assets \
+            -q '.assets[].name' | grep -q '^latest.json$' \
+            || { echo "❌ $TAG has no latest.json — not a complete build. Aborting."; exit 1; }
+
+      - name: Promote to latest (roll out to all tenants)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ inputs.version }}"
+          gh release edit "$TAG" --repo ${{ github.repository }} --prerelease=false --latest=true
+          echo "✅ $TAG promoted to latest. Tenants will auto-update on their next check (within 24h)."
