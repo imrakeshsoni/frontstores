@@ -14,6 +14,7 @@ import { exportAuditTrail, type AuditRow } from '@/lib/db/audit';
 import { PageIntro } from '@/components/ui/PageIntro';
 import { useTheme } from '@/lib/theme/useTheme';
 import { reportError } from '@/lib/errorReporter';
+import { enqueue, flushQueue } from '@/lib/syncQueue';
 import { triggerAutoSync } from '@/lib/autoSync';
 import { getCloudSyncStatus, refreshCloudSyncStatus, activateCloudSync, deactivateCloudSync, getCloudSyncFee, getPricing, setBillingDevice, getBillingUser, setLocalOnly, isLocalOnly } from '@/lib/db/cloudSync';
 import { getNavItemsForShopType } from '@/components/layout/AppLayout';
@@ -618,6 +619,7 @@ export function SettingsPage() {
       );
 
       case 'audittrail': return <AuditTrailSection tenantId={tenantId} shopName={config?.shop_name ?? 'shop'} />;
+      case 'report': return <ReportProblemSection tenantId={tenantId} shopName={config?.shop_name ?? ''} appVersion={config?.app_version ?? currentVersion ?? ''} />;
 
       case 'audit': return (
         <div className="p-4">
@@ -648,7 +650,7 @@ export function SettingsPage() {
     billing: '⌨️ Billing Preferences', gst: '🧾 Tax / GST', whatsapp: '📱 WhatsApp Business',
     pinlock: '🔐 Section PIN Lock', autolock: '🔒 Auto-Lock', password: '🔑 Login & Password',
     staff: '👥 Staff Logins', backup: '💾 Data Backup', migrate: '🖥️ Switch Computer', audit: '📋 Export Audit Log',
-    audittrail: '📜 Audit Trail',
+    audittrail: '📜 Audit Trail', report: '🐞 Report a Problem',
   };
 
   // ── Inline status values for row subtitles ────────────────────────────────────
@@ -715,6 +717,10 @@ export function SettingsPage() {
         {renderRow('audit', '📋', 'Export Audit Log', `${exportLogs?.length ?? 0} export${exportLogs?.length === 1 ? '' : 's'}`, undefined, true)}
       </>)}
 
+      {renderGroup('Help', <>
+        {renderRow('report', '🐞', 'Report a Problem', 'Tell us if something looks wrong')}
+      </>)}
+
       {/* ── Slide-over panel — rendered via portal so it escapes any overflow:auto ancestor ── */}
       {activePanel && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -753,6 +759,75 @@ function localFromRange(range: '1m' | '6m' | '1y' | 'all'): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} 00:00:00`;
 }
 const ACTION_LABEL: Record<string, string> = { CREATE: 'Added', UPDATE: 'Changed', DELETE: 'Deleted' };
+
+// [core] [all apps] [all tenants] — manual problem report. Sends the shopkeeper's message +
+// useful context through the SAME error pipeline (sync queue → update-server /error), so we
+// hear about issues from the shop directly instead of only via phone calls.
+function ReportProblemSection({ tenantId, shopName, appVersion }: { tenantId: string; shopName: string; appVersion: string }) {
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  async function submit() {
+    const msg = text.trim();
+    if (!msg || !tenantId) return;
+    setBusy(true);
+    try {
+      const context = `USER REPORT | shop=${shopName} | route=${window.location.hash || '#/'} | v=${appVersion}`;
+      await enqueue('error', tenantId, {
+        tenant_id: tenantId,
+        message: `[USER REPORT] ${msg.slice(0, 480)}`,
+        stack: '',
+        context,
+        app_version: appVersion || '',
+      });
+      await flushQueue().catch(() => {});
+      setSent(true);
+      setText('');
+    } catch {
+      toast.error('Could not send right now — it will retry automatically.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (sent) {
+    return (
+      <div className="p-4">
+        <div className="card p-4 text-center">
+          <div style={{ fontSize: 36 }}>✅</div>
+          <p style={{ fontWeight: 700, marginTop: 8 }}>Thank you — your report was sent.</p>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 4 }}>We’ll look into it. You can keep using the app normally.</p>
+          <button className="btn-secondary" style={{ marginTop: 12 }} onClick={() => setSent(false)}>Send another</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4">
+      <div className="card p-4 space-y-3">
+        <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
+          Noticed something wrong — a wrong number, a button not working, anything? Describe it below and we’ll get it fixed.
+          Your shop name and current screen are attached automatically.
+        </p>
+        <textarea
+          className="input"
+          rows={5}
+          placeholder="Example: In billing, the stock of Crocin shows 6 but inventory shows 4."
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          style={{ resize: 'vertical', minHeight: 120 }}
+        />
+        <div className="flex items-center justify-end">
+          <button className="btn-primary" onClick={submit} disabled={!text.trim() || busy}>
+            {busy ? 'Sending…' : 'Send report'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function AuditTrailSection({ tenantId, shopName }: { tenantId: string; shopName: string }) {
   const [range, setRange] = useState<'1m' | '6m' | '1y' | 'all'>('1y');

@@ -5,11 +5,18 @@ import { runAutoBackup } from './db/autoBackup';
 export async function runStartupChecks(tenantId: string, shopType?: string) {
   if (!tenantId) return;
   await ensureRegistered(tenantId);
-  // [medical] [all tenants] — self-heal any historic batch/stock drift so the POS billing
-  // search matches the Inventory page. Idempotent + best-effort; never blocks launch.
+  // [core] [all apps] [all tenants] — Data Doctor: auto-heal integrity issues (batch/stock
+  // drift, negative stock) + flag anything suspicious. Idempotent + best-effort; never blocks.
   try {
-    const { reconcileBatchStock } = await import('./db/inventory');
-    await reconcileBatchStock(tenantId);
+    const { runDataDoctor } = await import('./db/dataDoctor');
+    const report = await runDataDoctor(tenantId);
+    const healed = report.batchDriftFixed + report.negativeStockFixed;
+    if (healed > 0) {
+      toast.success(`✓ Auto-corrected stock for ${healed} item${healed > 1 ? 's' : ''}`, { duration: 6000 });
+    }
+    if (report.orphanOrderItems > 0) {
+      console.warn(`[data-doctor] ${report.orphanOrderItems} orphan order_items flagged for tenant ${tenantId}`);
+    }
   } catch { /* non-fatal */ }
   await checkLowStock(tenantId);
   await checkExpiringProducts(tenantId);
