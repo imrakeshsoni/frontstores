@@ -35,7 +35,7 @@ export function InventoryPage() {
   const [showProductDropdown, setShowProductDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const productSearchRef = useRef<HTMLInputElement>(null);
-  const quantityRef = useRef<HTMLInputElement>(null);           // [medical] [all tenants] — focus target when product is pre-filled
+  const challanRef = useRef<HTMLInputElement>(null);            // [medical] [all tenants] — focus target when product is pre-filled
   const adjustModalRef = useRef<HTMLDivElement>(null);          // [medical] [all tenants] — focus-trap root for Adjust Stock modal
   const dropdownItemRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const [dropdownIndex, setDropdownIndex] = useState(-1);
@@ -57,11 +57,11 @@ export function InventoryPage() {
 
   // [medical] [all tenants] — Pull keyboard focus INTO the modal when it opens, so Tab/typing
   // works immediately without a click. If a product is pre-filled (opened from Add Product →
-  // Create Inventory) jump to Quantity; otherwise focus the product search.
+  // Create Inventory) jump to Challan Number; otherwise focus the product search.
   useEffect(() => {
     if (!showAdjust) return;
     const t = setTimeout(() => {
-      if (adjustment.productId) quantityRef.current?.focus();
+      if (adjustment.productId) challanRef.current?.focus();
       else productSearchRef.current?.focus();
     }, 50);
     return () => clearTimeout(t);
@@ -406,7 +406,7 @@ export function InventoryPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">Challan Number</label>
-                  <input className="input" value={adjustment.challanNumber} onChange={(e) => setAdjustment((c) => ({ ...c, challanNumber: e.target.value }))} />
+                  <input ref={challanRef} className="input" value={adjustment.challanNumber} onChange={(e) => setAdjustment((c) => ({ ...c, challanNumber: e.target.value }))} />
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">Invoice Number</label>
@@ -416,7 +416,7 @@ export function InventoryPage() {
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">Quantity *</label>
-                <input ref={quantityRef} type="number" min="0.01" step="any" className="input" value={adjustment.quantity}
+                <input type="number" min="0.01" step="any" className="input" value={adjustment.quantity}
                   onChange={(e) => setAdjustment((c) => ({ ...c, quantity: e.target.value }))} />
                 {selectedProduct && (
                   <p className="mt-1 text-xs text-slate-500">Current stock: {selectedProduct.stock_qty} {selectedProduct.unit}</p>

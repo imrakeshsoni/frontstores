@@ -83,6 +83,90 @@ export async function adjustStock(tenantId: string, data: {
   );
 }
 
+// [medical] [all tenants] — Draw down per-batch stock when a sale is made. Previously sales
+// only reduced products.stock_qty, leaving inventory_batches untouched, so the POS billing
+// search (which sums batch quantities) over-reported availability by everything ever sold.
+// Sells from the exact batch the bill recorded first, then spills over FEFO (earliest expiry).
+export async function deductBatchStock(
+  tenantId: string, productId: string, quantity: number,
+  batchNo?: string | null, expiryDate?: string | null,
+): Promise<void> {
+  if (!quantity || quantity <= 0) return;
+  const db = await getDb();
+  const exact = batchNo
+    ? await db.select<{ id: string; quantity: number }[]>(
+        `SELECT id, quantity FROM inventory_batches
+         WHERE tenant_id = ? AND product_id = ? AND batch_no = ?
+           AND COALESCE(expiry_date,'') = COALESCE(?, '') AND deleted_at IS NULL AND quantity > 0`,
+        [tenantId, productId, batchNo, expiryDate ?? null])
+    : [];
+  const fefo = await db.select<{ id: string; quantity: number }[]>(
+    `SELECT id, quantity FROM inventory_batches
+     WHERE tenant_id = ? AND product_id = ? AND deleted_at IS NULL AND quantity > 0
+     ORDER BY expiry_date ASC`,
+    [tenantId, productId]
+  );
+  const seen = new Set<string>();
+  const ordered = [...exact, ...fefo].filter((b) => (seen.has(b.id) ? false : (seen.add(b.id), true)));
+  let remaining = quantity;
+  for (const b of ordered) {
+    if (remaining <= 0) break;
+    const take = Math.min(remaining, b.quantity);
+    await db.execute(`UPDATE inventory_batches SET quantity = quantity - ?, updated_at = ? WHERE id = ?`, [take, now(), b.id]);
+    remaining -= take;
+  }
+}
+
+// [medical] [all tenants] — Put batch stock back when a bill is voided (mirror of deductBatchStock).
+export async function restoreBatchStock(
+  tenantId: string, productId: string, quantity: number,
+  batchNo?: string | null, expiryDate?: string | null,
+): Promise<void> {
+  if (!quantity || quantity <= 0) return;
+  const db = await getDb();
+  let target = batchNo
+    ? (await db.select<{ id: string }[]>(
+        `SELECT id FROM inventory_batches WHERE tenant_id = ? AND product_id = ? AND batch_no = ?
+           AND COALESCE(expiry_date,'') = COALESCE(?, '') AND deleted_at IS NULL LIMIT 1`,
+        [tenantId, productId, batchNo, expiryDate ?? null]))[0]
+    : undefined;
+  if (!target) {
+    target = (await db.select<{ id: string }[]>(
+      `SELECT id FROM inventory_batches WHERE tenant_id = ? AND product_id = ? AND deleted_at IS NULL ORDER BY expiry_date ASC LIMIT 1`,
+      [tenantId, productId]))[0];
+  }
+  if (target) await db.execute(`UPDATE inventory_batches SET quantity = quantity + ?, updated_at = ? WHERE id = ?`, [quantity, now(), target.id]);
+}
+
+// [medical] [all tenants] — One-time/self-healing reconcile of historic drift: where the sum of a
+// product's batch quantities exceeds its (authoritative, net) stock_qty, draw the excess down FEFO
+// so the POS search matches the Inventory page. Idempotent — once aligned it does nothing, and it
+// never increases batches or touches stock_qty.
+export async function reconcileBatchStock(tenantId: string): Promise<void> {
+  const db = await getDb();
+  const drifted = await db.select<{ product_id: string; stock_qty: number; batch_sum: number }[]>(
+    `SELECT p.id AS product_id, p.stock_qty AS stock_qty, SUM(b.quantity) AS batch_sum
+     FROM products p
+     JOIN inventory_batches b ON b.product_id = p.id AND b.deleted_at IS NULL AND b.quantity > 0
+     WHERE p.tenant_id = ? AND p.deleted_at IS NULL
+     GROUP BY p.id HAVING batch_sum > p.stock_qty`,
+    [tenantId]
+  );
+  for (const row of drifted) {
+    let excess = row.batch_sum - Math.max(row.stock_qty, 0);
+    const batches = await db.select<{ id: string; quantity: number }[]>(
+      `SELECT id, quantity FROM inventory_batches WHERE tenant_id = ? AND product_id = ? AND deleted_at IS NULL AND quantity > 0 ORDER BY expiry_date ASC`,
+      [tenantId, row.product_id]
+    );
+    for (const b of batches) {
+      if (excess <= 0) break;
+      const take = Math.min(excess, b.quantity);
+      await db.execute(`UPDATE inventory_batches SET quantity = quantity - ?, updated_at = ? WHERE id = ?`, [take, now(), b.id]);
+      excess -= take;
+    }
+  }
+}
+
 export async function getExpiryAlerts(tenantId: string, daysAhead = 90): Promise<any[]> {
   const db = await getDb();
   const cutoff = new Date(); cutoff.setDate(cutoff.getDate() + daysAhead);

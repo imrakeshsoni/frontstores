@@ -1,6 +1,7 @@
 import { getDb, uuid, now } from './index';
 import { getNextBillNumber } from './config';
 import { updateStock } from './products';
+import { deductBatchStock, restoreBatchStock } from './inventory';
 
 export interface OrderItem {
   id: string;
@@ -129,7 +130,7 @@ export async function createOrder(tenantId: string, data: {
   // compensating rollback instead: if any write fails partway through, undo the order
   // header, restock anything already deducted, and drop the khata debit. This stops a
   // crash mid-checkout from leaving a half-written bill or a phantom receivable.
-  const stockApplied: { productId: string; qty: number }[] = [];
+  const stockApplied: { productId: string; qty: number; batchNo: string | null; expiry: string | null }[] = [];
   try {
     await db.execute(
       `INSERT INTO orders (id, tenant_id, bill_number, customer_id, customer_name, customer_phone,
@@ -153,7 +154,10 @@ export async function createOrder(tenantId: string, data: {
       );
       if (item.product_id) {
         await updateStock(tenantId, item.product_id, -item.quantity);
-        stockApplied.push({ productId: item.product_id, qty: item.quantity });
+        // [medical] [all tenants] — also draw the sold units out of the batch so the POS
+        // billing search (which sums batch quantities) reflects the sale, not just stock_qty.
+        await deductBatchStock(tenantId, item.product_id, item.quantity, item.batch_no, item.expiry_date);
+        stockApplied.push({ productId: item.product_id, qty: item.quantity, batchNo: item.batch_no ?? null, expiry: item.expiry_date ?? null });
         await db.execute(
           `INSERT INTO inventory_adjustments (id, tenant_id, product_id, quantity, type, reference_id)
            VALUES (?,?,?,?,?,?)`,
@@ -179,6 +183,7 @@ export async function createOrder(tenantId: string, data: {
     try {
       for (const s of stockApplied) {
         await updateStock(tenantId, s.productId, s.qty);
+        await restoreBatchStock(tenantId, s.productId, s.qty, s.batchNo, s.expiry);
       }
       await db.execute(
         `UPDATE orders SET payment_status = 'cancelled', deleted_at = ?, updated_at = ? WHERE id = ? AND tenant_id = ?`,
@@ -246,6 +251,8 @@ export async function voidOrder(tenantId: string, orderId: string): Promise<void
   for (const item of order.items ?? []) {
     if (item.product_id) {
       await updateStock(tenantId, item.product_id, item.quantity);
+      // [medical] [all tenants] — put the units back into the batch they were sold from.
+      await restoreBatchStock(tenantId, item.product_id, item.quantity, item.batch_no, item.expiry_date);
       await db.execute(
         `INSERT INTO inventory_adjustments (id, tenant_id, product_id, quantity, type, reference_id, notes)
          VALUES (?,?,?,?,?,?,?)`,

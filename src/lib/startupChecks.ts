@@ -5,6 +5,12 @@ import { runAutoBackup } from './db/autoBackup';
 export async function runStartupChecks(tenantId: string, shopType?: string) {
   if (!tenantId) return;
   await ensureRegistered(tenantId);
+  // [medical] [all tenants] — self-heal any historic batch/stock drift so the POS billing
+  // search matches the Inventory page. Idempotent + best-effort; never blocks launch.
+  try {
+    const { reconcileBatchStock } = await import('./db/inventory');
+    await reconcileBatchStock(tenantId);
+  } catch { /* non-fatal */ }
   await checkLowStock(tenantId);
   await checkExpiringProducts(tenantId);
   if (shopType === 'carwash') {
