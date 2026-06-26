@@ -7,7 +7,7 @@ import { shareWhatsApp, testWaCredentials } from '@/lib/whatsapp';
 import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { useAppStore } from '@/app/store/app.store';
 import { updateAppConfig, getOrCreateShopCode } from '@/lib/db/config';
-import { changePassword, changeUsername, getAuthUsername, getExportLogs, logExport } from '@/lib/db/auth';
+import { changePassword, changeUsername, getAuthUsername, getExportLogs, logExport, getPinStatus, setPin, setPinEnabled, clearPin, isValidPin } from '@/lib/db/auth';
 import { listStaffUsers, createStaffUser, deactivateStaffUser, generateJoinPin, countActiveStaffUsers, getStaffUserFee, getOnlineStaffUsernames, type StaffUser } from '@/lib/db/staffUsers';
 import { exportBackup } from '@/lib/db/backup';
 import { exportAuditTrail, type AuditRow } from '@/lib/db/audit';
@@ -148,6 +148,42 @@ export function SettingsPage() {
   useEffect(() => {
     if (tenantId) getAuthUsername(tenantId).then(u => { if (u) setCurrentUsername(u); });
   }, [tenantId]);
+
+  // [core] [all apps] [all tenants] — PIN login (stored locally only, never synced)
+  const [pinStatus, setPinStatus] = useState<{ hasPin: boolean; enabled: boolean }>({ hasPin: false, enabled: false });
+  const [pinInput, setPinInput] = useState('');
+  const [pinBusy, setPinBusy] = useState(false);
+  useEffect(() => {
+    if (tenantId) getPinStatus(tenantId).then(setPinStatus).catch(() => {});
+  }, [tenantId]);
+
+  async function handleSavePin() {
+    if (!isValidPin(pinInput)) { toast.error('PIN must be exactly 8 digits'); return; }
+    setPinBusy(true);
+    try {
+      const res = await setPin(tenantId, pinInput);
+      if (!res.ok) { toast.error(res.error ?? 'Could not save PIN'); return; }
+      // First time you set a PIN, switch it on automatically.
+      if (!pinStatus.enabled) await setPinEnabled(tenantId, true);
+      setPinStatus(await getPinStatus(tenantId));
+      setPinInput('');
+      toast.success('PIN saved');
+    } finally { setPinBusy(false); }
+  }
+
+  async function handleTogglePinEnabled(next: boolean) {
+    const res = await setPinEnabled(tenantId, next);
+    if (!res.ok) { toast.error(res.error ?? 'Set a PIN first'); return; }
+    setPinStatus(await getPinStatus(tenantId));
+    toast.success(next ? 'PIN login turned on' : 'PIN login turned off');
+  }
+
+  async function handleRemovePin() {
+    await clearPin(tenantId);
+    setPinStatus({ hasPin: false, enabled: false });
+    setPinInput('');
+    toast.success('PIN removed');
+  }
 
   async function handleChangePassword() {
     if (!newPass || newPass.length < 4) { toast.error('New password must be at least 4 characters'); return; }
@@ -523,6 +559,46 @@ export function SettingsPage() {
         </div>
       );
 
+      case 'pinlogin': return (
+        <div className="p-4 space-y-4">
+          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+            Set an 8-digit PIN to log in faster. The PIN is stored <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>only on this device</span> and is never sent to the cloud. Your password still works as a backup.
+          </p>
+
+          {/* Enable toggle */}
+          <div className="card p-3" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+            <div>
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Use PIN to log in</p>
+              <p className="text-xs" style={{ color: 'var(--text-tertiary)', margin: '2px 0 0' }}>
+                {pinStatus.hasPin ? (pinStatus.enabled ? 'On — login asks for your PIN' : 'Off — login asks for password') : 'Set a PIN below first'}
+              </p>
+            </div>
+            <button type="button" disabled={!pinStatus.hasPin} aria-pressed={pinStatus.enabled}
+              onClick={() => handleTogglePinEnabled(!pinStatus.enabled)}
+              style={{ position: 'relative', width: '46px', height: '26px', borderRadius: '999px', border: 'none', flexShrink: 0,
+                cursor: pinStatus.hasPin ? 'pointer' : 'not-allowed', opacity: pinStatus.hasPin ? 1 : 0.5,
+                background: pinStatus.enabled ? '#22c55e' : 'var(--surface-border)' }}>
+              <span style={{ position: 'absolute', top: '3px', left: pinStatus.enabled ? '23px' : '3px', width: '20px', height: '20px', borderRadius: '50%', background: '#fff', transition: 'left .15s' }} />
+            </button>
+          </div>
+
+          {/* Set / change PIN */}
+          <div className="space-y-3">
+            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{pinStatus.hasPin ? 'Change PIN' : 'Set 8-digit PIN'}</p>
+            <input className="input w-full" inputMode="numeric" type="password" placeholder="Enter 8 digits"
+              style={{ textAlign: 'center', letterSpacing: '0.4em', fontSize: '18px' }}
+              maxLength={8} value={pinInput}
+              onChange={e => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 8))} />
+            <button onClick={handleSavePin} disabled={pinBusy || !isValidPin(pinInput)} className="btn-secondary w-full disabled:opacity-40">
+              {pinBusy ? 'Saving…' : (pinStatus.hasPin ? 'Update PIN' : 'Save PIN & Turn On')}
+            </button>
+            {pinStatus.hasPin && (
+              <button onClick={handleRemovePin} className="w-full text-xs font-semibold" style={{ color: '#ef4444' }}>Remove PIN</button>
+            )}
+          </div>
+        </div>
+      );
+
       case 'password': return (
         <div className="p-4 space-y-3">
           <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Current username: <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{currentUsername || '—'}</span></p>
@@ -649,6 +725,7 @@ export function SettingsPage() {
     shop: '🏪 Shop Details', logo: '🖼️ Business Logo', invoice: '🧾 Invoice Template',
     billing: '⌨️ Billing Preferences', gst: '🧾 Tax / GST', whatsapp: '📱 WhatsApp Business',
     pinlock: '🔐 Section PIN Lock', autolock: '🔒 Auto-Lock', password: '🔑 Login & Password',
+    pinlogin: '🔢 PIN Login',
     staff: '👥 Staff Logins', backup: '💾 Data Backup', migrate: '🖥️ Switch Computer', audit: '📋 Export Audit Log',
     audittrail: '📜 Audit Trail', report: '🐞 Report a Problem',
   };
@@ -679,6 +756,10 @@ export function SettingsPage() {
 
 
       {/* ── Compact Apple-style grouped rows ───────────────────────────────────── */}
+      {renderGroup('Login', <>
+        {renderRow('pinlogin', '🔢', 'PIN Login', pinStatus.enabled ? '8-digit PIN · On' : pinStatus.hasPin ? 'PIN set · Off' : 'Set an 8-digit PIN to log in', pinStatus.enabled ? badge('On', 'green') : undefined, true)}
+      </>)}
+
       {renderGroup('General', <>
         {renderRow('updates', '🔄', 'App Updates', currentVersion ? `v${currentVersion}${updateStatus === 'found' ? ' · Update available' : ''}` : 'Check for updates',
           updateStatus === 'found' ? badge('Update', 'blue') : undefined)}

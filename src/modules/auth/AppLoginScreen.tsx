@@ -1,14 +1,14 @@
 // [core] [all tenants] — App login screen with per-shop-type theming
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '@/app/store/app.store';
-import { verifyAuth, resetPasswordWithCode, resetPasswordWithPhonePin, unlockWithCode, getAuthUsername } from '@/lib/db/auth';
+import { verifyAuth, resetPasswordWithCode, resetPasswordWithPhonePin, unlockWithCode, getAuthUsername, verifyPin, getPinStatus } from '@/lib/db/auth';
 import { verifyStaffAuth } from '@/lib/db/staffUsers';
 import { claimSession } from '@/lib/db/session';
 import { enqueue } from '@/lib/syncQueue';
 import { uuid, now } from '@/lib/db/index';
 import { toast } from 'sonner';
 
-type Screen = 'login' | 'forgot' | 'reset-code' | 'pin-reset' | 'locked' | 'unlock-code';
+type Screen = 'login' | 'pin' | 'forgot' | 'reset-code' | 'pin-reset' | 'locked' | 'unlock-code';
 
 // [core] [all apps] [all tenants] — the frontstores.com spectrum brand system
 export const SPEC_GRADIENT = 'linear-gradient(110deg, #ffb73d, #ff5e62 26%, #ff3d9a 50%, #8b5cf6 74%, #06d6f9)';
@@ -149,6 +149,44 @@ export function AppLoginScreen() {
   const [unlockCode, setUnlockCode] = useState('');
   const [pinPhone, setPinPhone] = useState('');
   const [pinCode, setPinCode] = useState('');
+
+  // [core] [all apps] [all tenants] — 8-digit PIN login (stored locally only).
+  const [loginPin, setLoginPin] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [pinAvailable, setPinAvailable] = useState(false);
+  const pinInputRef = useRef<HTMLInputElement>(null);
+
+  // On open, if this device has PIN login enabled, default to the PIN screen.
+  useEffect(() => {
+    if (!tenantId) return;
+    getPinStatus(tenantId).then(s => {
+      setPinAvailable(s.hasPin);
+      if (s.enabled) setScreen('pin');
+    }).catch(() => {});
+  }, [tenantId]);
+
+  // Auto-submits the moment the 8th digit is entered — no Enter needed.
+  async function submitPin(pinValue: string) {
+    setLoading(true);
+    setPinError('');
+    try {
+      const res = await verifyPin(tenantId, pinValue, maxAttempts);
+      if (res.ok) { await completeLogin('owner'); return; }
+      if (res.locked) { setLockedUntil(res.lockedUntil!); setScreen('locked'); return; }
+      setPinError('Wrong PIN — try again');
+      setLoginPin('');
+      pinInputRef.current?.focus();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handlePinInput(value: string) {
+    const v = value.replace(/\D/g, '').slice(0, 8);
+    setLoginPin(v);
+    if (pinError) setPinError('');
+    if (v.length === 8) void submitPin(v);
+  }
 
   useEffect(() => {
     if (screen !== 'locked' || !lockedUntil) return;
@@ -362,6 +400,37 @@ export function AppLoginScreen() {
           </p>
         </div>
 
+        {/* ── PIN LOGIN ── */}
+        {screen === 'pin' && (
+          <div style={cardStyle} className="space-y-4">
+            <p className="text-center text-sm font-semibold text-white/70">Enter your 8-digit PIN</p>
+            <div>
+              <input
+                ref={pinInputRef}
+                style={{ ...inputStyle, textAlign: 'center', letterSpacing: '0.5em', fontSize: '24px', padding: '14px' }}
+                type="password"
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="••••••••"
+                maxLength={8}
+                value={loginPin}
+                disabled={loading}
+                onChange={e => handlePinInput(e.target.value)}
+                autoFocus
+              />
+              {pinError
+                ? <p className="text-center text-xs mt-3 font-semibold" style={{ color: '#f87171' }}>{pinError}</p>
+                : <p className="text-center text-xs mt-3" style={{ color: theme.labelColor, opacity: 0.7 }}>
+                    {loading ? 'Checking…' : 'Logs you in automatically once all 8 digits are entered.'}
+                  </p>}
+            </div>
+            <button type="button" onClick={() => { setScreen('login'); setLoginPin(''); setPinError(''); }}
+              className="w-full text-center text-xs pt-1" style={{ color: theme.labelColor, opacity: 0.7 }}>
+              Use password instead
+            </button>
+          </div>
+        )}
+
         {/* ── LOGIN ── */}
         {screen === 'login' && (
           <form onSubmit={handleLogin} style={cardStyle} className="space-y-4">
@@ -386,6 +455,12 @@ export function AppLoginScreen() {
                 {loading ? 'Signing in…' : 'Sign In'}
               </button>
             </div>
+            {pinAvailable && (
+              <button type="button" onClick={() => { setScreen('pin'); setLoginPin(''); setPinError(''); }}
+                className="w-full text-center text-xs font-semibold pt-1" style={{ color: theme.accentLight }}>
+                Use 8-digit PIN instead
+              </button>
+            )}
             <button type="button" onClick={() => setScreen('forgot')}
               className="w-full text-center text-xs pt-1 transition-colors"
               style={{ color: theme.labelColor, opacity: 0.7 }}>

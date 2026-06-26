@@ -32,6 +32,9 @@ export interface AppAuth {
   locked_until: string | null;
   created_at: string;
   updated_at: string;
+  pin_hash: string | null;
+  pin_salt: string | null;
+  pin_enabled: number;
 }
 
 export interface ExportLog {
@@ -174,6 +177,111 @@ export async function changeUsername(tenantId: string, newUsername: string): Pro
     'UPDATE app_auth SET username = ?, updated_at = ? WHERE tenant_id = ?',
     [newUsername.trim().toLowerCase(), now(), tenantId]
   );
+}
+
+// ── PIN login ────────────────────────────────────────────────────────────────
+// [core] [all apps] [all tenants] — optional 8-digit numeric PIN login. The PIN
+// lives on app_auth, which is in SYNC_EXCLUDE_TABLES, so it NEVER leaves this
+// device. The password always remains as a fallback so the user can't be locked out.
+
+const PIN_LENGTH = 8;
+export function isValidPin(pin: string): boolean {
+  return new RegExp(`^\\d{${PIN_LENGTH}}$`).test(pin);
+}
+
+export async function getPinStatus(tenantId: string): Promise<{ hasPin: boolean; enabled: boolean }> {
+  const db = await getDb();
+  const rows = await db.select<{ pin_hash: string | null; pin_enabled: number }[]>(
+    'SELECT pin_hash, pin_enabled FROM app_auth WHERE tenant_id = ? LIMIT 1', [tenantId]
+  );
+  const r = rows[0];
+  return { hasPin: !!r?.pin_hash, enabled: !!r?.pin_hash && r?.pin_enabled === 1 };
+}
+
+// Set (or replace) the PIN. Does not auto-enable — caller toggles separately.
+export async function setPin(tenantId: string, pin: string): Promise<{ ok: boolean; error?: string }> {
+  if (!isValidPin(pin)) return { ok: false, error: `PIN must be exactly ${PIN_LENGTH} digits` };
+  const db = await getDb();
+  const salt = randomSalt();
+  const hash = await hashPassword(pin, salt);
+  await db.execute(
+    'UPDATE app_auth SET pin_hash = ?, pin_salt = ?, updated_at = ? WHERE tenant_id = ?',
+    [hash, salt, now(), tenantId]
+  );
+  return { ok: true };
+}
+
+// Turn PIN login on/off. Enabling requires a PIN to already be set.
+export async function setPinEnabled(tenantId: string, enabled: boolean): Promise<{ ok: boolean; error?: string }> {
+  const db = await getDb();
+  if (enabled) {
+    const { hasPin } = await getPinStatus(tenantId);
+    if (!hasPin) return { ok: false, error: 'Set a PIN first' };
+  }
+  await db.execute(
+    'UPDATE app_auth SET pin_enabled = ?, updated_at = ? WHERE tenant_id = ?',
+    [enabled ? 1 : 0, now(), tenantId]
+  );
+  return { ok: true };
+}
+
+// Remove the PIN entirely and disable PIN login.
+export async function clearPin(tenantId: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    'UPDATE app_auth SET pin_hash = NULL, pin_salt = NULL, pin_enabled = 0, updated_at = ? WHERE tenant_id = ?',
+    [now(), tenantId]
+  );
+}
+
+// Verify a login PIN. Shares the same lockout machinery as password login so PIN
+// attempts can't be used to brute-force around the 5-try lock.
+export async function verifyPin(
+  tenantId: string,
+  pin: string,
+  maxAttempts: number = 5
+): Promise<{ ok: boolean; locked?: boolean; lockedUntil?: string }> {
+  const db = await getDb();
+  const rows = await db.select<AppAuth[]>(
+    'SELECT * FROM app_auth WHERE tenant_id = ? LIMIT 1', [tenantId]
+  );
+  const auth = rows[0];
+  if (!auth || !auth.pin_hash || !auth.pin_salt) return { ok: false };
+
+  const memState = _checkMem(tenantId);
+  if (memState.locked) return { ok: false, locked: true, lockedUntil: memState.lockedUntil };
+
+  if (auth.locked_until && new Date(auth.locked_until) > new Date()) {
+    const ts = new Date(auth.locked_until).getTime();
+    _memLock.set(tenantId, { count: maxAttempts, lockedUntil: ts });
+    return { ok: false, locked: true, lockedUntil: auth.locked_until };
+  }
+
+  const hash = await hashPassword(pin, auth.pin_salt);
+  if (hash !== auth.pin_hash) {
+    const newAttempts = (auth.failed_attempts ?? 0) + 1;
+    const memResult = _recordMemAttempt(tenantId, maxAttempts);
+    if (newAttempts >= maxAttempts || memResult.locked) {
+      const lockUntil = memResult.lockedUntil || new Date(Date.now() + 30 * 60 * 1000).toISOString();
+      await db.execute(
+        'UPDATE app_auth SET failed_attempts = ?, locked_until = ?, updated_at = ? WHERE tenant_id = ?',
+        [newAttempts, lockUntil, now(), tenantId]
+      );
+      return { ok: false, locked: true, lockedUntil: lockUntil };
+    }
+    await db.execute(
+      'UPDATE app_auth SET failed_attempts = ?, updated_at = ? WHERE tenant_id = ?',
+      [newAttempts, now(), tenantId]
+    );
+    return { ok: false };
+  }
+
+  _clearMem(tenantId);
+  await db.execute(
+    'UPDATE app_auth SET failed_attempts = 0, locked_until = NULL, updated_at = ? WHERE tenant_id = ?',
+    [now(), tenantId]
+  );
+  return { ok: true };
 }
 
 // Reset via admin-issued code — replaces password and clears lockout
