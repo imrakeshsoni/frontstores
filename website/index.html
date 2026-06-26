@@ -380,12 +380,12 @@
 <!-- ───── NAV ───── -->
 <header class="nav">
   <div class="wrap nav-inner">
-    <a href="#home" class="brand"><span class="mark">FS</span><span>FrontStores<span style="color:var(--dim);font-weight:500">.com</span></span></a>
+    <a href="#home" class="brand"><span>FrontStores<sup style="font-size:.5em;font-weight:600;vertical-align:super;margin-left:1px">™</sup></span></a>
     <nav class="nav-links" id="navLinks">
       <a href="#home">Home</a>
       <a href="#solutions">Solutions</a>
       <a href="#why">Why Us</a>
-      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
       <a href="#contact">Contact</a>
     </nav>
     <div style="display:flex;align-items:center;gap:12px">
@@ -617,37 +617,21 @@
 
 </section>
 
-<!-- ───── PRICING ───── -->
-<section class="view" id="pricing">
+<!-- ───── FAQ ───── -->
+<section class="view" id="faq">
   <div class="view-head">
-    <div class="idx mono">04&nbsp; / &nbsp;<b>Pricing</b></div>
-    <h2 class="view-title">One price.<br>Everything in.</h2>
-    <p class="view-sub">No hidden charges, no per-feature add-ons. Start free, pay only if it helps your business.</p>
-  </div>
-  <div class="price-card">
-    <div class="tier">FrontStores</div>
-    <div class="amt">₹999<small>/month</small></div>
-    <div class="free-tag">✓ 30-day free trial — no card needed</div>
-    <ul class="price-list">
-      <li><span class="ck">✓</span> All features for your business type</li>
-      <li><span class="ck">✓</span> Cloud included — use on any device</li>
-      <li><span class="ck">✓</span> Unlimited bills, products &amp; customers</li>
-      <li><span class="ck">✓</span> Automatic updates &amp; backups</li>
-      <li><span class="ck">✓</span> WhatsApp &amp; email support</li>
-    </ul>
-    <a href="#contact" class="btn btn-light">Start your free trial</a>
-    <p class="price-note">Need extra users, local-only mode or a custom build? <a href="#contact">Talk to us →</a></p>
+    <div class="idx mono">04&nbsp; / &nbsp;<b>FAQ</b></div>
+    <h2 class="view-title">Questions,<br>answered.</h2>
+    <p class="view-sub">Everything you need to know before getting started.</p>
   </div>
 
   <!-- FAQ -->
   <div class="home-block faq">
-    <div class="view-head home-head"><div class="idx mono">FAQ</div><h2 class="view-title home-title">Questions, answered</h2></div>
     <details><summary>Where is my data stored — and is it safe?</summary><p>By default your data is stored securely on the cloud, encrypted and backed up automatically, so you can use it from any device. Prefer total privacy? We offer a local-only mode where your data stays on your computer and never goes to the cloud.</p></details>
     <details><summary>Can I use it on more than one device?</summary><p>Yes. Because your data is on the cloud, you can log in from your shop computer, home laptop or phone and everything stays in sync automatically.</p></details>
     <details><summary>Can my whole team use it?</summary><p>Yes — you can create multiple users with different roles (owner, cashier, manager) for your business. Just ask and we'll set it up.</p></details>
     <details><summary>Is it GST-ready?</summary><p>Yes — CGST/SGST invoices, HSN codes and Bill of Supply for non-GST shops, with reports your CA will love.</p></details>
     <details><summary>What if I need a feature you don't have?</summary><p>We build custom features and even fully custom software. Tell us your workflow and we'll tailor it to fit your business.</p></details>
-    <details><summary>How much does it cost?</summary><p>₹999/month flat, with a 30-day free trial — no card needed. Cloud is included by default; extra users, local-only mode and custom builds are quoted separately.</p></details>
   </div>
 
 </section>
@@ -696,7 +680,7 @@
 
 <footer>
   <div class="wrap foot-inner">
-    <a href="#home" class="brand"><span class="mark">FS</span><span>FrontStores<span style="color:var(--dim);font-weight:500">.com</span></span></a>
+    <a href="#home" class="brand"><span>FrontStores<sup style="font-size:.5em;font-weight:600;vertical-align:super;margin-left:1px">™</sup></span></a>
     <div class="foot-copy">© 2026 FrontStores · <a href="/terms.html">Terms</a> · <a href="/privacy.html">Privacy</a> · <a href="/refund.html">Refund</a> · Made with <span style="color:var(--accent)">♥</span> in India</div>
   </div>
 </footer>
@@ -726,8 +710,6 @@
       </div>
       <div class="m-section"><div class="m-label">Everything included</div><div id="mFeatures"></div></div>
       <div class="m-section">
-        <div class="m-label">Pricing</div>
-        <div class="m-price"><div class="amt">₹999<small>/month</small></div><div class="free">✓ 30-day free trial — no card needed</div></div>
         <div class="m-cta">
           <a href="#contact" class="btn btn-dark" id="mDownload">Get started →</a>
           <a href="#contact" class="btn btn-out" id="mContact">Ask about customisation</a>
@@ -755,7 +737,7 @@
   }
 
   // ════════ VIEW ROUTER — one screen at a time; nav tabs swap the visible view ════════
-  const VIEWS = ['home', 'solutions', 'why', 'pricing', 'contact'];
+  const VIEWS = ['home', 'solutions', 'why', 'faq', 'contact'];
   function showView(id) {
     if (!VIEWS.includes(id)) id = 'home';
     document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === id));
