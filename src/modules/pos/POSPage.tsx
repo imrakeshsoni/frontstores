@@ -427,6 +427,14 @@ export function POSPage() {
       return;
     }
 
+    // [medical] [all tenants] — when a product is sold loose (has units-per-strip) but no
+    // explicit loose price is set, derive the per-unit price from the strip MRP so a
+    // loose-only line still shows an amount instead of ₹0.
+    const totalUnits = Number(product.total_units ?? 0) || undefined;
+    const looseUnitPrice =
+      Number(product.loose_selling_price ?? 0) ||
+      (totalUnits ? Math.round((unitPrice / totalUnits) * 100) / 100 : undefined);
+
     cart.addItem({
       itemKey: [resolvedProductId, batchNo ?? 'no-batch', expiryDate ?? 'no-exp'].join(':'),
       productId: resolvedProductId,
@@ -434,7 +442,7 @@ export function POSPage() {
       sku: product.sku,
       unit: product.unit ?? 'pc',
       unitPrice,
-      looseUnitPrice: Number(product.loose_selling_price ?? 0) || undefined,
+      looseUnitPrice,
       gstRate: gstEnabled ? Number(product.gst_rate ?? 0) : 0,
       hsnCode: product.hsn_code ?? null,
       discount: 0,
@@ -444,7 +452,7 @@ export function POSPage() {
       availableBatches: getSortedBatches(product),
       availableQuantity: Number(product.availableQuantity ?? product.available_quantity ?? 0) || undefined,
       batchAvailableQuantity,
-      totalUnits: Number(product.total_units ?? 0) || undefined,
+      totalUnits,
     });
     setSearch('');
     searchRef.current?.focus();

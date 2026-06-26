@@ -9,6 +9,7 @@ import { PageIntro } from '@/components/ui/PageIntro';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { isMedicalShopType, isGroceryShopType, useActiveShopType } from '@/lib/shop/shopType';
+import { handleFormTabNav } from '@/lib/formNav';
 
 type ProductSaveMode = 'close' | 'inventory' | 'new';
 
@@ -68,12 +69,36 @@ export function ProductsPage() {
   const createNewRef = useRef<HTMLButtonElement>(null);
   const createInventoryRef = useRef<HTMLButtonElement>(null);
   const createProductRef = useRef<HTMLButtonElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const formBodyRef = useRef<HTMLDivElement>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['products', search, page, tenantId],
     queryFn: () => listProducts(tenantId, { search, page, perPage: 20 }),
     enabled: !!tenantId,
   });
+
+  // [medical] [all tenants] — focus the Name field as soon as Add Product opens
+  useEffect(() => {
+    if (showForm && !editing) {
+      const t = setTimeout(() => nameRef.current?.focus(), 50);
+      return () => clearTimeout(t);
+    }
+  }, [showForm, editing]);
+
+  // [medical] [all tenants] — warn (and block) when a product name already exists
+  const trimmedName = form.name.trim();
+  const { data: nameCheck } = useQuery({
+    queryKey: ['product-name-check', tenantId, trimmedName],
+    queryFn: () => listProducts(tenantId, { search: trimmedName, perPage: 6 }),
+    enabled: !!tenantId && showForm && trimmedName.length >= 2,
+  });
+  const nameMatches = (nameCheck?.items ?? []).filter(
+    (p) => p.id !== editing?.id && p.name.toLowerCase().includes(trimmedName.toLowerCase()),
+  );
+  const exactDuplicate = trimmedName
+    ? nameMatches.find((p) => p.name.trim().toLowerCase() === trimmedName.toLowerCase())
+    : undefined;
 
   useEffect(() => {
     if (editing) {
@@ -142,6 +167,11 @@ export function ProductsPage() {
       if (editing?.id) {
         await updateProduct(tenantId, editing.id, payload);
         return { id: editing.id, saveMode };
+      }
+      // [medical] [all tenants] — block creating a product that already exists by name
+      const existing = await listProducts(tenantId, { search: payload.name, perPage: 10 });
+      if (existing.items.some((p) => p.name.trim().toLowerCase() === payload.name.toLowerCase())) {
+        throw new Error(`"${payload.name}" is already in your catalogue`);
       }
       const product = await createProduct(tenantId, payload);
       return { id: product.id, name: product.name, saveMode };
@@ -295,7 +325,11 @@ export function ProductsPage() {
 
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-          <div className="card-strong flex max-h-[90vh] w-full max-w-3xl flex-col rounded-[2rem] p-6">
+          <div
+            ref={formBodyRef}
+            className="card-strong flex max-h-[90vh] w-full max-w-3xl flex-col rounded-[2rem] p-6"
+            onKeyDown={(e) => handleFormTabNav(formBodyRef.current, e)}
+          >
             <div className="mb-6 flex items-center justify-between">
               <div>
                 <p className="section-label">Products</p>
@@ -308,7 +342,24 @@ export function ProductsPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="md:col-span-2">
                   <label className="mb-2 block text-sm font-medium text-slate-700">Name *</label>
-                  <input className="input" value={form.name} onChange={(e) => setForm((c) => ({ ...c, name: e.target.value }))} />
+                  <input ref={nameRef} className="input" value={form.name} onChange={(e) => setForm((c) => ({ ...c, name: e.target.value }))} />
+                  {!editing && nameMatches.length > 0 && (
+                    <div className={`mt-2 rounded-xl border px-3 py-2 text-xs ${exactDuplicate ? 'border-rose-300 bg-rose-50 text-rose-700' : 'border-amber-300 bg-amber-50 text-amber-700'}`}>
+                      <p className="font-semibold">
+                        {exactDuplicate
+                          ? `⚠ "${exactDuplicate.name}" is already in your catalogue — you can't add it again.`
+                          : 'Already in your catalogue:'}
+                      </p>
+                      <ul className="mt-1 space-y-0.5">
+                        {nameMatches.map((p) => (
+                          <li key={p.id} className="flex justify-between gap-2">
+                            <span className="truncate">{p.name}</span>
+                            <span className="shrink-0 text-slate-400">{p.sku || p.unit}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
                 {!isMedicalStore && (
                   <>
@@ -428,10 +479,6 @@ export function ProductsPage() {
                     type="number" min="0" className="input"
                     value={form.min_stock_qty}
                     onChange={(e) => setForm((c) => ({ ...c, min_stock_qty: e.target.value }))}
-                    onKeyDown={(e) => {
-                      if (!isMedicalStore) return;
-                      if (e.key === 'Tab') { e.preventDefault(); nrxRef.current?.focus(); }
-                    }}
                   />
                 </div>
               </div>
@@ -448,8 +495,6 @@ export function ProductsPage() {
                       onClick={() => setForm((c) => ({ ...c, requires_prescription: !c.requires_prescription }))}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') { e.preventDefault(); setForm((c) => ({ ...c, requires_prescription: !c.requires_prescription })); }
-                        else if (e.key === 'Tab') { e.preventDefault(); createProductRef.current?.focus(); }
-                        else if (e.key === 'Shift') { e.preventDefault(); minStockRef.current?.focus(); }
                       }}
                       className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-1 ${form.requires_prescription ? 'bg-emerald-500' : 'bg-slate-300'}`}
                     >
@@ -463,11 +508,6 @@ export function ProductsPage() {
                   ref={cancelRef}
                   className="btn-secondary"
                   onClick={() => setShowForm(false)}
-                  onKeyDown={(e) => {
-                    if (!isMedicalStore) return;
-                    if (e.key === 'Tab') { e.preventDefault(); createNewRef.current?.focus(); }
-                    else if (e.key === 'Shift') { e.preventDefault(); nrxRef.current?.focus(); }
-                  }}
                 >Cancel</button>
                 {editing ? (
                   <button className="btn-primary" onClick={() => saveMutation.mutate('close')} disabled={saveMutation.isPending}>
@@ -479,34 +519,19 @@ export function ProductsPage() {
                       ref={createNewRef}
                       className="btn-secondary"
                       onClick={() => saveMutation.mutate('new')}
-                      disabled={saveMutation.isPending}
-                      onKeyDown={(e) => {
-                        if (!isMedicalStore) return;
-                        if (e.key === 'Tab') { e.preventDefault(); createInventoryRef.current?.focus(); }
-                        else if (e.key === 'Shift') { e.preventDefault(); cancelRef.current?.focus(); }
-                      }}
+                      disabled={saveMutation.isPending || !!exactDuplicate}
                     >{saveMutation.isPending ? 'Saving…' : 'Create And New'}</button>
                     <button
                       ref={createInventoryRef}
                       className="btn-secondary"
                       onClick={() => saveMutation.mutate('inventory')}
-                      disabled={saveMutation.isPending}
-                      onKeyDown={(e) => {
-                        if (!isMedicalStore) return;
-                        if (e.key === 'Tab') { e.preventDefault(); createProductRef.current?.focus(); }
-                        else if (e.key === 'Shift') { e.preventDefault(); createNewRef.current?.focus(); }
-                      }}
+                      disabled={saveMutation.isPending || !!exactDuplicate}
                     >{saveMutation.isPending ? 'Saving…' : 'Create And Add Inventory'}</button>
                     <button
                       ref={createProductRef}
                       className="btn-primary"
                       onClick={() => saveMutation.mutate('close')}
-                      disabled={saveMutation.isPending}
-                      onKeyDown={(e) => {
-                        if (!isMedicalStore) return;
-                        if (e.key === 'Tab') { e.preventDefault(); cancelRef.current?.focus(); }
-                        else if (e.key === 'Shift') { e.preventDefault(); createInventoryRef.current?.focus(); }
-                      }}
+                      disabled={saveMutation.isPending || !!exactDuplicate}
                     >{saveMutation.isPending ? 'Saving…' : 'Create Product'}</button>
                   </>
                 )}
