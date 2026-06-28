@@ -182,6 +182,74 @@ export async function getExpiryAlerts(tenantId: string, daysAhead = 90): Promise
   );
 }
 
+// [medical] [all tenants] — toggle "seen" marker on an expired batch pulled for return
+export async function setBatchReturnSeen(tenantId: string, batchId: string, seen: boolean): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `UPDATE inventory_batches SET return_seen_at = ?, updated_at = ? WHERE id = ? AND tenant_id = ?`,
+    [seen ? now() : null, now(), batchId, tenantId]
+  );
+}
+
+// [medical] [all tenants] — supplier-level expired-return settlements (one refund per supplier, not per product)
+export async function addReturnSettlement(tenantId: string, data: {
+  supplier_id?: string | null;
+  supplier_name?: string | null;
+  settlement_date: string;
+  amount: number;
+  batch_ids?: string[];
+  note?: string | null;
+}): Promise<void> {
+  const db = await getDb();
+  const batchIds = data.batch_ids ?? [];
+  await db.execute(
+    `INSERT INTO return_settlements
+       (id, tenant_id, supplier_id, supplier_name, settlement_date, amount, item_count, batch_ids, note, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [uuid(), tenantId, data.supplier_id ?? null, data.supplier_name ?? null, data.settlement_date,
+     data.amount, batchIds.length, JSON.stringify(batchIds), data.note ?? null, now(), now()]
+  );
+  // mark each returned batch as settled so it drops off the "to settle" list
+  const ts = now();
+  for (const id of batchIds) {
+    await db.execute(
+      `UPDATE inventory_batches SET return_settled_at = ?, updated_at = ? WHERE id = ? AND tenant_id = ?`,
+      [ts, ts, id, tenantId]
+    );
+  }
+}
+
+export async function listReturnSettlements(tenantId: string): Promise<any[]> {
+  const db = await getDb();
+  return db.select<any[]>(
+    `SELECT * FROM return_settlements
+     WHERE tenant_id = ? AND deleted_at IS NULL
+     ORDER BY settlement_date DESC, created_at DESC`,
+    [tenantId]
+  );
+}
+
+export async function deleteReturnSettlement(tenantId: string, id: string): Promise<void> {
+  const db = await getDb();
+  const ts = now();
+  // re-open the batches this settlement covered so they show up again as pending
+  const rows = await db.select<any[]>(
+    `SELECT batch_ids FROM return_settlements WHERE id = ? AND tenant_id = ?`, [id, tenantId]
+  );
+  let batchIds: string[] = [];
+  try { batchIds = JSON.parse(rows[0]?.batch_ids ?? '[]'); } catch { batchIds = []; }
+  for (const bid of batchIds) {
+    await db.execute(
+      `UPDATE inventory_batches SET return_settled_at = NULL, updated_at = ? WHERE id = ? AND tenant_id = ?`,
+      [ts, bid, tenantId]
+    );
+  }
+  await db.execute(
+    `UPDATE return_settlements SET deleted_at = ?, updated_at = ? WHERE id = ? AND tenant_id = ?`,
+    [ts, ts, id, tenantId]
+  );
+}
+
 export async function getBatchesWithChallan(tenantId: string, productId: string): Promise<any[]> {
   const db = await getDb();
   return db.select<any[]>(
