@@ -350,14 +350,26 @@ export function ProductsPage() {
                           ? `⚠ "${exactDuplicate.name}" is already in your catalogue — you can't add it again.`
                           : 'Already in your catalogue:'}
                       </p>
+                      {/* [medical] [all tenants] — click a match to open Inventory with it auto-selected */}
                       <ul className="mt-1 space-y-0.5">
                         {nameMatches.map((p) => (
-                          <li key={p.id} className="flex justify-between gap-2">
-                            <span className="truncate">{p.name}</span>
-                            <span className="shrink-0 text-slate-400">{p.sku || p.unit}</span>
+                          <li key={p.id}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowForm(false);
+                                navigate('/inventory', { state: { openAdjustStock: true, productId: p.id, productName: p.name, direction: 'add', type: 'purchase' } });
+                              }}
+                              className="flex w-full justify-between gap-2 rounded-md px-1 py-0.5 text-left hover:bg-black/[0.04]"
+                              title="Add inventory for this product"
+                            >
+                              <span className="truncate underline decoration-dotted underline-offset-2">{p.name}</span>
+                              <span className="shrink-0 text-slate-400">{p.sku || p.unit}</span>
+                            </button>
                           </li>
                         ))}
                       </ul>
+                      <p className="mt-1 text-[11px] text-slate-400">Tap a product to add its inventory.</p>
                     </div>
                   )}
                 </div>
