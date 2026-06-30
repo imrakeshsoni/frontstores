@@ -4,7 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import { format, subDays } from 'date-fns';
 import { useAppStore } from '@/app/store/app.store';
 import { getSalesSummary, listOrders } from '@/lib/db/orders';
-import { getLowStockAlerts, getExpiryAlerts, setBatchReturnSeen, addReturnSettlement, listReturnSettlements, deleteReturnSettlement } from '@/lib/db/inventory';
+import { getLowStockAlerts, getExpiryAlerts, setBatchReturnSeen, setBatchCounterPulled, addReturnSettlement, listReturnSettlements, deleteReturnSettlement } from '@/lib/db/inventory';
 import { listProducts } from '@/lib/db/products';
 import { PageIntro } from '@/components/ui/PageIntro';
 
@@ -52,6 +52,12 @@ export function ReportsPage() {
   const queryClient = useQueryClient();
   const seenMutation = useMutation({
     mutationFn: ({ id, seen }: { id: string; seen: boolean }) => setBatchReturnSeen(tenantId, id, seen),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['expiry-alerts', tenantId] }),
+  });
+
+  // [medical] [all tenants] — toggle the "To Counter" marker on a near-expiry batch (pulled forward to sell first)
+  const counterMutation = useMutation({
+    mutationFn: ({ id, pulled }: { id: string; pulled: boolean }) => setBatchCounterPulled(tenantId, id, pulled),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['expiry-alerts', tenantId] }),
   });
 
@@ -285,6 +291,7 @@ export function ReportsPage() {
 
       {tab === 'expiry' && (
         <div className="card p-6">
+          <p className="text-xs text-slate-500 mb-3">Tick <b>To Counter</b> for the batches you've pulled to the front to sell first. They float to the top here and clear themselves once fully sold; anything left over that expires moves to <b>Return Expired</b>.</p>
           <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
             <p className="section-label">Expiry Watch</p>
             <div className="flex gap-1 flex-wrap">
@@ -340,6 +347,8 @@ export function ReportsPage() {
               const expired = (expiryData ?? []).filter((a: any) => a.expiry_date < today);
               rows = [...expired, ...filtered.sort((a: any, b: any) => a.expiry_date.localeCompare(b.expiry_date))];
             }
+            // [medical] [all tenants] — float batches pulled to the front counter to the top (sell-first)
+            rows = [...rows.filter((a: any) => a.counter_pulled_at), ...rows.filter((a: any) => !a.counter_pulled_at)];
             return (
               <table className="data-table">
                 <thead>
@@ -350,17 +359,19 @@ export function ReportsPage() {
                     <th className="text-right">Quantity</th>
                     <th>Expiry Date</th>
                     <th className="text-right">Status</th>
+                    <th className="text-center">To Counter</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.length === 0 && (
-                    <tr><td colSpan={6} className="text-center text-sm text-emerald-600 py-6">{expiryMode === 'custom' ? `No batches expiring between ${expiryFrom} and ${expiryTo}` : `No batches expiring in the next ${expiryWindow} days`}</td></tr>
+                    <tr><td colSpan={7} className="text-center text-sm text-emerald-600 py-6">{expiryMode === 'custom' ? `No batches expiring between ${expiryFrom} and ${expiryTo}` : `No batches expiring in the next ${expiryWindow} days`}</td></tr>
                   )}
                   {rows.map((a: any) => {
                     const expiredRow = a.expiry_date < today;
                     const days = daysUntil(a.expiry_date);
+                    const pulled = !!a.counter_pulled_at;
                     return (
-                      <tr key={a.id}>
+                      <tr key={a.id} style={pulled ? { background: '#eff6ff' } : undefined}>
                         <td className="font-semibold">{a.product_name}</td>
                         <td className="text-slate-500">{a.batch_no ?? '—'}</td>
                         <td className="text-slate-500">{a.supplier_name ?? '—'}</td>
@@ -370,6 +381,16 @@ export function ReportsPage() {
                           {expiredRow
                             ? <span className="badge badge-red">Expired</span>
                             : <span className={`badge ${days <= 30 ? 'badge-red' : 'badge-yellow'}`}>{days} days left</span>}
+                        </td>
+                        <td className="text-center">
+                          <input
+                            type="checkbox"
+                            checked={pulled}
+                            disabled={counterMutation.isPending}
+                            onChange={(e) => counterMutation.mutate({ id: a.id, pulled: e.target.checked })}
+                            title="Tick when you've taken this batch to the front counter to sell first. It clears itself once the batch is fully sold."
+                            style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#2563eb' }}
+                          />
                         </td>
                       </tr>
                     );

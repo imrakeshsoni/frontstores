@@ -182,6 +182,15 @@ export async function getExpiryAlerts(tenantId: string, daysAhead = 90): Promise
   );
 }
 
+// [medical] [all tenants] — toggle "pulled to front counter" marker on a near-expiry batch (sell-first)
+export async function setBatchCounterPulled(tenantId: string, batchId: string, pulled: boolean): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `UPDATE inventory_batches SET counter_pulled_at = ?, updated_at = ? WHERE id = ? AND tenant_id = ?`,
+    [pulled ? now() : null, now(), batchId, tenantId]
+  );
+}
+
 // [medical] [all tenants] — toggle "seen" marker on an expired batch pulled for return
 export async function setBatchReturnSeen(tenantId: string, batchId: string, seen: boolean): Promise<void> {
   const db = await getDb();

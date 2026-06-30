@@ -80,6 +80,7 @@ import migration0079 from '../../../src-tauri/migrations/0079_audit_log.sql?raw'
 import migration0080 from '../../../src-tauri/migrations/0080_pin_login.sql?raw';
 import migration0081 from '../../../src-tauri/migrations/0081_batch_return_seen.sql?raw';
 import migration0082 from '../../../src-tauri/migrations/0082_return_settlements.sql?raw';
+import migration0083 from '../../../src-tauri/migrations/0083_batch_counter_pulled.sql?raw';
 
 export interface Migration {
   name: string;
@@ -170,5 +171,6 @@ export async function readMigrations(): Promise<Migration[]> {
     { name: '0080_pin_login', sql: migration0080 }, // [core] [all apps] [all tenants]
     { name: '0081_batch_return_seen', sql: migration0081 }, // [medical] [all tenants]
     { name: '0082_return_settlements', sql: migration0082 }, // [medical] [all tenants]
+    { name: '0083_batch_counter_pulled', sql: migration0083 }, // [medical] [all tenants]
   ];
 }
